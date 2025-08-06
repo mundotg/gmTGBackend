@@ -1,0 +1,215 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guia Completo: FastAPI + Alembic</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; background: #f9f9f9; }
+    h1, h2, h3 { color: #2c3e50; }
+    code { background: #eee; padding: 2px 4px; border-radius: 4px; }
+    pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    ul { margin-top: 0; }
+    .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>📘 Guia Completo: FastAPI + Alembic</h1>
+
+    <h2>✅ Instalação Inicial</h2>
+    <pre><code>pip install fastapi uvicorn sqlalchemy alembic python-dotenv pydantic</code></pre>
+
+    <h2>⚙️ Estrutura Sugerida</h2>
+    <pre><code>project/
+├── app/
+│   ├── main.py
+│   ├── models/
+│   │   └── user.py
+│   ├── schemas/
+│   │   └── user.py
+│   ├── crud/
+│   │   └── user.py
+│   ├── db/
+│   │   ├── session.py
+│   │   └── base.py
+│   └── routers/
+│       └── user.py
+├── alembic/
+├── alembic.ini
+├── requirements.txt
+└── .env</code></pre>
+
+    <h2>🔌 db/session.py</h2>
+    <pre><code>from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)</code></pre>
+
+    <h2>🧱 db/base.py</h2>
+    <pre><code>from sqlalchemy.orm import declarative_base
+Base = declarative_base()</code></pre>
+
+    <h2>👤 models/user.py</h2>
+    <pre><code>from sqlalchemy import Column, Integer, String
+from app.db.base import Base
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    email = Column(String, unique=True, index=True)</code></pre>
+
+    <h2>📦 schemas/user.py</h2>
+    <pre><code>from pydantic import BaseModel
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+
+class UserRead(UserCreate):
+    id: int
+
+    class Config:
+        orm_mode = True</code></pre>
+
+    <h2>🛠 crud/user.py</h2>
+    <pre><code>from sqlalchemy.orm import Session
+from app.models.user import User
+from app.schemas.user import UserCreate
+
+def get_users(db: Session):
+    return db.query(User).all()
+
+def create_user(db: Session, user: UserCreate):
+    db_user = User(name=user.name, email=user.email)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user</code></pre>
+
+    <h2>🚀 main.py</h2>
+    <pre><code>from fastapi import FastAPI
+from app.routers import user
+
+app = FastAPI()
+app.include_router(user.router)</code></pre>
+
+    <h2>📡 routers/user.py</h2>
+    <pre><code>from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.db.session import SessionLocal
+from app.crud import user as crud_user
+from app.schemas import user as schemas_user
+
+router = APIRouter(prefix="/users", tags=["Users"])
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@router.get("/", response_model=list[schemas_user.UserRead])
+def read_users(db: Session = Depends(get_db)):
+    return crud_user.get_users(db)
+
+@router.post("/", response_model=schemas_user.UserRead)
+def create_user(user: schemas_user.UserCreate, db: Session = Depends(get_db)):
+    return crud_user.create_user(db, user)</code></pre>
+
+    <h2>🧪 Testar</h2>
+    <pre><code>uvicorn app.main:app --reload</code></pre>
+    <p>Ir para: <a href="http://localhost:8000/docs">/docs</a></p>
+
+    <h2>🧬 Alembic</h2>
+    <p>Inicialização:</p>
+    <pre><code>alembic init alembic</code></pre>
+
+    <p>Editar <strong>alembic.ini</strong>:</p>
+    <pre><code>sqlalchemy.url = sqlite:///./test.db</code></pre>
+
+    <p>Editar <strong>alembic/env.py</strong>:</p>
+    <pre><code>from alembic import context
+from sqlalchemy import engine_from_config, pool
+from logging.config import fileConfig
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+from app.db.base import Base
+from app.models import user
+
+config = context.config
+fileConfig(config.config_file_name)
+config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
+target_metadata = Base.metadata
+
+def run_migrations_online():
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+
+run_migrations_online()</code></pre>
+
+    <p>Criar migration:</p>
+    <pre><code>alembic revision --autogenerate -m "create user table"</code></pre>
+
+    <p>Aplicar:</p>
+    <pre><code>alembic upgrade head</code></pre>
+
+    <h2>📚 Comandos Alembic</h2>
+    <ul>
+      <li><code>alembic history</code> - Ver histórico</li>
+      <li><code>alembic current</code> - Ver versão atual</li>
+      <li><code>alembic upgrade head</code> - Aplicar todas as migrações</li>
+      <li><code>alembic downgrade -1</code> - Reverter a última migração</li>
+    </ul>
+
+    <h2>🛡️ Segurança e Melhores Práticas</h2>
+    <ul>
+      <li>Valide dados com <code>Pydantic</code></li>
+      <li>Use <code>python-dotenv</code> para variáveis sensíveis</li>
+      <li>Evite expor senhas em código</li>
+    </ul>
+
+    <h2>🌐 CORS</h2>
+    <pre><code>from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)</code></pre>
+
+    <h2>🧾 Exemplo de .env</h2>
+    <pre><code>DATABASE_URL=sqlite:///./test.db</code></pre>
+
+    <h2>📦 requirements.txt</h2>
+    <pre><code>fastapi
+uvicorn
+sqlalchemy
+alembic
+python-dotenv
+pydantic</code></pre>
+
+    <p><strong>✅ Pronto para uso offline!</strong></p>
+  </div>
+</body>
+</html>

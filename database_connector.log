@@ -1,0 +1,610 @@
+2025-07-22 12:30:49,917 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:30:49,934 - INFO - \U0001f50d Buscando conexão com ID 3
+2025-07-22 12:30:50,014 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2025-07-22 12:31:14,336 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:31:14,339 - INFO - \U0001f50d Buscando conexão com ID 3
+2025-07-22 12:31:20,404 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:31:20,407 - INFO - \U0001f50d Buscando conexão com ID 3
+2025-07-22 12:31:30,401 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-07-22 12:31:30,402 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-07-22 12:31:30,692 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-07-22 12:31:30,847 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:31:30,866 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-07-22 12:31:30,929 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:31:37,071 - INFO - \U0001f50d Buscando conexão com ID 3
+2025-07-22 12:31:49,020 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-07-22 12:31:49,362 - INFO - \u2705 Novo engine configurado com sucesso para o usuário 1.
+2025-07-22 12:31:49,385 - INFO - \U0001f504 Status da conexão 'qualidade_ugs' atualizado para o usuário 1
+2025-07-22 12:31:50,194 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-07-22 12:31:50,211 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 3
+2025-07-22 12:31:50,231 - INFO - \u2705 Conexão ativa definida: user=1, conn=3
+2025-07-22 12:31:50,254 - INFO - \U0001f4d1 Log criado para conexão 3: ação='Conexão testada e salva', status='success'
+2025-07-22 12:31:50,297 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-07-22 12:31:50,483 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:31:59,201 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-07-22 12:31:59,201 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-07-22 12:31:59,210 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:31:59,216 - INFO - \U0001f50d Buscando conexão com ID 3
+2025-07-22 12:31:59,410 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:32:18,389 - INFO - \U0001f50d Buscando conexão com ID 3
+2025-07-22 12:32:37,496 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-07-22 12:32:37,528 - INFO - \u2705 Novo engine configurado com sucesso para o usuário 1.
+2025-07-22 12:32:37,532 - INFO - \u2705 Conexão 'qualidade_Lubango' criada para o usuário 1
+2025-07-22 12:32:37,544 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-07-22 12:32:37,547 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 5
+2025-07-22 12:32:37,553 - INFO - \u2705 Conexão ativa definida: user=1, conn=5
+2025-07-22 12:32:37,558 - INFO - \U0001f4d1 Log criado para conexão 5: ação='Conexão testada e salva', status='success'
+2025-07-22 12:32:37,592 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-07-22 12:32:37,619 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:32:50,168 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-07-22 12:32:50,179 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-07-22 12:32:50,242 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:32:50,245 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:32:50,251 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 12:32:50,281 - WARNING - \u26a0\ufe0f Nenhuma estatística encontrada para a conexão ID=5.
+2025-07-22 12:32:57,684 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:32:57,691 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 12:32:57,708 - WARNING - \u26a0\ufe0f Nenhuma estatística encontrada para a conexão ID=5.
+2025-07-22 12:32:57,708 - INFO - \U0001f504 Iniciando sincronização de estatísticas para conexão ID=5, usuário ID=1
+2025-07-22 12:32:57,873 - INFO - \U0001f4ca Estatísticas coletadas: {'server_version': 'Desconhecida', 'table_count': 231, 'view_count': 140, 'procedure_count': 0, 'function_count': 0, 'trigger_count': 0, 'index_count': 0, 'tables_connected': 231, 'queries_today': 0, 'records_analyzed': 0}
+2025-07-22 12:32:57,886 - INFO - \u2705 Estatísticas criadas para conexão ID=5
+2025-07-22 12:32:57,886 - INFO - \u2705 Estatísticas '<app.models.dbstatistics_models.DBStatistics object at 0x000002DB0E78C2B0>' registradas para conexão ID=5.
+2025-07-22 12:32:57,974 - INFO - \u2705 Estrutura 'APP' criada (Conexão ID: 5)
+2025-07-22 12:32:57,975 - INFO - \U0001f195 Estrutura registrada: APP
+2025-07-22 12:32:58,122 - INFO - \u2705 Estrutura 'processamento_mensal_controle' criada (Conexão ID: 5)
+2025-07-22 12:32:58,122 - INFO - \U0001f195 Estrutura registrada: processamento_mensal_controle
+2025-07-22 12:32:58,206 - INFO - \u2705 Estrutura 't_aluno' criada (Conexão ID: 5)
+2025-07-22 12:32:58,206 - INFO - \U0001f195 Estrutura registrada: t_aluno
+2025-07-22 12:32:58,228 - INFO - \u2705 Estrutura 't_aluno_anexo' criada (Conexão ID: 5)
+2025-07-22 12:32:58,228 - INFO - \U0001f195 Estrutura registrada: t_aluno_anexo
+2025-07-22 12:32:58,273 - INFO - \u2705 Estrutura 't_aluno_audit' criada (Conexão ID: 5)
+2025-07-22 12:32:58,273 - INFO - \U0001f195 Estrutura registrada: t_aluno_audit
+2025-07-22 12:33:01,565 - INFO - \u2705 Estrutura 'T_ALUNO_DISCIPLINA' criada (Conexão ID: 5)
+2025-07-22 12:33:01,565 - INFO - \U0001f195 Estrutura registrada: T_ALUNO_DISCIPLINA
+2025-07-22 12:33:01,619 - INFO - \u2705 Estrutura 't_aluno_foto_teste' criada (Conexão ID: 5)
+2025-07-22 12:33:01,619 - INFO - \U0001f195 Estrutura registrada: t_aluno_foto_teste
+2025-07-22 12:33:01,675 - INFO - \u2705 Estrutura 't_ano_lectivo' criada (Conexão ID: 5)
+2025-07-22 12:33:01,676 - INFO - \U0001f195 Estrutura registrada: t_ano_lectivo
+2025-07-22 12:33:01,687 - INFO - \u2705 Estrutura 'T_APROVEITAMENTO_DROP' criada (Conexão ID: 5)
+2025-07-22 12:33:01,687 - INFO - \U0001f195 Estrutura registrada: T_APROVEITAMENTO_DROP
+2025-07-22 12:33:01,737 - INFO - \u2705 Estrutura 'T_APROVEITAMENTO_DROP_2' criada (Conexão ID: 5)
+2025-07-22 12:33:01,737 - INFO - \U0001f195 Estrutura registrada: T_APROVEITAMENTO_DROP_2
+2025-07-22 12:33:01,798 - INFO - \u2705 Estrutura 't_auditoria' criada (Conexão ID: 5)
+2025-07-22 12:33:01,798 - INFO - \U0001f195 Estrutura registrada: t_auditoria
+2025-07-22 12:33:01,825 - INFO - \u2705 Estrutura 't_autorizacao_lancamento_especial' criada (Conexão ID: 5)
+2025-07-22 12:33:01,825 - INFO - \U0001f195 Estrutura registrada: t_autorizacao_lancamento_especial
+2025-07-22 12:33:01,871 - INFO - \u2705 Estrutura 't_autorizacao_lancamento_nota' criada (Conexão ID: 5)
+2025-07-22 12:33:01,871 - INFO - \U0001f195 Estrutura registrada: t_autorizacao_lancamento_nota
+2025-07-22 12:33:01,916 - INFO - \u2705 Estrutura 't_autorizacao_registro_inscricao' criada (Conexão ID: 5)
+2025-07-22 12:33:01,917 - INFO - \U0001f195 Estrutura registrada: t_autorizacao_registro_inscricao
+2025-07-22 12:33:01,947 - INFO - \u2705 Estrutura 't_banco' criada (Conexão ID: 5)
+2025-07-22 12:33:01,947 - INFO - \U0001f195 Estrutura registrada: t_banco
+2025-07-22 12:33:01,958 - INFO - \u2705 Estrutura 't_billing_address' criada (Conexão ID: 5)
+2025-07-22 12:33:01,958 - INFO - \U0001f195 Estrutura registrada: t_billing_address
+2025-07-22 12:33:01,991 - INFO - \u2705 Estrutura 't_biometrico' criada (Conexão ID: 5)
+2025-07-22 12:33:01,991 - INFO - \U0001f195 Estrutura registrada: t_biometrico
+2025-07-22 12:33:02,022 - INFO - \u2705 Estrutura 't_bordero' criada (Conexão ID: 5)
+2025-07-22 12:33:02,022 - INFO - \U0001f195 Estrutura registrada: t_bordero
+2025-07-22 12:33:02,779 - INFO - \u2705 Estrutura 't_bordero_empresa' criada (Conexão ID: 5)
+2025-07-22 12:33:02,779 - INFO - \U0001f195 Estrutura registrada: t_bordero_empresa
+2025-07-22 12:33:02,796 - INFO - \u2705 Estrutura 't_calendario_academico' criada (Conexão ID: 5)
+2025-07-22 12:33:02,796 - INFO - \U0001f195 Estrutura registrada: t_calendario_academico
+2025-07-22 12:33:02,844 - INFO - \u2705 Estrutura 't_calendario_processamento' criada (Conexão ID: 5)
+2025-07-22 12:33:02,845 - INFO - \U0001f195 Estrutura registrada: t_calendario_processamento
+2025-07-22 12:33:02,857 - INFO - \u2705 Estrutura 't_campanha' criada (Conexão ID: 5)
+2025-07-22 12:33:02,857 - INFO - \U0001f195 Estrutura registrada: t_campanha
+2025-07-22 12:33:02,903 - INFO - \u2705 Estrutura 't_campanha_personalizada' criada (Conexão ID: 5)
+2025-07-22 12:33:02,903 - INFO - \U0001f195 Estrutura registrada: t_campanha_personalizada
+2025-07-22 12:33:02,942 - INFO - \u2705 Estrutura 't_candidato' criada (Conexão ID: 5)
+2025-07-22 12:33:02,942 - INFO - \U0001f195 Estrutura registrada: t_candidato
+2025-07-22 12:33:02,963 - INFO - \u2705 Estrutura 't_candidato_audit' criada (Conexão ID: 5)
+2025-07-22 12:33:02,963 - INFO - \U0001f195 Estrutura registrada: t_candidato_audit
+2025-07-22 12:33:03,018 - INFO - \u2705 Estrutura 'T_CANDIDATO_ONLINE' criada (Conexão ID: 5)
+2025-07-22 12:33:03,018 - INFO - \U0001f195 Estrutura registrada: T_CANDIDATO_ONLINE
+2025-07-22 12:33:03,131 - INFO - \u2705 Estrutura 't_cargo' criada (Conexão ID: 5)
+2025-07-22 12:33:03,131 - INFO - \U0001f195 Estrutura registrada: t_cargo
+2025-07-22 12:33:03,202 - INFO - \u2705 Estrutura 't_cartao_matriz_bloqueio' criada (Conexão ID: 5)
+2025-07-22 12:33:03,202 - INFO - \U0001f195 Estrutura registrada: t_cartao_matriz_bloqueio
+2025-07-22 12:33:03,239 - INFO - \u2705 Estrutura 'T_CERTIFICADO_INTERMEDIO' criada (Conexão ID: 5)
+2025-07-22 12:33:03,239 - INFO - \U0001f195 Estrutura registrada: T_CERTIFICADO_INTERMEDIO
+2025-07-22 12:33:03,407 - INFO - \u2705 Estrutura 't_company_address' criada (Conexão ID: 5)
+2025-07-22 12:33:03,408 - INFO - \U0001f195 Estrutura registrada: t_company_address
+2025-07-22 12:33:03,426 - INFO - \u2705 Estrutura 't_compensassao_efetiva' criada (Conexão ID: 5)
+2025-07-22 12:33:03,426 - INFO - \U0001f195 Estrutura registrada: t_compensassao_efetiva
+2025-07-22 12:33:03,454 - INFO - \u2705 Estrutura 't_compensassao_provisoria' criada (Conexão ID: 5)
+2025-07-22 12:33:03,455 - INFO - \U0001f195 Estrutura registrada: t_compensassao_provisoria
+2025-07-22 12:33:03,542 - INFO - \u2705 Estrutura 't_comuna' criada (Conexão ID: 5)
+2025-07-22 12:33:03,542 - INFO - \U0001f195 Estrutura registrada: t_comuna
+2025-07-22 12:33:03,594 - INFO - \u2705 Estrutura 't_configuracao' criada (Conexão ID: 5)
+2025-07-22 12:33:03,594 - INFO - \U0001f195 Estrutura registrada: t_configuracao
+2025-07-22 12:33:03,630 - INFO - \u2705 Estrutura 't_configuracao_documentos_financeiros' criada (Conexão ID: 5)
+2025-07-22 12:33:03,630 - INFO - \U0001f195 Estrutura registrada: t_configuracao_documentos_financeiros
+2025-07-22 12:33:03,665 - INFO - \u2705 Estrutura 't_conta_candidato' criada (Conexão ID: 5)
+2025-07-22 12:33:03,666 - INFO - \U0001f195 Estrutura registrada: t_conta_candidato
+2025-07-22 12:33:03,730 - INFO - \u2705 Estrutura 't_conta_corrente' criada (Conexão ID: 5)
+2025-07-22 12:33:03,731 - INFO - \U0001f195 Estrutura registrada: t_conta_corrente
+2025-07-22 12:33:03,772 - INFO - \u2705 Estrutura 't_conta_corrente_empresa' criada (Conexão ID: 5)
+2025-07-22 12:33:03,773 - INFO - \U0001f195 Estrutura registrada: t_conta_corrente_empresa
+2025-07-22 12:33:03,797 - INFO - \u2705 Estrutura 't_contador' criada (Conexão ID: 5)
+2025-07-22 12:33:03,798 - INFO - \U0001f195 Estrutura registrada: t_contador
+2025-07-22 12:33:03,813 - INFO - \u2705 Estrutura 't_controlador_mapa_matriz' criada (Conexão ID: 5)
+2025-07-22 12:33:03,814 - INFO - \U0001f195 Estrutura registrada: t_controlador_mapa_matriz
+2025-07-22 12:33:03,862 - INFO - \u2705 Estrutura 't_controlle_job' criada (Conexão ID: 5)
+2025-07-22 12:33:03,862 - INFO - \U0001f195 Estrutura registrada: t_controlle_job
+2025-07-22 12:33:03,916 - INFO - \u2705 Estrutura 't_controlo_prova_extraordianaria' criada (Conexão ID: 5)
+2025-07-22 12:33:03,916 - INFO - \U0001f195 Estrutura registrada: t_controlo_prova_extraordianaria
+2025-07-22 12:33:03,964 - INFO - \u2705 Estrutura 't_credito_de_aluno' criada (Conexão ID: 5)
+2025-07-22 12:33:03,964 - INFO - \U0001f195 Estrutura registrada: t_credito_de_aluno
+2025-07-22 12:33:04,001 - INFO - \u2705 Estrutura 't_curso' criada (Conexão ID: 5)
+2025-07-22 12:33:04,001 - INFO - \U0001f195 Estrutura registrada: t_curso
+2025-07-22 12:33:04,016 - INFO - \u2705 Estrutura 't_curso_de_verao' criada (Conexão ID: 5)
+2025-07-22 12:33:04,016 - INFO - \U0001f195 Estrutura registrada: t_curso_de_verao
+2025-07-22 12:33:04,049 - INFO - \u2705 Estrutura 't_curso_ensino_medio' criada (Conexão ID: 5)
+2025-07-22 12:33:04,049 - INFO - \U0001f195 Estrutura registrada: t_curso_ensino_medio
+2025-07-22 12:33:04,072 - INFO - \u2705 Estrutura 'T_CURSO_EXAME_ADMISSAO' criada (Conexão ID: 5)
+2025-07-22 12:33:04,072 - INFO - \U0001f195 Estrutura registrada: T_CURSO_EXAME_ADMISSAO
+2025-07-22 12:33:04,105 - INFO - \u2705 Estrutura 't_customer' criada (Conexão ID: 5)
+2025-07-22 12:33:04,105 - INFO - \U0001f195 Estrutura registrada: t_customer
+2025-07-22 12:33:04,119 - INFO - \u2705 Estrutura 't_declaracao_destino' criada (Conexão ID: 5)
+2025-07-22 12:33:04,119 - INFO - \U0001f195 Estrutura registrada: t_declaracao_destino
+2025-07-22 12:33:04,132 - INFO - \u2705 Estrutura 't_desconto' criada (Conexão ID: 5)
+2025-07-22 12:33:04,132 - INFO - \U0001f195 Estrutura registrada: t_desconto
+2025-07-22 12:33:04,165 - INFO - \u2705 Estrutura 't_destinatario_campanha' criada (Conexão ID: 5)
+2025-07-22 12:33:04,165 - INFO - \U0001f195 Estrutura registrada: t_destinatario_campanha
+2025-07-22 12:33:04,184 - INFO - \u2705 Estrutura 't_dim_data' criada (Conexão ID: 5)
+2025-07-22 12:33:04,184 - INFO - \U0001f195 Estrutura registrada: t_dim_data
+2025-07-22 12:33:04,223 - INFO - \u2705 Estrutura 't_disciplina' criada (Conexão ID: 5)
+2025-07-22 12:33:04,223 - INFO - \U0001f195 Estrutura registrada: t_disciplina
+2025-07-22 12:33:04,267 - INFO - \u2705 Estrutura 't_disponibilidade_inscricoes' criada (Conexão ID: 5)
+2025-07-22 12:33:04,268 - INFO - \U0001f195 Estrutura registrada: t_disponibilidade_inscricoes
+2025-07-22 12:33:04,294 - INFO - \u2705 Estrutura 't_docente' criada (Conexão ID: 5)
+2025-07-22 12:33:04,295 - INFO - \U0001f195 Estrutura registrada: t_docente
+2025-07-22 12:33:04,371 - INFO - \u2705 Estrutura 't_document_status' criada (Conexão ID: 5)
+2025-07-22 12:33:04,371 - INFO - \U0001f195 Estrutura registrada: t_document_status
+2025-07-22 12:33:04,401 - INFO - \u2705 Estrutura 't_document_total' criada (Conexão ID: 5)
+2025-07-22 12:33:04,401 - INFO - \U0001f195 Estrutura registrada: t_document_total
+2025-07-22 12:33:04,422 - INFO - \u2705 Estrutura 'T_DROP_CALENDARIO_PROCESSAMENTO' criada (Conexão ID: 5)
+2025-07-22 12:33:04,422 - INFO - \U0001f195 Estrutura registrada: T_DROP_CALENDARIO_PROCESSAMENTO
+2025-07-22 12:33:04,452 - INFO - \u2705 Estrutura 'T_DROP_CERTIFICADO_INTERMEDIO' criada (Conexão ID: 5)
+2025-07-22 12:33:04,453 - INFO - \U0001f195 Estrutura registrada: T_DROP_CERTIFICADO_INTERMEDIO
+2025-07-22 12:33:04,588 - INFO - \u2705 Estrutura 't_emolumento' criada (Conexão ID: 5)
+2025-07-22 12:33:04,588 - INFO - \U0001f195 Estrutura registrada: t_emolumento
+2025-07-22 12:33:04,601 - INFO - \u2705 Estrutura 't_emolumento_historico' criada (Conexão ID: 5)
+2025-07-22 12:33:04,601 - INFO - \U0001f195 Estrutura registrada: t_emolumento_historico
+2025-07-22 12:33:04,730 - INFO - \u2705 Estrutura 't_emolumento_pedido' criada (Conexão ID: 5)
+2025-07-22 12:33:04,730 - INFO - \U0001f195 Estrutura registrada: t_emolumento_pedido
+2025-07-22 12:33:04,772 - INFO - \u2705 Estrutura 'T_EMOLUMENTOS_DESCONTOS_DESASSOCIADOS' criada (Conexão ID: 5)
+2025-07-22 12:33:04,772 - INFO - \U0001f195 Estrutura registrada: T_EMOLUMENTOS_DESCONTOS_DESASSOCIADOS
+2025-07-22 12:33:04,818 - INFO - \u2705 Estrutura 't_empresa_convenio' criada (Conexão ID: 5)
+2025-07-22 12:33:04,818 - INFO - \U0001f195 Estrutura registrada: t_empresa_convenio
+2025-07-22 12:33:04,830 - INFO - \u2705 Estrutura 't_epoca_especial' criada (Conexão ID: 5)
+2025-07-22 12:33:04,830 - INFO - \U0001f195 Estrutura registrada: t_epoca_especial
+2025-07-22 12:33:04,864 - INFO - \u2705 Estrutura 't_equivalencia' criada (Conexão ID: 5)
+2025-07-22 12:33:04,864 - INFO - \U0001f195 Estrutura registrada: t_equivalencia
+2025-07-22 12:33:04,950 - INFO - \u2705 Estrutura 't_equivalencia_audit' criada (Conexão ID: 5)
+2025-07-22 12:33:04,950 - INFO - \U0001f195 Estrutura registrada: t_equivalencia_audit
+2025-07-22 12:33:04,999 - INFO - \u2705 Estrutura 't_equivalencia_historico_aluno' criada (Conexão ID: 5)
+2025-07-22 12:33:04,999 - INFO - \U0001f195 Estrutura registrada: t_equivalencia_historico_aluno
+2025-07-22 12:33:05,038 - INFO - \u2705 Estrutura 't_exame_curso' criada (Conexão ID: 5)
+2025-07-22 12:33:05,038 - INFO - \U0001f195 Estrutura registrada: t_exame_curso
+2025-07-22 12:33:05,065 - INFO - \u2705 Estrutura 't_exame_eletronico' criada (Conexão ID: 5)
+2025-07-22 12:33:05,065 - INFO - \U0001f195 Estrutura registrada: t_exame_eletronico
+2025-07-22 12:33:05,210 - INFO - \u2705 Estrutura 'T_EXAME_ELETRONICO_BKP' criada (Conexão ID: 5)
+2025-07-22 12:33:05,210 - INFO - \U0001f195 Estrutura registrada: T_EXAME_ELETRONICO_BKP
+2025-07-22 12:33:05,265 - INFO - \u2705 Estrutura 't_factura' criada (Conexão ID: 5)
+2025-07-22 12:33:05,265 - INFO - \U0001f195 Estrutura registrada: t_factura
+2025-07-22 12:33:05,289 - INFO - \u2705 Estrutura 't_factura_detalhe' criada (Conexão ID: 5)
+2025-07-22 12:33:05,289 - INFO - \U0001f195 Estrutura registrada: t_factura_detalhe
+2025-07-22 12:33:05,309 - INFO - \u2705 Estrutura 't_faculdade' criada (Conexão ID: 5)
+2025-07-22 12:33:05,310 - INFO - \U0001f195 Estrutura registrada: t_faculdade
+2025-07-22 12:33:05,321 - INFO - \u2705 Estrutura 't_fechamento_classificacao' criada (Conexão ID: 5)
+2025-07-22 12:33:05,321 - INFO - \U0001f195 Estrutura registrada: t_fechamento_classificacao
+2025-07-22 12:33:05,341 - INFO - \u2705 Estrutura 't_feriado' criada (Conexão ID: 5)
+2025-07-22 12:33:05,341 - INFO - \U0001f195 Estrutura registrada: t_feriado
+2025-07-22 12:33:05,372 - INFO - \u2705 Estrutura 't_geracao_errada' criada (Conexão ID: 5)
+2025-07-22 12:33:05,372 - INFO - \U0001f195 Estrutura registrada: t_geracao_errada
+2025-07-22 12:33:05,396 - INFO - \u2705 Estrutura 't_guia_candidatura' criada (Conexão ID: 5)
+2025-07-22 12:33:05,396 - INFO - \U0001f195 Estrutura registrada: t_guia_candidatura
+2025-07-22 12:33:05,530 - INFO - \u2705 Estrutura 't_guia_candidatura_historico' criada (Conexão ID: 5)
+2025-07-22 12:33:05,530 - INFO - \U0001f195 Estrutura registrada: t_guia_candidatura_historico
+2025-07-22 12:33:05,630 - INFO - \u2705 Estrutura 't_guia_multa_negociacao' criada (Conexão ID: 5)
+2025-07-22 12:33:05,630 - INFO - \U0001f195 Estrutura registrada: t_guia_multa_negociacao
+2025-07-22 12:33:05,788 - INFO - \u2705 Estrutura 't_guia_multa_valor' criada (Conexão ID: 5)
+2025-07-22 12:33:05,788 - INFO - \U0001f195 Estrutura registrada: t_guia_multa_valor
+2025-07-22 12:33:05,834 - INFO - \u2705 Estrutura 't_guia_pagamento' criada (Conexão ID: 5)
+2025-07-22 12:33:05,835 - INFO - \U0001f195 Estrutura registrada: t_guia_pagamento
+2025-07-22 12:33:05,873 - INFO - \u2705 Estrutura 't_guia_pagamento_audit' criada (Conexão ID: 5)
+2025-07-22 12:33:05,873 - INFO - \U0001f195 Estrutura registrada: t_guia_pagamento_audit
+2025-07-22 12:33:06,542 - INFO - \u2705 Estrutura 't_guia_pagamento_historico' criada (Conexão ID: 5)
+2025-07-22 12:33:06,542 - INFO - \U0001f195 Estrutura registrada: t_guia_pagamento_historico
+2025-07-22 12:33:09,484 - INFO - \u2705 Estrutura 't_guia_pagamento_historico_audit' criada (Conexão ID: 5)
+2025-07-22 12:33:09,484 - INFO - \U0001f195 Estrutura registrada: t_guia_pagamento_historico_audit
+2025-07-22 12:33:10,440 - INFO - \u2705 Estrutura 't_guia_plano_multa' criada (Conexão ID: 5)
+2025-07-22 12:33:10,440 - INFO - \U0001f195 Estrutura registrada: t_guia_plano_multa
+2025-07-22 12:33:10,503 - INFO - \u2705 Estrutura 'T_GUIA_POR_UTILIZADOR' criada (Conexão ID: 5)
+2025-07-22 12:33:10,503 - INFO - \U0001f195 Estrutura registrada: T_GUIA_POR_UTILIZADOR
+2025-07-22 12:33:10,598 - INFO - \u2705 Estrutura 't_guia_usada' criada (Conexão ID: 5)
+2025-07-22 12:33:10,598 - INFO - \U0001f195 Estrutura registrada: t_guia_usada
+2025-07-22 12:33:10,630 - INFO - \u2705 Estrutura 'T_GUIAS_LIQUIDADAS' criada (Conexão ID: 5)
+2025-07-22 12:33:10,630 - INFO - \U0001f195 Estrutura registrada: T_GUIAS_LIQUIDADAS
+2025-07-22 12:33:11,138 - INFO - \u2705 Estrutura 'T_GUIAS_LIQUIDADAS_01' criada (Conexão ID: 5)
+2025-07-22 12:33:11,138 - INFO - \U0001f195 Estrutura registrada: T_GUIAS_LIQUIDADAS_01
+2025-07-22 12:33:11,831 - INFO - \u2705 Estrutura 't_header' criada (Conexão ID: 5)
+2025-07-22 12:33:11,831 - INFO - \U0001f195 Estrutura registrada: t_header
+2025-07-22 12:33:11,880 - INFO - \u2705 Estrutura 't_historico_aluno' criada (Conexão ID: 5)
+2025-07-22 12:33:11,880 - INFO - \U0001f195 Estrutura registrada: t_historico_aluno
+2025-07-22 12:33:16,238 - INFO - \u2705 Estrutura 't_historico_aluno_audit' criada (Conexão ID: 5)
+2025-07-22 12:33:16,238 - INFO - \U0001f195 Estrutura registrada: t_historico_aluno_audit
+2025-07-22 12:33:23,910 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:33:23,914 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 12:33:23,914 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:33:23,916 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 12:33:23,933 - INFO - \U0001f50d Usando cache para 92 tabelas na conexão 5
+2025-07-22 12:33:27,216 - INFO - \u2705 Estrutura 't_historico_aluno_ccd' criada (Conexão ID: 5)
+2025-07-22 12:33:27,216 - INFO - \U0001f195 Estrutura registrada: t_historico_aluno_ccd
+2025-07-22 12:33:27,277 - INFO - \u2705 Estrutura 't_historico_credito' criada (Conexão ID: 5)
+2025-07-22 12:33:27,277 - INFO - \U0001f195 Estrutura registrada: t_historico_credito
+2025-07-22 12:33:28,224 - INFO - \u2705 Estrutura 't_historico_credito_candidato' criada (Conexão ID: 5)
+2025-07-22 12:33:28,224 - INFO - \U0001f195 Estrutura registrada: t_historico_credito_candidato
+2025-07-22 12:33:28,360 - INFO - \u2705 Estrutura 't_historico_credito_empresa' criada (Conexão ID: 5)
+2025-07-22 12:33:28,360 - INFO - \U0001f195 Estrutura registrada: t_historico_credito_empresa
+2025-07-22 12:33:28,443 - INFO - \u2705 Estrutura 't_historico_equivalencia' criada (Conexão ID: 5)
+2025-07-22 12:33:28,443 - INFO - \U0001f195 Estrutura registrada: t_historico_equivalencia
+2025-07-22 12:33:28,634 - INFO - \u2705 Estrutura 't_historico_equivalencia_audit' criada (Conexão ID: 5)
+2025-07-22 12:33:28,634 - INFO - \U0001f195 Estrutura registrada: t_historico_equivalencia_audit
+2025-07-22 12:33:28,833 - INFO - \u2705 Estrutura 't_historico_troca_curso' criada (Conexão ID: 5)
+2025-07-22 12:33:28,833 - INFO - \U0001f195 Estrutura registrada: t_historico_troca_curso
+2025-07-22 12:33:29,031 - INFO - \u2705 Estrutura 't_horario' criada (Conexão ID: 5)
+2025-07-22 12:33:29,031 - INFO - \U0001f195 Estrutura registrada: t_horario
+2025-07-22 12:33:29,080 - INFO - \u2705 Estrutura 't_horario_calendario' criada (Conexão ID: 5)
+2025-07-22 12:33:29,080 - INFO - \U0001f195 Estrutura registrada: t_horario_calendario
+2025-07-22 12:33:29,151 - INFO - \u2705 Estrutura 't_horario_calendario_BKP' criada (Conexão ID: 5)
+2025-07-22 12:33:29,151 - INFO - \U0001f195 Estrutura registrada: t_horario_calendario_BKP
+2025-07-22 12:33:29,169 - INFO - \u2705 Estrutura 't_horario_temporario' criada (Conexão ID: 5)
+2025-07-22 12:33:29,169 - INFO - \U0001f195 Estrutura registrada: t_horario_temporario
+2025-07-22 12:33:29,201 - INFO - \u2705 Estrutura 't_imagens_sistema' criada (Conexão ID: 5)
+2025-07-22 12:33:29,201 - INFO - \U0001f195 Estrutura registrada: t_imagens_sistema
+2025-07-22 12:33:29,237 - INFO - \u2705 Estrutura 't_inscricao_extraordinaria' criada (Conexão ID: 5)
+2025-07-22 12:33:29,238 - INFO - \U0001f195 Estrutura registrada: t_inscricao_extraordinaria
+2025-07-22 12:33:29,443 - INFO - \u2705 Estrutura 't_instituicao' criada (Conexão ID: 5)
+2025-07-22 12:33:29,443 - INFO - \U0001f195 Estrutura registrada: t_instituicao
+2025-07-22 12:33:29,458 - INFO - \u2705 Estrutura 't_intervalo' criada (Conexão ID: 5)
+2025-07-22 12:33:29,458 - INFO - \U0001f195 Estrutura registrada: t_intervalo
+2025-07-22 12:33:29,547 - INFO - \u2705 Estrutura 't_invoice' criada (Conexão ID: 5)
+2025-07-22 12:33:29,547 - INFO - \U0001f195 Estrutura registrada: t_invoice
+2025-07-22 12:33:29,571 - INFO - \u2705 Estrutura 't_lancamento_faculdade' criada (Conexão ID: 5)
+2025-07-22 12:33:29,571 - INFO - \U0001f195 Estrutura registrada: t_lancamento_faculdade
+2025-07-22 12:33:29,603 - INFO - \u2705 Estrutura 't_leciona' criada (Conexão ID: 5)
+2025-07-22 12:33:29,603 - INFO - \U0001f195 Estrutura registrada: t_leciona
+2025-07-22 12:33:32,062 - INFO - \u2705 Estrutura 'T_LECIONA_BKP' criada (Conexão ID: 5)
+2025-07-22 12:33:32,062 - INFO - \U0001f195 Estrutura registrada: T_LECIONA_BKP
+2025-07-22 12:33:32,274 - INFO - \u2705 Estrutura 't_line' criada (Conexão ID: 5)
+2025-07-22 12:33:32,274 - INFO - \U0001f195 Estrutura registrada: t_line
+2025-07-22 12:33:32,307 - INFO - \u2705 Estrutura 'T_LISTA_TRANSITA' criada (Conexão ID: 5)
+2025-07-22 12:33:32,307 - INFO - \U0001f195 Estrutura registrada: T_LISTA_TRANSITA
+2025-07-22 12:33:32,379 - INFO - \u2705 Estrutura 'T_LISTAGEM_BANCARIA' criada (Conexão ID: 5)
+2025-07-22 12:33:32,379 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_BANCARIA
+2025-07-22 12:33:32,765 - INFO - \u2705 Estrutura 'T_LISTAGEM_BANCARIA_01' criada (Conexão ID: 5)
+2025-07-22 12:33:32,765 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_BANCARIA_01
+2025-07-22 12:33:32,928 - INFO - \u2705 Estrutura 'T_LISTAGEM_BANCARIA_02' criada (Conexão ID: 5)
+2025-07-22 12:33:32,928 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_BANCARIA_02
+2025-07-22 12:33:33,142 - INFO - \u2705 Estrutura 'T_LISTAGEM_EMOLUMENTO' criada (Conexão ID: 5)
+2025-07-22 12:33:33,142 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_EMOLUMENTO
+2025-07-22 12:33:33,820 - INFO - \u2705 Estrutura 'T_LISTAGEM_EMOLUMENTO_01' criada (Conexão ID: 5)
+2025-07-22 12:33:33,821 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_EMOLUMENTO_01
+2025-07-22 12:33:34,167 - INFO - \u2705 Estrutura 'T_LISTAGEM_EMOLUMENTO_02' criada (Conexão ID: 5)
+2025-07-22 12:33:34,168 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_EMOLUMENTO_02
+2025-07-22 12:33:34,703 - INFO - \u2705 Estrutura 't_log_falha_internet' criada (Conexão ID: 5)
+2025-07-22 12:33:34,703 - INFO - \U0001f195 Estrutura registrada: t_log_falha_internet
+2025-07-22 12:33:34,719 - INFO - \u2705 Estrutura 't_log_saft' criada (Conexão ID: 5)
+2025-07-22 12:33:34,720 - INFO - \U0001f195 Estrutura registrada: t_log_saft
+2025-07-22 12:33:34,735 - INFO - \u2705 Estrutura 't_logo_marca' criada (Conexão ID: 5)
+2025-07-22 12:33:34,735 - INFO - \U0001f195 Estrutura registrada: t_logo_marca
+2025-07-22 12:33:34,772 - INFO - \u2705 Estrutura 'T_MAPA_ALUNO' criada (Conexão ID: 5)
+2025-07-22 12:33:34,772 - INFO - \U0001f195 Estrutura registrada: T_MAPA_ALUNO
+2025-07-22 12:33:35,201 - INFO - \u2705 Estrutura 'T_MAPA_ALUNO_01' criada (Conexão ID: 5)
+2025-07-22 12:33:35,201 - INFO - \U0001f195 Estrutura registrada: T_MAPA_ALUNO_01
+2025-07-22 12:33:35,742 - INFO - \u2705 Estrutura 't_mapa_limpo' criada (Conexão ID: 5)
+2025-07-22 12:33:35,742 - INFO - \U0001f195 Estrutura registrada: t_mapa_limpo
+2025-07-22 12:33:35,764 - INFO - \u2705 Estrutura 't_mapa_mensalidade' criada (Conexão ID: 5)
+2025-07-22 12:33:35,764 - INFO - \U0001f195 Estrutura registrada: t_mapa_mensalidade
+2025-07-22 12:33:35,779 - INFO - \u2705 Estrutura 't_matricula' criada (Conexão ID: 5)
+2025-07-22 12:33:35,779 - INFO - \U0001f195 Estrutura registrada: t_matricula
+2025-07-22 12:33:35,798 - INFO - \u2705 Estrutura 't_matricula_audit' criada (Conexão ID: 5)
+2025-07-22 12:33:35,798 - INFO - \U0001f195 Estrutura registrada: t_matricula_audit
+2025-07-22 12:33:36,070 - INFO - \u2705 Estrutura 't_matricula_ccd' criada (Conexão ID: 5)
+2025-07-22 12:33:36,070 - INFO - \U0001f195 Estrutura registrada: t_matricula_ccd
+2025-07-22 12:33:36,085 - INFO - \u2705 Estrutura 't_matricula_online' criada (Conexão ID: 5)
+2025-07-22 12:33:36,085 - INFO - \U0001f195 Estrutura registrada: t_matricula_online
+2025-07-22 12:33:36,133 - INFO - \u2705 Estrutura 't_matriz_docente' criada (Conexão ID: 5)
+2025-07-22 12:33:36,133 - INFO - \U0001f195 Estrutura registrada: t_matriz_docente
+2025-07-22 12:33:36,186 - INFO - \u2705 Estrutura 't_memoravel' criada (Conexão ID: 5)
+2025-07-22 12:33:36,186 - INFO - \U0001f195 Estrutura registrada: t_memoravel
+2025-07-22 12:33:36,202 - INFO - \u2705 Estrutura 't_mensagem_candidato' criada (Conexão ID: 5)
+2025-07-22 12:33:36,202 - INFO - \U0001f195 Estrutura registrada: t_mensagem_candidato
+2025-07-22 12:33:36,225 - INFO - \u2705 Estrutura 't_mensalidades_liquidadas' criada (Conexão ID: 5)
+2025-07-22 12:33:36,225 - INFO - \U0001f195 Estrutura registrada: t_mensalidades_liquidadas
+2025-07-22 12:33:36,254 - INFO - \u2705 Estrutura 't_mes' criada (Conexão ID: 5)
+2025-07-22 12:33:36,254 - INFO - \U0001f195 Estrutura registrada: t_mes
+2025-07-22 12:33:36,271 - INFO - \u2705 Estrutura 't_mes_emolumento_propina' criada (Conexão ID: 5)
+2025-07-22 12:33:36,271 - INFO - \U0001f195 Estrutura registrada: t_mes_emolumento_propina
+2025-07-22 12:33:36,287 - INFO - \u2705 Estrutura 'T_MIGRATE_PERGUNTA' criada (Conexão ID: 5)
+2025-07-22 12:33:36,287 - INFO - \U0001f195 Estrutura registrada: T_MIGRATE_PERGUNTA
+2025-07-22 12:33:36,318 - INFO - \u2705 Estrutura 'T_MIGRATE_PROVA' criada (Conexão ID: 5)
+2025-07-22 12:33:36,319 - INFO - \U0001f195 Estrutura registrada: T_MIGRATE_PROVA
+2025-07-22 12:33:36,355 - INFO - \u2705 Estrutura 't_modelo_avaliacao' criada (Conexão ID: 5)
+2025-07-22 12:33:36,355 - INFO - \U0001f195 Estrutura registrada: t_modelo_avaliacao
+2025-07-22 12:33:36,374 - INFO - \u2705 Estrutura 't_moeda' criada (Conexão ID: 5)
+2025-07-22 12:33:36,374 - INFO - \U0001f195 Estrutura registrada: t_moeda
+2025-07-22 12:33:36,387 - INFO - \u2705 Estrutura 't_multas_guia' criada (Conexão ID: 5)
+2025-07-22 12:33:36,388 - INFO - \U0001f195 Estrutura registrada: t_multas_guia
+2025-07-22 12:33:36,405 - INFO - \u2705 Estrutura 't_municipio' criada (Conexão ID: 5)
+2025-07-22 12:33:36,405 - INFO - \U0001f195 Estrutura registrada: t_municipio
+2025-07-22 12:33:36,418 - INFO - \u2705 Estrutura 't_nota_credito' criada (Conexão ID: 5)
+2025-07-22 12:33:36,418 - INFO - \U0001f195 Estrutura registrada: t_nota_credito
+2025-07-22 12:33:36,488 - INFO - \u2705 Estrutura 't_nota_credito_detalhe' criada (Conexão ID: 5)
+2025-07-22 12:33:36,488 - INFO - \U0001f195 Estrutura registrada: t_nota_credito_detalhe
+2025-07-22 12:33:36,500 - INFO - \u2705 Estrutura 't_numero_gerado' criada (Conexão ID: 5)
+2025-07-22 12:33:36,501 - INFO - \U0001f195 Estrutura registrada: t_numero_gerado
+2025-07-22 12:33:36,518 - INFO - \u2705 Estrutura 't_numero_matriz' criada (Conexão ID: 5)
+2025-07-22 12:33:36,518 - INFO - \U0001f195 Estrutura registrada: t_numero_matriz
+2025-07-22 12:33:36,532 - INFO - \u2705 Estrutura 't_order_reference' criada (Conexão ID: 5)
+2025-07-22 12:33:36,532 - INFO - \U0001f195 Estrutura registrada: t_order_reference
+2025-07-22 12:33:36,544 - INFO - \u2705 Estrutura 't_pacote_subscrito' criada (Conexão ID: 5)
+2025-07-22 12:33:36,545 - INFO - \U0001f195 Estrutura registrada: t_pacote_subscrito
+2025-07-22 12:33:36,569 - INFO - \u2705 Estrutura 't_pagamento_referencia' criada (Conexão ID: 5)
+2025-07-22 12:33:36,569 - INFO - \U0001f195 Estrutura registrada: t_pagamento_referencia
+2025-07-22 12:33:36,584 - INFO - \u2705 Estrutura 't_pagamento_remoto' criada (Conexão ID: 5)
+2025-07-22 12:33:36,584 - INFO - \U0001f195 Estrutura registrada: t_pagamento_remoto
+2025-07-22 12:33:36,856 - INFO - \u2705 Estrutura 't_pais' criada (Conexão ID: 5)
+2025-07-22 12:33:36,856 - INFO - \U0001f195 Estrutura registrada: t_pais
+2025-07-22 12:33:36,871 - INFO - \u2705 Estrutura 't_payment' criada (Conexão ID: 5)
+2025-07-22 12:33:36,871 - INFO - \U0001f195 Estrutura registrada: t_payment
+2025-07-22 12:33:36,888 - INFO - \u2705 Estrutura 't_payment_document_status' criada (Conexão ID: 5)
+2025-07-22 12:33:36,888 - INFO - \U0001f195 Estrutura registrada: t_payment_document_status
+2025-07-22 12:33:36,903 - INFO - \u2705 Estrutura 't_payment_document_total' criada (Conexão ID: 5)
+2025-07-22 12:33:36,903 - INFO - \U0001f195 Estrutura registrada: t_payment_document_total
+2025-07-22 12:33:36,922 - INFO - \u2705 Estrutura 't_payment_line' criada (Conexão ID: 5)
+2025-07-22 12:33:36,922 - INFO - \U0001f195 Estrutura registrada: t_payment_line
+2025-07-22 12:33:36,938 - INFO - \u2705 Estrutura 't_payment_method' criada (Conexão ID: 5)
+2025-07-22 12:33:36,938 - INFO - \U0001f195 Estrutura registrada: t_payment_method
+2025-07-22 12:33:36,951 - INFO - \u2705 Estrutura 't_payments' criada (Conexão ID: 5)
+2025-07-22 12:33:36,951 - INFO - \U0001f195 Estrutura registrada: t_payments
+2025-07-22 12:33:36,964 - INFO - \u2705 Estrutura 't_pedido' criada (Conexão ID: 5)
+2025-07-22 12:33:36,964 - INFO - \U0001f195 Estrutura registrada: t_pedido
+2025-07-22 12:33:36,980 - INFO - \u2705 Estrutura 't_pergunta' criada (Conexão ID: 5)
+2025-07-22 12:33:36,980 - INFO - \U0001f195 Estrutura registrada: t_pergunta
+2025-07-22 12:33:37,099 - INFO - \u2705 Estrutura 't_pergunta_respota' criada (Conexão ID: 5)
+2025-07-22 12:33:37,099 - INFO - \U0001f195 Estrutura registrada: t_pergunta_respota
+2025-07-22 12:33:37,124 - INFO - \u2705 Estrutura 't_permissao_curso' criada (Conexão ID: 5)
+2025-07-22 12:33:37,124 - INFO - \U0001f195 Estrutura registrada: t_permissao_curso
+2025-07-22 12:33:37,188 - INFO - \u2705 Estrutura 't_plano_mestrado' criada (Conexão ID: 5)
+2025-07-22 12:33:37,188 - INFO - \U0001f195 Estrutura registrada: t_plano_mestrado
+2025-07-22 12:33:37,204 - INFO - \u2705 Estrutura 't_plano_pagamento' criada (Conexão ID: 5)
+2025-07-22 12:33:37,204 - INFO - \U0001f195 Estrutura registrada: t_plano_pagamento
+2025-07-22 12:33:37,220 - INFO - \u2705 Estrutura 't_portal_authorization' criada (Conexão ID: 5)
+2025-07-22 12:33:37,220 - INFO - \U0001f195 Estrutura registrada: t_portal_authorization
+2025-07-22 12:33:37,253 - INFO - \u2705 Estrutura 't_portal_block_user_role' criada (Conexão ID: 5)
+2025-07-22 12:33:37,253 - INFO - \U0001f195 Estrutura registrada: t_portal_block_user_role
+2025-07-22 12:33:37,268 - INFO - \u2705 Estrutura 't_portal_module' criada (Conexão ID: 5)
+2025-07-22 12:33:37,268 - INFO - \U0001f195 Estrutura registrada: t_portal_module
+2025-07-22 12:33:37,290 - INFO - \u2705 Estrutura 't_portal_permition' criada (Conexão ID: 5)
+2025-07-22 12:33:37,291 - INFO - \U0001f195 Estrutura registrada: t_portal_permition
+2025-07-22 12:33:37,303 - INFO - \u2705 Estrutura 't_portal_role' criada (Conexão ID: 5)
+2025-07-22 12:33:37,303 - INFO - \U0001f195 Estrutura registrada: t_portal_role
+2025-07-22 12:33:37,323 - INFO - \u2705 Estrutura 't_portal_role_module' criada (Conexão ID: 5)
+2025-07-22 12:33:37,323 - INFO - \U0001f195 Estrutura registrada: t_portal_role_module
+2025-07-22 12:33:37,350 - INFO - \u2705 Estrutura 't_portal_role_permition' criada (Conexão ID: 5)
+2025-07-22 12:33:37,351 - INFO - \U0001f195 Estrutura registrada: t_portal_role_permition
+2025-07-22 12:33:37,367 - INFO - \u2705 Estrutura 't_portal_user_acess_temporals' criada (Conexão ID: 5)
+2025-07-22 12:33:37,367 - INFO - \U0001f195 Estrutura registrada: t_portal_user_acess_temporals
+2025-07-22 12:33:37,381 - INFO - \u2705 Estrutura 't_portal_user_module' criada (Conexão ID: 5)
+2025-07-22 12:33:37,381 - INFO - \U0001f195 Estrutura registrada: t_portal_user_module
+2025-07-22 12:33:37,397 - INFO - \u2705 Estrutura 't_portal_user_module_autho' criada (Conexão ID: 5)
+2025-07-22 12:33:37,397 - INFO - \U0001f195 Estrutura registrada: t_portal_user_module_autho
+2025-07-22 12:33:37,416 - INFO - \u2705 Estrutura 't_portal_user_role' criada (Conexão ID: 5)
+2025-07-22 12:33:37,416 - INFO - \U0001f195 Estrutura registrada: t_portal_user_role
+2025-07-22 12:33:37,441 - INFO - \u2705 Estrutura 't_portal_usuario' criada (Conexão ID: 5)
+2025-07-22 12:33:37,441 - INFO - \U0001f195 Estrutura registrada: t_portal_usuario
+2025-07-22 12:33:37,466 - INFO - \u2705 Estrutura 't_presenca_professor' criada (Conexão ID: 5)
+2025-07-22 12:33:37,466 - INFO - \U0001f195 Estrutura registrada: t_presenca_professor
+2025-07-22 12:33:37,477 - INFO - \u2705 Estrutura 't_processamento_mensal' criada (Conexão ID: 5)
+2025-07-22 12:33:37,477 - INFO - \U0001f195 Estrutura registrada: t_processamento_mensal
+2025-07-22 12:33:37,494 - INFO - \u2705 Estrutura 't_processamento_referencias' criada (Conexão ID: 5)
+2025-07-22 12:33:37,494 - INFO - \U0001f195 Estrutura registrada: t_processamento_referencias
+2025-07-22 12:33:37,509 - INFO - \u2705 Estrutura 't_product' criada (Conexão ID: 5)
+2025-07-22 12:33:37,509 - INFO - \U0001f195 Estrutura registrada: t_product
+2025-07-22 12:33:37,520 - INFO - \u2705 Estrutura 't_profissao' criada (Conexão ID: 5)
+2025-07-22 12:33:37,521 - INFO - \U0001f195 Estrutura registrada: t_profissao
+2025-07-22 12:33:37,539 - INFO - \u2705 Estrutura 't_prova' criada (Conexão ID: 5)
+2025-07-22 12:33:37,540 - INFO - \U0001f195 Estrutura registrada: t_prova
+2025-07-22 12:33:37,565 - INFO - \u2705 Estrutura 't_provincia' criada (Conexão ID: 5)
+2025-07-22 12:33:37,565 - INFO - \U0001f195 Estrutura registrada: t_provincia
+2025-07-22 12:33:37,579 - INFO - \u2705 Estrutura 't_rebibo_detalhe' criada (Conexão ID: 5)
+2025-07-22 12:33:37,579 - INFO - \U0001f195 Estrutura registrada: t_rebibo_detalhe
+2025-07-22 12:33:37,591 - INFO - \u2705 Estrutura 't_recibo' criada (Conexão ID: 5)
+2025-07-22 12:33:37,591 - INFO - \U0001f195 Estrutura registrada: t_recibo
+2025-07-22 12:33:37,605 - INFO - \u2705 Estrutura 't_reference' criada (Conexão ID: 5)
+2025-07-22 12:33:37,605 - INFO - \U0001f195 Estrutura registrada: t_reference
+2025-07-22 12:33:37,618 - INFO - \u2705 Estrutura 'T_REFERENCIA_PROCESSAMENTO' criada (Conexão ID: 5)
+2025-07-22 12:33:37,618 - INFO - \U0001f195 Estrutura registrada: T_REFERENCIA_PROCESSAMENTO
+2025-07-22 12:33:37,686 - INFO - \u2705 Estrutura 't_registo_certificado' criada (Conexão ID: 5)
+2025-07-22 12:33:37,686 - INFO - \U0001f195 Estrutura registrada: t_registo_certificado
+2025-07-22 12:33:37,698 - INFO - \u2705 Estrutura 't_registro_documentos' criada (Conexão ID: 5)
+2025-07-22 12:33:37,699 - INFO - \U0001f195 Estrutura registrada: t_registro_documentos
+2025-07-22 12:33:37,712 - INFO - \u2705 Estrutura 't_regresso_estatistica_online' criada (Conexão ID: 5)
+2025-07-22 12:33:37,712 - INFO - \U0001f195 Estrutura registrada: t_regresso_estatistica_online
+2025-07-22 12:33:37,725 - INFO - \u2705 Estrutura 't_relario_financeiro' criada (Conexão ID: 5)
+2025-07-22 12:33:37,725 - INFO - \U0001f195 Estrutura registrada: t_relario_financeiro
+2025-07-22 12:33:37,736 - INFO - \u2705 Estrutura 't_resposta' criada (Conexão ID: 5)
+2025-07-22 12:33:37,737 - INFO - \U0001f195 Estrutura registrada: t_resposta
+2025-07-22 12:33:37,837 - INFO - \u2705 Estrutura 't_sala' criada (Conexão ID: 5)
+2025-07-22 12:33:37,837 - INFO - \U0001f195 Estrutura registrada: t_sala
+2025-07-22 12:33:37,857 - INFO - \u2705 Estrutura 't_sale_invoice' criada (Conexão ID: 5)
+2025-07-22 12:33:37,857 - INFO - \U0001f195 Estrutura registrada: t_sale_invoice
+2025-07-22 12:33:37,870 - INFO - \u2705 Estrutura 't_servico_auditoria' criada (Conexão ID: 5)
+2025-07-22 12:33:37,870 - INFO - \U0001f195 Estrutura registrada: t_servico_auditoria
+2025-07-22 12:33:37,883 - INFO - \u2705 Estrutura 't_sms' criada (Conexão ID: 5)
+2025-07-22 12:33:37,883 - INFO - \U0001f195 Estrutura registrada: t_sms
+2025-07-22 12:33:37,895 - INFO - \u2705 Estrutura 't_solicitacao_candidatura' criada (Conexão ID: 5)
+2025-07-22 12:33:37,895 - INFO - \U0001f195 Estrutura registrada: t_solicitacao_candidatura
+2025-07-22 12:33:37,905 - INFO - \u2705 Estrutura 't_source_document_id' criada (Conexão ID: 5)
+2025-07-22 12:33:37,905 - INFO - \U0001f195 Estrutura registrada: t_source_document_id
+2025-07-22 12:33:37,919 - INFO - \u2705 Estrutura 't_special_regime' criada (Conexão ID: 5)
+2025-07-22 12:33:37,919 - INFO - \U0001f195 Estrutura registrada: t_special_regime
+2025-07-22 12:33:37,932 - INFO - \u2705 Estrutura 't_sumario' criada (Conexão ID: 5)
+2025-07-22 12:33:37,932 - INFO - \U0001f195 Estrutura registrada: t_sumario
+2025-07-22 12:33:38,033 - INFO - \u2705 Estrutura 't_tax' criada (Conexão ID: 5)
+2025-07-22 12:33:38,033 - INFO - \U0001f195 Estrutura registrada: t_tax
+2025-07-22 12:33:38,048 - INFO - \u2705 Estrutura 't_tax_table' criada (Conexão ID: 5)
+2025-07-22 12:33:38,048 - INFO - \U0001f195 Estrutura registrada: t_tax_table
+2025-07-22 12:33:38,065 - INFO - \u2705 Estrutura 't_tax_table_entry' criada (Conexão ID: 5)
+2025-07-22 12:33:38,066 - INFO - \U0001f195 Estrutura registrada: t_tax_table_entry
+2025-07-22 12:33:38,078 - INFO - \u2705 Estrutura 't_tipo_bolsa' criada (Conexão ID: 5)
+2025-07-22 12:33:38,078 - INFO - \U0001f195 Estrutura registrada: t_tipo_bolsa
+2025-07-22 12:33:38,106 - INFO - \u2705 Estrutura 't_tipo_contrato_laboral' criada (Conexão ID: 5)
+2025-07-22 12:33:38,106 - INFO - \U0001f195 Estrutura registrada: t_tipo_contrato_laboral
+2025-07-22 12:33:38,126 - INFO - \u2705 Estrutura 't_tipo_de_declaracao' criada (Conexão ID: 5)
+2025-07-22 12:33:38,126 - INFO - \U0001f195 Estrutura registrada: t_tipo_de_declaracao
+2025-07-22 12:33:38,143 - INFO - \u2705 Estrutura 't_tipo_dia' criada (Conexão ID: 5)
+2025-07-22 12:33:38,143 - INFO - \U0001f195 Estrutura registrada: t_tipo_dia
+2025-07-22 12:33:38,181 - INFO - \u2705 Estrutura 't_tipo_inscricao' criada (Conexão ID: 5)
+2025-07-22 12:33:38,181 - INFO - \U0001f195 Estrutura registrada: t_tipo_inscricao
+2025-07-22 12:33:38,194 - INFO - \u2705 Estrutura 't_turma' criada (Conexão ID: 5)
+2025-07-22 12:33:38,194 - INFO - \U0001f195 Estrutura registrada: t_turma
+2025-07-22 12:33:38,209 - INFO - \u2705 Estrutura 't_turmas_disponiveis' criada (Conexão ID: 5)
+2025-07-22 12:33:38,209 - INFO - \U0001f195 Estrutura registrada: t_turmas_disponiveis
+2025-07-22 12:33:38,243 - INFO - \u2705 Estrutura 't_usuario' criada (Conexão ID: 5)
+2025-07-22 12:33:38,244 - INFO - \U0001f195 Estrutura registrada: t_usuario
+2025-07-22 12:33:38,257 - INFO - \u2705 Estrutura 't_usuario_rh' criada (Conexão ID: 5)
+2025-07-22 12:33:38,257 - INFO - \U0001f195 Estrutura registrada: t_usuario_rh
+2025-07-22 12:33:38,308 - INFO - \u2705 Estrutura 't_work_document' criada (Conexão ID: 5)
+2025-07-22 12:33:38,308 - INFO - \U0001f195 Estrutura registrada: t_work_document
+2025-07-22 12:33:38,325 - INFO - \u2705 Estrutura 't_work_document_status' criada (Conexão ID: 5)
+2025-07-22 12:33:38,325 - INFO - \U0001f195 Estrutura registrada: t_work_document_status
+2025-07-22 12:33:38,336 - INFO - \u2705 Estrutura 't_work_documents' criada (Conexão ID: 5)
+2025-07-22 12:33:38,336 - INFO - \U0001f195 Estrutura registrada: t_work_documents
+2025-07-22 12:33:38,350 - INFO - \u2705 Estrutura 't_working_document_total' criada (Conexão ID: 5)
+2025-07-22 12:33:38,350 - INFO - \U0001f195 Estrutura registrada: t_working_document_total
+2025-07-22 12:33:38,361 - INFO - \u2705 Estrutura 't_working_line' criada (Conexão ID: 5)
+2025-07-22 12:33:38,361 - INFO - \U0001f195 Estrutura registrada: t_working_line
+2025-07-22 12:33:38,374 - INFO - \u2705 Estrutura 't_working_tax' criada (Conexão ID: 5)
+2025-07-22 12:33:38,374 - INFO - \U0001f195 Estrutura registrada: t_working_tax
+2025-07-22 12:33:38,385 - INFO - \u2705 Estrutura 'TB_APROVEITAMENTO_DROP' criada (Conexão ID: 5)
+2025-07-22 12:33:38,385 - INFO - \U0001f195 Estrutura registrada: TB_APROVEITAMENTO_DROP
+2025-07-22 12:33:38,422 - INFO - \u2705 Estrutura 'TB_ROTEAMENTO_GERAL_DE_AVALIACOES' criada (Conexão ID: 5)
+2025-07-22 12:33:38,422 - INFO - \U0001f195 Estrutura registrada: TB_ROTEAMENTO_GERAL_DE_AVALIACOES
+2025-07-22 12:33:38,475 - INFO - \u2705 Estrutura 'tbl_pedidos' criada (Conexão ID: 5)
+2025-07-22 12:33:38,475 - INFO - \U0001f195 Estrutura registrada: tbl_pedidos
+2025-07-22 12:33:38,496 - INFO - \u2705 Estrutura 'v_certificado_intermedio_mestrado_lt' criada (Conexão ID: 5)
+2025-07-22 12:33:38,496 - INFO - \U0001f195 Estrutura registrada: v_certificado_intermedio_mestrado_lt
+2025-07-22 12:33:38,522 - INFO - \u2705 Estrutura 'v_prog_curso_de_verao_curso_map' criada (Conexão ID: 5)
+2025-07-22 12:33:38,523 - INFO - \U0001f195 Estrutura registrada: v_prog_curso_de_verao_curso_map
+2025-07-22 12:33:38,557 - INFO - \u2705 Estrutura 'v_prog_declaracoes_usuario_dev' criada (Conexão ID: 5)
+2025-07-22 12:33:38,558 - INFO - \U0001f195 Estrutura registrada: v_prog_declaracoes_usuario_dev
+2025-07-22 12:33:38,573 - INFO - \u2705 Estrutura 'v_prog_estatistica_matriz_global' criada (Conexão ID: 5)
+2025-07-22 12:33:38,573 - INFO - \U0001f195 Estrutura registrada: v_prog_estatistica_matriz_global
+2025-07-22 12:33:38,588 - INFO - \u2705 Estrutura 'v_prog_historico_ctr_bolseiros' criada (Conexão ID: 5)
+2025-07-22 12:33:38,588 - INFO - \U0001f195 Estrutura registrada: v_prog_historico_ctr_bolseiros
+2025-07-22 12:33:38,601 - INFO - \u2705 Estrutura 'v_registro_base_dados_aproveitamento' criada (Conexão ID: 5)
+2025-07-22 12:33:38,601 - INFO - \U0001f195 Estrutura registrada: v_registro_base_dados_aproveitamento
+2025-07-22 12:33:38,614 - INFO - \u2705 Estrutura 'v_registro_base_de_dados_acesso' criada (Conexão ID: 5)
+2025-07-22 12:33:38,614 - INFO - \U0001f195 Estrutura registrada: v_registro_base_de_dados_acesso
+2025-07-22 12:33:38,625 - INFO - \u2705 Estrutura 'v_registro_base_de_dados_de_pos_graduacao' criada (Conexão ID: 5)
+2025-07-22 12:33:38,625 - INFO - \U0001f195 Estrutura registrada: v_registro_base_de_dados_de_pos_graduacao
+2025-07-22 12:33:38,641 - INFO - \u2705 Estrutura 'v_registro_base_de_dados_graduados_preliminar_e_definitivo' criada (Conexão ID: 5)
+2025-07-22 12:33:38,642 - INFO - \U0001f195 Estrutura registrada: v_registro_base_de_dados_graduados_preliminar_e_definitivo
+2025-07-22 12:33:38,661 - INFO - \u2705 Estrutura 'v_registro_base_de_dados_matricula_inicial' criada (Conexão ID: 5)
+2025-07-22 12:33:38,661 - INFO - \U0001f195 Estrutura registrada: v_registro_base_de_dados_matricula_inicial
+2025-07-22 12:33:39,235 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:33:39,239 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 12:33:39,251 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:33:39,254 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 12:33:39,275 - INFO - \U0001f50d Usando cache para 231 tabelas na conexão 5
+2025-07-22 12:33:50,209 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:33:50,211 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 12:33:51,444 - WARNING - \u26a0\ufe0f Este dialeto não implementa 'get_unique_constraints'. Continuando sem verificar unicidade...
+2025-07-22 12:33:51,586 - ERROR - \u274c Nenhum campo encontrado com nome 'id' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,619 - INFO - \U0001f7e2 Campo 'id' criado para estrutura ID 767
+2025-07-22 12:33:51,669 - ERROR - \u274c Nenhum campo encontrado com nome 'ano_curricular' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,698 - INFO - \U0001f7e2 Campo 'ano_curricular' criado para estrutura ID 767
+2025-07-22 12:33:51,721 - ERROR - \u274c Nenhum campo encontrado com nome 'ano_declaracao' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,727 - INFO - \U0001f7e2 Campo 'ano_declaracao' criado para estrutura ID 767
+2025-07-22 12:33:51,741 - ERROR - \u274c Nenhum campo encontrado com nome 'cerimonia' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,747 - INFO - \U0001f7e2 Campo 'cerimonia' criado para estrutura ID 767
+2025-07-22 12:33:51,761 - ERROR - \u274c Nenhum campo encontrado com nome 'data_declaracao' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,769 - INFO - \U0001f7e2 Campo 'data_declaracao' criado para estrutura ID 767
+2025-07-22 12:33:51,784 - ERROR - \u274c Nenhum campo encontrado com nome 'defesa_tcc' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,791 - INFO - \U0001f7e2 Campo 'defesa_tcc' criado para estrutura ID 767
+2025-07-22 12:33:51,805 - ERROR - \u274c Nenhum campo encontrado com nome 'numero_declaracao' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,811 - INFO - \U0001f7e2 Campo 'numero_declaracao' criado para estrutura ID 767
+2025-07-22 12:33:51,823 - ERROR - \u274c Nenhum campo encontrado com nome 'projecto_final' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,829 - INFO - \U0001f7e2 Campo 'projecto_final' criado para estrutura ID 767
+2025-07-22 12:33:51,843 - ERROR - \u274c Nenhum campo encontrado com nome 'retirado' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,848 - INFO - \U0001f7e2 Campo 'retirado' criado para estrutura ID 767
+2025-07-22 12:33:51,866 - ERROR - \u274c Nenhum campo encontrado com nome 'codigo_aluno' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,875 - INFO - \U0001f7e2 Campo 'codigo_aluno' criado para estrutura ID 767
+2025-07-22 12:33:51,887 - ERROR - \u274c Nenhum campo encontrado com nome 'codigo_declaracao_destino' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,894 - INFO - \U0001f7e2 Campo 'codigo_declaracao_destino' criado para estrutura ID 767
+2025-07-22 12:33:51,909 - ERROR - \u274c Nenhum campo encontrado com nome 'codigo_guia_pagamento' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,913 - INFO - \U0001f7e2 Campo 'codigo_guia_pagamento' criado para estrutura ID 767
+2025-07-22 12:33:51,929 - ERROR - \u274c Nenhum campo encontrado com nome 'codigo_tipo_declaracao' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,940 - INFO - \U0001f7e2 Campo 'codigo_tipo_declaracao' criado para estrutura ID 767
+2025-07-22 12:33:51,955 - ERROR - \u274c Nenhum campo encontrado com nome 'data_missao' na estrutura ID 767 para exclusão.
+2025-07-22 12:33:51,961 - INFO - \U0001f7e2 Campo 'data_missao' criado para estrutura ID 767
+2025-07-22 12:33:51,962 - INFO - \U0001f7e2 Valores ENUM sincronizados: {}
+2025-07-22 12:35:08,381 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:35:08,390 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 12:35:08,744 - WARNING - \u26a0\ufe0f Este dialeto não implementa 'get_unique_constraints'. Continuando sem verificar unicidade...
+2025-07-22 12:35:08,953 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'id' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:08,958 - INFO - \U0001f7e2 Campo 'id' criado para estrutura ID 767
+2025-07-22 12:35:09,005 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'ano_curricular' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,017 - INFO - \U0001f7e2 Campo 'ano_curricular' criado para estrutura ID 767
+2025-07-22 12:35:09,032 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'ano_declaracao' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,039 - INFO - \U0001f7e2 Campo 'ano_declaracao' criado para estrutura ID 767
+2025-07-22 12:35:09,083 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'cerimonia' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,089 - INFO - \U0001f7e2 Campo 'cerimonia' criado para estrutura ID 767
+2025-07-22 12:35:09,104 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'data_declaracao' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,110 - INFO - \U0001f7e2 Campo 'data_declaracao' criado para estrutura ID 767
+2025-07-22 12:35:09,127 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'defesa_tcc' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,138 - INFO - \U0001f7e2 Campo 'defesa_tcc' criado para estrutura ID 767
+2025-07-22 12:35:09,156 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'numero_declaracao' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,167 - INFO - \U0001f7e2 Campo 'numero_declaracao' criado para estrutura ID 767
+2025-07-22 12:35:09,187 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'projecto_final' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,197 - INFO - \U0001f7e2 Campo 'projecto_final' criado para estrutura ID 767
+2025-07-22 12:35:09,216 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'retirado' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,222 - INFO - \U0001f7e2 Campo 'retirado' criado para estrutura ID 767
+2025-07-22 12:35:09,241 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'codigo_aluno' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,250 - INFO - \U0001f7e2 Campo 'codigo_aluno' criado para estrutura ID 767
+2025-07-22 12:35:09,268 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'codigo_declaracao_destino' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,277 - INFO - \U0001f7e2 Campo 'codigo_declaracao_destino' criado para estrutura ID 767
+2025-07-22 12:35:09,294 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'codigo_guia_pagamento' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,304 - INFO - \U0001f7e2 Campo 'codigo_guia_pagamento' criado para estrutura ID 767
+2025-07-22 12:35:09,321 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'codigo_tipo_declaracao' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,331 - INFO - \U0001f7e2 Campo 'codigo_tipo_declaracao' criado para estrutura ID 767
+2025-07-22 12:35:09,352 - WARNING - \u26a0\ufe0f 1 campo(s) com nome 'data_missao' deletado(s) da estrutura ID 767.
+2025-07-22 12:35:09,360 - INFO - \U0001f7e2 Campo 'data_missao' criado para estrutura ID 767
+2025-07-22 12:35:09,368 - INFO - \U0001f7e2 Valores ENUM sincronizados: {}
+2025-07-22 12:35:22,685 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 12:35:22,687 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 12:35:22,698 - INFO - \U0001f50e Iniciando execução da query com filtros...
+2025-07-22 12:35:22,710 - INFO - \U0001f4d8 Query montada:
+SELECT t_registro_documentos.id, t_registro_documentos.ano_curricular, t_registro_documentos.ano_declaracao, t_registro_documentos.cerimonia, t_registro_documentos.data_declaracao, t_registro_documentos.defesa_tcc, t_registro_documentos.numero_declaracao, t_registro_documentos.projecto_final, t_registro_documentos.retirado, t_registro_documentos.codigo_aluno, t_registro_documentos.codigo_declaracao_destino, t_registro_documentos.codigo_guia_pagamento, t_registro_documentos.codigo_tipo_declaracao, t_registro_documentos.data_missao FROM t_registro_documentos WHERE t_registro_documentos.id = :t_registro_documentos_id ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY
+2025-07-22 12:35:22,710 - INFO - \U0001f4e6 Parâmetros:
+{
+  "t_registro_documentos_id": 47003.0
+}
+2025-07-22 12:35:22,744 - INFO - \u2705 Query executada com sucesso.
+2025-07-22 12:35:22,771 - INFO - Consulta criada com sucesso (UserID=1, ConnID=5)
+2025-07-22 14:10:32,717 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 14:10:32,740 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 14:10:40,456 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 14:10:40,459 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 14:10:44,246 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 14:10:44,250 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 14:11:48,094 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 14:11:48,096 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 14:11:48,136 - INFO - \U0001f50d Usando cache para 231 tabelas na conexão 5
+2025-07-22 14:11:48,149 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-07-22 14:11:48,152 - INFO - \U0001f50d Buscando conexão com ID 5
+2025-07-22 14:11:48,181 - INFO - \U0001f50d Usando cache para 231 tabelas na conexão 5

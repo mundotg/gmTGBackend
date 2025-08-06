@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guia Completo: FastAPI + Alembic</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; background: #f9f9f9; }
+    h1, h2, h3 { color: #2c3e50; }
+    code { background: #eee; padding: 2px 4px; border-radius: 4px; }
+    pre { background: #eee; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    ul { margin-top: 0; }
+    .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>📘 Guia Completo: FastAPI + Alembic</h1>
+
+    <h2>✅ Instalação Inicial</h2>
+    <pre><code>pip install fastapi uvicorn sqlalchemy alembic python-dotenv</code></pre>
+
+    <h2>⚙️ Estrutura Sugerida</h2>
+    <pre><code>project/
+├── app/
+│   ├── main.py
+│   ├── models/
+│   ├── schemas/
+│   ├── crud/
+│   ├── db/
+│   │   ├── session.py
+│   │   └── base.py
+│   └── routers/
+│       └── user.py
+├── alembic/
+├── alembic.ini
+├── requirements.txt
+└── .env</code></pre>
+
+    <h2>🔌 Banco de Dados</h2>
+    <p><strong>db/session.py:</strong></p>
+    <pre><code>from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+DATABASE_URL = "sqlite:///./test.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)</code></pre>
+
+    <p><strong>db/base.py:</strong></p>
+    <pre><code>from sqlalchemy.orm import declarative_base
+Base = declarative_base()</code></pre>
+
+    <h2>🧱 Modelo</h2>
+    <pre><code>from sqlalchemy import Column, Integer, String
+from app.db.base import Base
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    email = Column(String, unique=True)</code></pre>
+
+    <h2>🚀 Rotas e Inicialização</h2>
+    <pre><code># main.py
+from fastapi import FastAPI
+from app.routers import user
+app = FastAPI()
+app.include_router(user.router)</code></pre>
+
+    <pre><code># routers/user.py
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.db.session import SessionLocal
+from app.models.user import User
+
+router = APIRouter(prefix="/users", tags=["Users"])
+
+def get_db():
+    db = SessionLocal()
+    try: yield db
+    finally: db.close()
+
+@router.get("/")
+def get_users(db: Session = Depends(get_db)):
+    return db.query(User).all()</code></pre>
+
+    <h2>🧪 Testar</h2>
+    <p>Rodar servidor:</p>
+    <pre><code>uvicorn app.main:app --reload</code></pre>
+    <p>Ir para: <a href="http://localhost:8000/docs">/docs</a> ou <a href="http://localhost:8000/redoc">/redoc</a></p>
+
+    <h2>🧬 Alembic</h2>
+    <p>Inicialização:</p>
+    <pre><code>alembic init alembic</code></pre>
+
+    <p>Editar <strong>alembic.ini</strong>:</p>
+    <pre><code>sqlalchemy.url = sqlite:///./test.db</code></pre>
+
+    <p>Editar <strong>env.py</strong>:</p>
+    <pre><code>from app.db.base import Base
+from app.models import user
+
+target_metadata = Base.metadata</code></pre>
+
+    <p>Criar migration:</p>
+    <pre><code>alembic revision --autogenerate -m "create user table"</code></pre>
+    <p>Aplicar:</p>
+    <pre><code>alembic upgrade head</code></pre>
+
+    <h2>📚 Comandos Alembic</h2>
+    <ul>
+      <li><code>alembic history</code> - ver histórico</li>
+      <li><code>alembic current</code> - versão atual</li>
+      <li><code>alembic upgrade head</code> - aplicar tudo</li>
+      <li><code>alembic downgrade -1</code> - reverter última</li>
+    </ul>
+
+    <h2>🛡️ Segurança</h2>
+    <ul>
+      <li>Use <code>pydantic</code> para validar entradas</li>
+      <li>Use <code>python-dotenv</code> para variáveis sensíveis</li>
+      <li>Habilite CORS:</li>
+    </ul>
+    <pre><code>from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)</code></pre>
+
+    <h2>📦 Extras</h2>
+    <ul>
+      <li>Autenticação com OAuth2 e JWT</li>
+      <li>Separação por módulos: crud, schemas, routers</li>
+      <li>Versionamento com prefixo nas rotas: <code>/api/v1</code></li>
+    </ul>
+
+    <h2>🧾 Exemplo requirements.txt</h2>
+    <pre><code>fastapi
+uvicorn
+sqlalchemy
+alembic
+python-dotenv
+pydantic</code></pre>
+
+    <p>Guia pronto para consulta offline. ✅</p>
+  </div>
+</body>
+</html>

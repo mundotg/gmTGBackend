@@ -21,13 +21,13 @@ def get_active_connection_by_userid(db: Session, user_id: int):
     return (
         db.query(ActiveConnection)
         .join(ActiveConnection.connection)
-        .filter(ActiveConnection.connection.has(user_id=user_id))
-        .filter(ActiveConnection.status == True)
+        .filter(ActiveConnection.connection.has(user_id=user_id),ActiveConnection.status == True)
         .first()
     )
 def get_active_connection_by_connid(db: Session, conn_id: int):
     log_message(f"📡 Verificando conexão ativa do conexão {conn_id}", "info")
-    return db.query(ActiveConnection).filter(ActiveConnection.connection_id == conn_id).first()
+    conn_ativa = db.query(ActiveConnection).filter(ActiveConnection.connection_id == conn_id, ActiveConnection.status == True).first()
+    return conn_ativa
 
 def delete_active_connection(db: Session, conn_id: int):
     active = get_active_connection_by_userid(db, conn_id)
@@ -51,6 +51,8 @@ def disconnect_active_connection(db: Session, conn_id: int):
 def connect_active_connection(db: Session, conn_id: int):
     
     active = get_active_connection_by_connid(db, conn_id)
+    if not active:
+        return None
     desactivate_all_connections(db, active.connection.user_id)  # Desativa todas as conexões ativas do usuário
     if active:
         active.status = True
@@ -96,6 +98,7 @@ def desactivate_all_connections(db: Session, user_id: int):
         {"status": False},
         synchronize_session=False
     )
+    
 
     db.commit()
     log_message(f"🔒 {updated} conexões desativadas para o usuário {user_id}", "info")
@@ -124,7 +127,6 @@ def create_db_connection(db: Session, user_id: int, conn_data: DBConnectionBase)
 
 def get_db_connections(db: Session, user_id: int):
     log_message(f"🔍 Buscando conexões do usuário {user_id}", "info")
-    # print(f"🔍 Buscando conexões do usuário {user_id}")
     return db.query(DBConnection).filter(DBConnection.user_id == user_id).all()
 
 def get_db_connections_pagination(
@@ -220,7 +222,6 @@ def get_connection_logs_pagination(
         query = query.filter(ConnectionLog.connection_id == connection_id)
 
     total = query.count()
-    # print(f"Total de logs encontrados: {total}")
     results = query.offset((page - 1) * limit).limit(limit).all()
 
     return {

@@ -17,6 +17,4 @@ def get_env(name: str, default: Optional[str] = None) -> Optional[str]:
     Retorna:
     - str | None: Valor da variável ou o padrão informado.
     """
-    # print(f"Obtendo variável de ambiente: {name} com valor padrão: {default}")
-    # print(f"Valor obtido: {os.getenv(name)}")
     return os.getenv(name, default)

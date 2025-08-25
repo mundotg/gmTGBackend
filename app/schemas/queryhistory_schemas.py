@@ -109,3 +109,4 @@ class QueryPayload(BaseModel):
     limit: Optional[int] = None
     distinct: Optional[DistinctList] = None
     offset: Optional[int] = None
+    isCountQuery: Optional[bool] = False

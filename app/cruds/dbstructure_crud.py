@@ -101,18 +101,35 @@ def delete_structure_by_name(
 # ------------------------------------------------------------------------------
 
 def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> DBField:
-    # Verifica se o campo já existe na estrutura (evita duplicação)
+    # Verifica se já existe campo com o mesmo nome nessa estrutura
     existing_field = db.query(DBField).filter_by(
         structure_id=structure_id,
         name=field_in.name
-    ).all()
+    ).first()
 
     if existing_field:
-        log_message(f"⚠️ Campo '{field_in.name}' já existe para estrutura ID {structure_id}. Ignorando criação.", "warning")
-        print(f"[DUPLICADO] Campo '{field_in.name}' já existe para estrutura {structure_id}")
+        # Atualiza os dados do campo existente
+        existing_field.type = field_in.type
+        existing_field.is_nullable = field_in.is_nullable
+        existing_field.default_value = field_in.default_value
+        existing_field.is_primary_key = field_in.is_primary_key
+        existing_field.is_ForeignKey = field_in.is_ForeignKey
+        existing_field.is_unique = field_in.is_unique
+        existing_field.referenced_table = field_in.referenced_table
+        existing_field.field_references = field_in.field_references
+        existing_field.is_auto_increment = field_in.is_auto_increment
+        existing_field.comment = field_in.comment
+        existing_field.length = field_in.length
+        existing_field.precision = field_in.precision
+        existing_field.scale = field_in.scale
+
+        db.commit()
+        db.refresh(existing_field)
+
+        log_message(f"🔄 Campo '{field_in.name}' atualizado na estrutura ID {structure_id}", "info")
         return existing_field
 
-    # Cria novo campo
+    # Caso não exista, cria um novo campo
     field = DBField(
         structure_id=structure_id,
         name=field_in.name,
@@ -123,6 +140,7 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
         is_ForeignKey=field_in.is_ForeignKey,
         is_unique=field_in.is_unique,
         referenced_table=field_in.referenced_table,
+        field_references=field_in.field_references,
         is_auto_increment=field_in.is_auto_increment,
         comment=field_in.comment,
         length=field_in.length,
@@ -134,9 +152,9 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
     db.commit()
     db.refresh(field)
 
-    log_message(f"🟢 Campo '{field.name}' criado para estrutura ID {structure_id}", "info")
-    print(f"[CRIADO] Campo '{field.name}' adicionado à estrutura {structure_id}")
+    log_message(f"🟢 Campo '{field.name}' criado na estrutura ID {structure_id}", "info")
     return field
+
 
 
 

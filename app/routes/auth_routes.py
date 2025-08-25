@@ -55,8 +55,8 @@ def login_user(credentials: users_chemas.UserLogin, response: Response, db: Sess
 
     set_cookie(response, "refresh_token", refresh_token, path="/auth/refresh")
     set_cookie(response, "access_token", access_token)
-    
-    rep =reativar_connection(user.id, db)
+
+    rep = reativar_connection(user.id, db)
     if rep["success"]:
         user.InfPlus = rep["config"]
 
@@ -71,7 +71,6 @@ def refresh_access_token(
 ):
     if not refresh_token or not is_refresh_token_valid(db, refresh_token):
         raise HTTPException(status_code=422, detail="Refresh token inválido ou expirado")
-    # print(f"[TOKEN] Refresh token válido: {refresh_token}")
     payload = auth.decode_token(refresh_token)
     if not payload:
         raise HTTPException(status_code=402, detail="Token inválido")
@@ -89,7 +88,6 @@ def get_logged_user(
     access_token: str = Cookie(None),
     db: Session = Depends(database.get_db)
 ):
-    # print(f"[TOKEN] auth/me Access token recebido: {access_token}")
     # if not access_token or not is_refresh_token_valid(db, access_token):
         # raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado")
     if access_token is None:
@@ -105,7 +103,6 @@ def get_logged_user(
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
     rep =reativar_connection(user.id, db)
-    # print(rep)
     if rep["success"]:
         user.InfPlus = rep["config"]
 

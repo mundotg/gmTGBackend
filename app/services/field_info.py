@@ -93,7 +93,6 @@ def montar_resposta_sincronizacao(
     duplicados = {nome for nome in nomes if nomes.count(nome) > 1}
 
     # if duplicados:
-    #     print(f"Colunas duplicadas detectadas: {', '.join(duplicados)}")
     
     return MetadataTableResponse(
         message="Metadados obtidos com sucesso",
@@ -140,6 +139,10 @@ def processar_enum_fields(
             is_nullable=column.is_nullable,
             is_unique=column.is_unique,
             is_primary_key=column.is_primary_key,
+            is_foreign_key=column.is_ForeignKey,
+            referenced_table=column.referenced_table,
+            field_references=column.field_references,
+            is_auto_increment=column.is_auto_increment,
             default=column.default_value,
             comentario=column.comment,
             length=column.length,
@@ -185,9 +188,8 @@ def buscar_ou_criar_campos_tabela(
     #     return campos_existentes
 
     # 🔹 Buscar chaves estrangeiras já organizadas: { "coluna": "tabela_referenciada" }
-    foreign_keys_map = _get_foreign_keys(engine, structure.table_name)
-    foreign_keys = foreign_keys_map.get(structure.table_name, {})
-    print(f"🔍 Chaves estrangeiras encontradas: {foreign_keys}")
+    # foreign_keys_map = _get_foreign_keys(engine, structure.table_name)
+    # foreign_keys = foreign_keys_map.get(structure.table_name, {})
 
     try:
         inspector: Inspector = inspect(engine)
@@ -223,10 +225,23 @@ def buscar_ou_criar_campos_tabela(
 
     # Chaves estrangeiras (fallback extra, já usamos `_get_foreign_keys`)
     foreign_keys_info = inspector.get_foreign_keys(structure.table_name, schema=structure.schema_name)
-    fk_columns = set()
+    relations_map = {}  # mapa de relações encontradas
+
     for fk in foreign_keys_info:
-        for col in fk.get("constrained_columns", []):
-            fk_columns.add(col)
+        tabela_origem = structure.table_name
+        tabela_relacao = fk["referred_table"]
+        for col_origem, col_relacao in zip(
+            fk.get("constrained_columns", []),
+            fk.get("referred_columns", []),
+        ):
+            relation = {
+                "fieldTabelaOrigem": col_origem,
+                "tabelaRelacao": tabela_relacao,
+                "fieldTabelaRelacao": col_relacao,
+            }
+            relations_map[col_origem] = relation
+            # print(f"🔗 FK: {relation}")
+
 
     # Processa cada coluna
     for column in columns:
@@ -237,7 +252,10 @@ def buscar_ou_criar_campos_tabela(
         scale = getattr(column_type, "scale", None)
         is_primary_key = col_name in primary_keys
         is_unique = col_name in unique_columns
-        is_ForeignKey = col_name in fk_columns or col_name in foreign_keys
+        relation = relations_map.get(col_name)
+        print(f"🔗 FK: {relation}" if relation else f"🔗 Não é FK: {col_name} ", f"{relation is not None}")
+        is_ForeignKey = True if relation else False
+        print(f"is ForeignKey: {is_ForeignKey}")
 
         is_auto_incremento = _is_system_field(
             col_name,
@@ -258,7 +276,8 @@ def buscar_ou_criar_campos_tabela(
             default_value=column.get("default"),
             is_primary_key=is_primary_key,
             comment=column.get("comment", "") or "",
-            referenced_table=foreign_keys.get(col_name),
+            referenced_table=relations_map.get(col_name).get("tabelaRelacao") if is_ForeignKey else None,
+            field_references=relations_map.get(col_name).get("fieldTabelaRelacao") if is_ForeignKey else None,
             is_unique=is_unique,
             is_ForeignKey=is_ForeignKey,
             is_auto_increment=is_auto_incremento,
@@ -270,11 +289,11 @@ def buscar_ou_criar_campos_tabela(
         field = create_db_field(db=db, field_in=field_in, structure_id=structure.id)
         campos_resultantes.append(field_in)
 
-        print(f"🟢 Campo criado: {col_name} (FK: {is_ForeignKey}", end="")
-        if is_ForeignKey and col_name in foreign_keys:
-            print(f" → {foreign_keys[col_name]})")
-        else:
-            print(")")
+        # print(f"🟢 Campo criado: {col_name} (FK: {is_ForeignKey}", end="")
+        # if is_ForeignKey and col_name in foreign_keys:
+        #     print(f" → {foreign_keys[col_name]})")
+        # else:
+        #     print(")")
 
     return campos_resultantes
 

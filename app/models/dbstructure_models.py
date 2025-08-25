@@ -44,6 +44,7 @@ class DBField(Base):
     is_auto_increment = Column(Boolean, default=False)
     is_ForeignKey = Column(Boolean, default=False)
     referenced_table = Column(String, nullable=True)  # ← Adicionado aqui
+    field_references =  Column(String, nullable=True)  # Nome do campo que referencia
     default_value = Column(String, nullable=True)
     comment = Column(Text, nullable=True)
     length = Column(Integer, nullable=True)

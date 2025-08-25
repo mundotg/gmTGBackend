@@ -15,6 +15,7 @@ class DBFieldBase(BaseModel):
     is_primary_key: Optional[bool] = Field(default=False, description="É chave primária?")
     is_ForeignKey: Optional[bool] = Field(default=False, description="É chave estrangeira?")
     referenced_table: Optional[str] = Field(default=None, description="Nome da tabela referenciada (se for chave estrangeira)")
+    field_references: Optional[str] = Field(default=None, description="Nome do campo que referencia (se for chave estrangeira)")
     is_unique: Optional[bool] = Field(default=False, description="É valor único?")
     is_auto_increment: Optional[bool] = Field(default=False, description="É autoincrementável?")
     comment: Optional[str] = Field(default=None, description="Comentário da coluna")
@@ -68,6 +69,9 @@ class CampoDetalhado(BaseModel):
     is_nullable: bool
     is_primary_key: bool
     is_ForeignKey: Optional[bool] = False
+    is_auto_increment: Optional[bool] = False
+    referenced_table: Optional[str] = None
+    field_references: Optional[str] = None
     is_unique: Optional[bool] = False
     default: Optional[str] = None
     comentario: Optional[str] = None

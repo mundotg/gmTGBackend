@@ -21,7 +21,6 @@ def pesquisar_in_db(
     retornando os dados com chaves no formato tabela.coluna.
     """
     try:
-        print(f"Pesquisando linha no índice {selected_row_index} na tabela {table_name}... type: {db_type}")
         db_type = (db_type or "").strip().lower()
         valid_db_types = ["postgres", "postgresql", "sqlite", "mysql", "oracle", "mssql", "sql server", "sqlserver"]
 
@@ -138,7 +137,6 @@ def convert_values(value: Any) -> Any:
     """
     Converte valores para tipos compatíveis com bancos de dados.
     """
-    print(f"Convertendo valor: {value} (tipo: {type(value)})")
     if isinstance(value, (int, np.integer)):
         return int(value)
     if isinstance(value, (float, np.floating)):

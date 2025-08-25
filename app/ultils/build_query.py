@@ -202,7 +202,6 @@ def get_query_string(
 
     # Escape table
     quoted_base_table = quote_identifier(db_type, base_table)
-    print(f"🔍 quoted_base_table: {quoted_base_table} joins {joins} table_list {table_list} ")
     # JOINs
     if joins:
         join_sql = " " + " ".join(
@@ -259,8 +258,43 @@ def get_query_string(
             )
         else:
             query = f"SELECT * FROM ({query}) WHERE ROWNUM <= {max_rows}"
-    # print(f"🔍 db type: {db_type}, query: {query}")
     return query
+
+def get_count_query(
+    base_table: str,
+    joins: Optional[List[JoinOption]] = None,
+    filters: Optional[str] = None,
+    distinct: Optional[DistinctList] = None,
+    db_type: str = "mysql"
+) -> str:
+    """
+    Gera uma query SQL para contar registros, considerando joins, filtros e DISTINCT.
+    """
+    db_type = db_type.lower()
+    quoted_base_table = quote_identifier(db_type, base_table)
+
+    # JOINs
+    if joins:
+        join_sql = " " + " ".join(
+            f"{join.type.upper()} {quote_identifier(db_type, join.table)} ON {join.on}"
+            for join in joins
+        )
+    else:
+        join_sql = ""
+
+    # COUNT com DISTINCT
+    if distinct and distinct.useDistinct and distinct.distinct_columns:
+        distinct_cols = ", ".join(quote_identifier(db_type, col) for col in distinct.distinct_columns)
+        query = f"SELECT COUNT(DISTINCT {distinct_cols}) FROM {quoted_base_table}{join_sql}"
+    else:
+        query = f"SELECT COUNT(*) FROM {quoted_base_table}{join_sql}"
+
+    # WHERE
+    if filters:
+        query += f" {filters}"
+
+    return query
+
 
 
 def quote_identifier(db_type: str, identifier: str) -> str:

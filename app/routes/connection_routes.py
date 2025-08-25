@@ -35,7 +35,6 @@ def test_and_connect(
     user_id: int = Depends(get_current_user_id)
 ):
     db_conn = None  # Inicializa fora do try para uso no except
-    # print("body:",conn_data)
     try:
         # 1. Fecha engine antigo, se houver
         try:
@@ -144,7 +143,7 @@ def connect_or_disconnect(
             )
         else:
             log_message("⚡ Nenhuma conexão ativa detectada. Iniciando conexão...")
-
+            desactivate_all_connections(db, user_id)
             conn_data: DBConnectionBase = get_db_connection_by_id(db, conn_id)
             engine = get_session_by_connection(conn_data)
 
@@ -158,7 +157,6 @@ def connect_or_disconnect(
             act = connect_active_connection(db,db_conn.id)
             if not act:
                 act = set_active_connection(db, user_id, db_conn.id)
-            # print("act: ",act)
             create_connection_log(
                 db, connection_id=db_conn.id,
                 action="Conexão ativada",  status="success"
@@ -170,7 +168,7 @@ def connect_or_disconnect(
             )
 
     except Exception as e:
-        log_message(f"❌ Erro ao alternar conexão: {str(e)}", level="error")
+        log_message(f"❌ Erro ao alternar conexão: {str(e)}\n{traceback.format_exc()}", level="error")
         raise HTTPException(
             status_code=500,
             detail="Erro ao conectar ou desconectar. Verifique os dados e tente novamente."
@@ -197,7 +195,6 @@ def list_connections(
             }) for conn in connections
     ]
 
-    # print(f"[LISTA] Obtendo conexões salvas para o usuário {user_id}: {lista_convertida}")
     return lista_convertida
 
 @router.get("/connections/", response_model=ConnectionPaginationOutput)
@@ -237,7 +234,6 @@ def delete_connection_save(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    # print("Método da requisição:", Request.method)
     conn = None  # Garante que conn existe mesmo se falhar
     try:
         # Deleta a conexão

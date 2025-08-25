@@ -2,14 +2,16 @@ import traceback
 from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 from app.config.dependencies import EngineManager, get_session_by_connection
-from app.cruds.connection_cruds import disconnect_active_connection, get_active_connection_by_userid, get_db_connection_by_id
+from app.cruds.connection_cruds import create_db_connection, disconnect_active_connection, get_active_connection_by_userid, get_db_connection_by_id
 from app.cruds.dbstatistics_crud import get_statistics_by_connection_geral
 from app.cruds.queryhistory_crud import get_ultima_consulta
 from app.models.connection_models import DBConnection
+from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.users_chemas import Db_on
 from app.ultils.logger import log_message
 from datetime import datetime
 
+from app.ultils.socket_connection import is_port_open
 def reativar_connection(id_user: int, db: Session) -> dict:
     """
     Reativa a conexão de banco de dados para um usuário específico.
@@ -25,24 +27,18 @@ def reativar_connection(id_user: int, db: Session) -> dict:
         }
     """
     try:
-        
-
-        conexao,activated_at = get_connection_current(db,id_user)
+        conexao, activated_at = get_connection_current(db, id_user)
         if not conexao:
-            # print("conexao=",conexao)
             return {"success": False, "config": None}
 
         stats = get_statistics_by_connection_geral(db, conexao.id)
-        # print("stats: ",stats)
-        num_tabelas =  0
+        num_tabelas = 0
         consultas_hoje = 0
         registros = 0
         if stats:
             num_tabelas = stats.total_structured_tables or 0
             consultas_hoje = stats.statistics.queries_today or 0
             registros = stats.statistics.records_analyzed or 0
-
-        
 
         ultima_consulta = get_ultima_consulta(db, conexao.id, id_user)
         data_ultima = ultima_consulta.executed_at if ultima_consulta else None
@@ -59,28 +55,43 @@ def reativar_connection(id_user: int, db: Session) -> dict:
             ultima_consulta_em=data_ultima,
             registros_analizados=registros
         )
-        
-        # print("db_on:", db_on)
 
+        # Se não houver engine ativa, tenta criar
         if not EngineManager.get(id_user):
+            # 🔍 Checa antes de criar engine se o host:porta está acessível
+            if not is_port_open(conexao.host, conexao.port):
+                log_message(
+                    f"❌ Banco {conexao.host}:{conexao.port} inacessível para o usuário {id_user}",
+                    "error"
+                )
+                desativar_connection(id_user, conexao.id, db)
+                return {"success": False, "config": db_on}
+
             engine = get_session_by_connection(conexao)
             if engine:
                 EngineManager.set(engine, id_user)
             else:
-                log_message(f"⚠️ Falha ao criar engine para o usuário {id_user}", "warning")
+                log_message(
+                    f"⚠️ Falha ao criar engine para o usuário {id_user}",
+                    "warning"
+                )
+                desativar_connection(id_user, conexao.id, db)
                 return {"success": False, "config": db_on}
 
         return {"success": True, "config": db_on}
 
     except Exception as e:
-        log_message(f"❌ Erro em reativar_connection:"
-        f"Tipo: { type(e).__name__}\n"
-        f"Mensagem: {str(e)}\n"
-        f"StackTrace:\n{traceback.format_exc()}","error")
+        log_message(
+            f"❌ Erro em reativar_connection:"
+            f"\nTipo: {type(e).__name__}"
+            f"\nMensagem: {str(e)}"
+            f"\nStackTrace:\n{traceback.format_exc()}",
+            "error"
+        )
         return {"success": False, "config": None}
 
 
-def desativar_connection(id_user: int, db: Session) -> dict:
+def desativar_connection(id_user: int, conn: int, db: Session) -> dict:
     """
     Desativa a conexão de banco de dados para um usuário específico.
 
@@ -95,7 +106,11 @@ def desativar_connection(id_user: int, db: Session) -> dict:
         }
     """
     try:
-        conexao_ativa = disconnect_active_connection(db, id_user)
+        conexao_ativa = disconnect_active_connection(db, conn)
+        conn_data: DBConnectionBase = get_db_connection_by_id(db, conn)
+        conn_data.status = "disconnected"
+        create_db_connection(db, id_user, conn_data)
+
         if not conexao_ativa or not conexao_ativa.status:
             return {"success": False, "message": "Nenhuma conexão ativa encontrada para o usuário."}
         disconnect_active_connection(db, conexao_ativa.connection_id)
@@ -122,7 +137,6 @@ def get_connection_current(db: Session, id_user: int) -> Tuple[Optional[DBConnec
     :return: Uma tupla contendo (conexão, data de ativação) ou (None, None)
     """
     conexao_ativa = get_active_connection_by_userid(db, id_user)
-
     if not conexao_ativa or not conexao_ativa.status:
         return None, None
 

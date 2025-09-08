@@ -1,18 +1,17 @@
 import json
 import time
 import re
-import traceback
 from datetime import datetime, timezone
 from typing import List
-from fastapi import params
 from sqlalchemy.orm import Session
 from sqlalchemy.engine import Engine
 from sqlalchemy.sql import text
 
-from app.cruds.queryhistory_crud import create_query_history
+from app.cruds.queryhistory_crud import create_query_history, get_query_history_by_user_and_query
 from app.models.connection_models import DBConnection
 from app.schemas.queryhistory_schemas import CondicaoFiltro, QueryHistoryCreate, QueryPayload
 from app.ultils.build_query import get_count_query, get_filter_condition_with_operation, get_query_string
+from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
 
@@ -44,7 +43,7 @@ def montar_filter_com_parametros(
             operation=cond.operator,
             param_name="",
             enum_values="",
-            value_otheir_between=""
+            value_otheir_between=cond.value2
         )
 
         logic = cond.logicalOperator or "AND"
@@ -57,12 +56,13 @@ def montar_filter_com_parametros(
 
     return f"WHERE {where_sql}", params
 
-def executar_query_e_salvar(
+def executar_query_e_salvar( 
     db: Session,
     user_id: int,
     connection: DBConnection,
     engine: Engine,
-    queryrequest: QueryPayload
+    queryrequest: QueryPayload,
+    chache_consulta: bool = False
 ) -> dict:
     log_message("🔎 Iniciando execução da query com filtros...", "info")
     start = time.time()
@@ -79,7 +79,6 @@ def executar_query_e_salvar(
     # Filtros WHERE
     filters = ""
     params = {}
-
     if queryrequest.where:
         filters, params = montar_filter_com_parametros(queryrequest.where, connection.type)
 
@@ -101,7 +100,7 @@ def executar_query_e_salvar(
             table_list=queryrequest.table_list,
             order_by=queryrequest.orderBy,
             max_rows=queryrequest.limit,
-            offset=queryrequest.offset ,
+            offset=queryrequest.offset,
             db_type=connection.type,
             distinct=queryrequest.distinct
         )
@@ -109,31 +108,77 @@ def executar_query_e_salvar(
     log_message(f"📘 Query montada:\n{query_string}", "debug")
     log_message(f"📦 Parâmetros:\n{json.dumps(params, indent=2)}", "debug")
 
+    # 🔎 Verificar se já existe essa query registrada para o mesmo user/connection
+    
+    if chache_consulta:
+        print("Verificando cache...")
+        consulta_existente = get_query_history_by_user_and_query(db,user_id,connection.id, query_string)
+
+        if consulta_existente:
+            log_message("⚠️ Consulta já registrada no histórico. Retornando resultado salvo.", "warning")
+            if "Erro operacional ao executar a consulta. Verifique a conexão e a consulta." not in (consulta_existente.error_message or ""):
+                if consulta_existente.error_message:
+                    raise ValueError(consulta_existente.error_message)
+
+                if queryrequest.isCountQuery:
+                    # Recupera o valor count salvo como string e transforma em int
+                    count_value = int(consulta_existente.result_preview)
+                    return {
+                        "success": True,
+                        "count": count_value,
+                        "query": consulta_existente.query,
+                        "duration_ms": consulta_existente.duration_ms,
+                        "cached": True
+                    }
+                else:
+                    # Recupera o preview salvo como JSON
+                    preview_data = json.loads(consulta_existente.result_preview) if consulta_existente.result_preview else []
+                    columns = list(preview_data[0].keys()) if isinstance(preview_data, list) and preview_data else []
+                    return {
+                        "success": True,
+                        "query": consulta_existente.query,
+                        "params": params,
+                        "duration_ms": consulta_existente.duration_ms,
+                        "columns": columns,
+                        "preview": preview_data,
+                        "cached": True
+                    }
+
+    # Se não existir, executa e salva normalmente
     result_preview = None
     error_message = None
     colunas = []
 
     try:
         with engine.connect() as conn:
+            # print("Query final:", query_string % params) 
+
             result = conn.execute(text(query_string), parameters=params)
-            
             if queryrequest.isCountQuery:
-                # Retorna apenas o primeiro valor da contagem
                 count_value = result.scalar()
                 result_preview = count_value
                 colunas = ["count"]
             else:
                 linhas = result.fetchall()
                 colunas = result.keys()
-                preview = [dict(zip(queryrequest.select, linha)) for linha in linhas] if linhas else []
+
+                if linhas:
+                    if queryrequest.select:
+                        # usa os nomes do select
+                        preview = [dict(zip(queryrequest.select, linha)) for linha in linhas]
+                    else:
+                        # usa os nomes vindos do banco (result.keys())
+                        preview = [dict(zip(colunas, linha)) for linha in linhas]
+                else:
+                    preview = []
+                # print("test",preview)
                 result_preview = json.dumps(preview, default=str)
 
         log_message("✅ Query executada com sucesso.", "success")
 
     except Exception as e:
-        error_message = f"{str(e)}\n{traceback.format_exc()}"
         db.rollback()
-        log_message(f"❌ Erro na execução da query:\n{error_message}", "error")
+        error_message = _lidar_com_erro_sql(e)
 
     duration_ms = int((time.time() - start) * 1000)
 
@@ -147,8 +192,9 @@ def executar_query_e_salvar(
         result_preview=result_preview if not queryrequest.isCountQuery else str(result_preview),
         error_message=error_message,
         is_favorite=False,
-        tags=""
+        tags="count" if queryrequest.isCountQuery else "select"
     )
+
 
     create_query_history(db=db, data=historico)
     
@@ -156,9 +202,8 @@ def executar_query_e_salvar(
         log_message(f"📝  {error_message}", "error")
         raise Exception(f"Erro na execução da query:\n{error_message}")
 
-    # Retorno
     if queryrequest.isCountQuery:
-        return {"success": True, "count": result_preview, "query": query_string, "duration_ms": duration_ms}
+        return {"success": True, "count": int(result_preview), "query": query_string, "duration_ms": duration_ms}
 
     return {
         "success": True,
@@ -166,7 +211,8 @@ def executar_query_e_salvar(
         "params": params,
         "duration_ms": duration_ms,
         "columns": list(colunas),
-        "preview": json.loads(result_preview) if result_preview else []
+        "preview": json.loads(result_preview) if result_preview else [],
+        "cached": False
     }
 
 

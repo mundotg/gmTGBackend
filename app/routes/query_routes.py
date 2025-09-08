@@ -1,8 +1,12 @@
+import traceback
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.routes.connection_routes import get_current_user_id
-from app.schemas.queryhistory_schemas import QueryPayload
+from app.schemas.queryhistory_schemas import AutoCreateRequest, InsertRequest, QueryPayload, UpdateRequest
+from app.services.insert_row_service import insert_row_service
+from app.services.editar_linha import  update_row_service
+from app.services.insert_service_auto import insert_row_service_auto
 from app.services.query_executor import executar_query_e_salvar
 from app.ultils.ativar_session_bd import get_connection_current, reativar_connection
 from app.config.dependencies import EngineManager
@@ -39,7 +43,7 @@ def executar_query(
         
         return resultado
     except Exception as e:
-        log_message(f"Erro ao executar a query: {str(e)}", "error") 
+        log_message(f"Erro ao executar a query: {str(e)}{traceback.format_exc()}", "error") 
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -69,9 +73,88 @@ def executar_query(
             connection=connection,
             engine=engine,
             queryrequest=body  # ✅ Aqui está a correção
+        
         )
         
         return resultado
     except Exception as e:
         log_message(f"Erro ao executar a query: {str(e)}", "error") 
         raise HTTPException(status_code=500, detail=str(e))
+    
+    
+
+@router.post("/update_row")
+def update_row(data: UpdateRequest, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
+    try:
+        engine = EngineManager.get(user_id)
+
+        if not engine:
+            res = reativar_connection(db=db, id_user=user_id)
+            if not res["success"]:
+                raise HTTPException(status_code=400, detail="Conexão do banco de dados não encontrada")
+            engine = EngineManager.get(user_id)
+
+        connection, _ = get_connection_current(db, user_id)
+        if connection is None:
+            raise HTTPException(status_code=400, detail="ID da conexão não está disponível")
+        
+        return update_row_service(data, engine, user_id, connection.type, connection.id,db)
+
+    except Exception as e:
+        db.rollback()
+        log_message(f"Erro ao atualizar a linha: {str(e)}{traceback.format_exc()}", "error")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.post("/insert_row")
+def update_row(data: InsertRequest, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
+    try:
+        engine = EngineManager.get(user_id)
+
+        if not engine:
+            res = reativar_connection(db=db, id_user=user_id)
+            if not res["success"]:
+                raise HTTPException(status_code=400, detail="Conexão do banco de dados não encontrada")
+            engine = EngineManager.get(user_id)
+
+        connection, _ = get_connection_current(db, user_id)
+        if connection is None:
+            raise HTTPException(status_code=400, detail="ID da conexão não está disponível")
+        
+        return insert_row_service(data, engine, user_id, connection.type, connection.id,db)
+
+    except Exception as e:
+        db.rollback()
+        log_message(f"Erro ao atualizar a linha: {str(e)}{traceback.format_exc()}", "error")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/auto-create")
+def auto_create(
+    data: AutoCreateRequest,
+    user_id: int = Depends(get_current_user_id),  # substituir pelo usuário logado
+    db: Session = Depends(get_db)
+):
+    """
+    Recebe configs do frontend e insere múltiplas linhas.
+    """
+    
+    try:
+        engine = EngineManager.get(user_id)
+
+        if not engine:
+            res = reativar_connection(db=db, id_user=user_id)
+            if not res["success"]:
+                raise HTTPException(status_code=400, detail="Conexão do banco de dados não encontrada")
+            engine = EngineManager.get(user_id)
+
+        connection, _ = get_connection_current(db, user_id)
+        if connection is None:
+            raise HTTPException(status_code=400, detail="ID da conexão não está disponível")
+        
+        return insert_row_service_auto(data, engine, user_id, connection, db)
+
+    except Exception as e:
+        db.rollback()
+        log_message(f"Erro ao atualizar a linha: {str(e)}{traceback.format_exc()}", "error")
+        raise HTTPException(status_code=500, detail=str(e))
+ 

@@ -1,11 +1,12 @@
 import traceback
 from typing import Optional, Tuple
+from unittest import result
 from sqlalchemy.orm import Session
 from app.config.dependencies import EngineManager, get_session_by_connection
 from app.cruds.connection_cruds import create_db_connection, disconnect_active_connection, get_active_connection_by_userid, get_db_connection_by_id
 from app.cruds.dbstatistics_crud import get_statistics_by_connection_geral
 from app.cruds.queryhistory_crud import get_ultima_consulta
-from app.models.connection_models import DBConnection
+from app.models.connection_models import ActiveConnection, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.users_chemas import Db_on
 from app.ultils.logger import log_message
@@ -128,21 +129,38 @@ def desativar_connection(id_user: int, conn: int, db: Session) -> dict:
         f"StackTrace:\n{traceback.format_exc()}", "error")
         return {"success": False, "message": "Erro ao desativar a conexão."}
 
+# def get_connection_current(db: Session, id_user: int) -> Tuple[Optional[DBConnection], Optional[datetime]]:
+#     """
+#     Retorna a conexão ativa do usuário, se existir, e a data de ativação.
+
+#     :param db: Sessão do banco de dados
+#     :param id_user: ID do usuário
+#     :return: Uma tupla contendo (conexão, data de ativação) ou (None, None)
+#     """
+#     conexao_ativa = get_active_connection_by_userid(db, id_user)
+#     if not conexao_ativa or not conexao_ativa.status:
+#         return None, None
+
+#     conexao = get_db_connection_by_id(db, conexao_ativa.connection_id)
+    
+#     if not conexao:
+#         return None, None
+
+#     return conexao, conexao_ativa.activated_at
+
 def get_connection_current(db: Session, id_user: int) -> Tuple[Optional[DBConnection], Optional[datetime]]:
     """
     Retorna a conexão ativa do usuário, se existir, e a data de ativação.
-
-    :param db: Sessão do banco de dados
-    :param id_user: ID do usuário
-    :return: Uma tupla contendo (conexão, data de ativação) ou (None, None)
+    Agora com apenas 1 consulta ao banco.
     """
-    conexao_ativa = get_active_connection_by_userid(db, id_user)
-    if not conexao_ativa or not conexao_ativa.status:
-        return None, None
+    connection = (
+        db.query(DBConnection, ActiveConnection.activated_at)
+        .join(ActiveConnection, ActiveConnection.connection_id == DBConnection.id)
+        .filter(DBConnection.user_id == id_user, ActiveConnection.status == True)
+        .first()
+    )
 
-    conexao = get_db_connection_by_id(db, conexao_ativa.connection_id)
-    
-    if not conexao:
+    if not connection:
         return None, None
-
-    return conexao, conexao_ativa.activated_at
+    connection, activated_at = connection
+    return connection, activated_at

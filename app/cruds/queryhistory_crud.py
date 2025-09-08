@@ -23,6 +23,17 @@ def create_query_history(db: Session, data: QueryHistoryCreate) -> QueryHistory:
     )
     return new_query
 
+def get_query_history_by_user_and_query(db: Session, user_id: int, connection_id: int, query_string: str) -> QueryHistory | None:
+    return (
+        db.query(QueryHistory)
+        .filter(
+            QueryHistory.user_id == user_id,
+            QueryHistory.db_connection_id == connection_id,
+            QueryHistory.query == query_string
+        )
+        .first()
+    )
+
 
 # ─────────────── Obter por ID ───────────────
 

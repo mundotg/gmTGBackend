@@ -13,7 +13,7 @@ class DBFieldBase(BaseModel):
     is_nullable: Optional[bool] = Field(default=None, description="Indica se o campo permite nulo")
     default_value: Optional[str] = Field(default=None, description="Valor padrão da coluna")
     is_primary_key: Optional[bool] = Field(default=False, description="É chave primária?")
-    is_ForeignKey: Optional[bool] = Field(default=False, description="É chave estrangeira?")
+    is_foreign_key: Optional[bool] = Field(default=False, description="É chave estrangeira?")
     referenced_table: Optional[str] = Field(default=None, description="Nome da tabela referenciada (se for chave estrangeira)")
     field_references: Optional[str] = Field(default=None, description="Nome do campo que referencia (se for chave estrangeira)")
     is_unique: Optional[bool] = Field(default=False, description="É valor único?")
@@ -22,6 +22,7 @@ class DBFieldBase(BaseModel):
     length: Optional[int] = Field(default=None, description="Tamanho do campo, se aplicável")
     precision: Optional[int] = Field(default=None, description="Precisão decimal, se aplicável")
     scale: Optional[int] = Field(default=None, description="Escala decimal, se aplicável")
+
 
 
 
@@ -63,12 +64,15 @@ class CampoEnumSincronizado(BaseModel):
 
 
 
+from typing import List, Optional
+from pydantic import BaseModel, Field
+
 class CampoDetalhado(BaseModel):
     nome: str
     tipo: str
     is_nullable: bool
     is_primary_key: bool
-    is_ForeignKey: Optional[bool] = False
+    is_foreign_key: Optional[bool] = False
     is_auto_increment: Optional[bool] = False
     referenced_table: Optional[str] = None
     field_references: Optional[str] = None
@@ -76,8 +80,9 @@ class CampoDetalhado(BaseModel):
     default: Optional[str] = None
     comentario: Optional[str] = None
     length: Optional[int] = None
-    enum_valores_encontrados: Optional[List[str]] = []
-    enum_valores_adicionados: Optional[List[str]] = []
+    enum_valores_encontrados: List[str] = Field(default_factory=list)
+    enum_valores_adicionados: List[str] = Field(default_factory=list)
+
 
 
 class MetadataTableResponse(BaseModel):

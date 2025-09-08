@@ -35,4 +35,7 @@ class QueryHistory(Base):
     # Relacionamentos
     user = relationship("User", back_populates="query_history")
     connection = relationship("DBConnection", back_populates="queries")
+    
+    
+
 

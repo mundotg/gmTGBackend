@@ -175,18 +175,13 @@ def get_db_connection_by_id(db: Session, connection_id: int)->DBConnection|None:
 def get_db_connection_by_name(db: Session, name: str):
     log_message(f"🔍 Buscando conexão com ID {name}", "info")
     return db.query(DBConnection).filter(DBConnection.database_name == name).first()
-
 def delete_connection(db: Session, id_conn: int):
     try:
         log_message(f"🗑️ Deletando conexão com ID {id_conn}", "info")
 
-        connection = get_db_connection_by_id(db, id_conn)
+        connection = get_db_connection_by_id(db, id_conn)  # levanta HTTPException se não achar
 
-        if not connection:
-            log_message(f"❌ Conexão {id_conn} não encontrada", "error")
-            return None
-
-        # Remove dependências (relacionamentos em ActiveConnection)
+        # Remove dependências
         db.query(ActiveConnection).filter(
             ActiveConnection.connection_id == connection.id
         ).delete()
@@ -194,7 +189,6 @@ def delete_connection(db: Session, id_conn: int):
         # Remove a conexão principal
         db.delete(connection)
 
-        # Commit final
         db.commit()
 
         log_message(f"✅ Conexão {id_conn} deletada com sucesso", "success")
@@ -203,7 +197,8 @@ def delete_connection(db: Session, id_conn: int):
     except Exception as e:
         db.rollback()
         log_message(f"❌ Erro ao deletar conexão {id_conn}: {str(e)}", "error")
-        raise
+        raise e
+
 
 
 def get_connection_logs(db: Session, connection_id: int):

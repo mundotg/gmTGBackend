@@ -15,6 +15,7 @@ def get_current_user_id(
     
     # 2. Caso contrário, tenta pegar do Authorization Basic
     elif authorization and authorization.startswith("Basic "):
+        # print("Tentando pegar token do Authorization Basic",authorization)
         try:
             token = authorization.split(" ")[1] 
         except Exception:

@@ -1,23 +1,31 @@
 from datetime import datetime, timezone
 import traceback
-from typing import Tuple
 from typing import Dict, List
-from fastapi import HTTPException
 from sqlalchemy import  inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
-from sqlalchemy.engine.reflection import Inspector
 from app.config.dependencies import EngineManager
 from app.cruds.connection_cruds import get_active_connection_by_userid, get_db_connection_by_id
-from app.cruds.dbstructure_crud import create_db_field, create_db_structure, create_enum_field, delete_field_name, delete_structure_by_name, get_db_structures_by_conn_id_and_table, get_fields_by_structure, list_enum_fields_by_field
-from app.models.dbstructure_models import   DBEnum_field, DBField,  DBStructure
+from app.cruds.dbstructure_crud import create_db_field, create_db_structure, delete_structure_by_name, get_db_structures_by_conn_id_and_table
+from app.models.dbstructure_models import   DBField,  DBStructure
 from app.schemas.dbstructure_schema import  CampoDetalhado, DBFieldCreate, DBStructureCreate, MetadataTableResponse
-from app.services.fields_estruture import _is_system_field, obter_schema_do_engine
-from app.services.pesquizar_index_linha_in_bd import _get_foreign_keys
-from app.ultils.build_query import _build_enum_query, _parse_enum_result
+from app.services.fields_estruture import  _is_system_field_from_column, obter_schema_do_engine
+from app.ultils.buscar_enum_bd import _fetch_enum_values
 from app.ultils.logger import log_message
 from app.ultils.ativar_session_bd import reativar_connection
 from sqlalchemy.exc import SQLAlchemyError, NoSuchTableError
+from sqlalchemy.exc import OperationalError
+ 
+def safe_get_columns(engine: Engine, table_name: str, schema: str):
+    inspector = inspect(engine)
+    try:
+        return inspector.get_columns(table_name, schema=schema),inspector
+    except OperationalError as e:
+        if "SSL connection has been closed" in str(e):
+            # 🔄 recria o inspector e tenta de novo
+            inspector = inspect(engine)
+            return inspector.get_columns(table_name, schema=schema),inspector
+        raise
 
 def sincronizar_metadados_da_tabela(
     db: Session, table_name: str, user_id: int
@@ -53,7 +61,8 @@ def sincronizar_metadados_da_tabela(
         fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine)
 
         # 5. Busca valores ENUM por coluna
-        enum_map: Dict[str, List[str]] = _fetch_enum_values(db, fields_table, engine, structure, db_type)
+        enum_map: Dict[str, List[str]] = _fetch_enum_values(db,fields_table, engine, structure, db_type)
+        # print(f"{enum_map}")
 
         # 6. Processa e sincroniza campos ENUM
         resposta_colunas = processar_enum_fields(
@@ -71,12 +80,13 @@ def sincronizar_metadados_da_tabela(
         )
 
     except SQLAlchemyError as e:
-        # db.rollback()
+        db.rollback()
         # traceback.print_exc()
         log_message(f"❌ Erro de banco de dados ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}", "error")
         raise RuntimeError(f"❌ Erro de banco de dados ao sincronizar a tabela '{table_name}': {str(e)}")
 
     except Exception as e:
+        db.rollback()
         # traceback.print_exc()
         log_message(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}", "error")
         raise RuntimeError(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}")
@@ -89,11 +99,7 @@ def montar_resposta_sincronizacao(
     resposta_colunas: List[CampoDetalhado],
     total_adicionado: int
 ) -> dict:
-    nomes = [col.nome for col in resposta_colunas]  # Correção aqui
-    duplicados = {nome for nome in nomes if nomes.count(nome) > 1}
-
-    # if duplicados:
-    
+ 
     return MetadataTableResponse(
         message="Metadados obtidos com sucesso",
         executado_em=datetime.now(timezone.utc),
@@ -122,18 +128,14 @@ def processar_enum_fields(
     for column in columns:
         col_name = column.name
         col_type = column.type.lower()
-        is_enum = "enum" in col_type
 
-        valores_encontrados = enum_map.get(col_name, []) if is_enum else []
+        valores_encontrados = enum_map.get(col_name, []) 
         valores_adicionados = []
 
-        if is_enum:
-            # Insere os novos valores no banco local
-            for valor in valores_encontrados:
-                valores_adicionados.append(valor)
-
-        # Adiciona metadado da coluna para resposta
-        resposta_colunas.append(CampoDetalhado(
+        
+        for valor in valores_encontrados:
+            valores_adicionados.append(valor)
+        valor_editado =CampoDetalhado(
             nome=col_name,
             tipo=col_type,
             is_nullable=column.is_nullable,
@@ -148,7 +150,9 @@ def processar_enum_fields(
             length=column.length,
             enum_valores_encontrados=valores_encontrados,
             enum_valores_adicionados=valores_adicionados,
-        ))
+        )
+        # Adiciona metadado da coluna para resposta
+        resposta_colunas.append(valor_editado)
 
     return resposta_colunas
 
@@ -171,6 +175,24 @@ def buscar_estrutura_tabela(
             DBStructureCreate( table_name=table_name, schema_name=schema_name, db_connection_id=db_connection_id)
         )
     return structure
+def map_column_type(col_type: str, db_type: str) -> str:
+    """
+    Converte o tipo de coluna da base para um tipo genérico.
+    Para SQL Server, converte 'integer' em 'int'.
+    """
+    # normaliza para evitar problema de maiúscula/minúscula
+    col_type = col_type.lower()
+    db_type = db_type.lower()
+
+  
+
+    # regra especial para SQL Server
+    if db_type in ("sqlserver", "mssql"):
+        if col_type == "integer":
+            # print("Convertendo 'integer' para 'int'")
+            return "int"
+    # retorna mapeado ou o próprio tipo se não achar
+    return col_type
 
 def buscar_ou_criar_campos_tabela(
     db: Session,
@@ -183,7 +205,7 @@ def buscar_ou_criar_campos_tabela(
     """
 
     # Verifica se já existem campos locais
-    campos_existentes = get_fields_by_structure(db, structure.id)
+    # campos_existentes = get_fields_by_structure(db, structure.id)
     # if campos_existentes:
     #     return campos_existentes
 
@@ -192,8 +214,7 @@ def buscar_ou_criar_campos_tabela(
     # foreign_keys = foreign_keys_map.get(structure.table_name, {})
 
     try:
-        inspector: Inspector = inspect(engine)
-        columns = inspector.get_columns(structure.table_name, schema=structure.schema_name)
+        columns,inspector = safe_get_columns(engine,structure.table_name, schema=structure.schema_name)
     except NoSuchTableError as ex:
         raise ValueError(
             f"Tabela '{structure.table_name}' não encontrada no banco.  {ex}{traceback.format_exc()}"
@@ -228,7 +249,6 @@ def buscar_ou_criar_campos_tabela(
     relations_map = {}  # mapa de relações encontradas
 
     for fk in foreign_keys_info:
-        tabela_origem = structure.table_name
         tabela_relacao = fk["referred_table"]
         for col_origem, col_relacao in zip(
             fk.get("constrained_columns", []),
@@ -240,9 +260,8 @@ def buscar_ou_criar_campos_tabela(
                 "fieldTabelaRelacao": col_relacao,
             }
             relations_map[col_origem] = relation
-            # print(f"🔗 FK: {relation}")
-
-
+    # print(f"column {columns}")
+   
     # Processa cada coluna
     for column in columns:
         col_name = column["name"]
@@ -253,96 +272,35 @@ def buscar_ou_criar_campos_tabela(
         is_primary_key = col_name in primary_keys
         is_unique = col_name in unique_columns
         relation = relations_map.get(col_name)
-        print(f"🔗 FK: {relation}" if relation else f"🔗 Não é FK: {col_name} ", f"{relation is not None}")
-        is_ForeignKey = True if relation else False
-        print(f"is ForeignKey: {is_ForeignKey}")
-
-        is_auto_incremento = _is_system_field(
-            col_name,
-            str(column_type),
-            structure.connection.type,
-            structure.table_name,
-            engine
-        )
-
+        is_foreign_key = True if relation else False
+        tipo = column_type.compile(dialect=engine.dialect)
+        default_value =column.get("default")
+        is_auto_incremento = _is_system_field_from_column(tipo, column,is_foreign_key)
         # Apaga o campo se já existir com mesmo nome
-        delete_field_name(db, col_name, structure.id)
+        # delete_field_name(db, col_name, structure.id)
 
         # Cria o novo campo
         field_in = DBFieldCreate(
             name=col_name,
-            type=str(column_type),
+            type=map_column_type(tipo, structure.connection.type),
             is_nullable=column.get("nullable", True),
-            default_value=column.get("default"),
+            default_value=default_value,
             is_primary_key=is_primary_key,
             comment=column.get("comment", "") or "",
-            referenced_table=relations_map.get(col_name).get("tabelaRelacao") if is_ForeignKey else None,
-            field_references=relations_map.get(col_name).get("fieldTabelaRelacao") if is_ForeignKey else None,
+            referenced_table=relations_map.get(col_name).get("tabelaRelacao") if is_foreign_key else None,
+            field_references=relations_map.get(col_name).get("fieldTabelaRelacao") if is_foreign_key else None,
             is_unique=is_unique,
-            is_ForeignKey=is_ForeignKey,
+            is_foreign_key=bool(is_foreign_key),
             is_auto_increment=is_auto_incremento,
             length=length,
             precision=precision,
             scale=scale
         )
 
-        field = create_db_field(db=db, field_in=field_in, structure_id=structure.id)
-        campos_resultantes.append(field_in)
-
-        # print(f"🟢 Campo criado: {col_name} (FK: {is_ForeignKey}", end="")
-        # if is_ForeignKey and col_name in foreign_keys:
-        #     print(f" → {foreign_keys[col_name]})")
-        # else:
-        #     print(")")
-
+        field_create =create_db_field(db=db, field_in=field_in, structure_id=structure.id)
+        campos_resultantes.append(field_create)
     return campos_resultantes
 
 
 
 
-def _fetch_enum_values(
-    db: Session, columns: List[DBField],
-    engine: Engine, structure: DBStructure,  db_type: str
-) -> Dict[str, List[str]]:
-    """
-    Obtém os valores ENUM de cada coluna ENUM da tabela.
-    Se já existirem valores no banco local, retorna esses.
-    Caso contrário, busca diretamente no banco de dados.
-    """
-    enum_values: Dict[str, List[str]] = {}
-
-    try:
-        for col in columns:
-            if "enum" not in col.type.lower():
-                continue
-
-            # 1. Busca valores já salvos localmente
-            enums_local = list_enum_fields_by_field(db, col.id)
-            if enums_local:
-                enum_values[col.name] = [e.valor for e in enums_local]
-                continue
-
-            # 2. Caso não existam localmente, gera a query
-            query = _build_enum_query(col.name, structure.table_name, db_type)
-            if not query:
-                continue
-
-            with engine.connect() as conn:
-                result = conn.execute(query).fetchall()
-
-                if result:
-                    valores_enum = _parse_enum_result(db_type, result, col.name)
-                    enum_values[col.name] = []
-
-                    for valor in valores_enum:
-                        # Insere valor no banco local
-                        enum_model = DBEnum_field(field_id=col.id, valor=valor)
-                        create_enum_field(db, enum_model)
-                        enum_values[col.name].append(valor)
-
-        log_message(f"🟢 Valores ENUM sincronizados: {enum_values}", "info")
-        return enum_values
-
-    except Exception as e:
-        log_message(f"❌ Erro ao buscar ENUMs: {e}\n{traceback.format_exc()}", "warning")
-        return {}

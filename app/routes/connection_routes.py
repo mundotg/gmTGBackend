@@ -159,7 +159,8 @@ def connect_or_disconnect(
                 act = set_active_connection(db, user_id, db_conn.id)
             create_connection_log(
                 db, connection_id=db_conn.id,
-                action="Conexão ativada",  status="success"
+                action="Conexão ativada",  
+                status="success"
             )
             # log_message(f"✅ Conexão finalizada com sucesso. conn_id={conn_id}")
             return DbConnectionOutput(
@@ -242,7 +243,8 @@ def delete_connection_save(
         create_connection_log(
             db,
             connection_id=None,
-            action="Conexão deletada "+conn.name, status="success"
+            action="Conexão deletada "+conn.name, 
+            status="success"
         )
 
         return DbConnectionOutput(
@@ -250,12 +252,13 @@ def delete_connection_save(
             message="Conexão deletada com sucesso!", connect=False
         )
     except Exception as e:
-        log_message(f"❌ Erro ao deletar conexão: {str(e)}", level="error")
+        log_message(f"❌ Erro ao deletar conexão: {str(e)}{traceback.format_exc()}", level="error")
 
         create_connection_log(
             db,
             connection_id=None ,
-            action="Erro ao deletar conexão "+conn_id, status="error"
+            action="Erro ao deletar conexão "+conn_id, 
+            status="error"
         )
 
         raise HTTPException(
@@ -275,7 +278,6 @@ def list_connection_history(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    # print(f"[HISTÓRICO] Obtendo histórico de conexões para o usuário {user_id}")
     logs = get_connection_logs(db, user_id)
     lista_logs = [
         ConnectionLogBase.model_validate({  

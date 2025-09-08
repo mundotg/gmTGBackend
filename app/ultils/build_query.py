@@ -1,68 +1,68 @@
 from typing import List, Optional
-from sqlalchemy import Boolean, Date, DateTime, Numeric, text
-
+import uuid
+from sqlalchemy import Boolean, Date, DateTime, Numeric
 from app.schemas.queryhistory_schemas import DistinctList, JoinOption, OrderByOption
 
+def is_valid_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(str(value))
+        return True
+    except ValueError:
+        return False
+    
+def build_contains_condition(
+    field_escaped: str,
+    operation: str,
+    value: str,
+    db_type: str,
+    col_type: str,
+    param_name: str,
+    params: dict
+) -> str:
+    """
+    Monta condição SQL para operações 'Contém' e 'Não Contém',
+    suportando TEXT, DATE, JSON e conversão automática para INTEGER/NUMERIC.
+    Compatível com PostgreSQL, MySQL, SQL Server e Oracle.
+    """
+    col_type_str = col_type.lower()
+    like_value = f"%{value}%"
+    params[param_name] = like_value
+    not_ = "NOT " if operation == "Não Contém" else ""
 
-def _build_enum_query(col_name: str, table_name: str, db_type: str):
-    if db_type == "postgresql":
-        return text(f"""
-            SELECT e.enumlabel 
-            FROM pg_type t
-            JOIN pg_enum e ON t.oid = e.enumtypid
-            WHERE t.typname = '{col_name}';
-        """)
-    elif db_type in ("mysql", "mariadb"):
-        return text(f"SHOW COLUMNS FROM {table_name} LIKE '{col_name}'")
-    elif db_type in ("mssql", "sql server", "sqlserver"):
-        return text(f"""
-            SELECT definition 
-            FROM sys.check_constraints con
-            JOIN sys.columns col ON con.parent_object_id = col.object_id
-            JOIN sys.tables tab ON col.object_id = tab.object_id
-            WHERE tab.name = '{table_name}' 
-            AND col.name = '{col_name}' 
-            AND con.definition LIKE 'IN (%)';
-        """)
-    elif db_type == "sqlite":
-        return text(f"PRAGMA table_info({table_name})")
-    elif db_type == "oracle":
-        return text(f"""
-            SELECT con.search_condition 
-            FROM user_constraints con
-            JOIN user_cons_columns col ON con.constraint_name = col.constraint_name
-            WHERE con.constraint_type = 'C'
-            AND col.table_name = '{table_name.upper()}'
-            AND col.column_name = '{col_name.upper()}';
-        """)
-    return None
+    db_type = db_type.lower()
 
+    # Strings e JSON → LIKE direto
+    if any(t in col_type_str for t in ["text", "char", "json"]):
+        return f"{field_escaped} {not_}LIKE :{param_name}"
 
-def _parse_enum_result(db_type: str, result, col_name: str) -> List[str]:
-    if not result:
-        return []
+    # Datas → precisa converter para texto dependendo do banco
+    elif "date" in col_type_str or "time" in col_type_str:
+        if db_type in ["postgres", "postgresql"]:
+            return f"CAST({field_escaped} AS TEXT) {not_}LIKE :{param_name}"
+        elif db_type == "mysql":
+            return f"CAST({field_escaped} AS CHAR) {not_}LIKE :{param_name}"
+        elif db_type in ["sqlserver", "mssql"]:
+            return f"CONVERT(VARCHAR, {field_escaped}, 120) {not_}LIKE :{param_name}"
+        elif db_type == "oracle":
+            return f"TO_CHAR({field_escaped}, 'YYYY-MM-DD HH24:MI:SS') {not_}LIKE :{param_name}"
+        else:
+            raise ValueError(f"Banco de dados '{db_type}' não suportado para operação Contém em datas.")
 
-    if db_type == "postgresql":
-        return [row[0] for row in result]
+    # Números → CAST para string
+    elif any(t in col_type_str for t in ["int", "numeric", "decimal", "float", "double"]):
+        if db_type in ["postgres", "postgresql"]:
+            return f"CAST({field_escaped} AS TEXT) {not_}LIKE :{param_name}"
+        elif db_type == "mysql":
+            return f"CAST({field_escaped} AS CHAR) {not_}LIKE :{param_name}"
+        elif db_type in ["sqlserver", "mssql"]:
+            return f"CAST({field_escaped} AS NVARCHAR(MAX)) {not_}LIKE :{param_name}"
+        elif db_type == "oracle":
+            return f"TO_CHAR({field_escaped}) {not_}LIKE :{param_name}"
+        else:
+            raise ValueError(f"Banco de dados '{db_type}' não suportado para operação Contém em números.")
 
-    elif db_type in ("mysql", "mariadb"):
-        enum_text = result[0][1]
-        if "enum(" in enum_text.lower():
-            return enum_text.replace("enum(", "").replace(")", "").replace("'", "").split(",")
-
-    elif db_type in ("mssql", "sql server", "oracle", "sqlserver"):
-        check_clause = result[0][0]
-        if "IN (" in check_clause.upper():
-            valores_brutos = check_clause.split("IN (")[1].replace(")", "")
-            return [v.strip().replace("'", "") for v in valores_brutos.split(",")]
-
-    elif db_type == "sqlite":
-        for row in result:
-            if row[1] == col_name and "CHECK" in row[5].upper():
-                valores_brutos = row[5].split("IN (")[1].replace(")", "").replace("'", "")
-                return [v.strip() for v in valores_brutos.split(",")]
-
-    return []
+    # Caso não seja suportado
+    raise ValueError(f"Operação '{operation}' não suportada para tipo '{col_type}'.")
 
 
 def get_filter_condition_with_operation(
@@ -107,6 +107,8 @@ def get_filter_condition_with_operation(
 
     # 🔹 UUID
     if "uuid" in col_type_str:
+        if not is_valid_uuid(value):
+            raise ValueError(f"Valor inválido para UUID: {value}")
         params[param_name] = str(value)
         return f"{col_escaped} = :{param_name}"
 
@@ -124,7 +126,7 @@ def get_filter_condition_with_operation(
     # 🔹 Tipos
     is_date = any(t in col_type_str for t in ["date", "timestamp", "time"]) or isinstance(col_type, (Date, DateTime))
     is_number = any(t in col_type_str for t in ["int", "decimal", "float", "numeric"]) or isinstance(col_type, Numeric)
-    is_text = any(t in col_type_str for t in ["text", "char", "varchar"])
+    # is_text = any(t in col_type_str for t in ["text", "char", "varchar"])
 
     def basic_op(field_escaped: str) -> str:
         op_map = {
@@ -139,6 +141,12 @@ def get_filter_condition_with_operation(
         if operation in op_map:
             params[param_name] = float(value) if is_number else value
             return f"{field_escaped} {op_map[operation]} :{param_name}"
+        
+        elif operation == "IS NULL":
+            return f"{field_escaped} IS NULL"
+
+        elif operation == "IS NOT NULL":
+            return f"{field_escaped} IS NOT NULL"
 
         elif operation == "Entre":
             if not value_otheir_between.strip():
@@ -147,11 +155,29 @@ def get_filter_condition_with_operation(
             params[f"{param_name}_max"] = float(value_otheir_between) if is_number else value_otheir_between
             return f"{field_escaped} BETWEEN :{param_name}_min AND :{param_name}_max"
 
-        elif operation in ["Contém", "Não Contém"] and (is_text or is_date or "json" in col_type_str):
-            like_value = f"%{value}%"
-            params[param_name] = like_value
-            not_ = "NOT " if operation == "Não Contém" else ""
-            return f"{field_escaped} {not_}LIKE :{param_name}"
+        elif operation in ["Contém", "Não Contém"]:
+            return build_contains_condition(
+                field_escaped=field_escaped,
+                operation=operation,
+                value=value,
+                col_type=col_type,
+                db_type=db_type,
+                param_name=param_name,
+                params=params
+            )
+        elif operation in ["IN", "NOT IN"]:
+            values_list = [v.strip() for v in value.split(",") if v.strip()]
+            if not values_list:
+                raise ValueError(f"Lista vazia para operação '{operation}' em '{col_name}'.")
+
+            placeholders = []
+            for i, v in enumerate(values_list):
+                pname = f"{param_name}_{i}"
+                params[pname] = float(v) if is_number else v
+                placeholders.append(f":{pname}")
+
+            not_ = "NOT " if operation == "NOT IN" else ""
+            return f"{field_escaped} {not_}IN ({', '.join(placeholders)})"
 
         elif operation == "Antes de" and is_date:
             params[param_name] = value

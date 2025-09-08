@@ -107,13 +107,14 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
         name=field_in.name
     ).first()
 
+    # print(f" is_foreign_key: {field_in.is_ForeignKey} field_name {field_in.name}")
     if existing_field:
         # Atualiza os dados do campo existente
         existing_field.type = field_in.type
         existing_field.is_nullable = field_in.is_nullable
         existing_field.default_value = field_in.default_value
         existing_field.is_primary_key = field_in.is_primary_key
-        existing_field.is_ForeignKey = field_in.is_ForeignKey
+        existing_field.is_ForeignKey = field_in.is_foreign_key
         existing_field.is_unique = field_in.is_unique
         existing_field.referenced_table = field_in.referenced_table
         existing_field.field_references = field_in.field_references
@@ -130,6 +131,7 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
         return existing_field
 
     # Caso não exista, cria um novo campo
+   
     field = DBField(
         structure_id=structure_id,
         name=field_in.name,
@@ -137,7 +139,7 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
         is_nullable=field_in.is_nullable,
         default_value=field_in.default_value,
         is_primary_key=field_in.is_primary_key,
-        is_ForeignKey=field_in.is_ForeignKey,
+        is_ForeignKey=field_in.is_foreign_key,
         is_unique=field_in.is_unique,
         referenced_table=field_in.referenced_table,
         field_references=field_in.field_references,
@@ -199,12 +201,21 @@ def delete_field_name(db: Session, field_name: str, structure_id: int) -> bool:
 # ------------------------------------------------------------------------------
 
 def create_enum_field(db: Session, data: DBEnum_field) -> DBEnum_field:
-    # item = DBEnum_field(**data.dict())
+    existing = (
+        db.query(DBEnum_field)
+        .filter_by(field_id=data.field_id, valor=data.valor)
+        .first()
+    )
+    if existing:
+        log_message(f"⚠️ Valor ENUM '{data.valor}' já existe para field ID {data.field_id}", "warning")
+        return existing
+
     db.add(data)
     db.commit()
     db.refresh(data)
     log_message(f"🆕 Valor ENUM '{data.valor}' criado para field ID {data.field_id}", "info")
     return data
+
 
 
 def get_enum_field(db: Session, field_id: int, valor: str) -> Optional[DBEnum_field]:

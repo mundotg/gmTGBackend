@@ -1,10 +1,11 @@
+
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
 from sqlalchemy.orm import Session
 from app import database, auth
 from app.cruds import user_crud
 from app.models import user_model
 from app.schemas import users_chemas
-from app.token_storage import store_refresh_token, is_refresh_token_valid, revoke_token
+from app.token_storage import refresh_token_time_left, store_refresh_token, is_refresh_token_valid, revoke_token, update_refresh_token
 from app.config.dotenv import get_env
 from app.ultils.ativar_session_bd import desativar_connection, reativar_connection
 from app.ultils.logger import log_message
@@ -77,8 +78,15 @@ def refresh_access_token(
 
     user_id = payload if isinstance(payload, str) else payload.get("sub")
     access_token = auth.create_access_token({"sub": str(user_id)})
+    data_exp, isExpiring = refresh_token_time_left(db, refresh_token)
+    # print(f"Tempo restante para expiração do refresh token: {data_exp}, Está expirando? {isExpiring}")
+    if isExpiring:  # Se o token está prestes a expirar, renova
+        refresh_token2 = auth.create_refresh_token({"sub": str(user_id)})
+        update_refresh_token(db, refresh_token, refresh_token2)
+        set_cookie(response, "refresh_token", refresh_token2, path="/auth/refresh")
 
     set_cookie(response, "access_token", access_token)
+    set_cookie(response, "refresh_token", refresh_token, path="/auth/refresh")
 
     return users_chemas.AccessTokenOut(access_token="", token_type="") 
 

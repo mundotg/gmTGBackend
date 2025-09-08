@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 from datetime import datetime
 
 
@@ -81,6 +81,7 @@ class CondicaoFiltro(BaseModel):
     column: str = Field(..., title="Coluna")
     operator: str = Field(..., title="Operador")
     value: str = Field(..., title="Valor")
+    value2: Optional[str] = Field(None, title="Valor 2 (para BETWEEN)")
     column_type: str = Field(..., title="Tipo da Coluna (ex: varchar, int)")
     logicalOperator: Optional[Literal['AND', 'OR']] = Field("AND", title="Operador Lógico")
     value_type: Optional[Literal['string', 'number', 'date', 'boolean']] = Field("string", title="Tipo de Valor")
@@ -110,3 +111,30 @@ class QueryPayload(BaseModel):
     distinct: Optional[DistinctList] = None
     offset: Optional[int] = None
     isCountQuery: Optional[bool] = False
+    
+class ChangedField(BaseModel):
+    value: str
+    type_column: str
+    
+
+class UpdateRequest(BaseModel):
+    updatedRow: Dict[str, Dict[str, ChangedField]]
+    tables_primary_keys_values: Dict[str, Dict[str, str]]
+    
+class InsertRequest(BaseModel):
+    createdRow: Dict[str, Dict[str, ChangedField]]
+    
+class CampoPadronizado(BaseModel):
+    campo: str
+    valor: Optional[str] = None
+    id: str = "text"
+
+class ConfiguracaoTabela(BaseModel):
+    schema_name: Optional[str] = ""
+    tabela: str
+    quantidade: int = 1
+    camposPadronizados: Optional[List[CampoPadronizado]] | None = None
+
+class AutoCreateRequest(BaseModel):
+    configs: List[ConfiguracaoTabela]
+

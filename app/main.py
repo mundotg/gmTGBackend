@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from app.config.dotenv import get_env
 from app.config.startup_reset import already_initialized, mark_initialized, reset_database
-from app.routes import auth_routes, connection_routes, dbInfo_routes, query_routes, user_routes, geral_routes
+from app.routes import auth_routes, connection_routes, dbInfo_routes, dbstatistics_routes, query_routes, task_routes, user_routes, geral_routes
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="API de Autenticação com FastAPI")
@@ -27,6 +27,8 @@ app.include_router(geral_routes.router)
 app.include_router(connection_routes.router)
 app.include_router(dbInfo_routes.router)
 app.include_router(query_routes.router)
+app.include_router(task_routes.router)
+app.include_router(dbstatistics_routes.router)
 
 # EVENTO DE STARTUP
 @app.on_event("startup")

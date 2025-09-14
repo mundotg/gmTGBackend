@@ -6,7 +6,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from app.config.dependencies import EngineManager
 from app.cruds.connection_cruds import get_active_connection_by_userid, get_db_connection_by_id
-from app.cruds.dbstructure_crud import create_db_field, create_db_structure, delete_structure_by_name, get_db_structures_by_conn_id_and_table
+from app.cruds.dbstructure_crud import create_db_field, create_db_structure, delete_structure_by_name, get_db_structures_by_conn_id_and_table, get_fields_by_structure
 from app.models.dbstructure_models import   DBField,  DBStructure
 from app.schemas.dbstructure_schema import  CampoDetalhado, DBFieldCreate, DBStructureCreate, MetadataTableResponse
 from app.services.fields_estruture import  _is_system_field_from_column, obter_schema_do_engine
@@ -205,13 +205,9 @@ def buscar_ou_criar_campos_tabela(
     """
 
     # Verifica se já existem campos locais
-    # campos_existentes = get_fields_by_structure(db, structure.id)
-    # if campos_existentes:
-    #     return campos_existentes
-
-    # 🔹 Buscar chaves estrangeiras já organizadas: { "coluna": "tabela_referenciada" }
-    # foreign_keys_map = _get_foreign_keys(engine, structure.table_name)
-    # foreign_keys = foreign_keys_map.get(structure.table_name, {})
+    campos_existentes = get_fields_by_structure(db, structure.id)
+    if campos_existentes:
+        return campos_existentes
 
     try:
         columns,inspector = safe_get_columns(engine,structure.table_name, schema=structure.schema_name)

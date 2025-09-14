@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 
@@ -126,6 +126,14 @@ def get_cached_row_count_all(
     return db.query(TableRowCountCache).filter_by(
         connection_id=connection_id
     ).all()
+    
+    
+def get_cached_row_count_all_tupla(db: Session, connection_id: int) -> List[Tuple[str, int]]:
+    return (
+        db.query(TableRowCountCache.table_name, TableRowCountCache.row_count)
+        .filter(TableRowCountCache.connection_id == connection_id)
+        .all()
+    )
 
 
 def get_cached_row_count(

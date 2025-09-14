@@ -73,9 +73,6 @@ class QueryHistoryOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)  # Para suportar ORM
 
-
-# --------- Filtros ---------
-
 class CondicaoFiltro(BaseModel):
     table_name_fil: str = Field(..., title="Tabela")
     column: str = Field(..., title="Coluna")
@@ -85,32 +82,39 @@ class CondicaoFiltro(BaseModel):
     column_type: str = Field(..., title="Tipo da Coluna (ex: varchar, int)")
     logicalOperator: Optional[Literal['AND', 'OR']] = Field("AND", title="Operador Lógico")
     value_type: Optional[Literal['string', 'number', 'date', 'boolean']] = Field("string", title="Tipo de Valor")
-   
+    length: Optional[int] = None
+    is_nullable: Optional[bool] = None
+
+
 class JoinOption(BaseModel):
     table: str
-    type: str  # Pode validar com Enum se quiser
+    type: str
     on: str 
 
 
 class OrderByOption(BaseModel):
-    column: str = Field(..., title="Coluna para Ordenação", description="Coluna pela qual ordenar os resultados.")
-    direction: str = Field(..., title="Direção da Ordenação", description="Direção da ordenação: 'asc' para ascendente ou 'desc' para descendente.")
-    
+    column: str
+    direction: str  # 'ASC' ou 'DESC'
+
+
 class DistinctList(BaseModel):
-    useDistinct: bool = Field(False, title="Usar DISTINCT", description="Se True, aplica DISTINCT na consulta.")
-    distinct_columns: List[str] = Field(..., title="Colunas Distintas", description="Lista de colunas para aplicar DISTINCT na consulta.")
+    useDistinct: bool = False
+    distinct_columns: List[str] = Field(default_factory=list)
+
 
 class QueryPayload(BaseModel):
     baseTable: str
     joins: Optional[List[JoinOption]] = None
     table_list: Optional[List[str]] = None
-    select: Optional[List[str]]=[]
+    select: Optional[List[str]] = []
+    aliaisTables: Optional[Dict[str, str]] = None   # agora suporta
     where: Optional[List[CondicaoFiltro]] = None
-    orderBy: Optional[OrderByOption] = None
+    orderBy: Optional[List[OrderByOption]] = None   # lista, não único
     limit: Optional[int] = None
     distinct: Optional[DistinctList] = None
     offset: Optional[int] = None
     isCountQuery: Optional[bool] = False
+
     
 class ChangedField(BaseModel):
     value: str

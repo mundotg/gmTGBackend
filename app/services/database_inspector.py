@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 import traceback
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import Engine, inspect, text
 from sqlalchemy.orm import Session
 from app.config.dependencies import EngineManager, get_session_by_connection_id
 from app.cruds.dbstatistics_crud import create_statistics, get_cached_row_count_all, get_statistics_by_connection, update_or_create_cache, update_statistics
 from app.cruds.dbstructure_crud import create_db_structure, get_structure_by_id_and_name, update_db_structure
 from app.models.dbstructure_models import DBStructure
+from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
 def verificar_ou_atualizar_estrutura(db: Session, connection_id: int, table_name: str, schema_name: str | None = None):
@@ -94,6 +96,55 @@ def get_table_names_with_count(connection_id: int, id_user: int, db: Session):
 
 
 
+
+def get_table_names(connection_id: int, id_user: int, db: Session):
+    engine = EngineManager.get(id_user) or get_session_by_connection_id(connection_id, db)
+    inspector = inspect(engine)
+    # pega tabelas normais
+    table_names = inspector.get_table_names()
+
+    # pega views
+    view_names = inspector.get_view_names()
+
+    # junta tudo
+    all_names = table_names + view_names
+    return all_names
+
+def get_table_count(connection_id: int, table_name: str, db: Session, id_user: int) -> int:
+    """
+    Retorna a contagem de registros de uma tabela de forma segura e eficiente.
+    - Retorna 0 se for uma view.
+    - Usa quote para evitar SQL injection.
+    - Faz fallback para -1 em caso de erro.
+    """
+    engine = EngineManager.get(id_user) or get_session_by_connection_id(connection_id, db)
+
+    try:
+        inspector = inspect(engine)
+
+        # 🚩 Verifica se o objeto é uma view
+        if table_name in inspector.get_view_names(schema=inspector.default_schema_name):
+            log_message(f"ℹ️ '{table_name}' é uma VIEW, retornando 0.", "info")
+            return 0
+        else:
+            log_message(f"ℹ️ '{table_name}' é uma TABELA, procedendo com a contagem.", "info")
+
+        with engine.connect() as conn:
+            query = text(f'SELECT COUNT(*) FROM "{table_name}"')
+            count = conn.execute(query).scalar()
+            return count if count is not None else 0
+
+    except SQLAlchemyError as e:
+        error_type = _lidar_com_erro_sql(e)
+        log_message(
+            f"⚠️ Erro ao contar registros da tabela '{table_name}': {error_type} - {e}",
+            "error"
+        )
+        return -1
+
+
+
+
 from app.schemas.dbstatistics_schema import DBStatisticsDict
 
 def collect_statistics(engine: Engine , db_type: str) -> DBStatisticsDict:
@@ -113,14 +164,18 @@ def collect_statistics(engine: Engine , db_type: str) -> DBStatisticsDict:
         "index_count": 0,
         "tables_connected": len(tables_name),
         "queries_today": 0,
-        "records_analyzed": 0
+        "records_analyzed": 0,
+        "connection_name": "",
+        "db_connection_id": 0
     }
 
     version_query = {
         "postgresql": "SHOW server_version",
         "mysql": "SELECT VERSION()",
         "sqlite": "SELECT sqlite_version()",
-        "mssql": "SELECT @@VERSION"
+        "mssql": "SELECT @@VERSION",
+        "sql server": "SELECT @@VERSION",
+        "sqlserver": "SELECT @@VERSION",
     }.get(dialect)
 
     with engine.connect() as conn:
@@ -143,7 +198,7 @@ def collect_statistics(engine: Engine , db_type: str) -> DBStatisticsDict:
             stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger'")).scalar()
             stats["index_count"] = conn.execute(text("SELECT COUNT(*) FROM sqlite_master WHERE type='index'")).scalar()
 
-        elif dialect == "mssql":
+        elif dialect in ["mssql", "sql server", "sqlserver"]:
             stats["procedure_count"] = conn.execute(text("SELECT COUNT(*) FROM sys.procedures")).scalar()
             stats["function_count"] = conn.execute(text("SELECT COUNT(*) FROM sys.objects WHERE type IN ('FN', 'TF', 'IF')")).scalar()
             stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM sys.triggers")).scalar()
@@ -163,6 +218,7 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
             db_connection_id=connection_id,
             **{k: stats[k] for k in DBStatisticsCreate.__annotations__ if k in stats}
         )
+        log_message(f"🆕 Criando novas estatísticas para a conexão {data_create}.", "info")
         return create_statistics(db, data_create) or "created"
 
     # Verifica se há alguma diferença
@@ -185,7 +241,7 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
 
 
 
-def sync_connection_statistics(connection_id: int, id_user: int, db_type:str,  db: Session):
+def sync_connection_statistics(connection_id: int, id_user: int, db_type:str,  db: Session,connection_name: str = "") -> dict | None:
     """
     Sincroniza estatísticas da conexão: coleta e armazena se necessário.
     """
@@ -209,8 +265,10 @@ def sync_connection_statistics(connection_id: int, id_user: int, db_type:str,  d
         log_message(f"📊 Estatísticas coletadas: {stats}", "info")
 
         action = save_or_update_statistics(connection_id, stats, db)
+        
 
         log_message(f"✅ Estatísticas '{action}' registradas para conexão ID={connection_id}.", "success")
+        stats["connection_name"] = connection_name
         return stats
 
     except Exception as e:

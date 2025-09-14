@@ -11,6 +11,8 @@ from typing import TypedDict
 
 class DBStatisticsDict(TypedDict):
     server_version: str
+    connection_name: str
+    db_connection_id: int
     table_count: int
     view_count: int
     procedure_count: int
@@ -20,6 +22,7 @@ class DBStatisticsDict(TypedDict):
     tables_connected: int
     queries_today: int
     records_analyzed: int
+    
 
     
 class DBStatisticsCreate(BaseModel):

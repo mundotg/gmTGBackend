@@ -94,7 +94,7 @@ def get_filter_condition_with_operation(
     db_type_lower = db_type.lower()
     value = value.strip()
 
-    if value == "" and operation not in ["Entre"]:
+    if value == "" and operation not in ["Entre"] and operation not in ["IS NULL", "IS NOT NULL"]:
         raise ValueError(f"Valor vazio para '{col_name}' com operação '{operation}'.")
 
     # Escapar nome da coluna
@@ -209,6 +209,61 @@ def get_filter_condition_with_operation(
     # 🔹 Número ou Texto
     return basic_op(col_escaped)
 
+def format_column(db_type: str, col: str, alias: Optional[str] = None) -> str:
+    """
+    Formata uma coluna com quote e alias (se existir).
+    """
+    if alias and alias != col:
+        return f"{quote_identifier(db_type, col)} AS {quote_identifier(db_type, alias)}"
+    return quote_identifier(db_type, col)
+
+def build_select_view(db_type: str, select: Optional[list[str]], aliases: Optional[dict[str, str]]) -> str:
+    """
+    Monta o SELECT, considerando select explícito e aliases.
+    - Se select foi enviado → usa select.
+    - Se select é None/[] e aliases existe → usa aliases como fonte.
+    - Caso contrário → usa '*'.
+    """
+    if select and len(select) > 0:
+        return ", ".join(
+            format_column(db_type, col, aliases.get(col) if aliases else None)
+            for col in select
+        )
+    elif aliases:
+        return ", ".join(
+            format_column(db_type, col, alias) for col, alias in aliases.items()
+        )
+    else:
+        return "*"
+    
+from typing import Optional, Union
+
+def format_order_by(db_type: str, order_by: Optional[list[Union[dict, "OrderByOption"]]] = None) -> str:
+    """
+    Monta a cláusula ORDER BY a partir de uma lista de dicts ou objetos OrderByOption.
+    """
+    if not order_by:
+        return ""
+
+    order_parts = []
+    for item in order_by:
+        # Caso venha como objeto Pydantic
+        if hasattr(item, "column") and hasattr(item, "direction"):
+            col = item.column
+            direction = item.direction or "ASC"
+        else:  # Caso venha como dict
+            col = item.get("column")
+            direction = item.get("direction", "ASC")
+
+        if not col:
+            continue
+
+        order_parts.append(f"{quote_identifier(db_type, col)} {direction.upper()}")
+
+    return "ORDER BY " + ", ".join(order_parts) if order_parts else ""
+
+
+
 def get_query_string(
     base_table: str,
     joins: Optional[List[JoinOption]] = None,
@@ -217,9 +272,10 @@ def get_query_string(
     table_list: Optional[List[str]] = None,
     max_rows: int = 1000,
     db_type: str = "mysql",
-    order_by: Optional[OrderByOption] = None,
+    order_by: Optional[list[OrderByOption]] = None,
     offset: Optional[int] = None,
-    distinct: Optional[DistinctList] = None
+    distinct: Optional[DistinctList] = None,
+    aliases: Optional[dict[str, str]] = None
 ) -> str:
     """
     Gera uma query SQL adaptada ao tipo de banco de dados, com DISTINCT, filtros, joins, ordenação e paginação.
@@ -246,7 +302,7 @@ def get_query_string(
 
 
     # SELECT
-    select_view = ", ".join(quote_identifier(db_type, col) for col in select) if select else "*"
+    select_view = build_select_view(db_type, select, aliases)
 
     if distinct and distinct.useDistinct:
         distinct_cols = ", ".join(quote_identifier(db_type, col) for col in distinct.distinct_columns)
@@ -262,8 +318,8 @@ def get_query_string(
         query += f" {filters}"
 
     # ORDER BY
-    if order_by and order_by.column:
-        query += f" ORDER BY {quote_identifier(db_type, order_by.column)} {order_by.direction.upper()}"
+    if order_by and len(order_by) > 0:
+        query += f" {format_order_by(db_type, order_by)}"
 
     # Paginação
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
@@ -338,7 +394,7 @@ def quote_identifier(db_type: str, identifier: str) -> str:
     
     if db_type in ['postgresql', 'postgres', 'oracle']:
         return ".".join(f'"{part}"' for part in parts)
-    elif db_type in ['mssql', 'sql server']:
+    elif db_type in ['mssql', 'sql server', 'sqlserver']:
         return ".".join(f'[{part}]' for part in parts)
     elif db_type in ['mysql']:
         return ".".join(f'`{part}`' for part in parts)

@@ -2,7 +2,7 @@ import os
 import pickle
 from sqlalchemy import text
 from app.config.dotenv import get_env  # ou ajuste conforme seu projeto
-from app.database import engine
+from app.database import sync_engine as engine
 from app.models import user_model, geral_model, connection_models
 
 FLAG_FILE = get_env('FLAG_FILE', 'app/config/initialized.pkl')

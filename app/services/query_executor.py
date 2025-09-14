@@ -2,10 +2,11 @@ import json
 import time
 import re
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Tuple, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, Result
 from sqlalchemy.sql import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.cruds.queryhistory_crud import create_query_history, get_query_history_by_user_and_query
 from app.models.connection_models import DBConnection
@@ -14,25 +15,45 @@ from app.ultils.build_query import get_count_query, get_filter_condition_with_op
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
+# Limite de linhas a manter no preview (evita OOM)
+MAX_PREVIEW_ROWS = 500
+# Tamanho do lote para fetchmany
+FETCH_BATCH_SIZE = 100
+
 
 def is_safe_identifier(identifier: str) -> bool:
-    """Valida se um identificador (tabela/coluna) é seguro contra SQL Injection."""
-    return re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", identifier) is not None
+    """
+    Valida se um identificador é seguro.
+    Aceita formatos: table, schema.table - sem caracteres especiais.
+    """
+    if not identifier:
+        return False
+    # permite opcionalmente "schema.table"
+    return re.fullmatch(r"(?:[A-Za-z_][A-Za-z0-9_]*)(?:\.(?:[A-Za-z_][A-Za-z0-9_]*))?", identifier) is not None
 
 
 def montar_filter_com_parametros(
-    conditions: List[CondicaoFiltro],
+    conditions: Optional[List[CondicaoFiltro]],
     db_type: str = "postgres"
-) -> tuple[str, dict]:
-    """Monta o SQL do WHERE e os parâmetros com base nas condições."""
-    where_clauses = []
-    params = {}
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    Monta a cláusula WHERE e o dicionário de parâmetros.
+    Retorna ("", {}) se conditions for None ou vazio.
+    Gera nomes de parâmetro únicos por condição para evitar colisões.
+    """
+    if not conditions:
+        return "", {}
 
-    for cond in conditions:
+    where_clauses: List[str] = []
+    params: Dict[str, Any] = {}
+
+    for idx, cond in enumerate(conditions):
         if not is_safe_identifier(cond.table_name_fil) or not is_safe_identifier(cond.column):
-            raise ValueError("Identificador inválido: tabela ou coluna com nome inseguro.")
+            raise ValueError(f"Identificador inválido: {cond.table_name_fil}.{cond.column}")
 
         field = f"{cond.table_name_fil}.{cond.column}"
+        # gera um prefixo único para o param name
+        param_prefix = f"p_{idx}_"
 
         sql_part = get_filter_condition_with_operation(
             col_name=field,
@@ -41,52 +62,69 @@ def montar_filter_com_parametros(
             params=params,
             db_type=db_type,
             operation=cond.operator,
-            param_name="",
+            param_name=param_prefix,
             enum_values="",
             value_otheir_between=cond.value2
         )
 
-        logic = cond.logicalOperator or "AND"
+        logic = (cond.logicalOperator or "AND").strip().upper()
+        if logic not in ("AND", "OR"):
+            logic = "AND"
         where_clauses.append((logic, sql_part))
 
-    # Concatenação lógica das cláusulas
+    if not where_clauses:
+        return "", {}
+
+    # Concatena respeitando operadores lógicos (assume ordem sequencial)
     where_sql = where_clauses[0][1]
     for logic, clause in where_clauses[1:]:
-        where_sql += f" {logic} {clause}"
+        where_sql = f"{where_sql} {logic} {clause}"
 
     return f"WHERE {where_sql}", params
 
-def executar_query_e_salvar( 
+
+def _safe_int(v: Any, default: int = 0) -> int:
+    try:
+        return int(v)
+    except Exception:
+        return default
+
+
+def executar_query_e_salvar(
     db: Session,
     user_id: int,
     connection: DBConnection,
     engine: Engine,
     queryrequest: QueryPayload,
     chache_consulta: bool = False
-) -> dict:
+) -> Dict[str, Any]:
+    """
+    Executa a query de forma segura, salva histórico e retorna um dicionário com o resultado.
+    Evita fetchall() para grandes consultas e trata erros de SQL separadamente.
+    """
     log_message("🔎 Iniciando execução da query com filtros...", "info")
     start = time.time()
 
-    # Validação do nome da tabela base
+    # Validações básicas
+    if not queryrequest:
+        raise ValueError("QueryPayload é obrigatório")
+
     if not is_safe_identifier(queryrequest.baseTable):
         raise ValueError("Nome da tabela base inválido")
 
-    # Validação das tabelas de junção
-    for join in queryrequest.joins:
-        if not is_safe_identifier(join.table):
-            raise ValueError(f"Tabela de junção inválida: {join.table}")
+    if queryrequest.joins:
+        for join in queryrequest.joins:
+            if not is_safe_identifier(join.table):
+                raise ValueError(f"Tabela de junção inválida: {join.table}")
 
     # Filtros WHERE
-    filters = ""
-    params = {}
-    if queryrequest.where:
-        filters, params = montar_filter_com_parametros(queryrequest.where, connection.type)
+    filters, params = montar_filter_com_parametros(queryrequest.where, connection.type)
 
-    # Montagem da query final
+    # Monta query (count ou select)
     if queryrequest.isCountQuery:
         query_string = get_count_query(
             base_table=queryrequest.baseTable,
-            joins=queryrequest.joins,
+            joins=queryrequest.joins or [],
             filters=filters,
             distinct=queryrequest.distinct,
             db_type=connection.type
@@ -94,7 +132,7 @@ def executar_query_e_salvar(
     else:
         query_string = get_query_string(
             base_table=queryrequest.baseTable,
-            joins=queryrequest.joins,
+            joins=queryrequest.joins or [],
             select=queryrequest.select,
             filters=filters,
             table_list=queryrequest.table_list,
@@ -106,23 +144,24 @@ def executar_query_e_salvar(
         )
 
     log_message(f"📘 Query montada:\n{query_string}", "debug")
-    log_message(f"📦 Parâmetros:\n{json.dumps(params, indent=2)}", "debug")
+    log_message(f"📦 Parâmetros: {json.dumps(params, indent=2, default=str)}", "debug")
 
-    # 🔎 Verificar se já existe essa query registrada para o mesmo user/connection
-    
+    # Check cache
     if chache_consulta:
-        print("Verificando cache...")
-        consulta_existente = get_query_history_by_user_and_query(db,user_id,connection.id, query_string)
-
-        if consulta_existente:
-            log_message("⚠️ Consulta já registrada no histórico. Retornando resultado salvo.", "warning")
-            if "Erro operacional ao executar a consulta. Verifique a conexão e a consulta." not in (consulta_existente.error_message or ""):
+        try:
+            consulta_existente = get_query_history_by_user_and_query(db, user_id, connection.id, query_string)
+            if consulta_existente:
+                log_message("⚠️ Consulta já registrada no histórico. Retornando resultado salvo.", "warning")
+                # se existiu erro operacional, repassa
                 if consulta_existente.error_message:
-                    raise ValueError(consulta_existente.error_message)
+                    # se for erro operacional genérico, levanta para re-executar
+                    if "Erro operacional ao executar a consulta" in (consulta_existente.error_message or ""):
+                        pass
+                    else:
+                        raise ValueError(consulta_existente.error_message)
 
                 if queryrequest.isCountQuery:
-                    # Recupera o valor count salvo como string e transforma em int
-                    count_value = int(consulta_existente.result_preview)
+                    count_value = int(consulta_existente.result_preview or 0)
                     return {
                         "success": True,
                         "count": count_value,
@@ -131,7 +170,6 @@ def executar_query_e_salvar(
                         "cached": True
                     }
                 else:
-                    # Recupera o preview salvo como JSON
                     preview_data = json.loads(consulta_existente.result_preview) if consulta_existente.result_preview else []
                     columns = list(preview_data[0].keys()) if isinstance(preview_data, list) and preview_data else []
                     return {
@@ -143,76 +181,105 @@ def executar_query_e_salvar(
                         "preview": preview_data,
                         "cached": True
                     }
+        except Exception as e:
+            # erro ao consultar cache: loga e segue para executar ao invés de falhar
+            log_message(f"⚠️ Erro ao acessar cache: {e}", "warning")
 
-    # Se não existir, executa e salva normalmente
-    result_preview = None
-    error_message = None
-    colunas = []
+    # Variáveis de retorno
+    result_preview: Optional[str] = None
+    error_message: Optional[str] = None
+    colunas: List[str] = []
 
     try:
         with engine.connect() as conn:
-            # print("Query final:", query_string % params) 
+            result: Result = conn.execute(text(query_string), parameters=params)
 
-            result = conn.execute(text(query_string), parameters=params)
             if queryrequest.isCountQuery:
                 count_value = result.scalar()
-                result_preview = count_value
+                result_preview = str(count_value or 0)
                 colunas = ["count"]
+                log_message(f"📊 Count obtido: {result_preview}", "debug")
             else:
-                linhas = result.fetchall()
-                colunas = result.keys()
+                # Evita trazer tudo para memória: monta preview em batches até MAX_PREVIEW_ROWS
+                preview_rows: List[Dict[str, Any]] = []
+                keys = list(result.keys())
+                colunas = keys
 
-                if linhas:
-                    if queryrequest.select:
-                        # usa os nomes do select
-                        preview = [dict(zip(queryrequest.select, linha)) for linha in linhas]
-                    else:
-                        # usa os nomes vindos do banco (result.keys())
-                        preview = [dict(zip(colunas, linha)) for linha in linhas]
-                else:
-                    preview = []
-                # print("test",preview)
-                result_preview = json.dumps(preview, default=str)
+                fetched = 0
+                while True:
+                    batch = result.fetchmany(FETCH_BATCH_SIZE)
+                    if not batch:
+                        break
+
+                    for row in batch:
+                        if queryrequest.select:
+                            # se select informado, usa ordem do select
+                            preview_rows.append(dict(zip(queryrequest.select, row)))
+                        else:
+                            preview_rows.append(dict(zip(keys, row)))
+
+                        fetched += 1
+                        if fetched >= MAX_PREVIEW_ROWS:
+                            break
+
+                    if fetched >= MAX_PREVIEW_ROWS:
+                        break
+
+                result_preview = json.dumps(preview_rows, default=str)
+
+                log_message(f"✅ Preview gerado com {fetched} linhas (cap {MAX_PREVIEW_ROWS}).", "debug")
 
         log_message("✅ Query executada com sucesso.", "success")
 
+    except SQLAlchemyError as sa_err:
+        # trata erros SQL de forma específica
+        error_message = _lidar_com_erro_sql(sa_err)
+        log_message(f"⚠️ Erro SQL: {error_message}", "error")
     except Exception as e:
-        db.rollback()
-        error_message = _lidar_com_erro_sql(e)
+        # erro genérico
+        error_message = str(e)
+        log_message(f"❌ Erro inesperado: {error_message}", "error")
 
     duration_ms = int((time.time() - start) * 1000)
 
-    historico = QueryHistoryCreate(
-        user_id=user_id,
-        db_connection_id=connection.id,
-        query=query_string,
-        query_type="SELECT",
-        executed_at=datetime.now(timezone.utc),
-        duration_ms=duration_ms,
-        result_preview=result_preview if not queryrequest.isCountQuery else str(result_preview),
-        error_message=error_message,
-        is_favorite=False,
-        tags="count" if queryrequest.isCountQuery else "select"
-    )
+    # Salva histórico sempre — inclui error_message para auditoria
+    try:
+        historico = QueryHistoryCreate(
+            user_id=user_id,
+            db_connection_id=connection.id,
+            query=query_string,
+            query_type="SELECT",
+            executed_at=datetime.now(timezone.utc),
+            duration_ms=duration_ms,
+            result_preview=result_preview if not queryrequest.isCountQuery else str(result_preview),
+            error_message=error_message,
+            is_favorite=False,
+            tags="count" if queryrequest.isCountQuery else "select"
+        )
+        create_query_history(db=db, data=historico)
+    except Exception as hist_err:
+        log_message(f"⚠️ Falha ao salvar histórico: {hist_err}", "warning")
 
-
-    create_query_history(db=db, data=historico)
-    
+    # Se houve erro, lança para o controller lidar (ou retorna estrutura apropriada)
     if error_message:
-        log_message(f"📝  {error_message}", "error")
+        # aqui escolhemos lançar Exception com mensagem amigável
         raise Exception(f"Erro na execução da query:\n{error_message}")
 
+    # Monta retorno
     if queryrequest.isCountQuery:
-        return {"success": True, "count": int(result_preview), "query": query_string, "duration_ms": duration_ms}
+        return {
+            "success": True,
+            "count": int(result_preview) if result_preview is not None and str(result_preview).isdigit() else 0,
+            "query": query_string,
+            "duration_ms": duration_ms
+        }
 
     return {
         "success": True,
         "query": query_string,
         "params": params,
         "duration_ms": duration_ms,
-        "columns": list(colunas),
+        "columns": colunas,
         "preview": json.loads(result_preview) if result_preview else [],
         "cached": False
     }
-
-

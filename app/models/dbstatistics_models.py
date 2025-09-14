@@ -1,7 +1,6 @@
 # models/dbstatistcs_models.py
 
 from datetime import datetime, timezone
-from wsgiref.simple_server import server_version
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from app.database import Base

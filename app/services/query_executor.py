@@ -10,7 +10,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.cruds.queryhistory_crud import create_query_history, get_query_history_by_user_and_query
 from app.models.connection_models import DBConnection
-from app.schemas.queryhistory_schemas import CondicaoFiltro, QueryHistoryCreate, QueryPayload
+from app.schemas.query_select_upAndInsert_schema import CondicaoFiltro, QueryPayload
+from app.schemas.queryhistory_schemas import QueryHistoryCreate
+from app.services.cloudeAi_execute_query import QueryFilterBuilder, QuerySecurityValidator
 from app.ultils.build_query import get_count_query, get_filter_condition_with_operation, get_query_string
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
@@ -83,14 +85,7 @@ def montar_filter_com_parametros(
     return f"WHERE {where_sql}", params
 
 
-def _safe_int(v: Any, default: int = 0) -> int:
-    try:
-        return int(v)
-    except Exception:
-        return default
-
-
-def executar_query_e_salvar(
+async def executar_query_e_salvar(
     db: Session,
     user_id: int,
     connection: DBConnection,
@@ -104,21 +99,19 @@ def executar_query_e_salvar(
     """
     log_message("🔎 Iniciando execução da query com filtros...", "info")
     start = time.time()
-
+    security_validator = QuerySecurityValidator()
+    filter_builder = QueryFilterBuilder()
     # Validações básicas
     if not queryrequest:
         raise ValueError("QueryPayload é obrigatório")
 
-    if not is_safe_identifier(queryrequest.baseTable):
-        raise ValueError("Nome da tabela base inválido")
-
-    if queryrequest.joins:
-        for join in queryrequest.joins:
-            if not is_safe_identifier(join.table):
-                raise ValueError(f"Tabela de junção inválida: {join.table}")
+    security_validator.ensure_base_table_in_query(queryrequest)
 
     # Filtros WHERE
-    filters, params = montar_filter_com_parametros(queryrequest.where, connection.type)
+    filters, params = await filter_builder.build_where_clause(
+                queryrequest.where or [], connection.type
+            )
+    # filters, params = montar_filter_com_parametros(queryrequest.where, connection.type)
 
     # Monta query (count ou select)
     if queryrequest.isCountQuery:

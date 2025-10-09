@@ -157,8 +157,33 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
     log_message(f"🟢 Campo '{field.name}' criado na estrutura ID {structure_id}", "info")
     return field
 
+from sqlalchemy import and_, or_
+from typing import Optional
 
-
+def get_fields_by_structure_pk(db: Session, structure_id: int) -> Optional[DBField]:
+    # Prioridade 1: chave primária
+    column = db.query(DBField).filter(
+        and_(DBField.structure_id == structure_id, DBField.is_primary_key == True)
+    ).first()
+    if column:
+        return column
+    # Prioridade 2: coluna única
+    column = db.query(DBField).filter(
+        and_(DBField.structure_id == structure_id, DBField.is_unique == True)
+    ).first()
+    if column:
+        return column
+    # Prioridade 3: auto increment ou nullable
+    column = db.query(DBField).filter(
+        and_(
+            DBField.structure_id == structure_id,
+            or_(DBField.is_auto_increment == True, DBField.is_nullable == True)
+        )
+    ).first()
+    if column:
+        return column
+    # Caso padrão: qualquer coluna
+    return db.query(DBField).filter(DBField.structure_id == structure_id).first()
 
 
 def get_fields_by_structure(db: Session, structure_id: int) -> List[DBField]:

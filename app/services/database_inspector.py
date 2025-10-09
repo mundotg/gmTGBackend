@@ -5,8 +5,9 @@ from sqlalchemy import Engine, inspect, text
 from sqlalchemy.orm import Session
 from app.config.dependencies import EngineManager, get_session_by_connection_id
 from app.cruds.dbstatistics_crud import create_statistics, get_cached_row_count_all, get_statistics_by_connection, update_or_create_cache, update_statistics
-from app.cruds.dbstructure_crud import create_db_structure, get_structure_by_id_and_name, update_db_structure
+from app.cruds.dbstructure_crud import create_db_structure, get_db_structures, get_structure_by_id_and_name, update_db_structure
 from app.models.dbstructure_models import DBStructure
+from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
@@ -95,20 +96,54 @@ def get_table_names_with_count(connection_id: int, id_user: int, db: Session):
     return sorted(table_info, key=lambda x: x["name"].lower())
 
 
-
-
 def get_table_names(connection_id: int, id_user: int, db: Session):
+    """
+    Retorna todas as tabelas e views de uma conexão e atualiza a estrutura das tabelas no banco local.
+    """
+    # 1️⃣ Tenta pegar do cache local
+    structures = get_db_structures(db, connection_id)
+    if structures:
+        # Retorna nomes das tabelas já registradas
+        # print("retorn da base de dados a estruture ficheiro database_inspector")
+        return [s.table_name for s in structures]
+
+    # 2️⃣ Caso não exista no cache, conecta ao banco
     engine = EngineManager.get(id_user) or get_session_by_connection_id(connection_id, db)
     inspector = inspect(engine)
-    # pega tabelas normais
-    table_names = inspector.get_table_names()
 
-    # pega views
-    view_names = inspector.get_view_names()
+    # 3️⃣ Pega todos os schemas
+    try:
+        schemas = inspector.get_schema_names()
+    except Exception as e:
+        log_message(f"⚠️ Erro ao obter schemas: {e}", "warning")
+        schemas = [inspector.default_schema_name]
 
-    # junta tudo
-    all_names = table_names + view_names
-    return all_names
+    all_table_names = []
+
+    # 4️⃣ Processa tabelas e atualiza estrutura
+    for schema in schemas:
+        try:
+            tables = inspector.get_table_names(schema=schema)
+        except Exception as e:
+            log_message(f"⚠️ Erro ao obter tabelas do schema '{schema}': {e}", "warning")
+            tables = []
+
+        for table in tables:
+            verificar_ou_atualizar_estrutura(db, connection_id, table, schema)
+        all_table_names.extend(tables)
+
+    # 5️⃣ Processa views
+    for schema in schemas:
+        try:
+            views = inspector.get_view_names(schema=schema)
+        except Exception as e:
+            log_message(f"⚠️ Erro ao obter views do schema '{schema}': {e}", "warning")
+            views = []
+        all_table_names.extend(views)
+
+    return all_table_names
+
+
 
 def get_table_count(connection_id: int, table_name: str, db: Session, id_user: int) -> int:
     """
@@ -216,7 +251,11 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
     if not existing:
         data_create = DBStatisticsCreate(
             db_connection_id=connection_id,
-            **{k: stats[k] for k in DBStatisticsCreate.__annotations__ if k in stats}
+            **{
+                k: stats[k]
+                for k in DBStatisticsCreate.__annotations__
+                if k in stats and k != "db_connection_id"
+            }
         )
         log_message(f"🆕 Criando novas estatísticas para a conexão {data_create}.", "info")
         return create_statistics(db, data_create) or "created"
@@ -241,34 +280,29 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
 
 
 
-def sync_connection_statistics(connection_id: int, id_user: int, db_type:str,  db: Session,connection_name: str = "") -> dict | None:
+def sync_connection_statistics( id_user: int,   db: Session) -> dict | None:
     """
     Sincroniza estatísticas da conexão: coleta e armazena se necessário.
     """
     try:
-        log_message(f"🔄 Iniciando sincronização de estatísticas para conexão ID={connection_id}, usuário ID={id_user}", "info")
 
-        engine = EngineManager.get(id_user)
-        if not engine:
-            log_message(f"⚠️ Nenhum engine em cache para o usuário {id_user}. Tentando recriar engine...", "warning")
-            engine = get_session_by_connection_id(connection_id, db)
+        engine,connection = ConnectionManager.ensure_connection(db, id_user)
+        existing = get_statistics_by_connection(db, connection.id)
+        if existing:
+            return existing
 
-        if not engine:
-            log_message(f"❌ Engine indisponível para a conexão {connection_id}.", "error")
-            return None
-
-        stats = collect_statistics(engine,db_type)
+        stats = collect_statistics(engine,connection.type)
         if not stats:
-            log_message(f"⚠️ Nenhuma estatística coletada para a conexão {connection_id}.", "warning")
+            log_message(f"⚠️ Nenhuma estatística coletada para a conexão {connection.id}.", "warning")
             return None
 
         log_message(f"📊 Estatísticas coletadas: {stats}", "info")
 
-        action = save_or_update_statistics(connection_id, stats, db)
+        action = save_or_update_statistics(connection.id, stats, db)
         
 
-        log_message(f"✅ Estatísticas '{action}' registradas para conexão ID={connection_id}.", "success")
-        stats["connection_name"] = connection_name
+        log_message(f"✅ Estatísticas '{action}' registradas para conexão ID={connection.id}.", "success")
+        stats["connection_name"] = connection.name
         return stats
 
     except Exception as e:
@@ -278,7 +312,7 @@ def sync_connection_statistics(connection_id: int, id_user: int, db_type:str,  d
         stack_trace = traceback.format_exc()
 
         log_message(
-            f"❌ Erro ao sincronizar estatísticas da conexão ID={connection_id}, usuário ID={id_user}:\n"
+            f"❌ Erro ao sincronizar estatísticas da conexão ID={connection.id}, usuário ID={id_user}:\n"
             f"Tipo: {error_type}\n"
             f"Mensagem: {error_message}\n"
             f"StackTrace:\n{stack_trace}",

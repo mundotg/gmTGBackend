@@ -1,0 +1,80 @@
+# ===============================
+# GITIGNORE PARA PROJETO PYTHON
+# gestorBd backend
+# ===============================
+
+# -------------------------------
+# 1. Arquivos e pastas de ambiente virtual
+# -------------------------------
+venv/
+.env/
+.env.* 
+.venv/
+env/
+ENV/
+*.env
+
+# -------------------------------
+# 2. Cache e arquivos compilados
+# -------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# -------------------------------
+# 3. Logs e arquivos temporários
+# -------------------------------
+*.log
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+*.pyo
+*.pyd
+*.bin
+database_connector.log
+init_done.bin
+
+# -------------------------------
+# 4. Dados de build e pacotes
+# -------------------------------
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# -------------------------------
+# 5. Configurações locais e IDEs
+# -------------------------------
+.vscode/
+.idea/
+*.code-workspace
+
+# -------------------------------
+# 6. Arquivos de migração compilados
+# -------------------------------
+alembic/__pycache__/
+alembic/versions/__pycache__/
+app/**/__pycache__/
+
+# -------------------------------
+# 7. Arquivos auxiliares e guias HTML locais
+# -------------------------------
+*.html
+!README.md  # mantém o README.md
+
+# -------------------------------
+# 8. Arquivos gerados por testes
+# -------------------------------
+.coverage
+htmlcov/
+.pytest_cache/
+.cache/
+
+# -------------------------------
+# 9. Outros
+# -------------------------------
+*.db
+*.sqlite3
+*.sqlite
+*.pid

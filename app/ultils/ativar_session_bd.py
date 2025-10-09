@@ -1,6 +1,7 @@
 import traceback
 from typing import Optional, Tuple
 from unittest import result
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.config.dependencies import EngineManager, get_session_by_connection
 from app.cruds.connection_cruds import create_db_connection, disconnect_active_connection, get_active_connection_by_userid, get_db_connection_by_id
@@ -164,3 +165,26 @@ def get_connection_current(db: Session, id_user: int) -> Tuple[Optional[DBConnec
         return None, None
     connection, activated_at = connection
     return connection, activated_at
+
+from sqlalchemy.ext.asyncio import AsyncSession
+async def get_connection_current_async(
+    db: AsyncSession, id_user: int
+) -> Tuple[Optional[DBConnection], Optional[datetime]]:
+    """
+    Retorna a conexão ativa do usuário, se existir, e a data de ativação.
+    Agora usando AsyncSession corretamente (sem .query).
+    """
+    stmt = (
+        select(DBConnection, ActiveConnection.activated_at)
+        .join(ActiveConnection, ActiveConnection.connection_id == DBConnection.id)
+        .filter(DBConnection.user_id == id_user, ActiveConnection.status == True)
+    )
+
+    result = await db.execute(stmt)
+    connection = result.first()  # pega a primeira tupla (DBConnection, activated_at)
+
+    if not connection:
+        return None, None
+
+    db_connection, activated_at = connection
+    return db_connection, activated_at

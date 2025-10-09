@@ -53,11 +53,8 @@ def _get_values(col_type: str, db_type: str, col_name: str, table_name: str, eng
             """)
             with engine.connect() as conn:
                 result = conn.execute(query_check, {"table_name": table_name, "col_name": col_name}).fetchall()
-                # print(type(result))
                 for row in result:
-                    # print(type(row), row[0])
                     values = _extract_check_values(row[0])
-                    # print("test",values)
                     if values:
                         enum_values[col_name] = values
 
@@ -158,12 +155,9 @@ def _fetch_enum_values(
 
             # 2. Busca diretamente no banco de dados
             valores_enum = _get_values(col.type, db_type, col.name, structure.table_name, engine)
-            # print(valores_enum)
             enum_values[col.name] = []
 
             for valor in valores_enum.get(col.name, []):
-                # Insere valor no banco local
-                print(f"{col.type} {valor} ")
                 enum_model = DBEnum_field(field_id=col.id, valor=valor)
                 create_enum_field(db, enum_model)
                 enum_values[col.name].append(valor)

@@ -1,40 +1,109 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Any, Dict, List, Literal, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+from enum import Enum
 
 
-# --------- Base ---------
+# --------- ENUM ---------
+
+class QueryType(str, Enum):
+    SELECT = "SELECT"
+    INSERT = "INSERT"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+    CREATE = "CREATE"
+    ALTER = "ALTER"
+    DROP = "DROP"
+    OTHER = "OTHER"
+
+
+# --------- BASES ---------
 
 class QueryHistoryBase(BaseModel):
-    query: str = Field(..., title="Query SQL", description="Consulta SQL executada.")
-    query_type: Optional[str] = Field(None, title="Tipo de Query", description="Tipo da query, ex: SELECT, INSERT, etc.")
-    duration_ms: Optional[int] = Field(None, title="Duração (ms)", description="Tempo de execução em milissegundos.")
-    result_preview: Optional[str] = Field(None, title="Prévia do Resultado", description="Texto ou JSON com os primeiros registros retornados.")
-    error_message: Optional[str] = Field(None, title="Erro", description="Mensagem de erro, se houver.")
-    is_favorite: Optional[bool] = Field(False, title="Favorita", description="Se a query foi marcada como favorita.")
-    tags: Optional[str] = Field(None, title="Tags", description="Tags separadas por vírgula, para facilitar agrupamento.")
+    """Base schema para histórico de consulta"""
+    user_id: int = Field(..., description="ID do usuário")
+    db_connection_id: int = Field(..., description="ID da conexão de banco")
+    query: str = Field(..., min_length=1, description="Query SQL executada")
+    query_type: Optional[QueryType] = Field(None, description="Tipo da query")
+    duration_ms: Optional[int] = Field(None, ge=0, description="Duração em ms")
+    result_preview: Optional[str] = Field(None, description="Preview dos resultados")
+    error_message: Optional[str] = Field(None, description="Mensagem de erro")
+    is_favorite: bool = Field(False, description="Se é favorita")
+    tags: Optional[str] = Field(None, description="Tags para categorização")
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-# --------- Estruturas auxiliares ---------
+# --------- AUXILIARES ---------
 
 class TableInfo(BaseModel):
     name: str = Field(..., title="Nome da Tabela")
-    rowcount: int = Field(..., title="Linhas", description="Número de linhas da tabela.")
+    rowcount: int = Field(..., title="Linhas", description="Número de linhas da tabela")
 
 
 class DatabaseMetadata(BaseModel):
     connectionName: str
     databaseName: str
     serverVersion: str
-
     tableCount: int
     viewCount: int
     procedureCount: int
     functionCount: int
     triggerCount: int
     indexCount: int
-
     tableNames: List[TableInfo]
+
+
+
+
+
+# --------- ASYNC MODELS ---------
+
+class QueryHistoryCreateAsync(QueryHistoryBase):
+    executed_at: datetime = Field(default_factory=lambda: datetime.now())
+    updated_at: datetime = Field(default_factory=lambda: datetime.now())
+
+    @field_validator('executed_at', 'updated_at', mode='before')
+    def ensure_naive_datetime(cls, v):
+        if v is None:
+            return datetime.now()
+        if isinstance(v, datetime):
+            # Remove tzinfo, deixando naive
+            return v.replace(tzinfo=None)
+        return v
+
+
+class QueryHistoryUpdateAsync(BaseModel):
+    is_favorite: Optional[bool] = None
+    tags: Optional[str] = None
+    error_message: Optional[str] = None
+    result_preview: Optional[str] = None
+    duration_ms: Optional[int] = Field(None, ge=0)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now().replace(tzinfo=None))
+
+    @field_validator('updated_at', mode='before')
+    def ensure_naive_datetime(cls, v):
+        if v is None:
+            return datetime.now().replace(tzinfo=None)
+        if isinstance(v, datetime) and v.tzinfo is not None:
+            return v.astimezone(timezone.utc).replace(tzinfo=None)
+        return v
+
+    model_config = ConfigDict(
+        json_encoders={datetime: lambda v: v.isoformat() if v else None}
+    )
+
+
+class QueryHistoryResponseAsync(QueryHistoryBase):
+    id: int
+    executed_at: datetime
+    updated_at: datetime
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_encoders={datetime: lambda v: v.isoformat() if v else None}
+    )
 
 
 # --------- Criação e Atualização ---------
@@ -72,73 +141,3 @@ class QueryHistoryOut(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)  # Para suportar ORM
-
-class CondicaoFiltro(BaseModel):
-    table_name_fil: str = Field(..., title="Tabela")
-    column: str = Field(..., title="Coluna")
-    operator: str = Field(..., title="Operador")
-    value: str = Field(..., title="Valor")
-    value2: Optional[str] = Field(None, title="Valor 2 (para BETWEEN)")
-    column_type: str = Field(..., title="Tipo da Coluna (ex: varchar, int)")
-    logicalOperator: Optional[Literal['AND', 'OR']] = Field("AND", title="Operador Lógico")
-    value_type: Optional[Literal['string', 'number', 'date', 'boolean']] = Field("string", title="Tipo de Valor")
-    length: Optional[int] = None
-    is_nullable: Optional[bool] = None
-
-
-class JoinOption(BaseModel):
-    table: str
-    type: str
-    on: str 
-
-
-class OrderByOption(BaseModel):
-    column: str
-    direction: str  # 'ASC' ou 'DESC'
-
-
-class DistinctList(BaseModel):
-    useDistinct: bool = False
-    distinct_columns: List[str] = Field(default_factory=list)
-
-
-class QueryPayload(BaseModel):
-    baseTable: str
-    joins: Optional[List[JoinOption]] = None
-    table_list: Optional[List[str]] = None
-    select: Optional[List[str]] = []
-    aliaisTables: Optional[Dict[str, str]] = None   # agora suporta
-    where: Optional[List[CondicaoFiltro]] = None
-    orderBy: Optional[List[OrderByOption]] = None   # lista, não único
-    limit: Optional[int] = None
-    distinct: Optional[DistinctList] = None
-    offset: Optional[int] = None
-    isCountQuery: Optional[bool] = False
-
-    
-class ChangedField(BaseModel):
-    value: str
-    type_column: str
-    
-
-class UpdateRequest(BaseModel):
-    updatedRow: Dict[str, Dict[str, ChangedField]]
-    tables_primary_keys_values: Dict[str, Dict[str, str]]
-    
-class InsertRequest(BaseModel):
-    createdRow: Dict[str, Dict[str, ChangedField]]
-    
-class CampoPadronizado(BaseModel):
-    campo: str
-    valor: Optional[str] = None
-    id: str = "text"
-
-class ConfiguracaoTabela(BaseModel):
-    schema_name: Optional[str] = ""
-    tabela: str
-    quantidade: int = 1
-    camposPadronizados: Optional[List[CampoPadronizado]] | None = None
-
-class AutoCreateRequest(BaseModel):
-    configs: List[ConfiguracaoTabela]
-

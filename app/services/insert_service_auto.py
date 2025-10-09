@@ -8,7 +8,8 @@ from sqlalchemy import Engine
 from app.models.connection_models import DBConnection
 from app.models.dbstructure_models import DBField
 from app.schemas.dbstructure_schema import CampoDetalhado
-from app.schemas.queryhistory_schemas import AutoCreateRequest, ConfiguracaoTabela, QueryHistoryCreate, QueryPayload
+from app.schemas.query_select_upAndInsert_schema import AutoCreateRequest, ConfiguracaoTabela, QueryPayload
+from app.schemas.queryhistory_schemas import  QueryHistoryCreate
 from app.cruds.queryhistory_crud import create_query_history
 from app.services.field_info import buscar_estrutura_tabela, buscar_ou_criar_campos_tabela, processar_enum_fields
 from app.services.insert_row_service import build_insert_query
@@ -166,7 +167,7 @@ def obter_chaves_estrangeira(
         baseTable=tabela,
         table_list=[tabela],
         select=[coluna],
-        joins=[],
+        joins={},
         where=[],
         orderBy=None,
         offset=None,  # não precisa offset se já usar random direto no SQL
@@ -212,7 +213,7 @@ def gerar_valor_auto(
             return None  # banco gera sozinho
         return gerar_valor_pelo_tipo_de_dados_na_bd(coluna)
     # 3) Enums
-    opcoes = (coluna.enum_valores_encontrados or []) + (coluna.enum_valores_adicionados or [])
+    opcoes = (coluna.enum_valores_encontrados or []) 
     if opcoes:
         return random.choice(list(set(opcoes)))
 

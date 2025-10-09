@@ -1,21 +1,6 @@
-2025-09-14 11:34:11,149 - INFO - \U0001f4ca Count obtido: 186934
-2025-09-14 11:34:11,157 - INFO - \u2705 Query executada com sucesso.
-2025-09-14 11:34:11,252 - INFO - Consulta criada com sucesso (UserID=1, ConnID=4)
-2025-09-14 11:34:15,477 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2025-09-14 11:34:15,478 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2025-09-14 11:34:15,626 - INFO - \U0001f50d Buscando conexão com ID 4
-2025-09-14 11:34:15,630 - INFO - \U0001f50d Buscando conexão com ID 4
-2025-09-14 11:34:15,865 - INFO - \U0001f504 Iniciando sincronização de estatísticas para conexão ID=4, usuário ID=1
-2025-09-14 11:34:15,871 - INFO - \U0001f504 Iniciando sincronização de estatísticas para conexão ID=4, usuário ID=1
-2025-09-14 11:34:15,881 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
-2025-09-14 11:34:15,886 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
-2025-09-14 11:34:15,887 - WARNING - \u26a0\ufe0f Nenhum engine em cache para o usuário 1. Tentando recriar engine...
-2025-09-14 11:34:15,887 - WARNING - \u26a0\ufe0f Nenhum engine em cache para o usuário 1. Tentando recriar engine...
-2025-09-14 11:34:15,918 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
-2025-09-14 11:34:15,924 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
-2025-09-14 11:34:16,488 - INFO - \U0001f4ca Estatísticas coletadas: {'server_version': 'Microsoft SQL Server 2022 (RTM-GDR) (KB5065221) - 16.0.1150.1 (X64) \n\tAug 13 2025 16:27:21 \n\tCopyright (C) 2022 Microsoft Corporation\n\tDeveloper Edition (64-bit) on Windows 10 Pro 10.0 <X64> (Build 26100: ) (Hypervisor)\n', 'table_count': 276, 'view_count': 205, 'procedure_count': 1311, 'function_count': 27, 'trigger_count': 343, 'index_count': 845, 'tables_connected': 276, 'queries_today': 0, 'records_analyzed': 0, 'connection_name': '', 'db_connection_id': 0}
-2025-09-14 11:34:16,488 - INFO - \U0001f4ca Estatísticas coletadas: {'server_version': 'Microsoft SQL Server 2022 (RTM-GDR) (KB5065221) - 16.0.1150.1 (X64) \n\tAug 13 2025 16:27:21 \n\tCopyright (C) 2022 Microsoft Corporation\n\tDeveloper Edition (64-bit) on Windows 10 Pro 10.0 <X64> (Build 26100: ) (Hypervisor)\n', 'table_count': 276, 'view_count': 205, 'procedure_count': 1311, 'function_count': 27, 'trigger_count': 343, 'index_count': 845, 'tables_connected': 276, 'queries_today': 0, 'records_analyzed': 0, 'connection_name': '', 'db_connection_id': 0}
-2025-09-14 11:34:16,509 - INFO - \u2139\ufe0f Estatísticas atualizadas para conexão ID=4
-2025-09-14 11:34:16,510 - INFO - \u2705 Estatísticas 'updated' registradas para conexão ID=4.
-2025-09-14 11:34:16,511 - INFO - \u2139\ufe0f Estatísticas atualizadas para conexão ID=4
-2025-09-14 11:34:16,511 - INFO - \u2705 Estatísticas 'updated' registradas para conexão ID=4.
+2025-10-08 23:39:51,369 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-08 23:39:51,373 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-08 23:39:51,730 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-08 23:39:51,736 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-08 23:39:51,753 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-08 23:39:51,820 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1

@@ -5,6 +5,27 @@ from app.ultils.logger import logger
 
 class DatabaseManager:
     """Gerencia conexões com diferentes bancos de dados usando SQLAlchemy."""
+    DB_URIS_ASYNC = {
+        "MySQL": "mysql+aiomysql://{user}:{password}@{host}:{port}/{database}",
+        "MariaDB": "mariadb+aiomysql://{user}:{password}@{host}:{port}/{database}",
+
+        "PostgreSQL": "postgresql+asyncpg://{user}:{password}@{host}:{port}/{database}",
+        "pg": "postgresql+asyncpg://{user}:{password}@{host}:{port}/{database}?sslmode={sslmode}",
+
+        "SQLite": "sqlite+aiosqlite:///{database}",  # pode usar ":memory:" para testes
+
+       "SQL Server": (
+            "mssql+aioodbc:///?odbc_connect="
+            "DRIVER={{ODBC Driver 17 for SQL Server}};"
+            "SERVER={host},{port};"
+            "DATABASE={database};"
+            "UID={user};PWD={password};"
+            "TrustServerCertificate={trustServerCertificate};"
+        ),
+        "Oracle": "oracle+cx_oracle://{user}:{password}@{host}:{port}/?service_name={service}",
+    }
+
+
 
     DB_URIS = {
         "MySQL": "mysql+pymysql://{user}:{password}@{host}:{port}/{database}",
@@ -50,10 +71,33 @@ class DatabaseManager:
                 database=config.get("database", ""),
                 service=config.get("service", "xe"),  # Apenas Oracle
                 sslmode=config.get("sslmode", "disable"),
-                TrustServerCertificate=config.get("TrustServerCertificate", "yes")
+                TrustServerCertificate=config.get("TrustServerCertificate", "yes"),
             )
+
             logger.debug(f"🔌 Criando engine para {db_type} em {config.get('host')}:{config.get('port')}")
-            return create_engine(uri, echo=False)
+
+            # Configurações padrão
+            extra_args: Dict[str, Any] = {
+                "echo": config.get("debug_sql", False),
+                "pool_pre_ping": True,
+            }
+
+            # Só aplica pool para bancos que suportam (não para SQLite)
+            if db_type != "sqlite":
+                extra_args.update({
+                    "pool_size": config.get("pool_size", 5),
+                    "max_overflow": config.get("max_overflow", 10),
+                    "pool_timeout": config.get("pool_timeout", 30),
+                    "pool_recycle": config.get("pool_recycle", 1800),
+                })
+
+            # Se precisar SSL ou args extras
+            if "connect_args" in config:
+                extra_args["connect_args"] = config["connect_args"]
+
+            engine = create_engine(uri, **extra_args)
+            return engine
+
         except Exception as e:
             logger.exception(f"❌ Erro ao montar URI de conexão para {db_type}: {e}")
             raise

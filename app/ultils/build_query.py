@@ -1,7 +1,13 @@
 from typing import List, Optional
 import uuid
-from sqlalchemy import Boolean, Date, DateTime, Numeric
-from app.schemas.queryhistory_schemas import DistinctList, JoinOption, OrderByOption
+from sqlalchemy import Boolean, Date, DateTime, Engine, Numeric, text
+from app.cruds.queryhistory_crud import create_query_history
+from app.schemas.query_select_upAndInsert_schema import AdvancedJoinOption, DistinctList, JoinOption, OrderByOption, UpdateRequest
+from app.schemas.queryhistory_schemas import  QueryHistoryCreate
+from app.services.editar_linha import _convert_column_type_for_string_one, quote_identifier
+from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
+from app.ultils.logger import log_message
+from app.ultils.logica_de_join_advance import build_join_clause
 
 def is_valid_uuid(value: str) -> bool:
     try:
@@ -136,7 +142,7 @@ def get_filter_condition_with_operation(
             "<=": "<=",
             ">": ">",
             ">=": ">="
-        }
+            }
 
         if operation in op_map:
             params[param_name] = float(value) if is_number else value
@@ -328,7 +334,7 @@ def get_query_string(
             query += f" OFFSET {offset}"
     
     elif db_type in {"mssql", "sql server","sqlserver"}:
-        if not order_by or not order_by.column:
+        if not order_by or len(order_by) == 0:
             query += f" ORDER BY (SELECT NULL)"  # fallback
         query += f" OFFSET {offset or 0} ROWS FETCH NEXT {max_rows} ROWS ONLY"
 
@@ -341,6 +347,76 @@ def get_query_string(
         else:
             query = f"SELECT * FROM ({query}) WHERE ROWNUM <= {max_rows}"
     return query
+
+
+
+
+def get_query_string_advance(
+    base_table: str,
+    joins: Optional[dict[str, AdvancedJoinOption]] = None,
+    filters: Optional[str] = None,
+    select: Optional[List[str]] = None,
+    table_list: Optional[List[str]] = None,
+    max_rows: int = 1000,
+    db_type: str = "mysql",
+    order_by: Optional[list[OrderByOption]] = None,
+    offset: Optional[int] = None,
+    distinct: Optional[DistinctList] = None,
+    aliases: Optional[dict[str, str]] = None,
+) -> str:
+    """
+    Gera uma query SQL adaptada ao tipo de banco de dados,
+    com DISTINCT, filtros, joins, ordenação e paginação.
+    """
+    db_type = db_type.lower()
+    quoted_base_table = quote_identifier(db_type, base_table)
+
+    # --- JOINs ---
+    join_sql = build_join_clause(db_type, base_table, joins, table_list)
+
+    
+    # SELECT
+    select_view = build_select_view(db_type, select, aliases)
+
+    if distinct and distinct.useDistinct:
+        distinct_cols = ", ".join(quote_identifier(db_type, col) for col in distinct.distinct_columns)
+        if db_type in {"postgres", "postgresql"} and distinct_cols:
+            query = f"SELECT DISTINCT ON ({distinct_cols}) {select_view} FROM {quoted_base_table}{join_sql}"
+        else:
+            query = f"SELECT DISTINCT {select_view} FROM {quoted_base_table}{join_sql}"
+    else:
+        query = f"SELECT {select_view} FROM {quoted_base_table}{join_sql}"
+
+    # WHERE
+    if filters:
+        query += f" {filters}"
+
+    # ORDER BY
+    if order_by and len(order_by) > 0:
+        query += f" {format_order_by(db_type, order_by)}"
+
+    # Paginação
+    if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
+        query += f" LIMIT {max_rows}"
+        if offset is not None:
+            query += f" OFFSET {offset}"
+    
+    elif db_type in {"mssql", "sql server","sqlserver"}:
+        if not order_by or len(order_by) == 0:
+            query += f" ORDER BY (SELECT NULL)"  # fallback
+        query += f" OFFSET {offset or 0} ROWS FETCH NEXT {max_rows} ROWS ONLY"
+
+    elif db_type == "oracle":
+        if offset is not None:
+            query = (
+                f"SELECT * FROM (SELECT a.*, ROWNUM rnum FROM ({query}) a "
+                f"WHERE ROWNUM <= {offset + max_rows}) WHERE rnum > {offset}"
+            )
+        else:
+            query = f"SELECT * FROM ({query}) WHERE ROWNUM <= {max_rows}"
+
+    return query
+
 
 def get_count_query(
     base_table: str,
@@ -357,10 +433,8 @@ def get_count_query(
 
     # JOINs
     if joins:
-        join_sql = " " + " ".join(
-            f"{join.type.upper()} {quote_identifier(db_type, join.table)} ON {join.on}"
-            for join in joins
-        )
+         # --- JOINs ---
+        join_sql = build_join_clause(db_type, base_table, joins, None)
     else:
         join_sql = ""
 
@@ -377,27 +451,116 @@ def get_count_query(
 
     return query
 
+def build_update_query(table_name, db_type, updated_values, primary_key, primary_value):
+    """Constrói a query de atualização dinâmica."""
+    set_clauses = []
+    for col, info in updated_values.items():
+        value = info.get("value")
+        col_type = info.get("type_column", "text")  # default string
+        set_clauses.append(f"{quote_identifier(db_type, col)} = {_convert_column_type_for_string_one(value, col_type)}")
 
+    if not set_clauses:
+        return None
 
-def quote_identifier(db_type: str, identifier: str) -> str:
-    """
-    Escapa um identificador SQL conforme o tipo de banco.
-    Suporta identificadores compostos como 'tabela.coluna'.
+    primary_value_formatted = f"'{primary_value}'" if isinstance(primary_value, str) else str(primary_value)
+    query = text(f"""
+        UPDATE {quote_identifier(db_type, table_name)}
+        SET {', '.join(set_clauses)}
+        WHERE {quote_identifier(db_type, primary_key)} = {primary_value_formatted};
+    """)
+    return query
 
-    Ex:
-    - PostgreSQL: "tabela"."coluna"
-    - MySQL: `tabela`.`coluna`
-    - MSSQL: [tabela].[coluna]
-    """
-    db_type = db_type.lower()
-    parts = identifier.split(".")
-    
-    if db_type in ['postgresql', 'postgres', 'oracle']:
-        return ".".join(f'"{part}"' for part in parts)
-    elif db_type in ['mssql', 'sql server', 'sqlserver']:
-        return ".".join(f'[{part}]' for part in parts)
-    elif db_type in ['mysql']:
-        return ".".join(f'`{part}`' for part in parts)
-    else:
-        return identifier
+from sqlalchemy.orm import Session
+def update_row_service(
+    data: UpdateRequest,
+    engine: Engine,
+    user_id: int,
+    db_type: str,
+    connection_id: str,
+    db: Session
+):
+    import time
+    from datetime import datetime, timezone
+
+    resposta_query = ""
+    query_string = ""
+    duration_ms = 0
+
+    try:
+        start = time.time()
+        with engine.begin() as conn:
+            for table_name, primary_key_data in data.tables_primary_keys_values.items():
+                if "primaryKey" not in primary_key_data or "valor" not in primary_key_data:
+                    raise ValueError(f"Tabela {table_name} não contém chave primária válida")
+
+                primary_key = primary_key_data["primaryKey"]
+                primary_value = primary_key_data["valor"]
+
+                raw_values = data.updatedRow.get(table_name, {})
+
+                updated_values = {
+                    col: {
+                        "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
+                        "type_column": field["type_column"] if isinstance(field, dict) else getattr(field, "type_column", "text")
+                    }
+                    for col, field in raw_values.items()
+                }
+
+                if not updated_values:
+                    raise ValueError(f"Tabela {table_name}: Nenhuma coluna para atualizar")
+
+                query = build_update_query(
+                    table_name=table_name,
+                    db_type=db_type,
+                    updated_values=updated_values,
+                    primary_key=primary_key,
+                    primary_value=primary_value
+                )
+
+                query_string += f"{table_name}: {query}\n"
+                rs = conn.execute(query)
+                resposta_query += f"\n{table_name}: {rs.rowcount} linha(s) atualizada(s)"
+
+        duration_ms = int((time.time() - start) * 1000)
+
+        historico = QueryHistoryCreate(
+            user_id=user_id,
+            db_connection_id=connection_id,
+            query=query_string.strip(),
+            query_type="UPDATE",
+            executed_at=datetime.now(timezone.utc),
+            duration_ms=duration_ms,
+            result_preview=resposta_query or "Nenhuma linha atualizada",
+            error_message=None,
+            is_favorite=False,
+            tags="update"
+        )
+        create_query_history(db=db, data=historico)
+
+        return {
+            "status": resposta_query or "Nenhuma linha atualizada",
+            "updated": data.updatedRow,
+            "response": resposta_query
+        }
+
+    except Exception as e:
+        duration_ms = int((time.time() - start) * 1000) if duration_ms == 0 else duration_ms
+        error_msg = _lidar_com_erro_sql(e)
+        log_message(error_msg, "error")
+        historico = QueryHistoryCreate(
+            user_id=user_id,
+            db_connection_id=connection_id,
+            query=query_string.strip() or "UPDATE falhou antes de montar a query",
+            query_type="UPDATE",
+            executed_at=datetime.now(timezone.utc),
+            duration_ms=duration_ms,
+            result_preview=resposta_query or "Sem resultado devido ao erro",
+            error_message=error_msg,
+            is_favorite=False,
+            tags="error"
+        )
+        create_query_history(db=db, data=historico)
+
+        raise ValueError(error_msg)
+
 

@@ -99,8 +99,7 @@ def _is_system_field_from_column(
 
     try:
         # Garante que column_info é um dict
-        column_info = column_info or {}
-
+        column_info = column_info if isinstance(column_info, dict) else {}
         # Normalização do tipo e valores auxiliares
         col_type_lower = str(col_type or "").lower().strip()
         default_value  = str(column_info.get("default") or "").lower()

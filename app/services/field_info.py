@@ -1,18 +1,16 @@
 from datetime import datetime, timezone
 import traceback
 from typing import Dict, List
-from sqlalchemy import  inspect
+from sqlalchemy import  MetaData, inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
-from app.config.dependencies import EngineManager
-from app.cruds.connection_cruds import get_active_connection_by_userid, get_db_connection_by_id
 from app.cruds.dbstructure_crud import create_db_field, create_db_structure, delete_structure_by_name, get_db_structures_by_conn_id_and_table, get_fields_by_structure
 from app.models.dbstructure_models import   DBField,  DBStructure
 from app.schemas.dbstructure_schema import  CampoDetalhado, DBFieldCreate, DBStructureCreate, MetadataTableResponse
 from app.services.fields_estruture import  _is_system_field_from_column, obter_schema_do_engine
+from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.buscar_enum_bd import _fetch_enum_values
 from app.ultils.logger import log_message
-from app.ultils.ativar_session_bd import reativar_connection
 from sqlalchemy.exc import SQLAlchemyError, NoSuchTableError
 from sqlalchemy.exc import OperationalError
  
@@ -32,31 +30,20 @@ def sincronizar_metadados_da_tabela(
 ) -> dict:
     try:
         # 1. Obtém conexão ativa do usuário
-        active_connection = get_active_connection_by_userid(db, user_id)
-        db_connection_id = active_connection.connection_id
-        engine: Engine = EngineManager.get(user_id)
-
-        if not engine:
-            sucesso = reativar_connection(user_id, db)
-            if sucesso.get("success"):
-                engine = EngineManager.get(user_id)
-            else:
-                raise RuntimeError("❌ Não foi possível reativar a conexão com o banco de dados.")
+        engine,connection = ConnectionManager.ensure_connection(db, user_id)
 
         # 2. Obtém o tipo do banco de dados
-        connection = get_db_connection_by_id(db, db_connection_id)
         db_type = connection.type if connection else "postgresql"  # fallback seguro
 
         # 3. Busca ou cria a estrutura da tabela
         structure = buscar_estrutura_tabela(
             db=db,
             table_name=table_name,
-            db_connection_id=db_connection_id,
+            db_connection_id=connection.id,
             engine=engine,
             db_type=db_type
         )
         
-
         # 4. Busca ou cria os campos
         fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine)
 
@@ -72,7 +59,7 @@ def sincronizar_metadados_da_tabela(
 
         # 7. Monta e retorna a resposta final
         return montar_resposta_sincronizacao(
-            db_connection_id=db_connection_id,
+            db_connection_id=connection.id,
             schema_name=structure.schema_name,
             table_name=table_name,
             resposta_colunas=resposta_colunas,
@@ -149,13 +136,11 @@ def processar_enum_fields(
             comentario=column.comment,
             length=column.length,
             enum_valores_encontrados=valores_encontrados,
-            enum_valores_adicionados=valores_adicionados,
         )
         # Adiciona metadado da coluna para resposta
         resposta_colunas.append(valor_editado)
 
     return resposta_colunas
-
 
 def buscar_estrutura_tabela(
     db: Session, table_name: str, db_connection_id: int,engine:Engine,db_type: str
@@ -175,24 +160,26 @@ def buscar_estrutura_tabela(
             DBStructureCreate( table_name=table_name, schema_name=schema_name, db_connection_id=db_connection_id)
         )
     return structure
+
 def map_column_type(col_type: str, db_type: str) -> str:
     """
     Converte o tipo de coluna da base para um tipo genérico.
     Para SQL Server, converte 'integer' em 'int'.
     """
     # normaliza para evitar problema de maiúscula/minúscula
-    col_type = col_type.lower()
-    db_type = db_type.lower()
+    col_typelower = col_type.lower()
+    db_typelower = db_type.lower()
 
   
 
     # regra especial para SQL Server
-    if db_type in ("sqlserver", "mssql"):
-        if col_type == "integer":
+    if db_typelower in ("sqlserver", "mssql"):
+        if col_typelower == "integer":
             # print("Convertendo 'integer' para 'int'")
             return "int"
     # retorna mapeado ou o próprio tipo se não achar
-    return col_type
+    return col_type.strip('"')
+
 
 def buscar_ou_criar_campos_tabela(
     db: Session,
@@ -203,9 +190,8 @@ def buscar_ou_criar_campos_tabela(
     Busca os campos de uma tabela no banco. Se não existirem localmente,
     insere todos os campos com base nos metadados do banco de dados.
     """
-
     # Verifica se já existem campos locais
-    campos_existentes = get_fields_by_structure(db, structure.id)
+    campos_existentes = None #get_fields_by_structure(db, structure.id)
     if campos_existentes:
         return campos_existentes
 
@@ -257,7 +243,8 @@ def buscar_ou_criar_campos_tabela(
             }
             relations_map[col_origem] = relation
     # print(f"column {columns}")
-   
+    
+    
     # Processa cada coluna
     for column in columns:
         col_name = column["name"]
@@ -272,8 +259,7 @@ def buscar_ou_criar_campos_tabela(
         tipo = column_type.compile(dialect=engine.dialect)
         default_value =column.get("default")
         is_auto_incremento = _is_system_field_from_column(tipo, column,is_foreign_key)
-        # Apaga o campo se já existir com mesmo nome
-        # delete_field_name(db, col_name, structure.id)
+        # print(f"tipo={tipo}  || column_type={column_type}")
 
         # Cria o novo campo
         field_in = DBFieldCreate(
@@ -296,7 +282,4 @@ def buscar_ou_criar_campos_tabela(
         field_create =create_db_field(db=db, field_in=field_in, structure_id=structure.id)
         campos_resultantes.append(field_create)
     return campos_resultantes
-
-
-
 

@@ -81,7 +81,6 @@ class CampoDetalhado(BaseModel):
     comentario: Optional[str] = None
     length: Optional[int] = None
     enum_valores_encontrados: List[str] = Field(default_factory=list)
-    enum_valores_adicionados: List[str] = Field(default_factory=list)
 
 
 

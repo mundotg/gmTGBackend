@@ -4,9 +4,9 @@ import time
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 from app.cruds.queryhistory_crud import create_query_history
-from app.schemas.queryhistory_schemas import InsertRequest, QueryHistoryCreate
-from app.services.editar_linha import _convert_column_type_for_string_one
-from app.ultils.build_query import quote_identifier
+from app.schemas.query_select_upAndInsert_schema import InsertRequest
+from app.schemas.queryhistory_schemas import QueryHistoryCreate
+from app.services.editar_linha import _convert_column_type_for_string_one, quote_identifier
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 

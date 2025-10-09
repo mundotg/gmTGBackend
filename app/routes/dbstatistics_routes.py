@@ -103,13 +103,10 @@ def sync_connection_stats(
     """
     Sincroniza e salva estatísticas da conexão ativa (tabelas, views, procedures, etc.).
     """
-    active = _get_active_connection_or_400(db, user_id)
-
-    connection = get_db_connection_by_id(db, active.connection_id)
-    if not connection:
-        raise HTTPException(status_code=404, detail="Conexão ativa não encontrada no banco.")
     try:
-        stats = sync_connection_statistics(active.connection_id, user_id, connection.type, db, connection.name)
+        stats = sync_connection_statistics( user_id, db)
+        if hasattr(stats, "__dict__"):
+            stats = {k: v for k, v in stats.__dict__.items() if not k.startswith("_")}
         return ResponseWrapper(success=True, data=stats)
     except Exception as e:
         log_message(f"❌ Erro ao sincronizar estatísticas: {e}", level="error")
@@ -119,12 +116,11 @@ def sync_connection_stats(
 
 @router.get("/stream/tables/counts")
 async def stream_table_counts(
-    user_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+     user_id: int =Depends(get_current_user_id)
 ):
-    active = _get_active_connection_or_400(db, user_id)
     
     print("Iniciando stream de contagem de tabelas...")
-    return get_table_count_streams(active.connection_id, db, user_id)
+    return get_table_count_streams( db , user_id)
     
 

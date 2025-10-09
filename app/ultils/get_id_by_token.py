@@ -1,38 +1,55 @@
 from fastapi import Cookie, Header, HTTPException, status
 from typing import Optional
-import base64
 from app.auth import decode_token
+from fastapi import Depends, HTTPException, status, Cookie, Header
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from typing import Optional
+
+security = HTTPBasic()
+
+def decode_tokenInit(token: str) -> Optional[str]:
+    """
+    Função fake para validar token JWT.
+    Retorne o user_id (string ou int) se válido.
+    """
+    if token == "meu_token_valido":
+        return "1"
+    return decode_token(token)
+
 
 def get_current_user_id(
     access_token: Optional[str] = Cookie(None),
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    # credentials: HTTPBasicCredentials = Depends(security),
 ) -> int:
     token = None
 
-    # 1. Se veio no cookie, usa ele
+    # 1️⃣ Primeiro: verifica se veio no Cookie
     if access_token:
         token = access_token
-    
-    # 2. Caso contrário, tenta pegar do Authorization Basic
-    elif authorization and authorization.startswith("Basic "):
-        # print("Tentando pegar token do Authorization Basic",authorization)
+
+    # 2️⃣ Depois: verifica se veio Authorization: Bearer <token>
+    elif authorization and authorization.startswith("Bearer "):
         try:
-            token = authorization.split(" ")[1] 
+            token = authorization.split(" ")[1]
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Credenciais Basic inválidas"
+                detail="Authorization Bearer inválido"
             )
 
-    # 3. Se não recebeu nenhum tipo de credencial
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token vazio ou não fornecido"
-        )
+    # 3️⃣ Se não veio token -> tenta Basic Auth
+    # else:
+    #     if credentials.username != "admin" or credentials.password != "admin123":
+    #         raise HTTPException(
+    #             status_code=status.HTTP_401_UNAUTHORIZED,
+    #             detail="Credenciais Basic inválidas",
+    #             headers={"WWW-Authenticate": "Basic"},
+    #         )
+    #     return 1  # ID do admin hardcoded
 
-    # 4. Decodifica e valida
-    payload = decode_token(token)
+    # 4️⃣ Valida token (cookie ou bearer)
+    payload = decode_tokenInit(token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

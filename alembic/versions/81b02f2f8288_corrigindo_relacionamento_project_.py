@@ -1,8 +1,8 @@
-"""create user tabl3de
+"""corrigindo relacionamento project-typeprojecto 2
 
-Revision ID: 1134637b9e0c
-Revises: 88c31600dcc8
-Create Date: 2025-07-01 11:32:54.539473
+Revision ID: 81b02f2f8288
+Revises: aed95d4a8dfb
+Create Date: 2025-10-16 12:02:33.828449
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '1134637b9e0c'
-down_revision: Union[str, None] = '88c31600dcc8'
+revision: str = '81b02f2f8288'
+down_revision: Union[str, None] = 'aed95d4a8dfb'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

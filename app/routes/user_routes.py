@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Cookie, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app import database, auth
-from app.config.dotenv import get_env
+from app import database
 from app.cruds import user_crud
 from app.models import user_model
 from app.schemas import users_chemas

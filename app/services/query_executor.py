@@ -244,10 +244,26 @@ async def executar_query_e_salvar(
             query_type="SELECT",
             executed_at=datetime.now(timezone.utc),
             duration_ms=duration_ms,
-            result_preview=result_preview if not queryrequest.isCountQuery else str(result_preview),
+            result_preview=(
+                result_preview if not queryrequest.isCountQuery else str(result_preview)
+            ),
             error_message=error_message,
             is_favorite=False,
-            tags="count" if queryrequest.isCountQuery else "select"
+            tags="count" if queryrequest.isCountQuery else "select",
+            app_source="API",  # ou "Console", "UI", dependendo da origem
+            client_ip=queryrequest.client_ip if hasattr(queryrequest, "client_ip") else None,
+            executed_by=queryrequest.executed_by if hasattr(queryrequest, "executed_by") else f"user_{user_id}",
+            modified_by=None,  # só será usado em updates posteriores
+            meta_info={
+                "base_table": queryrequest.baseTable,
+                "limit": queryrequest.limit,
+                "offset": queryrequest.offset,
+                "joins": len(queryrequest.joins or []),
+                "filters_count": len(queryrequest.where or []),
+                "timestamp": datetime.utcnow().isoformat(),
+                "cached_used": chache_consulta,
+                "connection_type": connection.type,
+            },
         )
         create_query_history(db=db, data=historico)
     except Exception as hist_err:

@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
-from typing import Optional
+import traceback
+from typing import Any, Dict, Optional
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.connection_models import ActiveConnection, ConnectionLog, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
-from app.schemas.users_chemas import PagitacionOutput
+from app.schemas.users_chemas import PaginacaoOutput
 from app.ultils.logger import log_message
 
 
@@ -125,13 +126,39 @@ def create_db_connection(db: Session, user_id: int, conn_data: DBConnectionBase)
     return db_conn
 
 
+def upsert_db_connection(db: Session, user_id: int, conn_data: DBConnectionBase):
+    """
+    Cria ou atualiza uma conexão de banco de dados para o usuário.
+    Se já existir uma conexão com o mesmo nome e usuário, atualiza as informações.
+    Caso contrário, cria uma nova entrada.
+    """
+    db_conn = db.query(DBConnection).filter(
+        DBConnection.user_id == user_id,
+        DBConnection.name == conn_data.name
+    ).first()
+
+    if db_conn:
+        # Atualiza apenas os campos que vierem no conn_data
+        for field, value in conn_data.model_dump().items():
+            setattr(db_conn, field, value)
+        log_message(f"🔄 Conexão '{db_conn.name}' atualizada para o usuário {user_id}", "info")
+    else:
+        db_conn = DBConnection(**conn_data.model_dump(), user_id=user_id)
+        db.add(db_conn)
+        log_message(f"✅ Nova conexão '{db_conn.name}' criada para o usuário {user_id}", "success")
+
+    db.commit()
+    db.refresh(db_conn)
+    return db_conn
+
+
 def get_db_connections(db: Session, user_id: int):
     log_message(f"🔍 Buscando conexões do usuário {user_id}", "info")
     return db.query(DBConnection).filter(DBConnection.user_id == user_id).all()
 
 def get_db_connections_pagination(
     db: Session, user_id: int,
-    page: int = 1, limit: int = 10) ->PagitacionOutput:
+    page: int = 1, limit: int = 10) ->PaginacaoOutput:
     log_message(f"🔍 Buscando conexões do usuário {user_id} | Página {page}, Limite {limit}", "info")
     
     offset = (page - 1) * limit
@@ -208,7 +235,7 @@ def get_connection_logs(db: Session, connection_id: int):
 def get_connection_logs_pagination(
     db: Session,user_id: int ,
     connection_id: int = None,
-    page: int = 1, limit: int = 10)->PagitacionOutput:
+    page: int = 1, limit: int = 10)->PaginacaoOutput:
     log_message(f"📜 Buscando logs | Conexão: {connection_id or 'todas'} | Página {page}, Limite {limit}", "info")
 
     query = db.query(ConnectionLog).join(DBConnection).filter(DBConnection.user_id == user_id)
@@ -227,15 +254,67 @@ def get_connection_logs_pagination(
     }
 
 
-def create_connection_log(db: Session, connection_id: int, action: str, status: str):
-    log_entry = ConnectionLog(
-        connection_id=connection_id,
-        action=action,
-        status=status,
-        timestamp=datetime.now(timezone.utc)
-    )
-    db.add(log_entry)
-    db.commit()
-    db.refresh(log_entry)
-    log_message(f"📑 Log criado para conexão {connection_id}: ação='{action}', status='{status}'", "info")
-    return log_entry
+def create_connection_log(
+    db: Session,
+    connection_id: Optional[int],
+    action: str,
+    status: str = "success",
+    details: Optional[Dict[str, Any]] = None,
+    user_id: Optional[int] = None
+):
+    """
+    Cria um registro de log de conexão no banco de dados.
+    
+    Args:
+        db (Session): Sessão ativa do SQLAlchemy.
+        connection_id (int | None): ID da conexão (pode ser None em falhas genéricas).
+        action (str): Descrição da ação executada.
+        status (str): Estado da operação ("success", "error", "warning").
+        details (dict | None): Dados adicionais relevantes.
+        user_id (int | None): ID do usuário associado (se disponível).
+
+    Returns:
+        ConnectionLog: Objeto de log persistido no banco.
+    """
+    details = details or {}
+    timestamp = datetime.now(timezone.utc)
+
+    try:
+        log_entry = ConnectionLog(
+            connection_id=connection_id,
+            action=action,
+            status=status,
+            timestamp=timestamp,
+            details=details,
+        )
+
+        db.add(log_entry)
+        db.commit()
+        db.refresh(log_entry)
+
+        log_message(
+            f"📑 Log criado → conexão={connection_id or 'N/A'}, ação='{action}', status='{status}', usuário={user_id or 'anon'}",
+            level="info"
+        )
+
+        return log_entry
+
+    except Exception as e:
+        db.rollback()  # Garante que a sessão não fique suja
+        error_info = traceback.format_exc()
+
+        log_message(
+            f"❌ Falha ao criar log: ação='{action}', status='{status}', conexão={connection_id or 'N/A'}, erro={e}\n{error_info}",
+            level="error"
+        )
+
+        # Recria log no console (fallback)
+        fallback = {
+            "connection_id": connection_id,
+            "action": action,
+            "status": "error",
+            "timestamp": timestamp.isoformat(),
+            "details": {"fallback_error": str(e)},
+        }
+        return fallback
+

@@ -12,8 +12,18 @@ def _lidar_com_erro_sql(e: Exception) -> str:
     )
 
     error_message = str(e)
+    
+    if any(kw in error_message for kw in [
+        "foreign key", "violates foreign key", "integrity constraint violation", "restrição reference"
+    ]):
+        msg = (
+            "❌ Falha ao salvar ou eliminar: integridade referencial violada. "
+            "O registro está a ser usado noutra tabela. "
+            "Verifique as chaves estrangeiras e dependências."
+        )
 
-    if "ForeignKeyViolation" in error_message or "violates foreign key" in error_message:
+
+    elif "ForeignKeyViolation" in error_message or "violates foreign key" in error_message:
         msg = (
             "❌ Falha ao salvar: violação de chave estrangeira. "
             "Verifique se os dados informados existem na tabela de referência."

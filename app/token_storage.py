@@ -3,10 +3,13 @@ from datetime import datetime, timedelta, timezone
 from app.config.dotenv import get_env
 from app.models.user_model import RefreshToken
 
-ACCESS_TOKEN_EXPIRE_MINUTES = int(get_env("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
-REFRESH_TOKEN_EXPIRE_DAYS = int(get_env("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+MEMINUTO_VALIDO_ACCESS_TOKEN = int(get_env("ACCESS_TOKEN_EXPIRE_MINUTES", 30)) 
+DIA_VALIDO_REFRESH_TOKEN = int(get_env("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+ACCESS_TOKEN_EXPIRE_MINUTES = MEMINUTO_VALIDO_ACCESS_TOKEN * 60
+REFRESH_TOKEN_EXPIRE_DAYS = DIA_VALIDO_REFRESH_TOKEN * 24 * 60 * 60
+
 # Salvar novo refresh token
-def store_refresh_token(db: Session, token: str, user_id: int, days_valid: int = REFRESH_TOKEN_EXPIRE_DAYS):
+def store_refresh_token(db: Session, token: str, user_id: int, days_valid: int = DIA_VALIDO_REFRESH_TOKEN):
     db_token = RefreshToken(
         token=token,
         user_id=user_id,

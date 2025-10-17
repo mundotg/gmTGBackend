@@ -1,18 +1,23 @@
 # ===============================
-# GITIGNORE PARA PROJETO PYTHON
-# gestorBd backend
+# 🐍 GITIGNORE PARA PROJETO PYTHON
+# Projeto: GestorBD Backend
 # ===============================
 
 # -------------------------------
-# 1. Arquivos e pastas de ambiente virtual
+# 1. Ambientes virtuais e variáveis de ambiente
 # -------------------------------
 venv/
-.env/
-.env.* 
 .venv/
 env/
 ENV/
+env.bak/
 *.env
+.env/
+.env.bak
+.env.local
+.env.development
+.env.production
+.env.test
 
 # -------------------------------
 # 2. Cache e arquivos compilados
@@ -20,6 +25,8 @@ ENV/
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+*.pyd
 
 # -------------------------------
 # 3. Logs e arquivos temporários
@@ -28,10 +35,10 @@ __pycache__/
 *.tmp
 *.bak
 *.swp
+*.swo
 *.DS_Store
-*.pyo
-*.pyd
 *.bin
+*.pid
 database_connector.log
 init_done.bin
 
@@ -42,6 +49,7 @@ build/
 dist/
 *.egg-info/
 .eggs/
+pip-wheel-metadata/
 
 # -------------------------------
 # 5. Configurações locais e IDEs
@@ -49,32 +57,69 @@ dist/
 .vscode/
 .idea/
 *.code-workspace
+*.sublime-project
+*.sublime-workspace
 
 # -------------------------------
-# 6. Arquivos de migração compilados
+# 6. Migrações e caches do Alembic
 # -------------------------------
 alembic/__pycache__/
 alembic/versions/__pycache__/
-app/**/__pycache__/
+alembic.ini.bak
 
 # -------------------------------
-# 7. Arquivos auxiliares e guias HTML locais
+# 7. Arquivos temporários da aplicação
+# -------------------------------
+app/**/__pycache__/
+temp/
+tmp/
+cache/
+*.cache
+
+# -------------------------------
+# 8. Arquivos auxiliares e documentação gerada
 # -------------------------------
 *.html
-!README.md  # mantém o README.md
+!README.md
+!README.txt
+docs/_build/
+site/
 
 # -------------------------------
-# 8. Arquivos gerados por testes
+# 9. Arquivos de testes e cobertura
 # -------------------------------
 .coverage
+coverage.xml
 htmlcov/
 .pytest_cache/
 .cache/
+nosetests.xml
+test-results.xml
+reports/
 
 # -------------------------------
-# 9. Outros
+# 10. Banco de dados local
 # -------------------------------
 *.db
-*.sqlite3
 *.sqlite
-*.pid
+*.sqlite3
+DatabaseTest.db
+
+# -------------------------------
+# 11. Arquivos Docker e CI locais
+# -------------------------------
+docker-compose.override.yml
+*.env.docker
+*.env.override
+*.env.sample
+logs/
+.docker/
+.dockerignore.bak
+
+# -------------------------------
+# 12. Arquivos específicos do sistema
+# -------------------------------
+Thumbs.db
+ehthumbs.db
+Icon?
+Desktop.ini

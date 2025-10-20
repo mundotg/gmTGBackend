@@ -65,7 +65,7 @@ def insert_row_service(
 
                 if not insert_values:
                     raise ValueError(f"Tabela {table_name}: Nenhuma coluna para inserir")
-
+                # print("insert_values",insert_values)
                 query = build_insert_query(
                     table_name=table_name,
                     db_type=db_type,

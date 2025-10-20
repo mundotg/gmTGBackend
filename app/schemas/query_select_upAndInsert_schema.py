@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import  Dict, List, Literal, Optional
+from typing import  Any, Dict, List, Literal, Optional, Union
+
+from app.schemas.dbstructure_schema import CampoDetalhado
 # Condição individual do JOIN
 class JoinCondition(BaseModel):
     table: Optional[str] = None
@@ -110,4 +112,27 @@ class QueryPayload(BaseModel):
     distinct: Optional[DistinctList] = None
     offset: Optional[int] = None
     isCountQuery: bool = False
+    
+class QueryResultType(BaseModel):
+    success: bool
+    query: str
+    params: Dict[str, Union[int, str, bool]]
+    totalResults: Optional[int] = None
+    duration_ms: float
+    columns: List[str]
+    tabela_coluna: Optional[Dict[str, List[CampoDetalhado]]] = None
+    preview: List[Dict[str, Any]]
+    QueryPayload: Optional[QueryPayload] = None
+    
+class ParametrosRelatorioSchema(BaseModel):
+    formato: str = Field(..., description="Formato de saída do relatório (ex: pdf, csv, excel)")
+    incluirDetalhes: Optional[bool] = Field(default=False, description="Define se o relatório incluirá detalhes adicionais")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "formato": "excel",
+                "incluirDetalhes": True
+            }
+        }
 

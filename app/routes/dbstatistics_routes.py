@@ -4,12 +4,14 @@ from typing import Any, List, Dict
 from app.config.cache_manager import cache_result
 from app.database import get_db
 from app.routes.connection_routes import get_current_user_id
+from app.schemas.dbstructure_schema import DBStructureOut
 from app.schemas.responsehttp_schema import ResponseWrapper
 from app.schemas.queryhistory_schemas import TableInfo
 from app.cruds.connection_cruds import get_active_connection_by_userid, get_db_connection_by_id
 from app.services.stream_tables_counts_servvice import get_table_count_streams
 from app.ultils.logger import log_message
 from app.services.database_inspector import (
+    get_strutures_names,
     get_table_names_with_count,
     get_table_names,
     get_table_count,
@@ -48,6 +50,13 @@ def get_tables_with_count_cached(connection_id: int, user_id: int, db: Session) 
 def get_tables_names_cached(connection_id: int, user_id: int, db: Session) -> List[str]:
     """Obtém nomes de tabelas com cache"""
     return get_table_names(connection_id, user_id, db)
+
+
+
+@cache_result(ttl=600, user_id="user_{user_id}")  # 10 minutos de cache
+def get_strutures_names_cached(connection_id: int, user_id: int, db: Session) -> List[DBStructureOut]:
+    """Obtém nomes de tabelas com cache"""
+    return get_strutures_names(connection_id, user_id, db)
 
 @cache_result(ttl=180, user_id="user_{user_id}")  # 3 minutos de cache (contagens mudam frequentemente)
 def get_table_count_cached(connection_id: int, table_name: str, db: Session, user_id: int) -> int:
@@ -114,6 +123,29 @@ def get_tables(
         raise HTTPException(
             status_code=500, 
             detail="Erro interno ao buscar nomes das tabelas."
+        )
+        
+@router.get("/structures", response_model=ResponseWrapper[List[DBStructureOut]])  # Corrigido: era "/strutures"
+def get_structures(  # Corrigido: nome da função era "get_tables"
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    Retorna as estruturas das tabelas da conexão ativa.
+    Cache: 10 minutos
+    """
+    try:
+        active = _get_active_connection_or_400(db, user_id)
+        structures = get_strutures_names_cached(active.connection_id, user_id, db)  # Corrigido: variável "names" para "structures"
+        
+        return ResponseWrapper(success=True, data=structures)  # Corrigido: "names" para "structures"
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_message(f"❌ Erro ao obter estruturas de tabelas: {e}", level="error")  # Corrigido mensagem
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro interno ao buscar estruturas das tabelas."  # Corrigido mensagem
         )
 
 

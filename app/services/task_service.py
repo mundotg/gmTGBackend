@@ -329,18 +329,18 @@ def validate_task_service(db: Session, task_id: str, aprovado: bool=True,comenta
         )
         raise HTTPException(status_code=500, detail="Erro interno ao validar tarefa")
 
-
 def get_paginacao_service(
     db: Session,
     search: Optional[str] = None,
     page: int = 1,
     limit: int = 10,
-    options: Literal["user", "project", "task", "sprint"] = "user",
+    options: Literal["user", "project", "task", "sprint", "type_project", "Role", "project_team_association", "AuditLog", "TaskStats", "DBConnection"] = "user",
     filters: Optional[Dict[str, Any]] = None,
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    load_relations: bool = False,
 ):
     """
-    Serviço genérico para retornar dados paginados com suporte a busca e filtros.
+    Serviço genérico para retornar dados paginados com suporte a busca, filtros e relações.
 
     Args:
         db (Session): Sessão do banco de dados.
@@ -349,6 +349,8 @@ def get_paginacao_service(
         limit (int, opcional): Quantidade de itens por página. Padrão é 10.
         options (Literal): Define qual modelo será consultado.
         filters (dict, opcional): Filtros adicionais, ex: {"status": "ativo"}
+        user_id (str, opcional): ID do usuário para filtros específicos
+        load_relations (bool, opcional): Se deve carregar relações automaticamente
 
     Returns:
         dict: Resultado contendo items, total, página e total de páginas.
@@ -359,8 +361,8 @@ def get_paginacao_service(
         "project": Project,
         "task": Task,
         "sprint": Sprint,
-        "type_project" :  TypeProjecto,
-        "Role" : Role,
+        "type_project": TypeProjecto,
+        "Role": Role,
         "project_team_association": project_team_association,
         "AuditLog": AuditLog,
         "TaskStats": TaskStats,
@@ -369,9 +371,28 @@ def get_paginacao_service(
 
     # ✅ Verificação de tipo válido
     if options not in model_map:
-        raise ValueError(f"Opção inválida: '{options}'. Use: user, project, task ou sprint.")
+        raise ValueError(f"Opção inválida: '{options}'. Use: {', '.join(model_map.keys())}")
 
     model = model_map[options]
+
+    # 🔗 Definir relações para cada modelo
+    relation_map = {
+        "user": ["role_ref", "created_projects", "assigned_tasks", "projects_participating"],
+        "project": ["owner_user", "team_members",  "task_stats", "type_project", "db_connection"],
+        "task": ["assigned_user", "delegated_user", "creator_user", "project", "sprint"],
+        "sprint": ["created_by", "project", "task_stats"],
+        "type_project": [],  # Sem relações
+        "Role": ["users"],
+        "AuditLog": ["user"],
+        # "TaskStats": ["project", "sprint"],
+        "DBConnection": ["projects"],
+        "project_team_association": []  # Tabela de associação, sem relações
+    }
+
+    # Preparar relações para carregamento
+    relationships = []
+    if load_relations and options in relation_map:
+        relationships = relation_map[options]
 
     # 🔍 Chama o método genérico de paginação e busca
     return get_paginated_query(
@@ -380,5 +401,6 @@ def get_paginacao_service(
         search=search,
         filters=filters,
         page=page,
-        limit=limit
+        limit=limit,
+        relationships=relationships if load_relations else None,
     )

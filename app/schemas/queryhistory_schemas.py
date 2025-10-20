@@ -15,6 +15,7 @@ class QueryType(str, Enum):
     ALTER = "ALTER"
     DROP = "DROP"
     OTHER = "OTHER"
+    COUNT = "COUNT"
 
 
 # --------- BASE ---------

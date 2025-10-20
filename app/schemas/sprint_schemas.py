@@ -2,8 +2,10 @@
 # app/schemas/sprint_schemas.py
 # -----------------------------
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
 
 
 # -----------------------------
@@ -78,10 +80,13 @@ class SprintUpdateSchema(BaseModel):
         extra="ignore",
     )
 
+# -----------------------------
+# RESPONSE / FULL SCHEMA (versão simplificada)
+# -----------------------------
 
-# -----------------------------
-# RESPONSE / FULL SCHEMA
-# -----------------------------
+from app.schemas.task_schema import TaskStatsSchema   
+from app.schemas.userTask_schemas import UsuarioMiniSchema,ProjectMiniSchema, TaskMiniSchema
+
 class SprintSchema(BaseSprintSchema):
     """Schema completo de uma sprint (para responses)."""
 
@@ -92,8 +97,27 @@ class SprintSchema(BaseSprintSchema):
         default=None, description="Motivo do cancelamento (se aplicável)"
     )
     project_id: str = Field(..., alias="projectId")
+    created_by_id: Optional[str] = Field(None, alias="createdById", description="ID do criador da sprint")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # 🔗 RELAÇÕES BÁSICAS (apenas IDs para evitar recursão)
+    project: Optional[ProjectMiniSchema] = Field(
+        default=None, description="Nome do projeto (apenas para display)"
+    )
+    created_by_name: Optional[UsuarioMiniSchema] = Field(
+        default=None, description="Nome do criador (apenas para display)"
+    )
+    tasks: Optional[TaskMiniSchema]= Field(
+        default=None, description="tarefas na sprint"
+    )
+    task_stats: Optional[TaskStatsSchema] = None
+    tasks_count: int = Field(
+        default=0, description="Número de tarefas na sprint"
+    )
+    completed_tasks_count: int = Field(
+        default=0, description="Número de tarefas concluídas"
+    )
 
     model_config = ConfigDict(
         from_attributes=True,

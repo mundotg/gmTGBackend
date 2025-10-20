@@ -14,6 +14,7 @@ from app.routes import (
     dbInfo_routes,
     dbstatistics_routes,
     delete_routes,
+    gerar_relatorio_routes,
     projects_routes,
     query_routes,
     sprint_routes,
@@ -53,6 +54,7 @@ app.include_router(connection_logs_routes.router)  # Adiciona as rotas de logs d
 app.include_router(userTask_routes.router)  # Adiciona as rotas de usuários e tarefas
 app.include_router(sprint_routes.router)
 app.include_router(projects_routes.router)
+app.include_router(gerar_relatorio_routes.router)
 
 
 # EVENTO DE STARTUP

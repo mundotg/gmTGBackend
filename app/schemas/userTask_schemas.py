@@ -2,10 +2,8 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import List, Optional
 from uuid import uuid4
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.schemas.task_schema import TaskStatusEnum
 
 
 # -----------------------------
@@ -145,11 +143,28 @@ class ProjectMiniSchema(BaseModel):
 class TaskMiniSchema(BaseModel):
     id: str
     title: Optional[str] = None
-    status: Optional[TaskStatusEnum] = None
+    status: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
+class UsuarioMiniSchema(BaseModel):
+    id: str
+    nome: str
+    email: Optional[str] = None
 
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    
+class SprintMiniSchema(BaseModel):
+    """Campos e validações comuns entre todos os schemas de Sprint."""
+
+    name: str = Field(..., min_length=3, max_length=100, description="Nome da sprint")
+    start_date: datetime = Field(
+        default_factory=datetime.utcnow, description="Data de início da sprint"
+    )
+    end_date: datetime = Field(..., description="Data de término da sprint")
+    goal: Optional[str] = Field(
+        default=None, max_length=255, description="Objetivo principal da sprint"
+    )
 # -----------------------------
 # RESPONSE - Login com Tokens
 # -----------------------------

@@ -25,10 +25,8 @@ class DBStructure(Base):
 
     # Relações
     fields = relationship(
-        "DBField",
-        back_populates="structure",
-        cascade="all, delete-orphan",
-        lazy="selectin"
+        "DBField",back_populates="structure",
+        cascade="all, delete-orphan", lazy="selectin"
     )
     connection = relationship("DBConnection", back_populates="structures")
 

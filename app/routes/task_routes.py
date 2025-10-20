@@ -226,5 +226,6 @@ def listar_elementos(
         limit=limit,
         options=tipo,
         user_id=user,
-        filters=filters
+        filters=filters,
+        load_relations=True
     )

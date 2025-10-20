@@ -1,0 +1,26 @@
+2025-10-20 17:24:24,685 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-20 17:24:24,686 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-20 17:24:24,732 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-20 17:24:24,751 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 17:24:24,770 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-20 17:24:24,838 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 17:44:30,606 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-20 17:44:30,613 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-20 17:44:31,117 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 17:44:32,244 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 17:44:32,270 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 18:01:11,532 - INFO - \U0001f9f9 Cache expirado removido: 52a4fe3b36b2a57feda69657e25a69e76fff39c3a772bb7c6142bbc0b8be9fa8.pkl.gz
+2025-10-20 18:01:11,569 - INFO - \U0001f9f9 Cache expirado removido: 64fd2a2a480f22ab92124700815f9c84b508274240c58b11642b3d94d6b78cb0.pkl.gz
+2025-10-20 18:01:11,577 - INFO - \U0001f9f9 Cache expirado removido: 82b2d21cc1c067c96033bda68d0b252ec9eb15ab46677f274e27f7b213f16549.pkl.gz
+2025-10-20 18:01:11,580 - INFO - \U0001f9f9 Cache expirado removido: 8aca33fd157de12a9880888e56b06815fa19f1efacfd83b89ed200dbb1b9c712.pkl.gz
+2025-10-20 18:01:11,584 - INFO - \U0001f9f9 Cache expirado removido: 92ae823b381a1660dabb19bbec65eb31bec0829d8b786ed35d6076f44c3044df.pkl.gz
+2025-10-20 18:01:11,587 - INFO - \U0001f9f9 Cache expirado removido: 9b559c84a9370f4b399f4a48489834dcd5d50f7ec621ac34d460d226c215b83e.pkl.gz
+2025-10-20 18:01:11,590 - INFO - \U0001f9f9 Cache expirado removido: 9d312d7849ca153918a4012b775431654e25e3ba363bc7abf58ab9cad71d8356.pkl.gz
+2025-10-20 18:01:11,707 - INFO - \U0001f9f9 Cache expirado removido: ce7e3d1aa761327416156c45994fe1ceb1be92524f9652bdf1a7520e93962d90.pkl.gz
+2025-10-20 18:01:11,749 - INFO - \U0001f9f9 Cache expirado removido: ced99a827fca032f4dddd6298b68e48f5d11ba969e362868dab62c9c54ed6c78.pkl.gz
+2025-10-20 18:01:11,775 - INFO - \U0001f9f9 Cache expirado removido: dc9980a0b6af977f3d8a0a2a4bd4de11bea7751bd77f7ff4d41e1f444eb020e2.pkl.gz
+2025-10-20 18:01:12,389 - INFO - \U0001f9f9 Cache expirado removido: e350db055654d75dd32fe687b15fc9758eef741addbb15d07ed9031ac6d1eb51.pkl.gz
+2025-10-20 18:01:12,393 - INFO - \U0001f9f9 Cache expirado removido: edfa7a3ffd5c0951c2882ff6584b7115c1dd6c13d4c0dd3b811888d322d51c49.pkl.gz
+2025-10-20 18:01:12,395 - INFO - \U0001f9f9 Cache expirado removido: f80f3a3ba59b14b4b0ea07864afd302b46bece01c4d45a17217fcce452d21baa.pkl.gz
+2025-10-20 18:01:12,397 - INFO - \U0001f9f9 Cache expirado removido: fbdcf097b1400c239492b718fc57dad225d4f4700e25ff1de67bc4cfb666f2a3.pkl.gz
+2025-10-20 18:01:12,397 - INFO - \U0001f9fe Total de 14/16 caches expirados removidos.

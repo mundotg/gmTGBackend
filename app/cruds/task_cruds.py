@@ -1,13 +1,19 @@
 import traceback
 from typing import List, Optional, Any, Dict, Type, TypeVar
 from uuid import uuid4
+from pydantic import ValidationError
 from sqlalchemy import func, select, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session,selectinload
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.cruds.project_cruds import get_project
-from app.models.task_models import Task as TaskORM
-from app.schemas.task_schema import TaskSchema
+from app.models.connection_models import DBConnection
+from app.models.task_models import Project, Role, Sprint, Task as TaskORM, TaskStats, TypeProjecto, Usuario
+from app.schemas.connetion_schema import DBConnectionBase
+from app.schemas.project_schemas import ProjectResponseSchema, TypeProjectoSchema
+from app.schemas.sprint_schemas import SprintSchema
+from app.schemas.task_schema import TaskSchema, TaskStatsSchema
+from app.schemas.userTask_schemas import RoleSchema, UsuarioResponseSchema
 from app.ultils.logger import log_message
 
 T = TypeVar("T")
@@ -168,11 +174,7 @@ def validate_task(db: Session, task_id: str,aprovado:bool=True, validator_id: Op
         db.rollback()
         log_message(f"Erro ao validar tarefa {task_id}: {e}", "error")
         return None
-
-
-# -----------------------------------------------------
-# 📄 PAGINAÇÃO E FILTROS
-# -----------------------------------------------------
+    
 def get_paginated_query(
     db: Session,
     model: Type,
@@ -180,12 +182,21 @@ def get_paginated_query(
     filters: Optional[Dict[str, Any]] = None,
     page: int = 1,
     limit: int = 10,
+    relationships: Optional[List[str]] = None,
 ):
-    """Retorna resultados paginados de qualquer modelo."""
+    """Retorna resultados paginados de qualquer modelo com suporte a relações e schemas."""
     try:
         query = select(model)
 
-        # 🔍 Busca textual (somente em colunas de texto)
+        # 🔗 Carregar relações se especificadas
+        if relationships:
+            for relation in relationships:
+                if hasattr(model, relation):
+                    query = query.options(selectinload(getattr(model, relation)))
+                else:
+                    log_message(f"Relação '{relation}' não encontrada no modelo {model.__name__}", "warning")
+
+        # 🔍 Busca textual
         if search:
             or_conditions = [
                 col.ilike(f"%{search}%")
@@ -199,14 +210,46 @@ def get_paginated_query(
         if filters:
             for key, value in filters.items():
                 if hasattr(model, key):
-                    query = query.filter(getattr(model, key) == value)
+                    if value is not None:
+                        query = query.filter(getattr(model, key) == value)
 
         total = db.scalar(select(func.count()).select_from(query.subquery()))
         offset = (page - 1) * limit
         items = db.scalars(query.offset(offset).limit(limit)).all()
+        
+        # 🎯 Converter modelos para schemas
+        resultado = []
+        if items:
+           
+            full_schema_map = {
+                Usuario: UsuarioResponseSchema,
+                Project: ProjectResponseSchema, 
+                TaskORM: TaskSchema,
+                Sprint: SprintSchema,
+                TypeProjecto: TypeProjectoSchema,
+                Role: RoleSchema,
+                TaskStats: TaskStatsSchema,
+                DBConnection: DBConnectionBase
+            }
+            
+            schema_class = full_schema_map.get(model)
+            
+            if schema_class:
+                try:
+                    # Converter cada item para schema
+                    if hasattr(items, '__iter__') and not isinstance(items, (str, dict)):
+                        resultado = [schema_class.model_validate(item) for item in items]
+                    else:
+                        resultado = [schema_class.model_validate(items)]
+                except ValidationError as e:
+                    log_message(f"Erro de validação ao converter para schema: {e}", "error")
+                    resultado = items
+            else:
+                resultado = items
+                log_message(f"Schema não definido para o modelo {model.__name__}", "info")
 
         return {
-            "items": items,
+            "items": resultado,
             "total": total,
             "page": page,
             "limit": limit,

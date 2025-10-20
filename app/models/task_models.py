@@ -28,7 +28,7 @@ class Role(Base):
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
 
     # 🔗 Relação inversa
-    users = relationship("Usuario", back_populates="role_ref")
+    users = relationship("Usuario", back_populates="role_ref", lazy="select")
 
     def __repr__(self):
         return f"<Role(id={self.id}, name='{self.name}')>"
@@ -43,25 +43,23 @@ class Usuario(Base, TimestampMixin):
     email = Column(String(255), nullable=False, unique=True)
     senha = Column(String(255), nullable=False)
     role_id = Column(String, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
-    role_ref = relationship("Role", back_populates="users")
+    role_ref = relationship("Role", back_populates="users", lazy="select")
     is_active = Column(Boolean, default=True)
     email_verified = Column(Boolean, default=False)
 
-
-
     # 🔗 Relações
-    created_projects = relationship("Project", back_populates="owner_user", cascade="all, delete-orphan")
-    assigned_tasks = relationship("Task", back_populates="assigned_user", foreign_keys="[Task.assigned_to_id]")
-    delegated_tasks = relationship("Task", back_populates="delegated_user", foreign_keys="[Task.delegated_to_id]")
-    created_tasks = relationship("Task", back_populates="creator_user", foreign_keys="[Task.created_by_id]")
-    created_sprints = relationship("Sprint", back_populates="created_by", foreign_keys="[Sprint.created_by_id]")
+    created_projects = relationship("Project", back_populates="owner_user", cascade="all, delete-orphan", lazy="select")
+    assigned_tasks = relationship("Task", back_populates="assigned_user", foreign_keys="[Task.assigned_to_id]", lazy="select")
+    delegated_tasks = relationship("Task", back_populates="delegated_user", foreign_keys="[Task.delegated_to_id]", lazy="select")
+    created_tasks = relationship("Task", back_populates="creator_user", foreign_keys="[Task.created_by_id]", lazy="select")
+    created_sprints = relationship("Sprint", back_populates="created_by", foreign_keys="[Sprint.created_by_id]", lazy="select")
     
-
     # 🔗 Projetos em que o usuário participa
     projects_participating = relationship(
         "Project",
         secondary=project_team_association,
-        back_populates="team_members"
+        back_populates="team_members",
+        lazy="select"
     )
 
     def __repr__(self):
@@ -76,6 +74,7 @@ class TypeProjecto(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), nullable=False)
     name = Column(String(50), unique=True, nullable=False)
     description = Column(String(200), nullable=True)
+
 # -----------------------------
 # Tabela: Project
 # -----------------------------
@@ -89,7 +88,7 @@ class Project(Base, TimestampMixin):
     due_date = Column(DateTime, nullable=True)
     type_project_id = Column(String, ForeignKey("typeprojecto.id", ondelete="SET NULL"), nullable=True)
 
-    type_project = relationship("TypeProjecto", backref="projects")
+    type_project = relationship("TypeProjecto", backref="projects", lazy="select")
 
     # Associação com conexão de banco
     id_conexao_db = Column(Integer, ForeignKey("db_connections.id", ondelete="SET NULL"), nullable=True)
@@ -98,13 +97,13 @@ class Project(Base, TimestampMixin):
     cancelled_at = Column(DateTime, nullable=True)
 
     # Relações
-    owner_user = relationship("Usuario", back_populates="created_projects")
-    team_members = relationship("Usuario", secondary="project_team_association", back_populates="projects_participating")
-    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
-    sprints = relationship("Sprint", back_populates="project", cascade="all, delete-orphan")
-    task_stats = relationship("TaskStats", back_populates="project", cascade="all, delete-orphan")
+    owner_user = relationship("Usuario", back_populates="created_projects", lazy="select")
+    team_members = relationship("Usuario", secondary="project_team_association", back_populates="projects_participating", lazy="select")
+    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan", lazy="select")
+    sprints = relationship("Sprint", back_populates="project", cascade="all, delete-orphan", lazy="select")
+    task_stats = relationship("TaskStats", back_populates="project", cascade="all, delete-orphan", lazy="select")
 
-    db_connection = relationship("DBConnection", back_populates="projects")
+    db_connection = relationship("DBConnection", back_populates="projects", lazy="select")
 
     def __repr__(self):
         return f"<Project(id='{self.id}', name='{self.name}', owner_id='{self.owner_id}')>"
@@ -124,6 +123,7 @@ class Task(Base,TimestampMixin):
     status = Column(String(50), nullable=False, default="pendente")
     completed_at = Column(DateTime, nullable=True)
     is_validated = Column(Boolean, default=None, nullable=True)
+    comentario_is_validated =Column(String(255), default=None, nullable=True)
     schedule = Column(JSON, nullable=True)
     sprint_id = Column(String, ForeignKey("sprints.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=True)
@@ -135,14 +135,14 @@ class Task(Base,TimestampMixin):
     delegated_to_id = Column(String, ForeignKey("usuarios.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True)
     created_by_id = Column(String, ForeignKey("usuarios.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
 
-    assigned_user = relationship("Usuario", back_populates="assigned_tasks", foreign_keys=[assigned_to_id])
-    delegated_user = relationship("Usuario", back_populates="delegated_tasks", foreign_keys=[delegated_to_id])
-    creator_user = relationship("Usuario", back_populates="created_tasks", foreign_keys=[created_by_id])
+    assigned_user = relationship("Usuario", back_populates="assigned_tasks", foreign_keys=[assigned_to_id], lazy="select")
+    delegated_user = relationship("Usuario", back_populates="delegated_tasks", foreign_keys=[delegated_to_id], lazy="select")
+    creator_user = relationship("Usuario", back_populates="created_tasks", foreign_keys=[created_by_id], lazy="select")
 
     # 🔗 Relação com projeto
     project_id = Column(String, ForeignKey("projects.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
-    sprint = relationship("Sprint", back_populates="tasks")
-    project = relationship("Project", back_populates="tasks")
+    sprint = relationship("Sprint", back_populates="tasks", lazy="select")
+    project = relationship("Project", back_populates="tasks", lazy="select")
 
     def __repr__(self):
         return f"<Task(id='{self.id}', title='{self.title}', project_id='{self.project_id}')>"
@@ -164,7 +164,7 @@ class Sprint(Base, TimestampMixin):
 
     # Relacionamento com usuário criador
     created_by_id = Column(String, ForeignKey("usuarios.id", ondelete="SET NULL"))
-    created_by = relationship("Usuario")
+    created_by = relationship("Usuario", lazy="select")
 
     # Relacionamento com projeto
     project_id = Column(
@@ -172,11 +172,11 @@ class Sprint(Base, TimestampMixin):
         ForeignKey("projects.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False
     )
-    project = relationship("Project", back_populates="sprints")
+    project = relationship("Project", back_populates="sprints", lazy="select")
 
     # Relacionamentos auxiliares
-    tasks = relationship("Task", back_populates="sprint", cascade="all, delete-orphan")
-    task_stats = relationship("TaskStats", back_populates="sprint", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="sprint", cascade="all, delete-orphan", lazy="select")
+    task_stats = relationship("TaskStats", back_populates="sprint", cascade="all, delete-orphan", lazy="select")
 
     def __repr__(self):
         return (
@@ -228,7 +228,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("usuarios.id"))
-    user = relationship("Usuario")
+    user = relationship("Usuario", lazy="select")
     action = Column(String(255))
     entity = Column(String(100))
     entity_id = Column(String(100))

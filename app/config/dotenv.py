@@ -94,6 +94,35 @@ def get_env_list(name: str, separator: str = ',', default: Optional[list] = None
     
     return [item.strip() for item in value.split(separator) if item.strip()]
 
+def get_env_list_cors(name: str, default: Optional[list] = None, separator: str = ",") -> list:
+    """
+    Retorna uma lista de origens CORS a partir da variável de ambiente.
+
+    Aceita tanto:
+    - BACKEND_CORS_ORIGINS=http://localhost:3000,https://app.com
+    - BACKEND_CORS_ORIGINS=["http://localhost:3000", "https://app.com"]
+    """
+    import json
+    value = get_env(name)
+
+    if not value:
+        return default or []
+
+    # Se já for lista
+    if isinstance(value, list):
+        return value
+
+    # Se vier como JSON string
+    if isinstance(value, str) and value.strip().startswith("["):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            pass
+
+    # Separar por vírgula
+    return [item.strip() for item in value.split(separator) if item.strip()]
+
+
 def set_env(name: str, value: str) -> None:
     """
     Define uma variável de ambiente temporariamente.

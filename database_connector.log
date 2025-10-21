@@ -1461,3 +1461,13 @@ asyncio.exceptions.CancelledError: Cancelled by cancel scope 2d93f5507e0
 2025-10-21 15:36:48,366 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
 2025-10-21 15:54:08,300 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
 2025-10-21 15:54:22,624 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-21 17:27:24,929 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-21 17:27:25,256 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-21 17:27:25,280 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-21 17:27:25,285 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-21 17:27:25,298 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-21 17:27:25,303 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-21 17:27:25,307 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-21 17:27:25,323 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-21 17:27:25,323 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-21 17:27:25,324 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s

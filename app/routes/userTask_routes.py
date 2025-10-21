@@ -8,7 +8,6 @@ from app.schemas.userTask_schemas import LoginResponseSchema, UsuarioCreateSchem
 from app.services.userTask_services import create_many_users_service, create_user_service, delete_user_service, get_user_service, list_users_service, login_user_service, refresh_token_user_service, update_user_service
 from app.ultils.get_current_user_id_task import get_current_user_id_task
 from app.ultils.logger import log_message
-from app.ultils.get_id_by_token import get_current_user_id
 
 router = APIRouter(prefix="/usuario", tags=["Usuários"])
 
@@ -38,7 +37,7 @@ def list_users(db: Session = Depends(get_db), user_id: str = Depends(get_current
 def refresh_token(
     db: Session = Depends(get_db),
     refresh_token: Optional[str] = Header(None, convert_underscores=False),
-    user_principal: int = Depends(get_current_user_id_task)
+    user_principal: str = Depends(get_current_user_id_task)
 ):
     """
     Atualiza o token de acesso usando o refresh_token.
@@ -85,7 +84,7 @@ def create_user(user: UsuarioCreateSchema, db: Session = Depends(get_db)):
 # CRIAR MÚLTIPLOS USUÁRIOS
 # -----------------------------
 @router.post("/bulk", response_model=dict)
-def create_many_users(users: List[UsuarioCreateSchema], db: Session = Depends(get_db),user_id_principal: int = Depends(get_current_user_id_task)):
+def create_many_users(users: List[UsuarioCreateSchema], db: Session = Depends(get_db),user_id_principal: str = Depends(get_current_user_id_task)):
     """Cria múltiplos usuários de uma vez."""
     try:
         return create_many_users_service(db, users)
@@ -97,7 +96,7 @@ def create_many_users(users: List[UsuarioCreateSchema], db: Session = Depends(ge
 # ATUALIZAR USUÁRIO
 # -----------------------------
 @router.put("/byid/{user_id}", response_model=UsuarioResponseSchema)
-def update_user(user_id: str, data: UsuarioUpdateSchema, db: Session = Depends(get_db), user_id_principal: int = Depends(get_current_user_id_task)):
+def update_user(user_id: str, data: UsuarioUpdateSchema, db: Session = Depends(get_db), user_id_principal: str = Depends(get_current_user_id_task)):
     """Atualiza os dados de um usuário existente."""
     try:
         return update_user_service(db, user_id, data)
@@ -109,10 +108,10 @@ def update_user(user_id: str, data: UsuarioUpdateSchema, db: Session = Depends(g
 # LOGIN
 # -----------------------------
 @router.post("/login", response_model=LoginResponseSchema)
-def login_user(credentials: UsuarioLoginSchema, db: Session = Depends(get_db),user_id_principal: int = Depends(get_current_user_id_task)):
+def login_user(credentials: UsuarioLoginSchema, db: Session = Depends(get_db)):
     """Realiza login e retorna token de acesso."""
     try:
-        return login_user_service(db, credentials,user_id_principal)
+        return login_user_service(db, credentials)
     except Exception as e:
         handle_service_error("login", e)
   

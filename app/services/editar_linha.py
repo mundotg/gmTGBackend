@@ -3,39 +3,102 @@ import json
 import uuid
 from app.ultils.logger import log_message
 
+from datetime import datetime
+import uuid
+import json
+
 def _map_column_type(col_type: str):
     """Mapeia o tipo da coluna para a função de conversão correspondente."""
     col_type = col_type.lower()
 
+    # 🔢 Inteiros
     if any(t in col_type for t in [
         "int", "integer", "smallint", "bigint", "tinyint", "serial", "bigserial", "number"
     ]):
         return int
 
+    # 🔣 Números decimais
     if any(t in col_type for t in [
         "float", "real", "double", "double precision", "decimal", "numeric"
     ]):
         return float
+
+    # ⚙️ Bits (0/1)
     elif col_type == "bit":
         return lambda x: None if x is None else (1 if str(x).lower() in ("1", "true", "t", "yes", "on") else 0)
 
+    # 🟢 Booleanos
     elif any(t in col_type for t in ["bool", "boolean"]):
-        return lambda x: str(x).lower() in ("true", "yes", "t", "on") if x is not None else None
+        return lambda x: str(x).lower() in ("true", "yes", "t", "on", "1") if x is not None else None
 
-    elif "timestamp" in col_type:
-        return lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S") if x else None
+    # 🕒 Timestamps e datas (mais tolerante)
+    elif "timestamp" in col_type or "date" in col_type:
+        def parse_datetime(x):
+            if not x:
+                return None
+            try:
+                # Caso venha direto como datetime
+                if isinstance(x, datetime):
+                    return x
+                # Normaliza formatos ISO
+                val = str(x).replace("T", " ").replace("Z", "").split(".")[0]
+                # Adiciona segundos se faltarem
+                if len(val) == 16:  # yyyy-MM-dd HH:mm
+                    val += ":00"
+                return datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                # Fallback para formato apenas de data
+                try:
+                    return datetime.strptime(str(x), "%Y-%m-%d")
+                except Exception:
+                    return None
+        return parse_datetime
+        # ⏱️ Tempo puro (sem data)
+    elif "time" in col_type :
+        return lambda x: datetime.strptime(x, "%H:%M:%S").time() if x else None
 
+    # ⏳ Intervalos
+    elif "interval" in col_type:
+        from datetime import timedelta
+        def parse_interval(x):
+            if not x:
+                return None
+            # Exemplo simples: '2 days 03:00:00'
+            try:
+                parts = str(x).split()
+                days = int(parts[0]) if "day" in parts else 0
+                time_part = parts[-1]
+                h, m, s = map(int, time_part.split(":"))
+                return timedelta(days=days, hours=h, minutes=m, seconds=s)
+            except Exception:
+                return None
+        return parse_interval
+
+    # 🧮 Arrays SQL
+    elif "[]" in col_type:
+        return lambda x: json.loads(x) if isinstance(x, str) and x.startswith("[") else None
+
+    # 💰 Money
+    elif "money" in col_type:
+        return lambda x: float(str(x).replace("$", "").replace(",", "").strip()) if x else None
+
+
+    # 🧩 UUIDs
     elif "uuid" in col_type:
-        return lambda x: uuid.UUID(x) if x else None
+        return lambda x: uuid.UUID(str(x)) if x else None
 
+    # 🧠 JSON e JSONB
     elif any(t in col_type for t in ["json", "jsonb"]):
         return lambda x: json.loads(x) if isinstance(x, str) and x.strip() else None
 
-    elif any(t in col_type for t in ["blob", "binary"]):
+    # 📦 Blobs e binários
+    elif any(t in col_type for t in ["blob", "binary", "bytea"]):
         return lambda x: bytes(x, "utf-8") if x is not None else None
 
+    # 🔤 Fallback: string
     else:
         return str
+
 
 
 def _convert_column_type_for_string_one(value, col_type):

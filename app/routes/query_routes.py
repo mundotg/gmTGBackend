@@ -23,7 +23,6 @@ from app.schemas.query_select_upAndInsert_schema import (
 )
 
 from app.services.cloudeAi_execute_query import executar_query_e_salvar_stream
-from app.services.delete_batch_service import DeleteBatchService
 from app.services.insert_row_service import insert_row_service
 from app.services.insert_service_auto import insert_row_service_auto
 from app.ultils.QueryExecutionService import QueryExecutionService
@@ -365,15 +364,5 @@ async def cleanup_channels_endpoint():
         "cleaned": cleaned,
         "active_channels": len(channel_manager.channels),
         "message": f"Removidos {cleaned} canais expirados",
-    }
-
-
-@router.get("/health")
-async def health_check():
-    """Health check do serviço."""
-    return {
-        "status": "healthy",
-        "active_channels": len(channel_manager.channels),
-        "timestamp": datetime.utcnow().isoformat(),
     }
 

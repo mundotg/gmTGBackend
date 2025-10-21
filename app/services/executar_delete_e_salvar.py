@@ -1,205 +1,249 @@
-"""
-Serviço para operações de deleção no banco de dados.
-Executa DELETEs de forma segura com validações e isolamento de dados.
-"""
-
-import traceback
-from typing import List, Dict, Any, Optional
-
+import json
+import re
+from datetime import datetime, timezone
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import bindparam, delete, Table, MetaData, and_
-
-from app.schemas.query_delete_schema import DeleteRequest, DeleteByIdsRequest, DeleteResponse
+from sqlalchemy.sql import text
+from sqlalchemy.exc import SQLAlchemyError
+from app.schemas.query_delete_schema import PayloadDeleteRow, DeleteResponse
+from app.schemas.query_select_upAndInsert_schema import QueryPayload
+from app.schemas.queryhistory_schemas import QueryHistoryCreate
+from app.cruds.queryhistory_crud import create_query_history
+from app.services.cloudeAi_execute_query import QueryFilterBuilder
+from app.services.query_executor import is_safe_identifier
+from app.ultils.ativar_engine import ConnectionManager
+from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
+from app.ultils.logica_de_join_advance import build_join_clause
 
 
 class DeleteOperationService:
     """
-    Serviço responsável por executar operações de DELETE de forma segura.
-    Utiliza metadados dinâmicos e validações para garantir integridade dos dados.
+    Serviço responsável por executar operações DELETE seguras e genéricas,
+    com suporte a múltiplos dialetos SQL (PostgreSQL, MySQL, SQL Server, SQLite).
     """
 
-    async def execute_conditional_delete(
+    def __init__(self) -> None:
+        self.connection_manager = ConnectionManager()
+
+    def detect_dialect(self, engine) -> str:
+        """Detecta o dialeto ativo."""
+        name = engine.dialect.name.lower()
+        if "postgres" in name:
+            return "postgres"
+        if "mysql" in name:
+            return "mysql"
+        if "mssql" in name or "sqlserver" in name:
+            return "mssql"
+        if "sqlite" in name:
+            return "sqlite"
+        return "generic"
+
+    async def execute_delete_all(
         self,
-        delete_request: DeleteRequest,
-        db_session: Session,
+        query_payload: QueryPayload,
+        db: Session,
         current_user_id: int,
+        client_ip: str = None,
+        app_source: str = "API",
+        executed_by: str = "sistema",
+        modified_by: str = None,
     ) -> DeleteResponse:
         """
-        Executa deleção baseada em condições WHERE com validação de segurança.
-        Garante isolamento de dados através do user_id.
+        Executa um DELETE genérico com suporte a JOINs e múltiplos dialetos SQL.
         """
-        target_table = delete_request.table
-        where_conditions = delete_request.conditions
+        tabela_base = getattr(query_payload, "baseTable", None)
+        if not tabela_base:
+            raise ValueError("Tabela base não informada no QueryPayload")
 
-        # Validações iniciais
-        if not where_conditions:
-            raise ValueError("Pelo menos uma condição WHERE é obrigatória")
+        if not is_safe_identifier(tabela_base):
+            raise ValueError(f"Tabela insegura: {tabela_base}")
 
-        # Carregar estrutura da tabela
-        table_metadata = await self._load_table_metadata(target_table, db_session)
-        
-        # Validar colunas de segurança
-        self._validate_required_columns(table_metadata)
+        engine, connection = self.connection_manager.ensure_connection(db, current_user_id)
+        dialect = self.detect_dialect(engine)
+        params: Dict[str, Any] = {}
 
-        # Construir cláusulas WHERE com segurança
-        where_clauses, query_parameters = self._build_where_clauses(
-            table_metadata, where_conditions, current_user_id
+        if dialect in ["mysql", "mssql"]:
+            sql_parts = [f"DELETE {tabela_base} FROM {tabela_base}"]
+        else:
+            sql_parts = [f"DELETE FROM {tabela_base}"]
+
+        # 🔗 JOINs e WHERE
+        join_clauses = build_join_clause(connection.type, tabela_base, query_payload.joins, query_payload.table_list)
+        filter_builder = QueryFilterBuilder()
+        filters, params = await filter_builder.build_where_clause(
+            query_payload.where or [], connection.type
         )
 
-        # Executar deleção
-        return await self._execute_delete_operation(
-            table_metadata, where_clauses, query_parameters, db_session, target_table
-        )
+        # ⚠️ Segurança
+        if not query_payload.where or len(filters) == 0:
+            log_message("⚠️ Tentativa de DELETE sem filtro. Operação cancelada.", "warning")
+            raise ValueError("Operação bloqueada: DELETE sem WHERE é perigoso.")
 
-    async def execute_bulk_delete_by_ids(
-        self,
-        delete_request: DeleteByIdsRequest,
-        db_session: Session,
-        current_user_id: int,
-    ) -> DeleteResponse:
-        """
-        Executa deleção em lote baseada em lista de IDs.
-        Aplica automaticamente restrição de user_id para segurança.
-        """
-        target_table = delete_request.table
-        record_ids = delete_request.ids
+        if join_clauses:
+            sql_parts.append(join_clauses)
+        if filters:
+            sql_parts.append(f" {filters}")
 
-        if not record_ids:
-            raise ValueError("Lista de IDs não pode estar vazia")
+        sql = " ".join(sql_parts)
+        log_message(f"🧹 DELETE ({dialect}) → {sql}\nParams: {params}", "debug")
 
-        # Carregar estrutura da tabela
-        table_metadata = await self._load_table_metadata(target_table, db_session)
-        
-        # Validar colunas de segurança
-        self._validate_required_columns(table_metadata)
-
-        # Construir cláusulas WHERE para deleção por IDs
-        primary_key_column = table_metadata.columns['id']
-        user_id_column = table_metadata.columns['user_id']
-        
-        where_clauses = [
-            primary_key_column.in_(record_ids),
-            user_id_column == str(current_user_id)
-        ]
-
-        # Executar deleção
-        return await self._execute_delete_operation(
-            table_metadata, where_clauses, {}, db_session, target_table
-        )
-
-    async def _load_table_metadata(self, table_name: str, db_session: Session) -> Table:
-        """Carrega metadados da tabela de forma segura."""
-        dynamic_metadata = MetaData()
+        # 🚀 Execução
         try:
-            return Table(table_name, dynamic_metadata, autoload_with=db_session.bind)
-        except Exception as error:
-            raise ValueError(f"Tabela '{table_name}' não encontrada: {str(error)}")
+            start = datetime.now(timezone.utc)
+            with engine.begin() as conn:
+                result = conn.execute(text(sql), params)
+                afetados = result.rowcount or 0
+            duration_ms = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
 
-    def _validate_required_columns(self, table_metadata: Table):
-        """Valida se a tabela possui colunas necessárias para operações seguras."""
-        required_columns = ['id', 'user_id']
-        for column_name in required_columns:
-            if column_name not in table_metadata.columns:
-                raise ValueError(
-                    f"Tabela '{table_metadata.name}' deve ter a coluna '{column_name}' "
-                    "para operações de segurança"
-                )
-
-    def _build_where_clauses(
-        self, 
-        table_metadata: Table, 
-        conditions: List[Dict], 
-        user_id: int
-    ) -> tuple:
-        """
-        Constrói cláusulas WHERE com validação de segurança.
-        Retorna tuple (cláusulas, parâmetros).
-        """
-        where_clauses = []
-        query_parameters = {}
-        parameter_counter = 0
-
-        # Isolamento obrigatório por user_id
-        user_id_column = table_metadata.columns['user_id']
-        where_clauses.append(user_id_column == str(user_id))
-
-        for condition in conditions:
-            field_name = condition.get('field')
-            operator_type = condition.get('operator', '=')
-            field_value = condition.get('value')
-            
-            if not field_name or field_value is None:
-                continue
-
-            # Validar existência da coluna
-            column_ref = table_metadata.columns.get(field_name)
-            if column_ref is None:
-                raise ValueError(f"Coluna '{field_name}' não encontrada")
-
-            parameter_name = f"param_{parameter_counter}"
-            parameter_counter += 1
-
-            # Aplicar operador com validação
-            where_clause, param_value = self._apply_operator(
-                column_ref, operator_type, field_value, parameter_name
+            # 🧾 Histórico completo
+            historico = QueryHistoryCreate(
+                user_id=current_user_id,
+                db_connection_id=connection.id,
+                query=sql,
+                query_type="DELETE",
+                executed_at=start,
+                updated_at=datetime.now(timezone.utc),
+                duration_ms=duration_ms,
+                result_preview=json.dumps({"afetados": afetados}, ensure_ascii=False),
+                error_message=None,
+                is_favorite=False,
+                tags=f"delete_generic_{dialect}",
+                app_source=app_source,
+                client_ip=client_ip,
+                executed_by=executed_by,
+                modified_by=modified_by or executed_by,
+                meta_info={
+                    "base_table": tabela_base,
+                    "joins": query_payload.joins,
+                    "filters": query_payload.where,
+                    "dialect": dialect,
+                    "timestamp": start.isoformat()
+                },
             )
-            
-            if param_value is not None:
-                query_parameters[parameter_name] = param_value
-            where_clauses.append(where_clause)
-
-        return where_clauses, query_parameters
-
-    def _apply_operator(self, column_ref, operator_type: str, value: Any, param_name: str):
-        """Aplica operador SQL com validação adequada."""
-        operator_mapping = {
-            '=': (column_ref == bindparam(param_name), value),
-            '!=': (column_ref != bindparam(param_name), value),
-            '>': (column_ref > bindparam(param_name), value),
-            '<': (column_ref < bindparam(param_name), value),
-            '>=': (column_ref >= bindparam(param_name), value),
-            '<=': (column_ref <= bindparam(param_name), value),
-            'IN': (column_ref.in_(value), None)  # IN trata valores diretamente
-        }
-
-        if operator_type.upper() == 'IN':
-            if not isinstance(value, (list, tuple)):
-                raise ValueError(f"Operador IN requer lista de valores: {column_ref.name}")
-            return column_ref.in_(value), None
-
-        if operator_type not in operator_mapping:
-            raise ValueError(f"Operador '{operator_type}' não suportado")
-
-        return operator_mapping[operator_type]
-
-    async def _execute_delete_operation(
-        self,
-        table_metadata: Table,
-        where_clauses: List,
-        parameters: Dict,
-        db_session: Session,
-        table_name: str
-    ) -> DeleteResponse:
-        """Executa a operação DELETE de forma segura."""
-        delete_statement = delete(table_metadata).where(and_(*where_clauses))
-
-        try:
-            execution_result = db_session.execute(delete_statement, parameters)
-            records_deleted = execution_result.rowcount
-            db_session.commit()
+            create_query_history(db=db, data=historico)
 
             return DeleteResponse(
-                table=table_name,
-                deleted_count=records_deleted,
-                status="success",
-                message=f"{records_deleted} registros removidos de '{table_name}'"
+                success=True,
+                mensagem=f"{afetados} registro(s) excluído(s) com sucesso.",
+                itens_afetados=[{"tabela": tabela_base, "afetados": afetados}],
+                executado_em=datetime.utcnow(),
             )
 
-        except Exception as error:
-            db_session.rollback()
-            log_message(
-                f"Erro na execução do DELETE: {str(error)}\n{traceback.format_exc()}", 
-                "error"
+        except SQLAlchemyError as sa_err:
+            error_msg = _lidar_com_erro_sql(sa_err)
+            log_message(f"❌ Erro SQL: {error_msg}", "error")
+            raise Exception(f"Erro SQL: {error_msg}")
+        except Exception as e:
+            log_message(f"❌ Erro inesperado no DELETE genérico: {e}", "error")
+            raise Exception(str(e))
+
+    async def execute_batch_delete(
+        self,
+        registros: List[PayloadDeleteRow],
+        db: Session,
+        current_user_id: int,
+        client_ip: str = None,
+        app_source: str = "API",
+        executed_by: str = "sistema",
+        modified_by: str = None,
+    ) -> DeleteResponse:
+        """
+        Exclui múltiplos registros de forma segura, validando identificadores e registrando histórico completo.
+        """
+        itens_afetados: List[Dict[str, Any]] = []
+        erros: List[str] = []
+        engine, connection = self.connection_manager.ensure_connection(db, current_user_id)
+
+        try:
+            start = datetime.now(timezone.utc)
+            with engine.begin() as conn:
+                for registro in registros:
+                    for tabela_name, dados in registro.rowDeletes.items():
+                        pk_coluna = dados.primaryKey
+                        pk_valor = dados.primaryKeyValue
+                        key_type = dados.keyType
+
+                        if not tabela_name or not pk_coluna:
+                            msg = f"Tabela ou coluna inválida no payload: {tabela_name or '?'}"
+                            erros.append(msg)
+                            continue
+
+                        if not pk_valor:
+                            msg = f"Registro ignorado (chave primária vazia) → {tabela_name}.{pk_coluna}"
+                            erros.append(msg)
+                            continue
+
+                        if not is_safe_identifier(tabela_name) or not is_safe_identifier(pk_coluna):
+                            msg = f"Nome inseguro detectado → tabela: {tabela_name}, coluna: {pk_coluna}"
+                            erros.append(msg)
+                            continue
+
+                        try:
+                            if key_type in ("integer", "int"):
+                                pk_valor = int(pk_valor)
+                            elif key_type in ("float", "double", "decimal"):
+                                pk_valor = float(pk_valor)
+                            else:
+                                pk_valor = str(pk_valor)
+                        except ValueError:
+                            erros.append(f"Valor inválido: {tabela_name}.{pk_coluna} = {pk_valor}")
+                            continue
+
+                        sql = f"DELETE FROM {tabela_name} WHERE {pk_coluna} = :pk_valor"
+                        result = conn.execute(text(sql), {"pk_valor": pk_valor})
+                        afetados = result.rowcount or 0
+
+                        itens_afetados.append({
+                            "tabela": tabela_name,
+                            "chave": pk_coluna,
+                            "valor": pk_valor,
+                            "afetados": afetados
+                        })
+
+            duration_ms = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+
+            # Histórico completo
+            historico = QueryHistoryCreate(
+                user_id=current_user_id,
+                db_connection_id=connection.id,
+                query="DELETE (batch)",
+                query_type="DELETE",
+                executed_at=start,
+                updated_at=datetime.now(timezone.utc),
+                duration_ms=duration_ms,
+                result_preview=json.dumps(itens_afetados, default=str, ensure_ascii=False),
+                error_message=json.dumps(erros, ensure_ascii=False) if erros else None,
+                is_favorite=False,
+                tags="delete_batch",
+                app_source=app_source,
+                client_ip=client_ip,
+                executed_by=executed_by,
+                modified_by=modified_by or executed_by,
+                meta_info={
+                    "total_itens": len(itens_afetados),
+                    "tabelas_afetadas": [i["tabela"] for i in itens_afetados],
+                    "erros": erros,
+                    "timestamp": start.isoformat()
+                },
             )
-            raise Exception(f"Falha na execução do DELETE: {error}")
+            create_query_history(db=db, data=historico)
+
+            mensagem_final = f"{len(itens_afetados)} registro(s) excluído(s) com sucesso."
+            if erros:
+                mensagem_final += f" ⚠️ {len(erros)} aviso(s)/erro(s) foram registrados."
+
+            return DeleteResponse(
+                success=True if itens_afetados else False,
+                mensagem=mensagem_final,
+                itens_afetados=itens_afetados,
+                executado_em=datetime.utcnow(),
+            )
+
+        except SQLAlchemyError as sa_err:
+            error_msg = _lidar_com_erro_sql(sa_err)
+            log_message(f"❌ Erro SQL no DELETE: {error_msg}", "error")
+            raise Exception(f"Erro SQL: {error_msg}")
+        except Exception as e:
+            log_message(f"❌ Erro inesperado no DELETE: {e}", "error")
+            raise Exception(str(e))

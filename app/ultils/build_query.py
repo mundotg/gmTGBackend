@@ -155,10 +155,38 @@ def get_filter_condition_with_operation(
             return f"{field_escaped} IS NOT NULL"
 
         elif operation == "Entre":
-            if not value_otheir_between.strip():
-                raise ValueError(f"Segundo valor ausente para operação 'Entre' em '{col_name}'.")
-            params[f"{param_name}_min"] = float(value) if is_number else value
-            params[f"{param_name}_max"] = float(value_otheir_between) if is_number else value_otheir_between
+            # Verificar se value_otheir_between tem valor válido
+            if not value_otheir_between or not str(value_otheir_between).strip() or str(value_otheir_between).strip() == "-1":
+                # Se value_otheir_between é inválido, verificar se value tem */-1
+                if value and '*/-1' in str(value):
+                    parts = str(value).split('*/-1')
+                    if len(parts) == 2:
+                        value_min = parts[0]
+                        value_max = parts[1]
+                    else:
+                        raise ValueError(f"Separador '*/-1' encontrado mas não produziu dois valores em '{col_name}': {value}")
+                else:
+                    raise ValueError(f"Segundo valor ausente para operação 'Entre' em '{col_name}'")
+            else:
+                # Usar os valores separados normalmente
+                value_min = value
+                value_max = value_otheir_between
+            
+            # Validar valores
+            value_min = str(value_min).strip()
+            value_max = str(value_max).strip()
+            
+            if not value_min or not value_max:
+                raise ValueError(f"Valores mínimo e máximo são obrigatórios para operador 'Entre' em '{col_name}'")
+            
+            # Converter para float se for número
+            if is_number:
+                params[f"{param_name}_min"] = float(value_min)
+                params[f"{param_name}_max"] = float(value_max)
+            else:
+                params[f"{param_name}_min"] = value_min
+                params[f"{param_name}_max"] = value_max
+            
             return f"{field_escaped} BETWEEN :{param_name}_min AND :{param_name}_max"
 
         elif operation in ["Contém", "Não Contém"]:
@@ -477,38 +505,61 @@ def update_row_service(
     user_id: int,
     db_type: str,
     connection_id: str,
-    db: Session
+    db: Session,
+    client_ip: str = None,
+    app_source: str = "API",
+    executed_by: str = "sistema",
+    modified_by: str = None,
 ):
+    """
+    Atualiza registros existentes em uma ou mais tabelas e salva no histórico completo.
+
+    Args:
+        data (UpdateRequest): Dados contendo as tabelas, chaves primárias e colunas a atualizar.
+        engine (Engine): Conexão SQLAlchemy para execução da query.
+        user_id (int): ID do usuário executando a operação.
+        db_type (str): Tipo de banco (ex: 'postgres', 'mysql', 'sqlite').
+        connection_id (str): ID da conexão do banco de dados.
+        db (Session): Sessão SQLAlchemy para salvar histórico.
+        client_ip (str, optional): Endereço IP do cliente.
+        app_source (str, optional): Origem da execução (ex: API, Console, UI).
+        executed_by (str, optional): Nome de quem executou (usuário ou sistema).
+        modified_by (str, optional): Usuário que modificou o registro.
+
+    Returns:
+        dict: Resumo da operação com status e linhas afetadas.
+    """
     import time
     from datetime import datetime, timezone
 
     resposta_query = ""
     query_string = ""
     duration_ms = 0
+    start = time.time()
 
     try:
-        start = time.time()
         with engine.begin() as conn:
             for table_name, primary_key_data in data.tables_primary_keys_values.items():
-                if "primaryKey" not in primary_key_data or "valor" not in primary_key_data:
-                    raise ValueError(f"Tabela {table_name} não contém chave primária válida")
+                # ✅ Validação da chave primária
+                primary_key = primary_key_data.get("primaryKey")
+                primary_value = primary_key_data.get("valor")
+                if not primary_key or primary_value is None:
+                    raise ValueError(f"Tabela '{table_name}' não contém chave primária válida")
 
-                primary_key = primary_key_data["primaryKey"]
-                primary_value = primary_key_data["valor"]
-
+                # ✅ Obtenção e estruturação dos dados a atualizar
                 raw_values = data.updatedRow.get(table_name, {})
-
                 updated_values = {
                     col: {
                         "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
-                        "type_column": field["type_column"] if isinstance(field, dict) else getattr(field, "type_column", "text")
+                        "type_column": field.get("type_column", "text") if isinstance(field, dict) else getattr(field, "type_column", "text")
                     }
                     for col, field in raw_values.items()
                 }
 
                 if not updated_values:
-                    raise ValueError(f"Tabela {table_name}: Nenhuma coluna para atualizar")
+                    raise ValueError(f"Tabela '{table_name}': Nenhuma coluna para atualizar")
 
+                # ✅ Monta a query SQL final
                 query = build_update_query(
                     table_name=table_name,
                     db_type=db_type,
@@ -517,12 +568,14 @@ def update_row_service(
                     primary_value=primary_value
                 )
 
+                # ✅ Execução da query
                 query_string += f"{table_name}: {query}\n"
                 rs = conn.execute(query)
                 resposta_query += f"\n{table_name}: {rs.rowcount} linha(s) atualizada(s)"
 
         duration_ms = int((time.time() - start) * 1000)
 
+        # ✅ Criação do histórico completo
         historico = QueryHistoryCreate(
             user_id=user_id,
             db_connection_id=connection_id,
@@ -533,9 +586,21 @@ def update_row_service(
             result_preview=resposta_query or "Nenhuma linha atualizada",
             error_message=None,
             is_favorite=False,
-            tags="update"
+            tags="update",
+            app_source=app_source,
+            client_ip=client_ip,
+            executed_by=executed_by,
+            modified_by=modified_by or executed_by,
+            meta_info={
+                "db_type": db_type,
+                "tables_updated": list(data.updatedRow.keys()),
+                "primary_keys": data.tables_primary_keys_values,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
         )
+
         create_query_history(db=db, data=historico)
+        log_message(f"Atualização concluída: {resposta_query}")
 
         return {
             "status": resposta_query or "Nenhuma linha atualizada",
@@ -544,9 +609,12 @@ def update_row_service(
         }
 
     except Exception as e:
-        duration_ms = int((time.time() - start) * 1000) if duration_ms == 0 else duration_ms
+        duration_ms = int((time.time() - start) * 1000)
         error_msg = _lidar_com_erro_sql(e)
-        log_message(error_msg, "error")
+
+        # ✅ Log e histórico de erro completo
+        log_message(f"Erro ao atualizar registro: {error_msg}", "error")
+
         historico = QueryHistoryCreate(
             user_id=user_id,
             db_connection_id=connection_id,
@@ -557,10 +625,20 @@ def update_row_service(
             result_preview=resposta_query or "Sem resultado devido ao erro",
             error_message=error_msg,
             is_favorite=False,
-            tags="error"
+            tags="error",
+            app_source=app_source,
+            client_ip=client_ip,
+            executed_by=executed_by,
+            modified_by=modified_by or executed_by,
+            meta_info={
+                "db_type": db_type,
+                "tables_attempted": list(data.updatedRow.keys()),
+                "primary_keys": data.tables_primary_keys_values,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
         )
-        create_query_history(db=db, data=historico)
 
+        create_query_history(db=db, data=historico)
         raise ValueError(error_msg)
 
 

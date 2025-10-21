@@ -3,8 +3,8 @@ from typing import Dict, List
 from sqlalchemy.orm import Session
 from sqlalchemy import Engine, text
 
-from app.cruds.dbstructure_crud import create_enum_field, list_enum_fields_by_field
-from app.models.dbstructure_models import DBEnum_field, DBField, DBStructure
+from app.cruds.dbstructure_crud import create_enum_field
+from app.models.dbstructure_models import DBEnumField, DBField, DBStructure
 from app.ultils.logger import log_message
 
 import re
@@ -158,7 +158,7 @@ def _fetch_enum_values(
             enum_values[col.name] = []
 
             for valor in valores_enum.get(col.name, []):
-                enum_model = DBEnum_field(field_id=col.id, valor=valor)
+                enum_model = DBEnumField(field_id=col.id, valor=valor)
                 create_enum_field(db, enum_model)
                 enum_values[col.name].append(valor)
 

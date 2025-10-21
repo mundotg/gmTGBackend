@@ -41,7 +41,12 @@ class DBStatistics(Base):
     records_analyzed = Column(BigInteger, nullable=False, default=0)
 
     # Última vez que esta estatística foi atualizada
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+    DateTime, 
+    default=datetime.now(timezone.utc), 
+    onupdate=func.now(),
+    nullable=False
+)
 
     # Momento da última consulta registrada (opcional)
     last_query_at = Column(DateTime, nullable=True)

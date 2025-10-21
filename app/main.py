@@ -61,9 +61,9 @@ app.include_router(gerar_relatorio_routes.router)
 @app.on_event("startup")
 def on_startup():
     print("🚀 Inicializando aplicação...")
-    db = SessionLocal()
-    seed_data(db)
-    db.close()
+    
+    
+   
     if get_env("ENV", "dev") == "dev":
         if not already_initialized():
             reset_database()
@@ -71,6 +71,9 @@ def on_startup():
             print("✅ Banco de dados resetado com sucesso!")
         else:
             print("🔒 Banco de dados já inicializado anteriormente.")
+    db = SessionLocal()
+    seed_data(db)
+    db.close()
     schedule_cache_cleanup()
 
 

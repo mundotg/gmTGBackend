@@ -12,7 +12,6 @@ from app.services.sprint_services import (
     update_sprint,
 )
 from app.ultils.get_current_user_id_task import get_current_user_id_task
-from app.ultils.get_id_by_token import get_current_user_id
 
 router = APIRouter(prefix="/sprints", tags=["Sprints"])
 
@@ -24,7 +23,8 @@ router = APIRouter(prefix="/sprints", tags=["Sprints"])
     summary="Listar sprints de um projeto",
     description="Retorna todas as sprints associadas a um determinado projeto."
 )
-def list_sprints(project_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task),user_id_principal: int = Depends(get_current_user_id)):
+def list_sprints(project_id: str, db: Session = Depends(get_db), 
+                 user_id: str = Depends(get_current_user_id_task)):
     sprints = get_sprints_by_project(db, project_id)
     if not sprints:
         raise HTTPException(status_code=404, detail="Nenhuma sprint encontrada para este projeto")
@@ -40,7 +40,7 @@ def list_sprints(project_id: str, db: Session = Depends(get_db), user_id: str = 
 def toggle_sprint_status_route(
     sprint_id: str,
     activate: bool = Query(..., description="Define se a sprint será ativada ou desativada."),
-    db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task),user_id_principal: int = Depends(get_current_user_id)
+    db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task)
 ):
     sprint = toggle_sprint_status(db, sprint_id, activate)
     if not sprint:
@@ -55,7 +55,8 @@ def toggle_sprint_status_route(
     summary="Criar nova sprint",
     description="Cria uma nova sprint associada a um projeto."
 )
-def create_sprint_route(project_id: str, data: SprintCreateSchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task),user_id_principal: int = Depends(get_current_user_id)):
+def create_sprint_route(project_id: str, data: SprintCreateSchema, db: Session = Depends(get_db), 
+                        user_id: str = Depends(get_current_user_id_task)):
     sprint = create_sprint(db, project_id, data)
     if not sprint:
         raise HTTPException(status_code=400, detail="Erro ao criar sprint")
@@ -68,7 +69,8 @@ def create_sprint_route(project_id: str, data: SprintCreateSchema, db: Session =
     summary="Atualizar sprint existente",
     description="Atualiza os dados de uma sprint já existente."
 )
-def update_sprint_route(sprint_id: str, data: SprintUpdateSchema, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task),user_id_principal: int = Depends(get_current_user_id)):
+def update_sprint_route(sprint_id: str, data: SprintUpdateSchema, db: Session = Depends(get_db),
+                        user_id: str = Depends(get_current_user_id_task)):
     sprint = update_sprint(db, sprint_id, data)
     if not sprint:
         raise HTTPException(status_code=404, detail="Sprint não encontrada")
@@ -82,7 +84,8 @@ def update_sprint_route(sprint_id: str, data: SprintUpdateSchema, db: Session = 
     summary="Excluir sprint",
     description="Remove uma sprint específica do banco de dados."
 )
-def delete_sprint_route(sprint_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task),user_id_principal: int = Depends(get_current_user_id)):
+def delete_sprint_route(sprint_id: str, db: Session = Depends(get_db), 
+                        user_id: str = Depends(get_current_user_id_task)):
     sprint = delete_sprint(db, sprint_id)
     if not sprint:
         raise HTTPException(status_code=404, detail="Sprint não encontrada")
@@ -97,7 +100,7 @@ def delete_sprint_route(sprint_id: str, db: Session = Depends(get_db), user_id: 
 def cancel_sprint_route(
     sprint_id: str,
     reason: str = Body(..., embed=True, description="Motivo do cancelamento da sprint."),
-    db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task),user_id_principal: int = Depends(get_current_user_id)
+    db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task)
 ):
     sprint = cancel_sprint(db, sprint_id, reason)
     if not sprint:

@@ -10,7 +10,6 @@ from app.schemas.task_schema import TaskSchema, TaskStatsSchema
 from app.database import get_db
 from app.services import task_service
 from app.ultils.get_current_user_id_task import get_current_user_id_task
-from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
 router = APIRouter(tags=["Tasks"])
@@ -36,13 +35,13 @@ def handle_service_error(context: str, error: Exception, status_code: int = 500)
 # 💾 Funções com Cache
 # -----------------------------
 @cache_result(ttl=300, user_id="user_{user_id}")
-def list_tasks_cached(db: Session, project_id: str, user_id: int, user_id_principal: int):
+def list_tasks_cached(db: Session, project_id: str, user_id: int):
     """Lista tarefas com cache."""
     return task_service.list_tasks_service(db, project_id)
 
 
 @cache_result(ttl=600, user_id="user_{user_id}")
-def retrieve_task_cached(db: Session, project_id: str, task_id: str, user_id: int, user_id_principal: int):
+def retrieve_task_cached(db: Session, project_id: str, task_id: str, user_id: int):
     """Obtém tarefa específica com cache."""
     tasks = task_service.list_tasks_service(db, project_id)
     task = next((t for t in tasks if str(t.id) == task_id), None)
@@ -59,13 +58,12 @@ def retrieve_task_cached(db: Session, project_id: str, task_id: str, user_id: in
 def list_project_tasks(
     project_id: str,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id_task),
-    user_id_principal: int = Depends(get_current_user_id)
+    user: str = Depends(get_current_user_id_task)
 ):
     """Lista todas as tarefas de um projeto."""
     try:
         print("listar")
-        return list_tasks_cached(db, project_id, user, user_id_principal)
+        return list_tasks_cached(db, project_id, user)
     except Exception as e:
         handle_service_error(f"listar tarefas do projeto {project_id}", e)
 
@@ -75,8 +73,7 @@ def add_new_task(
     project_id: str,
     task: TaskSchema,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id_task),
-    user_id_principal: int = Depends(get_current_user_id)
+    user: str = Depends(get_current_user_id_task)
 ):
     """Adiciona uma nova tarefa ao projeto."""
     try:
@@ -110,7 +107,6 @@ def delete_existing_task(
     task_id: str,
     db: Session = Depends(get_db),
     user: str = Depends(get_current_user_id_task),
-    user_id_principal: int = Depends(get_current_user_id)
 ):
     """Deleta uma tarefa existente."""
     try:
@@ -128,7 +124,6 @@ def delegar_task(
     task_id: str,
     assigned_to: Optional[str] = Query(None, description="ID do usuário para quem delegar a tarefa"),
     db: Session = Depends(get_db),
-    user_id_principal: int = Depends(get_current_user_id),
     user: str = Depends(get_current_user_id_task)
 ):
     """
@@ -153,7 +148,7 @@ def task_stats_route(
     project_id: Optional[str] = Query(None, description="Filtrar por ID do projeto"),
     sprint_id: Optional[str] = Query(None, description="Filtrar por ID da sprint"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)  # opcional
+    user_id: str = Depends(get_current_user_id_task)  # opcional
 ):
     """
     Retorna estatísticas das tarefas filtradas por projeto e/ou sprint.
@@ -175,7 +170,6 @@ def validar_task(
     aprovado: bool = Query(True, description="Define se a tarefa foi validada com sucesso"),
     comentario: str | None = Query(None, description="Comentário opcional sobre a validação"),
     db: Session = Depends(get_db),
-    user_id_principal: int = Depends(get_current_user_id),
     user: str = Depends(get_current_user_id_task)
 ):
     """
@@ -208,7 +202,6 @@ def listar_elementos(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
-    user_id_principal: int = Depends(get_current_user_id),
     user: str = Depends(get_current_user_id_task)
 ):
     """Paginação genérica de entidades."""

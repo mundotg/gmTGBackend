@@ -44,7 +44,6 @@ class ConnectionManager:
         connection, _ = await get_connection_current_async(db, user_id)
         if connection is None:
             raise HTTPException(status_code=400, detail="ID da conexão não está disponível")
-        print("trustServerCertificate : ", connection.trustServerCertificate)
 
         config = {
             "user": connection.username,

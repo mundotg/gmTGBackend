@@ -26,7 +26,7 @@ def handle_service_error(context: str, error: Exception):
 # LISTAR USUÁRIOS
 # -----------------------------
 @router.get("/", response_model=List[UsuarioResponseSchema])
-def list_users(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task),user_id_principal: int = Depends(get_current_user_id)):
+def list_users(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id_task)):
     """Lista todos os usuários cadastrados no sistema."""
     try:
         return list_users_service(db)
@@ -38,7 +38,7 @@ def list_users(db: Session = Depends(get_db), user_id: str = Depends(get_current
 def refresh_token(
     db: Session = Depends(get_db),
     refresh_token: Optional[str] = Header(None, convert_underscores=False),
-    user_principal: int = Depends(get_current_user_id)
+    user_principal: int = Depends(get_current_user_id_task)
 ):
     """
     Atualiza o token de acesso usando o refresh_token.
@@ -61,7 +61,7 @@ def refresh_token(
 # OBTER USUÁRIO POR ID
 # -----------------------------
 @router.get("/byid/{user_id}", response_model=UsuarioResponseSchema)
-def get_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(get_current_user_id_task),user_id_principal: int = Depends(get_current_user_id)):
+def get_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(get_current_user_id_task)):
     """Obtém um usuário específico pelo ID."""
     try:
         return get_user_service(db, user_id)
@@ -73,10 +73,10 @@ def get_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(get_c
 # CRIAR NOVO USUÁRIO
 # -----------------------------
 @router.post("/", response_model=UsuarioResponseSchema)
-def create_user(user: UsuarioCreateSchema, db: Session = Depends(get_db), user_id_principal: int = Depends(get_current_user_id)):
+def create_user(user: UsuarioCreateSchema, db: Session = Depends(get_db)):
     """Cria um novo usuário no sistema."""
     try:
-        return create_user_service(db, user,user_id_principal)
+        return create_user_service(db, user)
     except Exception as e:
         handle_service_error("criar usuário", e)
 
@@ -85,7 +85,7 @@ def create_user(user: UsuarioCreateSchema, db: Session = Depends(get_db), user_i
 # CRIAR MÚLTIPLOS USUÁRIOS
 # -----------------------------
 @router.post("/bulk", response_model=dict)
-def create_many_users(users: List[UsuarioCreateSchema], db: Session = Depends(get_db),user_id_principal: int = Depends(get_current_user_id)):
+def create_many_users(users: List[UsuarioCreateSchema], db: Session = Depends(get_db),user_id_principal: int = Depends(get_current_user_id_task)):
     """Cria múltiplos usuários de uma vez."""
     try:
         return create_many_users_service(db, users)
@@ -97,7 +97,7 @@ def create_many_users(users: List[UsuarioCreateSchema], db: Session = Depends(ge
 # ATUALIZAR USUÁRIO
 # -----------------------------
 @router.put("/byid/{user_id}", response_model=UsuarioResponseSchema)
-def update_user(user_id: str, data: UsuarioUpdateSchema, db: Session = Depends(get_db), user_id_principal: int = Depends(get_current_user_id)):
+def update_user(user_id: str, data: UsuarioUpdateSchema, db: Session = Depends(get_db), user_id_principal: int = Depends(get_current_user_id_task)):
     """Atualiza os dados de um usuário existente."""
     try:
         return update_user_service(db, user_id, data)
@@ -109,7 +109,7 @@ def update_user(user_id: str, data: UsuarioUpdateSchema, db: Session = Depends(g
 # LOGIN
 # -----------------------------
 @router.post("/login", response_model=LoginResponseSchema)
-def login_user(credentials: UsuarioLoginSchema, db: Session = Depends(get_db),user_id_principal: int = Depends(get_current_user_id)):
+def login_user(credentials: UsuarioLoginSchema, db: Session = Depends(get_db),user_id_principal: int = Depends(get_current_user_id_task)):
     """Realiza login e retorna token de acesso."""
     try:
         return login_user_service(db, credentials,user_id_principal)
@@ -122,7 +122,7 @@ def login_user(credentials: UsuarioLoginSchema, db: Session = Depends(get_db),us
 # DELETAR USUÁRIO
 # -----------------------------
 @router.delete("/byid/{user_id}", response_model=dict)
-def delete_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(get_current_user_id_task), user_id_principal: int = Depends(get_current_user_id)):
+def delete_user(user_id: str, db: Session = Depends(get_db), _: str = Depends(get_current_user_id_task)):
     """Remove um usuário pelo ID."""
     try:
         return delete_user_service(db, user_id)

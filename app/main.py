@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.config.cache_scheduler import schedule_cache_cleanup
-from app.config.dotenv import get_env
+from app.config.dotenv import get_env, get_env_list
 from app.config.startup_reset import (
     already_initialized,
     mark_initialized,
@@ -30,16 +30,17 @@ from app.seed_admin import seed_data
 app = FastAPI(title="API de Autenticação com FastAPI")
 
 # CORS CONFIG
-origins = ["http://localhost:3000", "http://192.168.54.68:3000"]
+origins = get_env_list("BACKEND_CORS_ORIGINS", ["http://localhost:3000"])
+# origins = ["http://localhost:3000", "http://192.168.54.68:3000"]
+allow_all = "*" in origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"] if allow_all else origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # ROTAS
 app.include_router(auth_routes.router)
 app.include_router(user_routes.router)

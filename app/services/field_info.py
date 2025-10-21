@@ -128,9 +128,11 @@ def processar_enum_fields(
             is_nullable=column.is_nullable,
             is_unique=column.is_unique,
             is_primary_key=column.is_primary_key,
-            is_foreign_key=column.is_ForeignKey,
+            is_foreign_key=column.is_foreign_key,
             referenced_table=column.referenced_table,
-            field_references=column.field_references,
+            field_references=column.referenced_field,
+            on_delete_action=column.fk_on_delete,
+            on_update_action=column.fk_on_update,
             is_auto_increment=column.is_auto_increment,
             default=column.default_value,
             comentario=column.comment,
@@ -235,11 +237,15 @@ def buscar_ou_criar_campos_tabela(
         for col_origem, col_relacao in zip(
             fk.get("constrained_columns", []),
             fk.get("referred_columns", []),
+            
+            
         ):
             relation = {
                 "fieldTabelaOrigem": col_origem,
                 "tabelaRelacao": tabela_relacao,
                 "fieldTabelaRelacao": col_relacao,
+                "ondelete": fk.get("options", {}).get("ondelete"),
+                "onupdate": fk.get("options", {}).get("onupdate"),
             }
             relations_map[col_origem] = relation
     # print(f"column {columns}")
@@ -260,7 +266,7 @@ def buscar_ou_criar_campos_tabela(
         default_value =column.get("default")
         is_auto_incremento = _is_system_field_from_column(tipo, column,is_foreign_key)
         # print(f"tipo={tipo}  || column_type={column_type}")
-
+        # print(f"coluna_reference={relation}  || is_foreign_key={is_foreign_key}")
         # Cria o novo campo
         field_in = DBFieldCreate(
             name=col_name,
@@ -269,8 +275,10 @@ def buscar_ou_criar_campos_tabela(
             default_value=default_value,
             is_primary_key=is_primary_key,
             comment=column.get("comment", "") or "",
-            referenced_table=relations_map.get(col_name).get("tabelaRelacao") if is_foreign_key else None,
-            field_references=relations_map.get(col_name).get("fieldTabelaRelacao") if is_foreign_key else None,
+            referenced_table=relation.get("tabelaRelacao") if is_foreign_key else None,
+            referenced_field=relation.get("fieldTabelaRelacao") if is_foreign_key else None,
+            fk_on_delete=relation.get("ondelete") if is_foreign_key else None,
+            fk_on_update=relation.get("onupdate") if is_foreign_key else None,
             is_unique=is_unique,
             is_foreign_key=bool(is_foreign_key),
             is_auto_increment=is_auto_incremento,

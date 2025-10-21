@@ -52,7 +52,58 @@ class QuerySecurityValidator:
     
     # Padrão para identificadores válidos
     IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-    
+
+    @staticmethod
+    def is_safe_value(value: Any, column_type: str) -> bool:
+        """
+        Valida se o valor fornecido é seguro para uso em SQL, baseado no tipo da coluna.
+        Suporta valores como "1,3" para listas de inteiros.
+        """
+        # Permite None
+        if value is None:
+            return True
+        # Tipos básicos
+        if column_type in ("int", "integer", "bigint", "smallint"):
+            # Suporta listas de inteiros em string separada por vírgula
+            if isinstance(value, str) and "," in value:
+                try:
+                    return all(int(v.strip()) or v.strip() == "0" for v in value.split(","))
+                except Exception:
+                    return False
+            try:
+                int(value)
+                return True
+            except Exception:
+                return False
+        if column_type in ("float", "double", "real", "numeric", "decimal"):
+            # Suporta listas de floats em string separada por vírgula
+            if isinstance(value, str) and "," in value:
+                try:
+                    return all(float(v.strip()) for v in value.split(","))
+                except Exception:
+                    return False
+            try:
+                float(value)
+                return True
+            except Exception:
+                return False
+        if column_type in ("bool", "boolean"):
+            return isinstance(value, bool) or value in (0, 1, "0", "1", "true", "false", "True", "False")
+        # Para strings, limita tamanho e caracteres perigosos
+        if column_type in ("str", "string", "varchar", "text", "char"):
+            if not isinstance(value, str):
+                return False
+            if len(value) > 1000:
+                return False
+            # Não permite ; ou comentários SQL
+            if ";" in value or "--" in value or "/*" in value or "*/" in value:
+                return False
+            return True
+        # Para outros tipos, aceita se não for objeto complexo
+        if isinstance(value, (dict, list, set, tuple)):
+            return False
+        return True
+
     @classmethod
     def is_safe_identifier(cls, identifier: str) -> bool:
         """Valida se um identificador SQL é seguro."""
@@ -173,9 +224,9 @@ class QuerySecurityValidator:
                     if condition.operator in ['IN', 'NOT IN'] and condition.value:
                         if isinstance(condition.value, list):
                             for val in condition.value:
-                                if not cls.is_safe_value(val):
+                                if not cls.is_safe_value(val,condition.column_type):
                                     raise ValueError(f"Valor inválido na condição IN: {val}")
-                        elif not cls.is_safe_value(condition.value):
+                        elif not cls.is_safe_value(condition.value,condition.column_type):
                             raise ValueError(f"Valor inválido: {condition.value}")
             
             # 4. Validação RÁPIDA: Aliases (apenas formato básico)
@@ -213,7 +264,7 @@ class QueryFilterBuilder:
         for i, condition in enumerate(conditions):
             # Validação de segurança já feita pelo SecurityValidator
             field = f"{condition.table_name_fil}.{condition.column}"
-            
+            # print(f"🔍 DEBUG: Processando condição {condition}")
             # Gera nome único do parâmetro
             param_prefix = f"param_{i}"
             
@@ -421,7 +472,7 @@ class QueryService:
                     params=params
                 )
             else:
-                print(list(query_payload.aliaisTables.keys()) if query_payload.aliaisTables else columns)
+                # print(list(query_payload.aliaisTables.keys()) if query_payload.aliaisTables else columns)
                 execution_result = QueryExecutionResult(
                     success=True,
                     query=query_string,
@@ -431,11 +482,26 @@ class QueryService:
                     params=params
                 )
             
+            result_preview = None
+            if not query_payload.isCountQuery and result_data:
+                result_preview = json.dumps(result_data[:10], default=str)  # salva apenas 10 linhas
+
             # 7. Salvar no histórico
             await self._save_query_history(
-                db, user_id, connection.id, query_string, 
-                duration_ms, str(json.dumps(result_data, default=str)), query_payload.isCountQuery
+                db=db, user_id=user_id, connection_id=connection.id,
+                query=query_string,
+                duration_ms=duration_ms,
+                result_preview=result_preview,
+                is_count_query=query_payload.isCountQuery,
+                error_message=None,
+                app_source="API",
+                executed_by="system",
+                meta_info={},
+                modified_by=None,
+                query_payload=query_payload,
+                row_count=len(result_data) if isinstance(result_data, list) else result_data
             )
+
             
             return execution_result
             
@@ -445,8 +511,9 @@ class QueryService:
             
             # Salvar erro no histórico
             await self._save_query_history(
-                db, user_id, connection.id, query_string if 'query_string' in locals() else "",
-                duration_ms, None, query_payload.isCountQuery, error_message
+                db=db, user_id=user_id, connection_id=connection.id, query=query_string if 'query_string' in locals() else "",
+                duration_ms=duration_ms, result_preview=None, is_count_query=query_payload.isCountQuery, error_message=error_message,
+                app_source="API", executed_by="system", meta_info={"error": error_message}, modified_by=None, query_payload=query_payload, row_count=None
             )
             
             return QueryExecutionResult(
@@ -485,7 +552,7 @@ class QueryService:
                 db_type=db_type,
                 distinct=payload.distinct,
             )
-    
+
     async def _save_query_history(
         self,
         db: AsyncSession,
@@ -495,42 +562,83 @@ class QueryService:
         duration_ms: int,
         result_preview: Optional[str],
         is_count_query: bool,
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
+        app_source: Optional[str] = None,
+        client_ip: Optional[str] = None,
+        executed_by: Optional[str] = None,
+        meta_info: Optional[dict] = None,
+        modified_by: Optional[str] = None,
+        query_payload: Optional[QueryPayload] = None,
+        row_count: Optional[int] = None,
     ) -> None:
         """
-        Salva a query no histórico de forma assíncrona.
-        Garante rollback seguro em caso de erro.
+        Salva o histórico da query com detalhes adicionais, incluindo:
+        - Tempo de execução e data/hora UTC
+        - Tabelas envolvidas, filtros e parâmetros
+        - Origem da requisição e IP do cliente
+        - Resultado resumido (nº de linhas, colunas)
+        - Tipo de query e status (sucesso/erro)
         """
         try:
-            log_message(f"Salvando histórico da query: {query}", "info")
+            start_ts = datetime.utcnow()
+
+            # Montagem do contexto detalhado
+            meta_context = {
+                "executed_at_utc": start_ts.isoformat(),
+                "execution_time_ms": duration_ms,
+                "status": "error" if error_message else "success",
+                "query_length": len(query or ""),
+                "row_count": row_count,
+                "base_table": getattr(query_payload, "baseTable", None),
+                "tables_involved": getattr(query_payload, "table_list", None),
+                "joins": list(getattr(query_payload, "joins", {}).keys()) if getattr(query_payload, "joins", None) else [],
+                "filters": [f"{w.table_name_fil}.{w.column} {w.operator} {w.value}" for w in getattr(query_payload, "where", [])] if getattr(query_payload, "where", None) else [],
+                "order_by": getattr(query_payload, "orderBy", None),
+                "limit": getattr(query_payload, "limit", None),
+                "offset": getattr(query_payload, "offset", None),
+                "distinct": getattr(query_payload, "distinct", None),
+                "params_used": meta_info.get("params") if meta_info else None,
+                "app_source": app_source or "API",
+                "client_ip": client_ip,
+                "executed_by": executed_by or "system",
+                "modified_by": modified_by,
+            }
+
+            # Criação do registro de histórico
             history_data = QueryHistoryCreateAsync(
-                        user_id=user_id,
-                        db_connection_id=connection_id,
-                        updated_at=datetime.utcnow(),
-                        executed_at=datetime.utcnow(),
-                        query=query,
-                        query_type=QueryType.SELECT,
-                        duration_ms=duration_ms,
-                        result_preview=result_preview,
-                        error_message=error_message,
-                        is_favorite=False,
-                        tags="count" if is_count_query else "select_preview",
-                    )
+                user_id=user_id,
+                db_connection_id=connection_id,
+                query=query.strip(),
+                query_type=QueryType.COUNT if is_count_query else QueryType.SELECT,
+                duration_ms=duration_ms,
+                result_preview=result_preview if result_preview and len(result_preview) < 15000 else None,  # evita salvar preview muito grande
+                error_message=error_message,
+                is_favorite=False,
+                tags="count" if is_count_query else "select_preview",
+                app_source=app_source or "API",
+                client_ip=client_ip,
+                executed_by=executed_by or "system",
+                meta_info=meta_context,
+                modified_by=modified_by,
+            )
 
             created_query = await create_query_history_async(db=db, data=history_data)
+
             log_message(
-                f"Histórico salvo com sucesso: UserID={user_id}, ConnID={connection_id}, QueryID={created_query.id}",
-                level="success"
+                f"✅ Histórico detalhado salvo: "
+                f"User={user_id}, Conn={connection_id}, Duração={duration_ms}ms, "
+                f"Tabelas={meta_context.get('tables_involved')}, Linhas={row_count}, Status={meta_context['status']}",
+                "success",
             )
 
         except SQLAlchemyError as e:
             await db.rollback()
-            log_message(f"Erro de banco ao salvar histórico: {str(e)}\n{traceback.format_exc()}", level="error")
-            raise
+            log_message(f"💥 Erro SQLAlchemy ao salvar histórico: {e}\n{traceback.format_exc()}", "error")
         except Exception as e:
             await db.rollback()
-            log_message(f"Erro inesperado ao salvar histórico: {str(e)}\n{traceback.format_exc()}", level="error")
-            raise
+            log_message(f"❌ Erro inesperado ao salvar histórico detalhado: {e}\n{traceback.format_exc()}", "error")
+
+
 
 # Instância global do serviço
 query_service = QueryService()

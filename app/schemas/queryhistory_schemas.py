@@ -15,21 +15,27 @@ class QueryType(str, Enum):
     ALTER = "ALTER"
     DROP = "DROP"
     OTHER = "OTHER"
+    COUNT = "COUNT"
 
 
-# --------- BASES ---------
+# --------- BASE ---------
 
 class QueryHistoryBase(BaseModel):
     """Base schema para histórico de consulta"""
-    user_id: int = Field(..., description="ID do usuário")
-    db_connection_id: int = Field(..., description="ID da conexão de banco")
+    user_id: Optional[int] = Field(None, description="ID do usuário (pode ser nulo se excluído)")
+    db_connection_id: Optional[int] = Field(None, description="ID da conexão de banco (pode ser nulo)")
     query: str = Field(..., min_length=1, description="Query SQL executada")
-    query_type: Optional[QueryType] = Field(None, description="Tipo da query")
-    duration_ms: Optional[int] = Field(None, ge=0, description="Duração em ms")
-    result_preview: Optional[str] = Field(None, description="Preview dos resultados")
+    query_type: Optional[QueryType] = Field(None, description="Tipo da query SQL")
+    duration_ms: Optional[int] = Field(None, ge=0, description="Duração da execução em milissegundos")
+    result_preview: Optional[str] = Field(None, description="Prévia dos resultados")
     error_message: Optional[str] = Field(None, description="Mensagem de erro")
-    is_favorite: bool = Field(False, description="Se é favorita")
+    is_favorite: bool = Field(False, description="Indica se foi marcada como favorita")
     tags: Optional[str] = Field(None, description="Tags para categorização")
+    app_source: Optional[str] = Field(None, description="Origem da execução (ex: API, Console, UI)")
+    client_ip: Optional[str] = Field(None, description="Endereço IP do cliente")
+    executed_by: Optional[str] = Field(None, description="Nome do executor (usuário ou sistema)")
+    meta_info: Optional[dict] = Field(default_factory=dict, description="Metadados adicionais")
+    modified_by: Optional[str] = Field(None, description="Usuário que modificou o registro")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -54,23 +60,20 @@ class DatabaseMetadata(BaseModel):
     tableNames: List[TableInfo]
 
 
-
-
-
 # --------- ASYNC MODELS ---------
 
 class QueryHistoryCreateAsync(QueryHistoryBase):
-    executed_at: datetime = Field(default_factory=lambda: datetime.now())
-    updated_at: datetime = Field(default_factory=lambda: datetime.now())
+    executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator('executed_at', 'updated_at', mode='before')
-    def ensure_naive_datetime(cls, v):
+    def ensure_utc_datetime(cls, v):
+        """Garante que as datas sejam timezone-aware (UTC)"""
         if v is None:
-            return datetime.now()
+            return datetime.now(timezone.utc)
         if isinstance(v, datetime):
-            # Remove tzinfo, deixando naive
-            return v.replace(tzinfo=None)
-        return v
+            return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc)
 
 
 class QueryHistoryUpdateAsync(BaseModel):
@@ -79,15 +82,16 @@ class QueryHistoryUpdateAsync(BaseModel):
     error_message: Optional[str] = None
     result_preview: Optional[str] = None
     duration_ms: Optional[int] = Field(None, ge=0)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now().replace(tzinfo=None))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    modified_by: Optional[str] = None
 
     @field_validator('updated_at', mode='before')
-    def ensure_naive_datetime(cls, v):
+    def ensure_utc_datetime(cls, v):
         if v is None:
-            return datetime.now().replace(tzinfo=None)
-        if isinstance(v, datetime) and v.tzinfo is not None:
-            return v.astimezone(timezone.utc).replace(tzinfo=None)
-        return v
+            return datetime.now(timezone.utc)
+        if isinstance(v, datetime):
+            return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc)
 
     model_config = ConfigDict(
         json_encoders={datetime: lambda v: v.isoformat() if v else None}
@@ -106,38 +110,32 @@ class QueryHistoryResponseAsync(QueryHistoryBase):
     )
 
 
-# --------- Criação e Atualização ---------
+# --------- CRUD Sync ---------
 
 class QueryHistoryCreate(QueryHistoryBase):
-    user_id: int = Field(..., title="ID do Usuário")
-    db_connection_id: int = Field(..., title="ID da Conexão")
+    """Criação síncrona"""
+    executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class QueryHistoryUpdate(QueryHistoryBase):
-    # Permite update parcial
-    query: Optional[str] = Field(None, title="Query SQL")
-    query_type: Optional[str] = Field(None)
-    duration_ms: Optional[int] = Field(None)
-    result_preview: Optional[str] = Field(None)
-    error_message: Optional[str] = Field(None)
-    is_favorite: Optional[bool] = Field(None)
-    tags: Optional[str] = Field(None)
-
-
-# --------- Resposta ---------
-
-class QueryHistoryOut(BaseModel):
-    id: int
-    user_id: int
-    db_connection_id: int
-    query: str
-    query_type: Optional[str] = None
-    executed_at: datetime
-    duration_ms: Optional[int] = None
+class QueryHistoryUpdate(BaseModel):
+    """Atualização síncrona parcial"""
+    query: Optional[str] = None
+    query_type: Optional[QueryType] = None
+    duration_ms: Optional[int] = Field(None, ge=0)
     result_preview: Optional[str] = None
     error_message: Optional[str] = None
-    is_favorite: bool
+    is_favorite: Optional[bool] = None
     tags: Optional[str] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    modified_by: Optional[str] = None
+
+
+# --------- OUTPUT ---------
+
+class QueryHistoryOut(QueryHistoryBase):
+    id: int
+    executed_at: datetime
     updated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)  # Para suportar ORM
+    model_config = ConfigDict(from_attributes=True)

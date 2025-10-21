@@ -1,8 +1,8 @@
 from fastapi import Cookie, Header, HTTPException, status
 from typing import Optional
 from app.auth import decode_token
-from fastapi import Depends, HTTPException, status, Cookie, Header
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import  HTTPException, status, Cookie, Header
+from fastapi.security import HTTPBasic
 from typing import Optional
 
 security = HTTPBasic()
@@ -35,7 +35,7 @@ def get_current_user_id(
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authorization Bearer inválido"
+                detail="Authorization Bearer inválido principal"
             )
 
     # 3️⃣ Se não veio token -> tenta Basic Auth
@@ -53,7 +53,7 @@ def get_current_user_id(
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido ou expirado"
+            detail="Token inválido ou expirado principal"
         )
 
     return int(payload)

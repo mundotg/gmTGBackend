@@ -114,12 +114,12 @@ async def delete_query_history_async(
         await db.delete(query_history)
         await db.commit()
         
-        logger.info(f"Histórico {query_id} deletado com sucesso")
+        # logger.info(f"Histórico {query_id} deletado com sucesso")
         return True
         
     except Exception as e:
         await db.rollback()
-        logger.error(f"Erro ao deletar histórico {query_id}: {str(e)}")
+        # logger.error(f"Erro ao deletar histórico {query_id}: {str(e)}")
         raise
 
 def create_query_history(db: Session, data: QueryHistoryCreate) -> QueryHistory:

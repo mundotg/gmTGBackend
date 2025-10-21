@@ -90,8 +90,6 @@ class ConnectionPassUserOut(BaseModel):
     trustServerCertificate: Optional[str] = None
 
         
-from typing import Optional, Annotated
-from pydantic import BaseModel, StringConstraints
 
 class DBConnectionBase(BaseModel):
     name: Annotated[str, StringConstraints(min_length=2, max_length=100)]
@@ -120,9 +118,12 @@ class DBConnectionBase(BaseModel):
                 "database_name": "app_db",
                 "sslmode": "require",  # exemplo para PostgreSQL
                 "status": "available"
+                ""
             }
         }
-
+class ConnectionRequest(BaseModel):
+    conn_data: DBConnectionBase
+    tipo:str = "con" 
         
 class ConnectionLogOut(BaseModel):
     id: int

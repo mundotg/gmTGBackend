@@ -132,9 +132,6 @@ def _is_system_field_from_column(
         return False
 
 
-
-    
-
 def obter_schema_do_engine(engine: Engine, db_type : str) -> str:
  
     if db_type == "postgresql":

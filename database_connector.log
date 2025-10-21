@@ -1,6 +1,1463 @@
-2025-10-08 23:39:51,369 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
-2025-10-08 23:39:51,373 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
-2025-10-08 23:39:51,730 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2025-10-08 23:39:51,736 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
-2025-10-08 23:39:51,753 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
-2025-10-08 23:39:51,820 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 17:24:24,685 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-20 17:24:24,686 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-20 17:24:24,732 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-20 17:24:24,751 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 17:24:24,770 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-20 17:24:24,838 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 17:44:30,606 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-20 17:44:30,613 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-20 17:44:31,117 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 17:44:32,244 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 17:44:32,270 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 18:01:11,532 - INFO - \U0001f9f9 Cache expirado removido: 52a4fe3b36b2a57feda69657e25a69e76fff39c3a772bb7c6142bbc0b8be9fa8.pkl.gz
+2025-10-20 18:01:11,569 - INFO - \U0001f9f9 Cache expirado removido: 64fd2a2a480f22ab92124700815f9c84b508274240c58b11642b3d94d6b78cb0.pkl.gz
+2025-10-20 18:01:11,577 - INFO - \U0001f9f9 Cache expirado removido: 82b2d21cc1c067c96033bda68d0b252ec9eb15ab46677f274e27f7b213f16549.pkl.gz
+2025-10-20 18:01:11,580 - INFO - \U0001f9f9 Cache expirado removido: 8aca33fd157de12a9880888e56b06815fa19f1efacfd83b89ed200dbb1b9c712.pkl.gz
+2025-10-20 18:01:11,584 - INFO - \U0001f9f9 Cache expirado removido: 92ae823b381a1660dabb19bbec65eb31bec0829d8b786ed35d6076f44c3044df.pkl.gz
+2025-10-20 18:01:11,587 - INFO - \U0001f9f9 Cache expirado removido: 9b559c84a9370f4b399f4a48489834dcd5d50f7ec621ac34d460d226c215b83e.pkl.gz
+2025-10-20 18:01:11,590 - INFO - \U0001f9f9 Cache expirado removido: 9d312d7849ca153918a4012b775431654e25e3ba363bc7abf58ab9cad71d8356.pkl.gz
+2025-10-20 18:01:11,707 - INFO - \U0001f9f9 Cache expirado removido: ce7e3d1aa761327416156c45994fe1ceb1be92524f9652bdf1a7520e93962d90.pkl.gz
+2025-10-20 18:01:11,749 - INFO - \U0001f9f9 Cache expirado removido: ced99a827fca032f4dddd6298b68e48f5d11ba969e362868dab62c9c54ed6c78.pkl.gz
+2025-10-20 18:01:11,775 - INFO - \U0001f9f9 Cache expirado removido: dc9980a0b6af977f3d8a0a2a4bd4de11bea7751bd77f7ff4d41e1f444eb020e2.pkl.gz
+2025-10-20 18:01:12,389 - INFO - \U0001f9f9 Cache expirado removido: e350db055654d75dd32fe687b15fc9758eef741addbb15d07ed9031ac6d1eb51.pkl.gz
+2025-10-20 18:01:12,393 - INFO - \U0001f9f9 Cache expirado removido: edfa7a3ffd5c0951c2882ff6584b7115c1dd6c13d4c0dd3b811888d322d51c49.pkl.gz
+2025-10-20 18:01:12,395 - INFO - \U0001f9f9 Cache expirado removido: f80f3a3ba59b14b4b0ea07864afd302b46bece01c4d45a17217fcce452d21baa.pkl.gz
+2025-10-20 18:01:12,397 - INFO - \U0001f9f9 Cache expirado removido: fbdcf097b1400c239492b718fc57dad225d4f4700e25ff1de67bc4cfb666f2a3.pkl.gz
+2025-10-20 18:01:12,397 - INFO - \U0001f9fe Total de 14/16 caches expirados removidos.
+2025-10-20 18:36:25,606 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-20 18:36:25,908 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-20 18:36:25,925 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-20 18:36:25,934 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-20 18:36:25,947 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-20 18:36:25,952 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-20 18:36:25,956 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-20 18:36:25,972 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-20 18:36:25,972 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-20 18:36:25,973 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-20 18:36:25,976 - INFO - \U0001f9f9 Cache expirado removido: 7686e60c75bd168b24dc6a09caa41ebd9936e04af230a6c65f458efcf9c5d403.pkl.gz
+2025-10-20 18:36:25,978 - INFO - \U0001f9f9 Cache expirado removido: bf88e4ea4030c2df1e2309e78bc553bdc9e6f6a7801205e05705171c9a8fca68.pkl.gz
+2025-10-20 18:36:25,978 - INFO - \U0001f9fe Total de 2/2 caches expirados removidos.
+2025-10-20 18:36:41,538 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2025-10-20 18:36:41,538 - INFO - Reativando conexão para usuário 1
+2025-10-20 18:36:41,646 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2025-10-20 18:36:41,646 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2025-10-20 18:36:46,478 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 18:46:49,278 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-20 20:07:19,343 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-20 20:07:26,587 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-20 20:07:26,588 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-20 20:07:26,752 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 20:07:31,304 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 20:07:52,948 - ERROR - \u274c Erro no stream: (psycopg2.OperationalError) connection to server at "orionforgenexusbd.postgres.database.azure.com" (40.87.95.27), port 5432 failed: Connection timed out (0x0000274C/10060)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-10-20 20:39:06,514 - INFO - \U0001f9f9 Cache expirado removido: 07368fac69a989df14cdc0519ea36bd3047a2e29c9072d75cdaf51ec1c14d970.pkl.gz
+2025-10-20 20:39:06,524 - INFO - \U0001f9f9 Cache expirado removido: 15a184ac80074fdc7aaa007b7ea46ed0f44538cfbc3012dc2a652f5e71bd292a.pkl.gz
+2025-10-20 20:39:06,525 - INFO - \U0001f9f9 Cache expirado removido: 6c5e7a4be2c4d46d20ef826cef2b35b406531c1a454da1bedabb7be16e10fb6b.pkl.gz
+2025-10-20 20:39:06,526 - INFO - \U0001f9f9 Cache expirado removido: 83a8682023623057905d5f3a523d831c44617dae1ea70c71fb879e66aa495d9c.pkl.gz
+2025-10-20 20:39:06,527 - INFO - \U0001f9f9 Cache expirado removido: c5c7ff43e9d563582db0939a5c0fbbbc2fec70c9c8a9cbb2220e436ea0a7a5b1.pkl.gz
+2025-10-20 20:39:06,528 - INFO - \U0001f9f9 Cache expirado removido: edae2327864b63c7f09de8e524f7953a4047ccf734f803ac86360b2433405483.pkl.gz
+2025-10-20 20:39:06,528 - INFO - \U0001f9f9 Cache expirado removido: ee99779ef8e21001f8065ecccbc8b04431d9d745ce32e08f43b39b1eb71ac122.pkl.gz
+2025-10-20 20:39:06,567 - INFO - \U0001f9f9 Cache expirado removido: f0d403b19a760bddccd6a3755db2c4f281dc8959b5262023a40ead9fffadc196.pkl.gz
+2025-10-20 20:39:06,567 - INFO - \U0001f9fe Total de 8/8 caches expirados removidos.
+2025-10-20 20:41:15,404 - ERROR - \u274c Erro no stream: (psycopg2.OperationalError) connection to server at "orionforgenexusbd.postgres.database.azure.com" (40.87.95.27), port 5432 failed: Connection timed out (0x0000274C/10060)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-10-20 20:41:29,742 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-20 20:41:51,217 - ERROR - \u274c Erro no stream: (psycopg2.OperationalError) connection to server at "orionforgenexusbd.postgres.database.azure.com" (40.87.95.27), port 5432 failed: Connection timed out (0x0000274C/10060)
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-10-20 20:42:05,493 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-20 21:39:06,600 - INFO - \U0001f9f9 Cache expirado removido: 11866f13f2dd9c3fd9d3c2fb06e83871664241fb98c54561054cd344c592ef8f.pkl.gz
+2025-10-20 21:39:06,610 - INFO - \U0001f9f9 Cache expirado removido: 9d141cdcbbbacbdf68759cec6ceef39b0a52493a8f8106823515019d3ca6920f.pkl.gz
+2025-10-20 21:39:06,612 - INFO - \U0001f9f9 Cache expirado removido: eb0456cb1b4c0fb269d06d388040285129465ca00a991ac8a9010286126f247d.pkl.gz
+2025-10-20 21:39:06,613 - INFO - \U0001f9f9 Cache expirado removido: f3077f8df1a3406934fe4cc7382194452968948a190d05bdbdc9f5d6706466e0.pkl.gz
+2025-10-20 21:39:06,613 - INFO - \U0001f9fe Total de 4/4 caches expirados removidos.
+2025-10-21 08:51:57,568 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-21 08:51:57,800 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-21 08:51:57,815 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-21 08:51:57,821 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-21 08:51:57,836 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-21 08:51:57,841 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-21 08:51:57,845 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-21 08:51:57,861 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-21 08:51:57,861 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-21 08:51:57,862 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-21 09:00:58,118 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2025-10-21 09:04:56,354 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-21 09:05:03,649 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-21 09:05:03,650 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-21 09:05:03,799 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 09:05:13,436 - INFO - \U0001f50d Buscando conexão com ID 2
+2025-10-21 09:05:27,827 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-10-21 09:05:28,604 - INFO - \u2705 Nova conexão 'siga Namibe qualidade' criada para o usuário 1
+2025-10-21 09:05:28,640 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-10-21 09:05:28,650 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 6
+2025-10-21 09:05:28,656 - INFO - \u2705 Conexão ativa definida: user=1, conn=6
+2025-10-21 09:05:28,672 - INFO - \U0001f4d1 Log criado \u2192 conexão=6, ação='Conexão testada e salva', status='success', usuário=1
+2025-10-21 09:05:28,709 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-21 09:05:28,774 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 09:05:44,824 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-10-21 09:05:44,899 - ERROR - \u274c Erro SQLAlchemy ao conectar ao banco
+2025-10-21 09:05:44,900 - ERROR - (pyodbc.InterfaceError) ('28000', '[28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user \'sa\'. (18456) (SQLDriverConnect); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot open database "siga_intellectusLubango" requested by the login. The login failed. (4060); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user \'sa\'. (18456); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot open database "siga_intellectusLubango" requested by the login. The login failed. (4060)')
+(Background on this error at: https://sqlalche.me/e/20/rvf5)
+2025-10-21 09:05:44,905 - ERROR - \u274c Erro ao conectar ou salvar: Engine não foi criado corretamente.
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\connection_routes.py", line 118, in test_and_connect
+    raise ValueError("Engine não foi criado corretamente.")
+ValueError: Engine não foi criado corretamente.
+
+2025-10-21 09:05:44,911 - INFO - \U0001f4d1 Log criado \u2192 conexão=N/A, ação='Tentativa de conexão falhou', status='error', usuário=1
+2025-10-21 09:05:51,664 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-10-21 09:05:52,290 - INFO - \u2705 Nova conexão 'siga Lubango qualidade' criada para o usuário 1
+2025-10-21 09:05:52,297 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-10-21 09:05:52,301 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 7
+2025-10-21 09:05:52,305 - INFO - \u2705 Conexão ativa definida: user=1, conn=7
+2025-10-21 09:05:52,309 - INFO - \U0001f4d1 Log criado \u2192 conexão=7, ação='Conexão testada e salva', status='success', usuário=1
+2025-10-21 09:06:13,562 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-10-21 09:06:13,601 - INFO - \U0001f504 Conexão 'siga Lubango qualidade' atualizada para o usuário 1
+2025-10-21 09:06:13,631 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-10-21 09:06:13,636 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 7
+2025-10-21 09:06:13,639 - INFO - \u2705 Conexão ativa definida: user=1, conn=7
+2025-10-21 09:06:13,644 - INFO - \U0001f4d1 Log criado \u2192 conexão=7, ação='Conexão testada e salva', status='success', usuário=1
+2025-10-21 09:06:29,030 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-10-21 09:06:29,077 - INFO - \u2705 Nova conexão 'siga Lubango qu' criada para o usuário 1
+2025-10-21 09:06:29,083 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-10-21 09:06:29,099 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 8
+2025-10-21 09:06:29,114 - INFO - \u2705 Conexão ativa definida: user=1, conn=8
+2025-10-21 09:06:29,120 - INFO - \U0001f4d1 Log criado \u2192 conexão=8, ação='Conexão testada e salva', status='success', usuário=1
+2025-10-21 09:06:35,192 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-10-21 09:06:35,215 - ERROR - \u274c Erro SQLAlchemy ao conectar ao banco
+2025-10-21 09:06:35,215 - ERROR - (pyodbc.InterfaceError) ('28000', '[28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user \'sa\'. (18456) (SQLDriverConnect); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot open database "siga_intellectus__ubango" requested by the login. The login failed. (4060); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user \'sa\'. (18456); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot open database "siga_intellectus__ubango" requested by the login. The login failed. (4060)')
+(Background on this error at: https://sqlalche.me/e/20/rvf5)
+2025-10-21 09:06:35,216 - ERROR - \u274c Erro ao conectar ou salvar: Engine não foi criado corretamente.
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\connection_routes.py", line 118, in test_and_connect
+    raise ValueError("Engine não foi criado corretamente.")
+ValueError: Engine não foi criado corretamente.
+
+2025-10-21 09:06:35,222 - INFO - \U0001f4d1 Log criado \u2192 conexão=N/A, ação='Tentativa de conexão falhou', status='error', usuário=1
+2025-10-21 09:06:38,883 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-10-21 09:06:38,945 - ERROR - \u274c Erro SQLAlchemy ao conectar ao banco
+2025-10-21 09:06:38,946 - ERROR - (pyodbc.InterfaceError) ('28000', '[28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user \'sa\'. (18456) (SQLDriverConnect); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot open database "siga_intellectus__ubango" requested by the login. The login failed. (4060); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user \'sa\'. (18456); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot open database "siga_intellectus__ubango" requested by the login. The login failed. (4060)')
+(Background on this error at: https://sqlalche.me/e/20/rvf5)
+2025-10-21 09:06:38,947 - ERROR - \u274c Erro ao conectar ou salvar: Engine não foi criado corretamente.
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\connection_routes.py", line 118, in test_and_connect
+    raise ValueError("Engine não foi criado corretamente.")
+ValueError: Engine não foi criado corretamente.
+
+2025-10-21 09:06:38,951 - INFO - \U0001f4d1 Log criado \u2192 conexão=N/A, ação='Tentativa de conexão falhou', status='error', usuário=1
+2025-10-21 09:06:48,129 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-10-21 09:06:48,300 - ERROR - \u274c Erro SQLAlchemy ao conectar ao banco
+2025-10-21 09:06:48,300 - ERROR - (pyodbc.InterfaceError) ('28000', '[28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user \'sa\'. (18456) (SQLDriverConnect); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot open database "siga_intellectus__ubango" requested by the login. The login failed. (4060); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Login failed for user \'sa\'. (18456); [28000] [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Cannot open database "siga_intellectus__ubango" requested by the login. The login failed. (4060)')
+(Background on this error at: https://sqlalche.me/e/20/rvf5)
+2025-10-21 09:06:48,301 - ERROR - \u274c Erro ao conectar ou salvar: Engine não foi criado corretamente.
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\connection_routes.py", line 118, in test_and_connect
+    raise ValueError("Engine não foi criado corretamente.")
+ValueError: Engine não foi criado corretamente.
+
+2025-10-21 09:06:48,305 - INFO - \U0001f4d1 Log criado \u2192 conexão=N/A, ação='Tentativa de conexão falhou', status='error', usuário=1
+2025-10-21 09:06:54,611 - INFO - \U0001f501 Engine antigo do usuário 1 descartado.
+2025-10-21 09:06:54,659 - INFO - \U0001f504 Conexão 'siga Lubango qu' atualizada para o usuário 1
+2025-10-21 09:06:54,671 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-10-21 09:06:54,684 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 8
+2025-10-21 09:06:54,686 - INFO - \u2705 Conexão ativa definida: user=1, conn=8
+2025-10-21 09:06:54,690 - INFO - \U0001f4d1 Log criado \u2192 conexão=8, ação='Conexão testada e salva', status='success', usuário=1
+2025-10-21 09:07:02,251 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-21 09:07:02,261 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-21 09:07:02,268 - WARNING - \u26a0\ufe0f Nenhuma estatística encontrada para a conexão ID=8.
+2025-10-21 09:07:02,366 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 09:07:16,672 - INFO - \U0001f4e1 Verificando conexão ativa do conexão 6
+2025-10-21 09:07:16,678 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-10-21 09:07:16,678 - INFO - \U0001f50d Buscando conexão com ID 6
+2025-10-21 09:07:16,727 - INFO - \U0001f504 Status da conexão 'siga Namibe qualidade' atualizado para o usuário 1
+2025-10-21 09:07:16,734 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 6
+2025-10-21 09:07:16,738 - INFO - \u2705 Conexão ativa definida: user=1, conn=6
+2025-10-21 09:07:16,744 - INFO - \U0001f4d1 Log criado \u2192 conexão=6, ação='Conexão ativada', status='success', usuário=1
+2025-10-21 09:07:16,770 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-21 09:07:16,831 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 09:07:18,487 - INFO - \U0001f4ca Estatísticas coletadas: {'server_version': 'Microsoft SQL Server 2022 (RTM) - 16.0.1000.6 (X64) \n\tOct  8 2022 05:58:25 \n\tCopyright (C) 2022 Microsoft Corporation\n\tStandard Edition (64-bit) on Windows Server 2019 Datacenter Evaluation 10.0 <X64> (Build 17763: ) (Hypervisor)\n', 'table_count': 232, 'view_count': 134, 'procedure_count': 56, 'function_count': 22, 'trigger_count': 1, 'index_count': 386, 'tables_connected': 232, 'queries_today': 0, 'records_analyzed': 0, 'connection_name': '', 'db_connection_id': 0}
+2025-10-21 09:07:18,490 - INFO - \U0001f195 Criando novas estatísticas para a conexão 6.
+2025-10-21 09:07:18,501 - INFO - \u2705 Estatísticas criadas para conexão ID=6
+2025-10-21 09:07:18,506 - INFO - \u2705 Estatísticas '<app.models.dbstatistics_models.DBStatistics object at 0x000002D93F4FF950>' registradas para conexão ID=6.
+2025-10-21 09:07:18,544 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 09:07:18,938 - INFO - \u2705 Estrutura 'processamento_mensal_controle' criada (Conexão ID: 6)
+2025-10-21 09:07:18,938 - INFO - \U0001f195 Estrutura registrada: processamento_mensal_controle
+2025-10-21 09:07:18,947 - INFO - \u2705 Estrutura 't_aluno' criada (Conexão ID: 6)
+2025-10-21 09:07:18,948 - INFO - \U0001f195 Estrutura registrada: t_aluno
+2025-10-21 09:07:18,953 - INFO - \u2705 Estrutura 't_aluno_anexo' criada (Conexão ID: 6)
+2025-10-21 09:07:18,953 - INFO - \U0001f195 Estrutura registrada: t_aluno_anexo
+2025-10-21 09:07:18,959 - INFO - \u2705 Estrutura 't_aluno_audit' criada (Conexão ID: 6)
+2025-10-21 09:07:18,959 - INFO - \U0001f195 Estrutura registrada: t_aluno_audit
+2025-10-21 09:07:18,964 - INFO - \u2705 Estrutura 't_aluno_foto_teste' criada (Conexão ID: 6)
+2025-10-21 09:07:18,964 - INFO - \U0001f195 Estrutura registrada: t_aluno_foto_teste
+2025-10-21 09:07:18,969 - INFO - \u2705 Estrutura 't_ano_lectivo' criada (Conexão ID: 6)
+2025-10-21 09:07:18,969 - INFO - \U0001f195 Estrutura registrada: t_ano_lectivo
+2025-10-21 09:07:18,975 - INFO - \u2705 Estrutura 'T_APROVEITAMENTO_DROP' criada (Conexão ID: 6)
+2025-10-21 09:07:18,976 - INFO - \U0001f195 Estrutura registrada: T_APROVEITAMENTO_DROP
+2025-10-21 09:07:18,982 - INFO - \u2705 Estrutura 'T_APROVEITAMENTO_DROP_2' criada (Conexão ID: 6)
+2025-10-21 09:07:18,983 - INFO - \U0001f195 Estrutura registrada: T_APROVEITAMENTO_DROP_2
+2025-10-21 09:07:18,988 - INFO - \u2705 Estrutura 't_auditoria' criada (Conexão ID: 6)
+2025-10-21 09:07:18,988 - INFO - \U0001f195 Estrutura registrada: t_auditoria
+2025-10-21 09:07:19,007 - INFO - \u2705 Estrutura 't_autorizacao_lancamento_especial' criada (Conexão ID: 6)
+2025-10-21 09:07:19,008 - INFO - \U0001f195 Estrutura registrada: t_autorizacao_lancamento_especial
+2025-10-21 09:07:19,020 - INFO - \u2705 Estrutura 't_autorizacao_lancamento_nota' criada (Conexão ID: 6)
+2025-10-21 09:07:19,020 - INFO - \U0001f195 Estrutura registrada: t_autorizacao_lancamento_nota
+2025-10-21 09:07:19,028 - INFO - \u2705 Estrutura 't_autorizacao_registro_inscricao' criada (Conexão ID: 6)
+2025-10-21 09:07:19,028 - INFO - \U0001f195 Estrutura registrada: t_autorizacao_registro_inscricao
+2025-10-21 09:07:19,037 - INFO - \u2705 Estrutura 't_banco' criada (Conexão ID: 6)
+2025-10-21 09:07:19,038 - INFO - \U0001f195 Estrutura registrada: t_banco
+2025-10-21 09:07:19,044 - INFO - \u2705 Estrutura 't_billing_address' criada (Conexão ID: 6)
+2025-10-21 09:07:19,044 - INFO - \U0001f195 Estrutura registrada: t_billing_address
+2025-10-21 09:07:19,049 - INFO - \u2705 Estrutura 't_biometrico' criada (Conexão ID: 6)
+2025-10-21 09:07:19,049 - INFO - \U0001f195 Estrutura registrada: t_biometrico
+2025-10-21 09:07:19,056 - INFO - \u2705 Estrutura 't_bordero' criada (Conexão ID: 6)
+2025-10-21 09:07:19,056 - INFO - \U0001f195 Estrutura registrada: t_bordero
+2025-10-21 09:07:19,064 - INFO - \u2705 Estrutura 't_bordero_empresa' criada (Conexão ID: 6)
+2025-10-21 09:07:19,064 - INFO - \U0001f195 Estrutura registrada: t_bordero_empresa
+2025-10-21 09:07:19,070 - INFO - \u2705 Estrutura 't_calendario_academico' criada (Conexão ID: 6)
+2025-10-21 09:07:19,070 - INFO - \U0001f195 Estrutura registrada: t_calendario_academico
+2025-10-21 09:07:19,094 - INFO - \u2705 Estrutura 't_calendario_processamento' criada (Conexão ID: 6)
+2025-10-21 09:07:19,094 - INFO - \U0001f195 Estrutura registrada: t_calendario_processamento
+2025-10-21 09:07:19,099 - INFO - \u2705 Estrutura 't_campanha' criada (Conexão ID: 6)
+2025-10-21 09:07:19,099 - INFO - \U0001f195 Estrutura registrada: t_campanha
+2025-10-21 09:07:19,104 - INFO - \u2705 Estrutura 't_campanha_personalizada' criada (Conexão ID: 6)
+2025-10-21 09:07:19,104 - INFO - \U0001f195 Estrutura registrada: t_campanha_personalizada
+2025-10-21 09:07:19,111 - INFO - \u2705 Estrutura 't_candidato' criada (Conexão ID: 6)
+2025-10-21 09:07:19,111 - INFO - \U0001f195 Estrutura registrada: t_candidato
+2025-10-21 09:07:19,117 - INFO - \u2705 Estrutura 't_candidato_audit' criada (Conexão ID: 6)
+2025-10-21 09:07:19,117 - INFO - \U0001f195 Estrutura registrada: t_candidato_audit
+2025-10-21 09:07:19,126 - INFO - \u2705 Estrutura 'T_CANDIDATO_ONLINE' criada (Conexão ID: 6)
+2025-10-21 09:07:19,126 - INFO - \U0001f195 Estrutura registrada: T_CANDIDATO_ONLINE
+2025-10-21 09:07:19,131 - INFO - \u2705 Estrutura 't_cargo' criada (Conexão ID: 6)
+2025-10-21 09:07:19,131 - INFO - \U0001f195 Estrutura registrada: t_cargo
+2025-10-21 09:07:19,135 - INFO - \u2705 Estrutura 't_cartao_matriz_bloqueio' criada (Conexão ID: 6)
+2025-10-21 09:07:19,135 - INFO - \U0001f195 Estrutura registrada: t_cartao_matriz_bloqueio
+2025-10-21 09:07:19,141 - INFO - \u2705 Estrutura 'T_CERTIFICADO_INTERMEDIO' criada (Conexão ID: 6)
+2025-10-21 09:07:19,141 - INFO - \U0001f195 Estrutura registrada: T_CERTIFICADO_INTERMEDIO
+2025-10-21 09:07:19,147 - INFO - \u2705 Estrutura 't_company_address' criada (Conexão ID: 6)
+2025-10-21 09:07:19,147 - INFO - \U0001f195 Estrutura registrada: t_company_address
+2025-10-21 09:07:19,152 - INFO - \u2705 Estrutura 't_compensassao_efetiva' criada (Conexão ID: 6)
+2025-10-21 09:07:19,152 - INFO - \U0001f195 Estrutura registrada: t_compensassao_efetiva
+2025-10-21 09:07:19,158 - INFO - \u2705 Estrutura 't_compensassao_provisoria' criada (Conexão ID: 6)
+2025-10-21 09:07:19,158 - INFO - \U0001f195 Estrutura registrada: t_compensassao_provisoria
+2025-10-21 09:07:19,163 - INFO - \u2705 Estrutura 't_comuna' criada (Conexão ID: 6)
+2025-10-21 09:07:19,163 - INFO - \U0001f195 Estrutura registrada: t_comuna
+2025-10-21 09:07:19,168 - INFO - \u2705 Estrutura 't_configuracao' criada (Conexão ID: 6)
+2025-10-21 09:07:19,168 - INFO - \U0001f195 Estrutura registrada: t_configuracao
+2025-10-21 09:07:19,172 - INFO - \u2705 Estrutura 't_configuracao_documentos_financeiros' criada (Conexão ID: 6)
+2025-10-21 09:07:19,173 - INFO - \U0001f195 Estrutura registrada: t_configuracao_documentos_financeiros
+2025-10-21 09:07:19,178 - INFO - \u2705 Estrutura 't_conta_candidato' criada (Conexão ID: 6)
+2025-10-21 09:07:19,178 - INFO - \U0001f195 Estrutura registrada: t_conta_candidato
+2025-10-21 09:07:19,183 - INFO - \u2705 Estrutura 't_conta_corrente' criada (Conexão ID: 6)
+2025-10-21 09:07:19,183 - INFO - \U0001f195 Estrutura registrada: t_conta_corrente
+2025-10-21 09:07:19,188 - INFO - \u2705 Estrutura 't_conta_corrente_empresa' criada (Conexão ID: 6)
+2025-10-21 09:07:19,188 - INFO - \U0001f195 Estrutura registrada: t_conta_corrente_empresa
+2025-10-21 09:07:19,194 - INFO - \u2705 Estrutura 't_contador' criada (Conexão ID: 6)
+2025-10-21 09:07:19,194 - INFO - \U0001f195 Estrutura registrada: t_contador
+2025-10-21 09:07:19,199 - INFO - \u2705 Estrutura 't_controlador_mapa_matriz' criada (Conexão ID: 6)
+2025-10-21 09:07:19,199 - INFO - \U0001f195 Estrutura registrada: t_controlador_mapa_matriz
+2025-10-21 09:07:19,203 - INFO - \u2705 Estrutura 't_controlle_job' criada (Conexão ID: 6)
+2025-10-21 09:07:19,203 - INFO - \U0001f195 Estrutura registrada: t_controlle_job
+2025-10-21 09:07:19,208 - INFO - \u2705 Estrutura 't_controlo_prova_extraordianaria' criada (Conexão ID: 6)
+2025-10-21 09:07:19,208 - INFO - \U0001f195 Estrutura registrada: t_controlo_prova_extraordianaria
+2025-10-21 09:07:19,212 - INFO - \u2705 Estrutura 't_credito_de_aluno' criada (Conexão ID: 6)
+2025-10-21 09:07:19,213 - INFO - \U0001f195 Estrutura registrada: t_credito_de_aluno
+2025-10-21 09:07:19,217 - INFO - \u2705 Estrutura 't_curso' criada (Conexão ID: 6)
+2025-10-21 09:07:19,217 - INFO - \U0001f195 Estrutura registrada: t_curso
+2025-10-21 09:07:19,223 - INFO - \u2705 Estrutura 't_curso_de_verao' criada (Conexão ID: 6)
+2025-10-21 09:07:19,223 - INFO - \U0001f195 Estrutura registrada: t_curso_de_verao
+2025-10-21 09:07:19,228 - INFO - \u2705 Estrutura 't_curso_ensino_medio' criada (Conexão ID: 6)
+2025-10-21 09:07:19,228 - INFO - \U0001f195 Estrutura registrada: t_curso_ensino_medio
+2025-10-21 09:07:19,232 - INFO - \u2705 Estrutura 'T_CURSO_EXAME_ADMISSAO' criada (Conexão ID: 6)
+2025-10-21 09:07:19,232 - INFO - \U0001f195 Estrutura registrada: T_CURSO_EXAME_ADMISSAO
+2025-10-21 09:07:19,236 - INFO - \u2705 Estrutura 't_customer' criada (Conexão ID: 6)
+2025-10-21 09:07:19,236 - INFO - \U0001f195 Estrutura registrada: t_customer
+2025-10-21 09:07:19,242 - INFO - \u2705 Estrutura 't_declaracao_destino' criada (Conexão ID: 6)
+2025-10-21 09:07:19,243 - INFO - \U0001f195 Estrutura registrada: t_declaracao_destino
+2025-10-21 09:07:19,247 - INFO - \u2705 Estrutura 't_desconto' criada (Conexão ID: 6)
+2025-10-21 09:07:19,247 - INFO - \U0001f195 Estrutura registrada: t_desconto
+2025-10-21 09:07:19,252 - INFO - \u2705 Estrutura 't_destinatario_campanha' criada (Conexão ID: 6)
+2025-10-21 09:07:19,252 - INFO - \U0001f195 Estrutura registrada: t_destinatario_campanha
+2025-10-21 09:07:19,257 - INFO - \u2705 Estrutura 't_dim_data' criada (Conexão ID: 6)
+2025-10-21 09:07:19,257 - INFO - \U0001f195 Estrutura registrada: t_dim_data
+2025-10-21 09:07:19,262 - INFO - \u2705 Estrutura 't_disciplina' criada (Conexão ID: 6)
+2025-10-21 09:07:19,262 - INFO - \U0001f195 Estrutura registrada: t_disciplina
+2025-10-21 09:07:19,267 - INFO - \u2705 Estrutura 'T_DISCIPLINA_ONLINE' criada (Conexão ID: 6)
+2025-10-21 09:07:19,268 - INFO - \U0001f195 Estrutura registrada: T_DISCIPLINA_ONLINE
+2025-10-21 09:07:19,273 - INFO - \u2705 Estrutura 't_disponibilidade_inscricoes' criada (Conexão ID: 6)
+2025-10-21 09:07:19,274 - INFO - \U0001f195 Estrutura registrada: t_disponibilidade_inscricoes
+2025-10-21 09:07:19,279 - INFO - \u2705 Estrutura 't_docente' criada (Conexão ID: 6)
+2025-10-21 09:07:19,279 - INFO - \U0001f195 Estrutura registrada: t_docente
+2025-10-21 09:07:19,284 - INFO - \u2705 Estrutura 't_document_status' criada (Conexão ID: 6)
+2025-10-21 09:07:19,284 - INFO - \U0001f195 Estrutura registrada: t_document_status
+2025-10-21 09:07:19,288 - INFO - \u2705 Estrutura 't_document_total' criada (Conexão ID: 6)
+2025-10-21 09:07:19,288 - INFO - \U0001f195 Estrutura registrada: t_document_total
+2025-10-21 09:07:19,293 - INFO - \u2705 Estrutura 'T_DROP_CERTIFICADO_INTERMEDIO' criada (Conexão ID: 6)
+2025-10-21 09:07:19,293 - INFO - \U0001f195 Estrutura registrada: T_DROP_CERTIFICADO_INTERMEDIO
+2025-10-21 09:07:19,298 - INFO - \u2705 Estrutura 'T_DROP_CETIFICADO_INTERMEDIO' criada (Conexão ID: 6)
+2025-10-21 09:07:19,298 - INFO - \U0001f195 Estrutura registrada: T_DROP_CETIFICADO_INTERMEDIO
+2025-10-21 09:07:19,302 - INFO - \u2705 Estrutura 'T_DROP_ESTADO' criada (Conexão ID: 6)
+2025-10-21 09:07:19,303 - INFO - \U0001f195 Estrutura registrada: T_DROP_ESTADO
+2025-10-21 09:07:19,308 - INFO - \u2705 Estrutura 't_emolumento' criada (Conexão ID: 6)
+2025-10-21 09:07:19,309 - INFO - \U0001f195 Estrutura registrada: t_emolumento
+2025-10-21 09:07:19,314 - INFO - \u2705 Estrutura 't_emolumento_historico' criada (Conexão ID: 6)
+2025-10-21 09:07:19,314 - INFO - \U0001f195 Estrutura registrada: t_emolumento_historico
+2025-10-21 09:07:19,320 - INFO - \u2705 Estrutura 't_emolumento_pedido' criada (Conexão ID: 6)
+2025-10-21 09:07:19,320 - INFO - \U0001f195 Estrutura registrada: t_emolumento_pedido
+2025-10-21 09:07:19,327 - INFO - \u2705 Estrutura 'T_EMOLUMENTOS_DESCONTOS_DESASSOCIADOS' criada (Conexão ID: 6)
+2025-10-21 09:07:19,327 - INFO - \U0001f195 Estrutura registrada: T_EMOLUMENTOS_DESCONTOS_DESASSOCIADOS
+2025-10-21 09:07:19,333 - INFO - \u2705 Estrutura 't_empresa_convenio' criada (Conexão ID: 6)
+2025-10-21 09:07:19,333 - INFO - \U0001f195 Estrutura registrada: t_empresa_convenio
+2025-10-21 09:07:19,338 - INFO - \u2705 Estrutura 't_epoca_especial' criada (Conexão ID: 6)
+2025-10-21 09:07:19,338 - INFO - \U0001f195 Estrutura registrada: t_epoca_especial
+2025-10-21 09:07:19,344 - INFO - \u2705 Estrutura 't_equivalencia' criada (Conexão ID: 6)
+2025-10-21 09:07:19,344 - INFO - \U0001f195 Estrutura registrada: t_equivalencia
+2025-10-21 09:07:19,349 - INFO - \u2705 Estrutura 't_equivalencia_audit' criada (Conexão ID: 6)
+2025-10-21 09:07:19,349 - INFO - \U0001f195 Estrutura registrada: t_equivalencia_audit
+2025-10-21 09:07:19,354 - INFO - \u2705 Estrutura 't_equivalencia_historico_aluno' criada (Conexão ID: 6)
+2025-10-21 09:07:19,354 - INFO - \U0001f195 Estrutura registrada: t_equivalencia_historico_aluno
+2025-10-21 09:07:19,360 - INFO - \u2705 Estrutura 't_exame_curso' criada (Conexão ID: 6)
+2025-10-21 09:07:19,360 - INFO - \U0001f195 Estrutura registrada: t_exame_curso
+2025-10-21 09:07:19,365 - INFO - \u2705 Estrutura 't_exame_eletronico' criada (Conexão ID: 6)
+2025-10-21 09:07:19,365 - INFO - \U0001f195 Estrutura registrada: t_exame_eletronico
+2025-10-21 09:07:19,371 - INFO - \u2705 Estrutura 't_factura' criada (Conexão ID: 6)
+2025-10-21 09:07:19,371 - INFO - \U0001f195 Estrutura registrada: t_factura
+2025-10-21 09:07:19,377 - INFO - \u2705 Estrutura 't_factura_detalhe' criada (Conexão ID: 6)
+2025-10-21 09:07:19,378 - INFO - \U0001f195 Estrutura registrada: t_factura_detalhe
+2025-10-21 09:07:19,383 - INFO - \u2705 Estrutura 't_faculdade' criada (Conexão ID: 6)
+2025-10-21 09:07:19,383 - INFO - \U0001f195 Estrutura registrada: t_faculdade
+2025-10-21 09:07:19,390 - INFO - \u2705 Estrutura 't_fechamento_classificacao' criada (Conexão ID: 6)
+2025-10-21 09:07:19,390 - INFO - \U0001f195 Estrutura registrada: t_fechamento_classificacao
+2025-10-21 09:07:19,396 - INFO - \u2705 Estrutura 't_feriado' criada (Conexão ID: 6)
+2025-10-21 09:07:19,396 - INFO - \U0001f195 Estrutura registrada: t_feriado
+2025-10-21 09:07:19,402 - INFO - \u2705 Estrutura 't_geracao_errada' criada (Conexão ID: 6)
+2025-10-21 09:07:19,402 - INFO - \U0001f195 Estrutura registrada: t_geracao_errada
+2025-10-21 09:07:19,409 - INFO - \u2705 Estrutura 't_guia_candidatura' criada (Conexão ID: 6)
+2025-10-21 09:07:19,409 - INFO - \U0001f195 Estrutura registrada: t_guia_candidatura
+2025-10-21 09:07:19,414 - INFO - \u2705 Estrutura 't_guia_candidatura_historico' criada (Conexão ID: 6)
+2025-10-21 09:07:19,414 - INFO - \U0001f195 Estrutura registrada: t_guia_candidatura_historico
+2025-10-21 09:07:19,420 - INFO - \u2705 Estrutura 't_guia_multa_negociacao' criada (Conexão ID: 6)
+2025-10-21 09:07:19,420 - INFO - \U0001f195 Estrutura registrada: t_guia_multa_negociacao
+2025-10-21 09:07:19,426 - INFO - \u2705 Estrutura 't_guia_multa_valor' criada (Conexão ID: 6)
+2025-10-21 09:07:19,426 - INFO - \U0001f195 Estrutura registrada: t_guia_multa_valor
+2025-10-21 09:07:19,431 - INFO - \u2705 Estrutura 't_guia_pagamento' criada (Conexão ID: 6)
+2025-10-21 09:07:19,431 - INFO - \U0001f195 Estrutura registrada: t_guia_pagamento
+2025-10-21 09:07:19,437 - INFO - \u2705 Estrutura 't_guia_pagamento_audit' criada (Conexão ID: 6)
+2025-10-21 09:07:19,437 - INFO - \U0001f195 Estrutura registrada: t_guia_pagamento_audit
+2025-10-21 09:07:19,444 - INFO - \u2705 Estrutura 't_guia_pagamento_historico' criada (Conexão ID: 6)
+2025-10-21 09:07:19,444 - INFO - \U0001f195 Estrutura registrada: t_guia_pagamento_historico
+2025-10-21 09:07:19,449 - INFO - \u2705 Estrutura 't_guia_pagamento_historico_audit' criada (Conexão ID: 6)
+2025-10-21 09:07:19,449 - INFO - \U0001f195 Estrutura registrada: t_guia_pagamento_historico_audit
+2025-10-21 09:07:19,455 - INFO - \u2705 Estrutura 't_guia_plano_multa' criada (Conexão ID: 6)
+2025-10-21 09:07:19,455 - INFO - \U0001f195 Estrutura registrada: t_guia_plano_multa
+2025-10-21 09:07:19,461 - INFO - \u2705 Estrutura 'T_GUIA_POR_UTILIZADOR' criada (Conexão ID: 6)
+2025-10-21 09:07:19,461 - INFO - \U0001f195 Estrutura registrada: T_GUIA_POR_UTILIZADOR
+2025-10-21 09:07:19,467 - INFO - \u2705 Estrutura 't_guia_usada' criada (Conexão ID: 6)
+2025-10-21 09:07:19,467 - INFO - \U0001f195 Estrutura registrada: t_guia_usada
+2025-10-21 09:07:19,472 - INFO - \u2705 Estrutura 'T_GUIAS_LIQUIDADAS' criada (Conexão ID: 6)
+2025-10-21 09:07:19,472 - INFO - \U0001f195 Estrutura registrada: T_GUIAS_LIQUIDADAS
+2025-10-21 09:07:19,478 - INFO - \u2705 Estrutura 'T_GUIAS_LIQUIDADAS_01' criada (Conexão ID: 6)
+2025-10-21 09:07:19,478 - INFO - \U0001f195 Estrutura registrada: T_GUIAS_LIQUIDADAS_01
+2025-10-21 09:07:19,483 - INFO - \u2705 Estrutura 't_header' criada (Conexão ID: 6)
+2025-10-21 09:07:19,483 - INFO - \U0001f195 Estrutura registrada: t_header
+2025-10-21 09:07:19,489 - INFO - \u2705 Estrutura 't_historico_aluno' criada (Conexão ID: 6)
+2025-10-21 09:07:19,489 - INFO - \U0001f195 Estrutura registrada: t_historico_aluno
+2025-10-21 09:07:19,496 - INFO - \u2705 Estrutura 't_historico_aluno_audit' criada (Conexão ID: 6)
+2025-10-21 09:07:19,496 - INFO - \U0001f195 Estrutura registrada: t_historico_aluno_audit
+2025-10-21 09:07:19,501 - INFO - \u2705 Estrutura 't_historico_aluno_ccd' criada (Conexão ID: 6)
+2025-10-21 09:07:19,501 - INFO - \U0001f195 Estrutura registrada: t_historico_aluno_ccd
+2025-10-21 09:07:19,506 - INFO - \u2705 Estrutura 't_historico_credito' criada (Conexão ID: 6)
+2025-10-21 09:07:19,506 - INFO - \U0001f195 Estrutura registrada: t_historico_credito
+2025-10-21 09:07:19,512 - INFO - \u2705 Estrutura 't_historico_credito_candidato' criada (Conexão ID: 6)
+2025-10-21 09:07:19,512 - INFO - \U0001f195 Estrutura registrada: t_historico_credito_candidato
+2025-10-21 09:07:19,517 - INFO - \u2705 Estrutura 't_historico_credito_empresa' criada (Conexão ID: 6)
+2025-10-21 09:07:19,517 - INFO - \U0001f195 Estrutura registrada: t_historico_credito_empresa
+2025-10-21 09:07:19,523 - INFO - \u2705 Estrutura 't_historico_equivalencia' criada (Conexão ID: 6)
+2025-10-21 09:07:19,523 - INFO - \U0001f195 Estrutura registrada: t_historico_equivalencia
+2025-10-21 09:07:19,529 - INFO - \u2705 Estrutura 't_historico_equivalencia_audit' criada (Conexão ID: 6)
+2025-10-21 09:07:19,529 - INFO - \U0001f195 Estrutura registrada: t_historico_equivalencia_audit
+2025-10-21 09:07:19,534 - INFO - \u2705 Estrutura 't_historico_troca_curso' criada (Conexão ID: 6)
+2025-10-21 09:07:19,534 - INFO - \U0001f195 Estrutura registrada: t_historico_troca_curso
+2025-10-21 09:07:19,540 - INFO - \u2705 Estrutura 't_horario' criada (Conexão ID: 6)
+2025-10-21 09:07:19,540 - INFO - \U0001f195 Estrutura registrada: t_horario
+2025-10-21 09:07:19,546 - INFO - \u2705 Estrutura 't_horario_calendario' criada (Conexão ID: 6)
+2025-10-21 09:07:19,546 - INFO - \U0001f195 Estrutura registrada: t_horario_calendario
+2025-10-21 09:07:19,551 - INFO - \u2705 Estrutura 't_horario_calendario_BKP' criada (Conexão ID: 6)
+2025-10-21 09:07:19,551 - INFO - \U0001f195 Estrutura registrada: t_horario_calendario_BKP
+2025-10-21 09:07:19,557 - INFO - \u2705 Estrutura 't_horario_temporario' criada (Conexão ID: 6)
+2025-10-21 09:07:19,557 - INFO - \U0001f195 Estrutura registrada: t_horario_temporario
+2025-10-21 09:07:19,563 - INFO - \u2705 Estrutura 't_imagens_sistema' criada (Conexão ID: 6)
+2025-10-21 09:07:19,563 - INFO - \U0001f195 Estrutura registrada: t_imagens_sistema
+2025-10-21 09:07:19,568 - INFO - \u2705 Estrutura 't_inscricao_extraordinaria' criada (Conexão ID: 6)
+2025-10-21 09:07:19,568 - INFO - \U0001f195 Estrutura registrada: t_inscricao_extraordinaria
+2025-10-21 09:07:19,574 - INFO - \u2705 Estrutura 't_instituicao' criada (Conexão ID: 6)
+2025-10-21 09:07:19,574 - INFO - \U0001f195 Estrutura registrada: t_instituicao
+2025-10-21 09:07:19,588 - INFO - \u2705 Estrutura 't_intervalo' criada (Conexão ID: 6)
+2025-10-21 09:07:19,588 - INFO - \U0001f195 Estrutura registrada: t_intervalo
+2025-10-21 09:07:19,595 - INFO - \u2705 Estrutura 't_invoice' criada (Conexão ID: 6)
+2025-10-21 09:07:19,595 - INFO - \U0001f195 Estrutura registrada: t_invoice
+2025-10-21 09:07:19,603 - INFO - \u2705 Estrutura 't_lancamento_faculdade' criada (Conexão ID: 6)
+2025-10-21 09:07:19,603 - INFO - \U0001f195 Estrutura registrada: t_lancamento_faculdade
+2025-10-21 09:07:19,617 - INFO - \u2705 Estrutura 't_leciona' criada (Conexão ID: 6)
+2025-10-21 09:07:19,617 - INFO - \U0001f195 Estrutura registrada: t_leciona
+2025-10-21 09:07:19,623 - INFO - \u2705 Estrutura 't_line' criada (Conexão ID: 6)
+2025-10-21 09:07:19,623 - INFO - \U0001f195 Estrutura registrada: t_line
+2025-10-21 09:07:19,631 - INFO - \u2705 Estrutura 'T_LISTA_TRANSITA' criada (Conexão ID: 6)
+2025-10-21 09:07:19,631 - INFO - \U0001f195 Estrutura registrada: T_LISTA_TRANSITA
+2025-10-21 09:07:19,645 - INFO - \u2705 Estrutura 'T_LISTAGEM_BANCARIA' criada (Conexão ID: 6)
+2025-10-21 09:07:19,645 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_BANCARIA
+2025-10-21 09:07:19,651 - INFO - \u2705 Estrutura 'T_LISTAGEM_BANCARIA_01' criada (Conexão ID: 6)
+2025-10-21 09:07:19,651 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_BANCARIA_01
+2025-10-21 09:07:19,668 - INFO - \u2705 Estrutura 'T_LISTAGEM_BANCARIA_02' criada (Conexão ID: 6)
+2025-10-21 09:07:19,668 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_BANCARIA_02
+2025-10-21 09:07:19,674 - INFO - \u2705 Estrutura 'T_LISTAGEM_EMOLUMENTO' criada (Conexão ID: 6)
+2025-10-21 09:07:19,674 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_EMOLUMENTO
+2025-10-21 09:07:19,683 - INFO - \u2705 Estrutura 'T_LISTAGEM_EMOLUMENTO_01' criada (Conexão ID: 6)
+2025-10-21 09:07:19,683 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_EMOLUMENTO_01
+2025-10-21 09:07:19,696 - INFO - \u2705 Estrutura 'T_LISTAGEM_EMOLUMENTO_02' criada (Conexão ID: 6)
+2025-10-21 09:07:19,697 - INFO - \U0001f195 Estrutura registrada: T_LISTAGEM_EMOLUMENTO_02
+2025-10-21 09:07:19,706 - INFO - \u2705 Estrutura 't_log_falha_internet' criada (Conexão ID: 6)
+2025-10-21 09:07:19,706 - INFO - \U0001f195 Estrutura registrada: t_log_falha_internet
+2025-10-21 09:07:19,720 - INFO - \u2705 Estrutura 't_log_saft' criada (Conexão ID: 6)
+2025-10-21 09:07:19,720 - INFO - \U0001f195 Estrutura registrada: t_log_saft
+2025-10-21 09:07:19,726 - INFO - \u2705 Estrutura 't_logo_marca' criada (Conexão ID: 6)
+2025-10-21 09:07:19,726 - INFO - \U0001f195 Estrutura registrada: t_logo_marca
+2025-10-21 09:07:19,735 - INFO - \u2705 Estrutura 'T_MAPA_ALUNO' criada (Conexão ID: 6)
+2025-10-21 09:07:19,735 - INFO - \U0001f195 Estrutura registrada: T_MAPA_ALUNO
+2025-10-21 09:07:19,741 - INFO - \u2705 Estrutura 'T_MAPA_ALUNO_01' criada (Conexão ID: 6)
+2025-10-21 09:07:19,741 - INFO - \U0001f195 Estrutura registrada: T_MAPA_ALUNO_01
+2025-10-21 09:07:19,746 - INFO - \u2705 Estrutura 'T_MAPA_LIMPO' criada (Conexão ID: 6)
+2025-10-21 09:07:19,746 - INFO - \U0001f195 Estrutura registrada: T_MAPA_LIMPO
+2025-10-21 09:07:19,759 - INFO - \u2705 Estrutura 't_mapa_mensalidade' criada (Conexão ID: 6)
+2025-10-21 09:07:19,759 - INFO - \U0001f195 Estrutura registrada: t_mapa_mensalidade
+2025-10-21 09:07:19,763 - INFO - \u2705 Estrutura 't_matricula' criada (Conexão ID: 6)
+2025-10-21 09:07:19,764 - INFO - \U0001f195 Estrutura registrada: t_matricula
+2025-10-21 09:07:19,769 - INFO - \u2705 Estrutura 't_matricula_audit' criada (Conexão ID: 6)
+2025-10-21 09:07:19,769 - INFO - \U0001f195 Estrutura registrada: t_matricula_audit
+2025-10-21 09:07:19,775 - INFO - \u2705 Estrutura 't_matricula_ccd' criada (Conexão ID: 6)
+2025-10-21 09:07:19,775 - INFO - \U0001f195 Estrutura registrada: t_matricula_ccd
+2025-10-21 09:07:19,780 - INFO - \u2705 Estrutura 't_matricula_online' criada (Conexão ID: 6)
+2025-10-21 09:07:19,780 - INFO - \U0001f195 Estrutura registrada: t_matricula_online
+2025-10-21 09:07:19,785 - INFO - \u2705 Estrutura 't_matriz_docente' criada (Conexão ID: 6)
+2025-10-21 09:07:19,785 - INFO - \U0001f195 Estrutura registrada: t_matriz_docente
+2025-10-21 09:07:19,791 - INFO - \u2705 Estrutura 't_memoravel' criada (Conexão ID: 6)
+2025-10-21 09:07:19,791 - INFO - \U0001f195 Estrutura registrada: t_memoravel
+2025-10-21 09:07:19,796 - INFO - \u2705 Estrutura 't_mensagem_candidato' criada (Conexão ID: 6)
+2025-10-21 09:07:19,796 - INFO - \U0001f195 Estrutura registrada: t_mensagem_candidato
+2025-10-21 09:07:19,801 - INFO - \u2705 Estrutura 't_mensalidades_liquidadas' criada (Conexão ID: 6)
+2025-10-21 09:07:19,801 - INFO - \U0001f195 Estrutura registrada: t_mensalidades_liquidadas
+2025-10-21 09:07:19,807 - INFO - \u2705 Estrutura 't_mes' criada (Conexão ID: 6)
+2025-10-21 09:07:19,807 - INFO - \U0001f195 Estrutura registrada: t_mes
+2025-10-21 09:07:19,813 - INFO - \u2705 Estrutura 't_mes_emolumento_propina' criada (Conexão ID: 6)
+2025-10-21 09:07:19,813 - INFO - \U0001f195 Estrutura registrada: t_mes_emolumento_propina
+2025-10-21 09:07:19,818 - INFO - \u2705 Estrutura 'T_MIGRATE_PERGUNTA' criada (Conexão ID: 6)
+2025-10-21 09:07:19,818 - INFO - \U0001f195 Estrutura registrada: T_MIGRATE_PERGUNTA
+2025-10-21 09:07:19,824 - INFO - \u2705 Estrutura 'T_MIGRATE_PROVA' criada (Conexão ID: 6)
+2025-10-21 09:07:19,824 - INFO - \U0001f195 Estrutura registrada: T_MIGRATE_PROVA
+2025-10-21 09:07:19,829 - INFO - \u2705 Estrutura 't_modelo_avaliacao' criada (Conexão ID: 6)
+2025-10-21 09:07:19,829 - INFO - \U0001f195 Estrutura registrada: t_modelo_avaliacao
+2025-10-21 09:07:19,834 - INFO - \u2705 Estrutura 't_moeda' criada (Conexão ID: 6)
+2025-10-21 09:07:19,835 - INFO - \U0001f195 Estrutura registrada: t_moeda
+2025-10-21 09:07:19,840 - INFO - \u2705 Estrutura 't_multas_guia' criada (Conexão ID: 6)
+2025-10-21 09:07:19,840 - INFO - \U0001f195 Estrutura registrada: t_multas_guia
+2025-10-21 09:07:19,846 - INFO - \u2705 Estrutura 't_municipio' criada (Conexão ID: 6)
+2025-10-21 09:07:19,846 - INFO - \U0001f195 Estrutura registrada: t_municipio
+2025-10-21 09:07:19,851 - INFO - \u2705 Estrutura 't_nota_credito' criada (Conexão ID: 6)
+2025-10-21 09:07:19,851 - INFO - \U0001f195 Estrutura registrada: t_nota_credito
+2025-10-21 09:07:19,858 - INFO - \u2705 Estrutura 't_nota_credito_detalhe' criada (Conexão ID: 6)
+2025-10-21 09:07:19,858 - INFO - \U0001f195 Estrutura registrada: t_nota_credito_detalhe
+2025-10-21 09:07:19,864 - INFO - \u2705 Estrutura 't_numero_gerado' criada (Conexão ID: 6)
+2025-10-21 09:07:19,864 - INFO - \U0001f195 Estrutura registrada: t_numero_gerado
+2025-10-21 09:07:19,869 - INFO - \u2705 Estrutura 't_numero_matriz' criada (Conexão ID: 6)
+2025-10-21 09:07:19,869 - INFO - \U0001f195 Estrutura registrada: t_numero_matriz
+2025-10-21 09:07:19,875 - INFO - \u2705 Estrutura 't_order_reference' criada (Conexão ID: 6)
+2025-10-21 09:07:19,875 - INFO - \U0001f195 Estrutura registrada: t_order_reference
+2025-10-21 09:07:19,881 - INFO - \u2705 Estrutura 't_pacote_subscrito' criada (Conexão ID: 6)
+2025-10-21 09:07:19,881 - INFO - \U0001f195 Estrutura registrada: t_pacote_subscrito
+2025-10-21 09:07:19,886 - INFO - \u2705 Estrutura 't_pagamento_referencia' criada (Conexão ID: 6)
+2025-10-21 09:07:19,886 - INFO - \U0001f195 Estrutura registrada: t_pagamento_referencia
+2025-10-21 09:07:19,891 - INFO - \u2705 Estrutura 't_pagamento_remoto' criada (Conexão ID: 6)
+2025-10-21 09:07:19,892 - INFO - \U0001f195 Estrutura registrada: t_pagamento_remoto
+2025-10-21 09:07:19,896 - INFO - \u2705 Estrutura 't_pais' criada (Conexão ID: 6)
+2025-10-21 09:07:19,896 - INFO - \U0001f195 Estrutura registrada: t_pais
+2025-10-21 09:07:19,902 - INFO - \u2705 Estrutura 't_payment' criada (Conexão ID: 6)
+2025-10-21 09:07:19,902 - INFO - \U0001f195 Estrutura registrada: t_payment
+2025-10-21 09:07:19,908 - INFO - \u2705 Estrutura 't_payment_document_status' criada (Conexão ID: 6)
+2025-10-21 09:07:19,908 - INFO - \U0001f195 Estrutura registrada: t_payment_document_status
+2025-10-21 09:07:19,912 - INFO - \u2705 Estrutura 't_payment_document_total' criada (Conexão ID: 6)
+2025-10-21 09:07:19,912 - INFO - \U0001f195 Estrutura registrada: t_payment_document_total
+2025-10-21 09:07:19,916 - INFO - \u2705 Estrutura 't_payment_line' criada (Conexão ID: 6)
+2025-10-21 09:07:19,916 - INFO - \U0001f195 Estrutura registrada: t_payment_line
+2025-10-21 09:07:19,920 - INFO - \u2705 Estrutura 't_payment_method' criada (Conexão ID: 6)
+2025-10-21 09:07:19,920 - INFO - \U0001f195 Estrutura registrada: t_payment_method
+2025-10-21 09:07:19,925 - INFO - \u2705 Estrutura 't_payments' criada (Conexão ID: 6)
+2025-10-21 09:07:19,925 - INFO - \U0001f195 Estrutura registrada: t_payments
+2025-10-21 09:07:19,930 - INFO - \u2705 Estrutura 't_pedido' criada (Conexão ID: 6)
+2025-10-21 09:07:19,930 - INFO - \U0001f195 Estrutura registrada: t_pedido
+2025-10-21 09:07:19,935 - INFO - \u2705 Estrutura 't_pergunta' criada (Conexão ID: 6)
+2025-10-21 09:07:19,935 - INFO - \U0001f195 Estrutura registrada: t_pergunta
+2025-10-21 09:07:19,942 - INFO - \u2705 Estrutura 'T_PERGUNTA_BKP' criada (Conexão ID: 6)
+2025-10-21 09:07:19,942 - INFO - \U0001f195 Estrutura registrada: T_PERGUNTA_BKP
+2025-10-21 09:07:19,947 - INFO - \u2705 Estrutura 't_pergunta_respota' criada (Conexão ID: 6)
+2025-10-21 09:07:19,947 - INFO - \U0001f195 Estrutura registrada: t_pergunta_respota
+2025-10-21 09:07:19,968 - INFO - \u2705 Estrutura 't_permissao_curso' criada (Conexão ID: 6)
+2025-10-21 09:07:19,968 - INFO - \U0001f195 Estrutura registrada: t_permissao_curso
+2025-10-21 09:07:19,973 - INFO - \u2705 Estrutura 't_plano_mestrado' criada (Conexão ID: 6)
+2025-10-21 09:07:19,973 - INFO - \U0001f195 Estrutura registrada: t_plano_mestrado
+2025-10-21 09:07:19,978 - INFO - \u2705 Estrutura 't_plano_pagamento' criada (Conexão ID: 6)
+2025-10-21 09:07:19,978 - INFO - \U0001f195 Estrutura registrada: t_plano_pagamento
+2025-10-21 09:07:19,983 - INFO - \u2705 Estrutura 't_portal_authorization' criada (Conexão ID: 6)
+2025-10-21 09:07:19,983 - INFO - \U0001f195 Estrutura registrada: t_portal_authorization
+2025-10-21 09:07:19,987 - INFO - \u2705 Estrutura 't_portal_block_user_role' criada (Conexão ID: 6)
+2025-10-21 09:07:19,987 - INFO - \U0001f195 Estrutura registrada: t_portal_block_user_role
+2025-10-21 09:07:19,993 - INFO - \u2705 Estrutura 't_portal_module' criada (Conexão ID: 6)
+2025-10-21 09:07:19,993 - INFO - \U0001f195 Estrutura registrada: t_portal_module
+2025-10-21 09:07:20,003 - INFO - \u2705 Estrutura 't_portal_permition' criada (Conexão ID: 6)
+2025-10-21 09:07:20,003 - INFO - \U0001f195 Estrutura registrada: t_portal_permition
+2025-10-21 09:07:20,008 - INFO - \u2705 Estrutura 't_portal_role' criada (Conexão ID: 6)
+2025-10-21 09:07:20,009 - INFO - \U0001f195 Estrutura registrada: t_portal_role
+2025-10-21 09:07:20,013 - INFO - \u2705 Estrutura 't_portal_role_module' criada (Conexão ID: 6)
+2025-10-21 09:07:20,013 - INFO - \U0001f195 Estrutura registrada: t_portal_role_module
+2025-10-21 09:07:20,018 - INFO - \u2705 Estrutura 't_portal_role_permition' criada (Conexão ID: 6)
+2025-10-21 09:07:20,018 - INFO - \U0001f195 Estrutura registrada: t_portal_role_permition
+2025-10-21 09:07:20,024 - INFO - \u2705 Estrutura 't_portal_user_acess_temporals' criada (Conexão ID: 6)
+2025-10-21 09:07:20,024 - INFO - \U0001f195 Estrutura registrada: t_portal_user_acess_temporals
+2025-10-21 09:07:20,029 - INFO - \u2705 Estrutura 't_portal_user_module' criada (Conexão ID: 6)
+2025-10-21 09:07:20,030 - INFO - \U0001f195 Estrutura registrada: t_portal_user_module
+2025-10-21 09:07:20,036 - INFO - \u2705 Estrutura 't_portal_user_module_autho' criada (Conexão ID: 6)
+2025-10-21 09:07:20,036 - INFO - \U0001f195 Estrutura registrada: t_portal_user_module_autho
+2025-10-21 09:07:20,041 - INFO - \u2705 Estrutura 't_portal_user_role' criada (Conexão ID: 6)
+2025-10-21 09:07:20,042 - INFO - \U0001f195 Estrutura registrada: t_portal_user_role
+2025-10-21 09:07:20,047 - INFO - \u2705 Estrutura 't_portal_usuario' criada (Conexão ID: 6)
+2025-10-21 09:07:20,047 - INFO - \U0001f195 Estrutura registrada: t_portal_usuario
+2025-10-21 09:07:20,053 - INFO - \u2705 Estrutura 't_presenca_professor' criada (Conexão ID: 6)
+2025-10-21 09:07:20,053 - INFO - \U0001f195 Estrutura registrada: t_presenca_professor
+2025-10-21 09:07:20,059 - INFO - \u2705 Estrutura 't_processamento_mensal' criada (Conexão ID: 6)
+2025-10-21 09:07:20,059 - INFO - \U0001f195 Estrutura registrada: t_processamento_mensal
+2025-10-21 09:07:20,064 - INFO - \u2705 Estrutura 't_processamento_referencias' criada (Conexão ID: 6)
+2025-10-21 09:07:20,064 - INFO - \U0001f195 Estrutura registrada: t_processamento_referencias
+2025-10-21 09:07:20,075 - INFO - \u2705 Estrutura 't_product' criada (Conexão ID: 6)
+2025-10-21 09:07:20,075 - INFO - \U0001f195 Estrutura registrada: t_product
+2025-10-21 09:07:20,083 - INFO - \u2705 Estrutura 't_profissao' criada (Conexão ID: 6)
+2025-10-21 09:07:20,084 - INFO - \U0001f195 Estrutura registrada: t_profissao
+2025-10-21 09:07:20,088 - INFO - \u2705 Estrutura 't_prova' criada (Conexão ID: 6)
+2025-10-21 09:07:20,088 - INFO - \U0001f195 Estrutura registrada: t_prova
+2025-10-21 09:07:20,096 - INFO - \u2705 Estrutura 't_provincia' criada (Conexão ID: 6)
+2025-10-21 09:07:20,096 - INFO - \U0001f195 Estrutura registrada: t_provincia
+2025-10-21 09:07:20,101 - INFO - \u2705 Estrutura 't_rebibo_detalhe' criada (Conexão ID: 6)
+2025-10-21 09:07:20,101 - INFO - \U0001f195 Estrutura registrada: t_rebibo_detalhe
+2025-10-21 09:07:20,107 - INFO - \u2705 Estrutura 't_recibo' criada (Conexão ID: 6)
+2025-10-21 09:07:20,107 - INFO - \U0001f195 Estrutura registrada: t_recibo
+2025-10-21 09:07:20,112 - INFO - \u2705 Estrutura 't_reference' criada (Conexão ID: 6)
+2025-10-21 09:07:20,112 - INFO - \U0001f195 Estrutura registrada: t_reference
+2025-10-21 09:07:20,117 - INFO - \u2705 Estrutura 'T_REFERENCIA_PROCESSAMENTO' criada (Conexão ID: 6)
+2025-10-21 09:07:20,117 - INFO - \U0001f195 Estrutura registrada: T_REFERENCIA_PROCESSAMENTO
+2025-10-21 09:07:20,122 - INFO - \u2705 Estrutura 't_registo_certificado' criada (Conexão ID: 6)
+2025-10-21 09:07:20,122 - INFO - \U0001f195 Estrutura registrada: t_registo_certificado
+2025-10-21 09:07:20,127 - INFO - \u2705 Estrutura 't_registro_documentos' criada (Conexão ID: 6)
+2025-10-21 09:07:20,127 - INFO - \U0001f195 Estrutura registrada: t_registro_documentos
+2025-10-21 09:07:20,132 - INFO - \u2705 Estrutura 't_regresso_estatistica_online' criada (Conexão ID: 6)
+2025-10-21 09:07:20,132 - INFO - \U0001f195 Estrutura registrada: t_regresso_estatistica_online
+2025-10-21 09:07:20,137 - INFO - \u2705 Estrutura 't_relario_financeiro' criada (Conexão ID: 6)
+2025-10-21 09:07:20,137 - INFO - \U0001f195 Estrutura registrada: t_relario_financeiro
+2025-10-21 09:07:20,143 - INFO - \u2705 Estrutura 't_resposta' criada (Conexão ID: 6)
+2025-10-21 09:07:20,143 - INFO - \U0001f195 Estrutura registrada: t_resposta
+2025-10-21 09:07:20,148 - INFO - \u2705 Estrutura 'T_RESPOSTA_BKP' criada (Conexão ID: 6)
+2025-10-21 09:07:20,149 - INFO - \U0001f195 Estrutura registrada: T_RESPOSTA_BKP
+2025-10-21 09:07:20,154 - INFO - \u2705 Estrutura 't_sala' criada (Conexão ID: 6)
+2025-10-21 09:07:20,154 - INFO - \U0001f195 Estrutura registrada: t_sala
+2025-10-21 09:07:20,160 - INFO - \u2705 Estrutura 't_sale_invoice' criada (Conexão ID: 6)
+2025-10-21 09:07:20,160 - INFO - \U0001f195 Estrutura registrada: t_sale_invoice
+2025-10-21 09:07:20,165 - INFO - \u2705 Estrutura 't_servico_auditoria' criada (Conexão ID: 6)
+2025-10-21 09:07:20,165 - INFO - \U0001f195 Estrutura registrada: t_servico_auditoria
+2025-10-21 09:07:20,169 - INFO - \u2705 Estrutura 't_sms' criada (Conexão ID: 6)
+2025-10-21 09:07:20,169 - INFO - \U0001f195 Estrutura registrada: t_sms
+2025-10-21 09:07:20,174 - INFO - \u2705 Estrutura 't_solicitacao_candidatura' criada (Conexão ID: 6)
+2025-10-21 09:07:20,174 - INFO - \U0001f195 Estrutura registrada: t_solicitacao_candidatura
+2025-10-21 09:07:20,179 - INFO - \u2705 Estrutura 't_source_document_id' criada (Conexão ID: 6)
+2025-10-21 09:07:20,179 - INFO - \U0001f195 Estrutura registrada: t_source_document_id
+2025-10-21 09:07:20,184 - INFO - \u2705 Estrutura 't_special_regime' criada (Conexão ID: 6)
+2025-10-21 09:07:20,184 - INFO - \U0001f195 Estrutura registrada: t_special_regime
+2025-10-21 09:07:20,189 - INFO - \u2705 Estrutura 't_sumario' criada (Conexão ID: 6)
+2025-10-21 09:07:20,189 - INFO - \U0001f195 Estrutura registrada: t_sumario
+2025-10-21 09:07:20,194 - INFO - \u2705 Estrutura 't_tax' criada (Conexão ID: 6)
+2025-10-21 09:07:20,194 - INFO - \U0001f195 Estrutura registrada: t_tax
+2025-10-21 09:07:20,199 - INFO - \u2705 Estrutura 't_tax_table' criada (Conexão ID: 6)
+2025-10-21 09:07:20,199 - INFO - \U0001f195 Estrutura registrada: t_tax_table
+2025-10-21 09:07:20,204 - INFO - \u2705 Estrutura 't_tax_table_entry' criada (Conexão ID: 6)
+2025-10-21 09:07:20,204 - INFO - \U0001f195 Estrutura registrada: t_tax_table_entry
+2025-10-21 09:07:20,210 - INFO - \u2705 Estrutura 't_tipo_bolsa' criada (Conexão ID: 6)
+2025-10-21 09:07:20,210 - INFO - \U0001f195 Estrutura registrada: t_tipo_bolsa
+2025-10-21 09:07:20,215 - INFO - \u2705 Estrutura 't_tipo_contrato_laboral' criada (Conexão ID: 6)
+2025-10-21 09:07:20,215 - INFO - \U0001f195 Estrutura registrada: t_tipo_contrato_laboral
+2025-10-21 09:07:20,220 - INFO - \u2705 Estrutura 't_tipo_de_declaracao' criada (Conexão ID: 6)
+2025-10-21 09:07:20,220 - INFO - \U0001f195 Estrutura registrada: t_tipo_de_declaracao
+2025-10-21 09:07:20,226 - INFO - \u2705 Estrutura 't_tipo_dia' criada (Conexão ID: 6)
+2025-10-21 09:07:20,226 - INFO - \U0001f195 Estrutura registrada: t_tipo_dia
+2025-10-21 09:07:20,231 - INFO - \u2705 Estrutura 't_tipo_inscricao' criada (Conexão ID: 6)
+2025-10-21 09:07:20,231 - INFO - \U0001f195 Estrutura registrada: t_tipo_inscricao
+2025-10-21 09:07:20,236 - INFO - \u2705 Estrutura 't_turma' criada (Conexão ID: 6)
+2025-10-21 09:07:20,236 - INFO - \U0001f195 Estrutura registrada: t_turma
+2025-10-21 09:07:20,242 - INFO - \u2705 Estrutura 't_turmas_disponiveis' criada (Conexão ID: 6)
+2025-10-21 09:07:20,242 - INFO - \U0001f195 Estrutura registrada: t_turmas_disponiveis
+2025-10-21 09:07:20,247 - INFO - \u2705 Estrutura 't_usuario' criada (Conexão ID: 6)
+2025-10-21 09:07:20,247 - INFO - \U0001f195 Estrutura registrada: t_usuario
+2025-10-21 09:07:20,252 - INFO - \u2705 Estrutura 't_usuario_rh' criada (Conexão ID: 6)
+2025-10-21 09:07:20,252 - INFO - \U0001f195 Estrutura registrada: t_usuario_rh
+2025-10-21 09:07:20,258 - INFO - \u2705 Estrutura 't_work_document' criada (Conexão ID: 6)
+2025-10-21 09:07:20,258 - INFO - \U0001f195 Estrutura registrada: t_work_document
+2025-10-21 09:07:20,262 - INFO - \u2705 Estrutura 't_work_document_status' criada (Conexão ID: 6)
+2025-10-21 09:07:20,263 - INFO - \U0001f195 Estrutura registrada: t_work_document_status
+2025-10-21 09:07:20,268 - INFO - \u2705 Estrutura 't_work_documents' criada (Conexão ID: 6)
+2025-10-21 09:07:20,268 - INFO - \U0001f195 Estrutura registrada: t_work_documents
+2025-10-21 09:07:20,273 - INFO - \u2705 Estrutura 't_working_document_total' criada (Conexão ID: 6)
+2025-10-21 09:07:20,274 - INFO - \U0001f195 Estrutura registrada: t_working_document_total
+2025-10-21 09:07:20,278 - INFO - \u2705 Estrutura 't_working_line' criada (Conexão ID: 6)
+2025-10-21 09:07:20,279 - INFO - \U0001f195 Estrutura registrada: t_working_line
+2025-10-21 09:07:20,284 - INFO - \u2705 Estrutura 't_working_tax' criada (Conexão ID: 6)
+2025-10-21 09:07:20,284 - INFO - \U0001f195 Estrutura registrada: t_working_tax
+2025-10-21 09:07:20,289 - INFO - \u2705 Estrutura 'TB_APROVEITAMENTO_DROP' criada (Conexão ID: 6)
+2025-10-21 09:07:20,289 - INFO - \U0001f195 Estrutura registrada: TB_APROVEITAMENTO_DROP
+2025-10-21 09:07:20,294 - INFO - \u2705 Estrutura 'TB_ROTEAMENTO_GERAL_DE_AVALIACOES' criada (Conexão ID: 6)
+2025-10-21 09:07:20,294 - INFO - \U0001f195 Estrutura registrada: TB_ROTEAMENTO_GERAL_DE_AVALIACOES
+2025-10-21 09:07:20,300 - INFO - \u2705 Estrutura 'tbl_pedidos' criada (Conexão ID: 6)
+2025-10-21 09:07:20,300 - INFO - \U0001f195 Estrutura registrada: tbl_pedidos
+2025-10-21 09:07:20,304 - INFO - \u2705 Estrutura 'v_certificado_intermedio_mestrado_lt' criada (Conexão ID: 6)
+2025-10-21 09:07:20,305 - INFO - \U0001f195 Estrutura registrada: v_certificado_intermedio_mestrado_lt
+2025-10-21 09:07:20,310 - INFO - \u2705 Estrutura 'V_DADOS_DIPLOMA_BKP_17_08_2023' criada (Conexão ID: 6)
+2025-10-21 09:07:20,310 - INFO - \U0001f195 Estrutura registrada: V_DADOS_DIPLOMA_BKP_17_08_2023
+2025-10-21 09:07:20,315 - INFO - \u2705 Estrutura 'v_prog_curso_de_verao_curso_map' criada (Conexão ID: 6)
+2025-10-21 09:07:20,315 - INFO - \U0001f195 Estrutura registrada: v_prog_curso_de_verao_curso_map
+2025-10-21 09:07:20,319 - INFO - \u2705 Estrutura 'v_prog_declaracoes_usuario_dev' criada (Conexão ID: 6)
+2025-10-21 09:07:20,319 - INFO - \U0001f195 Estrutura registrada: v_prog_declaracoes_usuario_dev
+2025-10-21 09:07:20,325 - INFO - \u2705 Estrutura 'v_prog_estatistica_matriz_global' criada (Conexão ID: 6)
+2025-10-21 09:07:20,325 - INFO - \U0001f195 Estrutura registrada: v_prog_estatistica_matriz_global
+2025-10-21 09:07:20,330 - INFO - \u2705 Estrutura 'v_prog_historico_ctr_bolseiros' criada (Conexão ID: 6)
+2025-10-21 09:07:20,330 - INFO - \U0001f195 Estrutura registrada: v_prog_historico_ctr_bolseiros
+2025-10-21 09:07:20,335 - INFO - \u2705 Estrutura 'v_registro_base_dados_aproveitamento' criada (Conexão ID: 6)
+2025-10-21 09:07:20,335 - INFO - \U0001f195 Estrutura registrada: v_registro_base_dados_aproveitamento
+2025-10-21 09:07:20,340 - INFO - \u2705 Estrutura 'v_registro_base_de_dados_acesso' criada (Conexão ID: 6)
+2025-10-21 09:07:20,340 - INFO - \U0001f195 Estrutura registrada: v_registro_base_de_dados_acesso
+2025-10-21 09:07:20,345 - INFO - \u2705 Estrutura 'v_registro_base_de_dados_de_pos_graduacao' criada (Conexão ID: 6)
+2025-10-21 09:07:20,345 - INFO - \U0001f195 Estrutura registrada: v_registro_base_de_dados_de_pos_graduacao
+2025-10-21 09:07:20,349 - INFO - \u2705 Estrutura 'v_registro_base_de_dados_graduados_preliminar_e_definitivo' criada (Conexão ID: 6)
+2025-10-21 09:07:20,349 - INFO - \U0001f195 Estrutura registrada: v_registro_base_de_dados_graduados_preliminar_e_definitivo
+2025-10-21 09:07:20,354 - INFO - \u2705 Estrutura 'v_registro_base_de_dados_matricula_inicial' criada (Conexão ID: 6)
+2025-10-21 09:07:20,354 - INFO - \U0001f195 Estrutura registrada: v_registro_base_de_dados_matricula_inicial
+2025-10-21 09:08:03,085 - WARNING - \u26a0\ufe0f Este dialeto não implementa 'get_unique_constraints'. Continuando sem verificar unicidade...
+2025-10-21 09:08:04,283 - INFO - \U0001f7e2 Campo 'id' criado na estrutura ID 420
+2025-10-21 09:08:04,316 - INFO - \U0001f7e2 Campo 'data_movimento' criado na estrutura ID 420
+2025-10-21 09:08:04,336 - INFO - \U0001f7e2 Campo 'valor' criado na estrutura ID 420
+2025-10-21 09:08:04,353 - INFO - \U0001f7e2 Campo 'valor_anterior' criado na estrutura ID 420
+2025-10-21 09:08:04,369 - INFO - \U0001f7e2 Campo 'codigo_ano_lectivo' criado na estrutura ID 420
+2025-10-21 09:08:04,387 - INFO - \U0001f7e2 Campo 'codigo_empresa' criado na estrutura ID 420
+2025-10-21 09:08:04,388 - INFO - \U0001f7e2 Valores ENUM sincronizados: {'id': [], 'data_movimento': [], 'valor': [], 'valor_anterior': [], 'codigo_ano_lectivo': [], 'codigo_empresa': []}
+2025-10-21 09:08:09,216 - INFO - query_payload:baseTable='t_conta_corrente_empresa' joins={} table_list=['t_conta_corrente_empresa'] select=[] aliaisTables={'t_conta_corrente_empresa.id': 't_conta_corrente_empresa.id', 't_conta_corrente_empresa.data_movimento': 't_conta_corrente_empresa.data_movimento', 't_conta_corrente_empresa.valor': 't_conta_corrente_empresa.valor', 't_conta_corrente_empresa.valor_anterior': 't_conta_corrente_empresa.valor_anterior', 't_conta_corrente_empresa.codigo_ano_lectivo': 't_conta_corrente_empresa.codigo_ano_lectivo', 't_conta_corrente_empresa.codigo_empresa': 't_conta_corrente_empresa.codigo_empresa'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2025-10-21 09:08:10,553 - INFO - Consulta criada com sucesso (ID=96, UserID=1, ConnID=6)
+2025-10-21 09:08:10,553 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=6, Duração=275ms, Tabelas=['t_conta_corrente_empresa'], Linhas=0, Status=success
+2025-10-21 09:08:11,037 - INFO - Consulta criada com sucesso (ID=97, UserID=1, ConnID=6)
+2025-10-21 09:08:11,037 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=6, Duração=17ms, Tabelas=['t_conta_corrente_empresa'], Linhas=0, Status=success
+2025-10-21 09:08:11,064 - ERROR - Exception closing connection <AdaptedConnection <aioodbc.connection.Connection object at 0x000002D93F4B38C0>>
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 376, in _close_connection
+    self._dialect.do_close(connection)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 712, in do_close
+    dbapi_connection.close()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\aioodbc.py", line 87, in close
+    super().close()
+    ~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 207, in close
+    self.await_(self._connection.close())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\aioodbc\connection.py", line 137, in close
+    c = await self._execute(self._conn.close)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError: Cancelled by cancel scope 2d93f551020
+2025-10-21 09:08:16,850 - INFO - \U0001f4ca Executando SELECT para usuário 1 (unknown)
+2025-10-21 09:08:16,850 - INFO - \U0001f4cb Tabela: t_ano_lectivo
+2025-10-21 09:08:16,850 - INFO - \U0001f50e Iniciando execução da query com filtros...
+2025-10-21 09:08:16,850 - INFO - \U0001f4d8 Query montada:
+SELECT * FROM [t_ano_lectivo] ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
+2025-10-21 09:08:16,850 - INFO - \U0001f4e6 Parâmetros: {}
+2025-10-21 09:08:16,895 - INFO - \u2705 Preview gerado com 15 linhas (cap 500).
+2025-10-21 09:08:16,899 - INFO - \u2705 Query executada com sucesso.
+2025-10-21 09:08:16,919 - INFO - Consulta criada com sucesso (UserID=1, ConnID=6)
+2025-10-21 09:08:17,017 - INFO - \U0001f4ca Executando SELECT para usuário 1 (unknown)
+2025-10-21 09:08:17,017 - INFO - \U0001f4cb Tabela: t_empresa_convenio
+2025-10-21 09:08:17,017 - INFO - \U0001f50e Iniciando execução da query com filtros...
+2025-10-21 09:08:17,017 - INFO - \U0001f4d8 Query montada:
+SELECT * FROM [t_empresa_convenio] ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
+2025-10-21 09:08:17,017 - INFO - \U0001f4e6 Parâmetros: {}
+2025-10-21 09:08:17,025 - INFO - \u2705 Preview gerado com 8 linhas (cap 500).
+2025-10-21 09:08:17,028 - INFO - \u2705 Query executada com sucesso.
+2025-10-21 09:08:17,038 - INFO - Consulta criada com sucesso (UserID=1, ConnID=6)
+2025-10-21 09:08:53,023 - INFO - \U0001f4ca Executando SELECT para usuário 1 (unknown)
+2025-10-21 09:08:53,024 - INFO - \U0001f4cb Tabela: t_ano_lectivo
+2025-10-21 09:08:53,024 - INFO - \U0001f50e Iniciando execução da query com filtros...
+2025-10-21 09:08:53,024 - INFO - \U0001f4d8 Query montada:
+SELECT * FROM [t_ano_lectivo] ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
+2025-10-21 09:08:53,024 - INFO - \U0001f4e6 Parâmetros: {}
+2025-10-21 09:08:53,055 - INFO - \u2705 Preview gerado com 15 linhas (cap 500).
+2025-10-21 09:08:53,058 - INFO - \u2705 Query executada com sucesso.
+2025-10-21 09:08:53,065 - INFO - Consulta criada com sucesso (UserID=1, ConnID=6)
+2025-10-21 09:09:50,076 - INFO - \U0001f4ca Executando SELECT para usuário 1 (unknown)
+2025-10-21 09:09:50,076 - INFO - \U0001f4cb Tabela: t_ano_lectivo
+2025-10-21 09:09:50,076 - INFO - \U0001f50e Iniciando execução da query com filtros...
+2025-10-21 09:09:50,076 - INFO - \U0001f4d8 Query montada:
+SELECT * FROM [t_ano_lectivo] ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
+2025-10-21 09:09:50,077 - INFO - \U0001f4e6 Parâmetros: {}
+2025-10-21 09:09:50,109 - INFO - \u2705 Preview gerado com 15 linhas (cap 500).
+2025-10-21 09:09:50,112 - INFO - \u2705 Query executada com sucesso.
+2025-10-21 09:09:50,125 - INFO - Consulta criada com sucesso (UserID=1, ConnID=6)
+2025-10-21 09:13:33,063 - INFO - Inserindo linha para usuário 1
+2025-10-21 09:13:33,142 - INFO - Consulta criada com sucesso (UserID=1, ConnID=6)
+2025-10-21 09:13:33,142 - INFO - \u2705 Registro(s) inserido(s) com sucesso: 
+t_conta_corrente_empresa: 1 linha(s) inserida(s)
+2025-10-21 09:13:33,142 - INFO - Linha inserida com sucesso
+2025-10-21 09:14:21,530 - INFO - query_payload:baseTable='t_conta_corrente_empresa' joins={} table_list=['t_conta_corrente_empresa'] select=[] aliaisTables={'t_conta_corrente_empresa.id': 't_conta_corrente_empresa.id', 't_conta_corrente_empresa.data_movimento': 't_conta_corrente_empresa.data_movimento', 't_conta_corrente_empresa.valor': 't_conta_corrente_empresa.valor', 't_conta_corrente_empresa.valor_anterior': 't_conta_corrente_empresa.valor_anterior', 't_conta_corrente_empresa.codigo_ano_lectivo': 't_conta_corrente_empresa.codigo_ano_lectivo', 't_conta_corrente_empresa.codigo_empresa': 't_conta_corrente_empresa.codigo_empresa'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2025-10-21 09:14:21,817 - INFO - Consulta criada com sucesso (ID=103, UserID=1, ConnID=6)
+2025-10-21 09:14:21,818 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=6, Duração=22ms, Tabelas=['t_conta_corrente_empresa'], Linhas=1, Status=success
+2025-10-21 09:14:27,282 - INFO - \U0001f4e5 Processando relatório de query (formato: pdf)...
+2025-10-21 09:14:27,288 - INFO - \U0001f4ca Relatório construído com 24 elementos
+2025-10-21 09:14:27,361 - INFO - \u2705 Relatório gerado com sucesso: temp_reports\relatorio_query_1_20251021_091427.pdf
+2025-10-21 09:14:27,361 - INFO - \u2705 PDF de query gerado: relatorio_query_1_20251021_091427.pdf
+2025-10-21 09:14:27,363 - INFO - \u2705 Relatório query PDF entregue em 0.27s
+2025-10-21 09:14:27,363 - INFO - \U0001f4e6 Preparando resposta do arquivo:
+ • Caminho: temp_reports\relatorio_query_1_20251021_091427.pdf
+ • Tipo MIME: application/pdf
+ • Nome do Arquivo: relatorio_query_1_20251021_091427.pdf
+ • Cabeçalhos: {
+  "X-Tempo-Geracao": "0.27s",
+  "X-Formato": "pdf",
+  "Content-Disposition": "attachment; filename=\"relatorio_query_1_20251021_091427.pdf\""
+}
+2025-10-21 09:25:05,160 - INFO - \U0001f4ca Executando SELECT para usuário 1 (unknown)
+2025-10-21 09:25:05,164 - INFO - \U0001f4cb Tabela: t_empresa_convenio
+2025-10-21 09:25:05,164 - INFO - \U0001f50e Iniciando execução da query com filtros...
+2025-10-21 09:25:05,165 - INFO - \U0001f4d8 Query montada:
+SELECT * FROM [t_empresa_convenio] ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
+2025-10-21 09:25:05,165 - INFO - \U0001f4e6 Parâmetros: {}
+2025-10-21 09:25:05,190 - INFO - \u2705 Preview gerado com 8 linhas (cap 500).
+2025-10-21 09:25:05,195 - INFO - \u2705 Query executada com sucesso.
+2025-10-21 09:25:05,237 - INFO - Consulta criada com sucesso (UserID=1, ConnID=6)
+2025-10-21 09:25:05,258 - INFO - \U0001f4ca Executando SELECT para usuário 1 (unknown)
+2025-10-21 09:25:05,258 - INFO - \U0001f4cb Tabela: t_ano_lectivo
+2025-10-21 09:25:05,258 - INFO - \U0001f50e Iniciando execução da query com filtros...
+2025-10-21 09:25:05,258 - INFO - \U0001f4d8 Query montada:
+SELECT * FROM [t_ano_lectivo] ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY
+2025-10-21 09:25:05,258 - INFO - \U0001f4e6 Parâmetros: {}
+2025-10-21 09:25:05,294 - INFO - \u2705 Preview gerado com 15 linhas (cap 500).
+2025-10-21 09:25:05,296 - INFO - \u2705 Query executada com sucesso.
+2025-10-21 09:25:05,305 - INFO - Consulta criada com sucesso (UserID=1, ConnID=6)
+2025-10-21 09:39:20,929 - INFO - query_payload:baseTable='t_conta_corrente_empresa' joins={} table_list=['t_conta_corrente_empresa'] select=[] aliaisTables={'t_conta_corrente_empresa.id': 't_conta_corrente_empresa.id', 't_conta_corrente_empresa.data_movimento': 't_conta_corrente_empresa.data_movimento', 't_conta_corrente_empresa.valor': 't_conta_corrente_empresa.valor', 't_conta_corrente_empresa.valor_anterior': 't_conta_corrente_empresa.valor_anterior', 't_conta_corrente_empresa.codigo_ano_lectivo': 't_conta_corrente_empresa.codigo_ano_lectivo', 't_conta_corrente_empresa.codigo_empresa': 't_conta_corrente_empresa.codigo_empresa'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2025-10-21 09:39:21,297 - INFO - Consulta criada com sucesso (ID=106, UserID=1, ConnID=6)
+2025-10-21 09:39:21,297 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=6, Duração=17ms, Tabelas=['t_conta_corrente_empresa'], Linhas=8, Status=success
+2025-10-21 09:39:21,473 - ERROR - Exception closing connection <AdaptedConnection <aioodbc.connection.Connection object at 0x000002D93F56D590>>
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 376, in _close_connection
+    self._dialect.do_close(connection)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 712, in do_close
+    dbapi_connection.close()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\aioodbc.py", line 87, in close
+    super().close()
+    ~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 207, in close
+    self.await_(self._connection.close())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\aioodbc\connection.py", line 137, in close
+    c = await self._execute(self._conn.close)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError: Cancelled by cancel scope 2d93f552db0
+2025-10-21 09:39:40,146 - WARNING - \u26a0\ufe0f Este dialeto não implementa 'get_unique_constraints'. Continuando sem verificar unicidade...
+2025-10-21 09:39:40,244 - INFO - \U0001f7e2 Campo 'id' criado na estrutura ID 448
+2025-10-21 09:39:40,281 - INFO - \U0001f7e2 Campo 'contribuinte' criado na estrutura ID 448
+2025-10-21 09:39:40,311 - INFO - \U0001f7e2 Campo 'data_cadastro' criado na estrutura ID 448
+2025-10-21 09:39:40,344 - INFO - \U0001f7e2 Campo 'designacao' criado na estrutura ID 448
+2025-10-21 09:39:40,380 - INFO - \U0001f7e2 Campo 'email' criado na estrutura ID 448
+2025-10-21 09:39:40,418 - INFO - \U0001f7e2 Campo 'estado' criado na estrutura ID 448
+2025-10-21 09:39:40,460 - INFO - \U0001f7e2 Campo 'morada' criado na estrutura ID 448
+2025-10-21 09:39:40,495 - INFO - \U0001f7e2 Campo 'quantidade_de_alunos' criado na estrutura ID 448
+2025-10-21 09:39:40,532 - INFO - \U0001f7e2 Campo 'responsavel_contrato' criado na estrutura ID 448
+2025-10-21 09:39:40,563 - INFO - \U0001f7e2 Campo 'teletone' criado na estrutura ID 448
+2025-10-21 09:39:40,593 - INFO - \U0001f7e2 Campo 'telefone' criado na estrutura ID 448
+2025-10-21 09:39:40,594 - INFO - \U0001f7e2 Valores ENUM sincronizados: {'id': [], 'contribuinte': [], 'data_cadastro': [], 'designacao': [], 'email': [], 'estado': [], 'morada': [], 'quantidade_de_alunos': [], 'responsavel_contrato': [], 'teletone': [], 'telefone': []}
+2025-10-21 09:40:51,180 - INFO - query_payload:baseTable='t_conta_corrente_empresa' joins={'t_empresa_convenio': AdvancedJoinOption(conditions=[JoinCondition(table='t_empresa_convenio', leftColumn='t_conta_corrente_empresa.codigo_empresa', operator='=', rightColumn='t_empresa_convenio.id', rightValue=None, valueColumnType='int', useValue=False, logicalOperator='AND', caseSensitive=None, collation=None, functionLeft=None, functionRight=None)], alias=None, typeJoin='INNER JOIN', groupStart=None, groupEnd=None)} table_list=['t_conta_corrente_empresa', 't_empresa_convenio'] select=[] aliaisTables={'t_conta_corrente_empresa.id': 't_conta_corrente_empresa.id', 't_conta_corrente_empresa.data_movimento': 't_conta_corrente_empresa.data_movimento', 't_conta_corrente_empresa.valor': 't_conta_corrente_empresa.valor', 't_conta_corrente_empresa.valor_anterior': 't_conta_corrente_empresa.valor_anterior', 't_conta_corrente_empresa.codigo_ano_lectivo': 't_conta_corrente_empresa.codigo_ano_lectivo', 't_conta_corrente_empresa.codigo_empresa': 't_conta_corrente_empresa.codigo_empresa', 't_empresa_convenio.designacao': 't_empresa_convenio.designacao'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2025-10-21 09:40:51,471 - INFO - Consulta criada com sucesso (ID=107, UserID=1, ConnID=6)
+2025-10-21 09:40:51,472 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=6, Duração=31ms, Tabelas=['t_conta_corrente_empresa', 't_empresa_convenio'], Linhas=8, Status=success
+2025-10-21 09:40:51,606 - INFO - Consulta criada com sucesso (ID=108, UserID=1, ConnID=6)
+2025-10-21 09:40:51,607 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=6, Duração=20ms, Tabelas=['t_conta_corrente_empresa', 't_empresa_convenio'], Linhas=8, Status=success
+2025-10-21 09:51:58,144 - INFO - \U0001f9f9 Cache expirado removido: 0033d93e7b5898baa5d7d14e10f6bded4dcc743f5ce8f8be8b599641e49dcdfb.pkl.gz
+2025-10-21 09:51:58,159 - INFO - \U0001f9f9 Cache expirado removido: 008e8f60a9d9cc37f71c5b37ff2d7b309751e66cda5360b3354a7e1a52e6a7db.pkl.gz
+2025-10-21 09:51:58,162 - INFO - \U0001f9f9 Cache expirado removido: 00b11c5ba70ce65f34371274bd4a2da96851f3d3e29151284ea7872d21094d43.pkl.gz
+2025-10-21 09:51:58,166 - INFO - \U0001f9f9 Cache expirado removido: 012fbfa09151b8e91e3ba2ee5769d9704fa348398d9b127670374bf643f1c17d.pkl.gz
+2025-10-21 09:51:58,294 - INFO - \U0001f9f9 Cache expirado removido: 017926ee292f2dda25118005c4f811ffcebc73b78e1c0213596cb45cb895e842.pkl.gz
+2025-10-21 09:51:58,299 - INFO - \U0001f9f9 Cache expirado removido: 02f16253c162667b26667532348d30cfb13877bd0c83ca6041a1e318fc5e971e.pkl.gz
+2025-10-21 09:51:58,302 - INFO - \U0001f9f9 Cache expirado removido: 036c13dc5c93a16ef365f187138fc92022d48082755fee442e7207fdd27fce5e.pkl.gz
+2025-10-21 09:51:58,304 - INFO - \U0001f9f9 Cache expirado removido: 03ba8f76277cb826603866ad74d6750831d94727d733655db6567b2a7d0454b0.pkl.gz
+2025-10-21 09:51:58,308 - INFO - \U0001f9f9 Cache expirado removido: 042dfdf5e12ed1bb6038c4ae443f9b42d70a69faf9bb855301cc6d0e97940d86.pkl.gz
+2025-10-21 09:51:58,310 - INFO - \U0001f9f9 Cache expirado removido: 053ea463d24349aa3505a51c92d6f5052c1fd215de239bb4e8fe59115be703ba.pkl.gz
+2025-10-21 09:51:58,312 - INFO - \U0001f9f9 Cache expirado removido: 05e8a945d4f4b91b3fa614e35bafa27f575ea0350f7656d892b3ce5e781ce640.pkl.gz
+2025-10-21 09:51:58,315 - INFO - \U0001f9f9 Cache expirado removido: 060ed7afcc25984b91c34056ff8e1ff17f9345b97a7504eeae62c1926bcb3b80.pkl.gz
+2025-10-21 09:51:58,318 - INFO - \U0001f9f9 Cache expirado removido: 063d2128f9a366cc3702c7829991fb440aeaf7c81a776a17ab599a6eb69449f5.pkl.gz
+2025-10-21 09:51:58,320 - INFO - \U0001f9f9 Cache expirado removido: 070fffcb10a65d665f15804e311ddba2800d411882b7c2fc7d1baa3697fee423.pkl.gz
+2025-10-21 09:51:58,324 - INFO - \U0001f9f9 Cache expirado removido: 07f3edf215c339d4caad8613956867b5a58d5eaa4f58ec38c045741702857269.pkl.gz
+2025-10-21 09:51:58,326 - INFO - \U0001f9f9 Cache expirado removido: 084cc57045b517c41fc9752d685eb418b50468c994ccfef313a67f8b4816bf9d.pkl.gz
+2025-10-21 09:51:58,329 - INFO - \U0001f9f9 Cache expirado removido: 08648409f0b1426aeca4d8f6a9df41a50b36481d0792facad5115858a229fff4.pkl.gz
+2025-10-21 09:51:58,333 - INFO - \U0001f9f9 Cache expirado removido: 0870549ec4edac0cfe8d91f68f35755e11bad1329de165f56141db0129162064.pkl.gz
+2025-10-21 09:51:58,335 - INFO - \U0001f9f9 Cache expirado removido: 09fa65bfc94963215d64a520665b4d8ae504e0965766a3ab25c8f1141543c4b9.pkl.gz
+2025-10-21 09:51:58,338 - INFO - \U0001f9f9 Cache expirado removido: 0a37c17065233b66a0e48476f96090ecffe6b7989eaa5ad80c2c6704d56843fb.pkl.gz
+2025-10-21 09:51:58,341 - INFO - \U0001f9f9 Cache expirado removido: 0a3d4980a70ffcd3adc10fdc1a36855c4e717b76b5cb4d2019af2bf6387ce78d.pkl.gz
+2025-10-21 09:51:58,343 - INFO - \U0001f9f9 Cache expirado removido: 0b4a15e8ffac7ecfed29aeb8cb0841dc4bcfe3537e7db7c7bac141232333774e.pkl.gz
+2025-10-21 09:51:58,346 - INFO - \U0001f9f9 Cache expirado removido: 0b70ed01f128138f1cc5889dd7249710c4dde9f6ff7dd23e8d8b9f0ce8edc23a.pkl.gz
+2025-10-21 09:51:58,349 - INFO - \U0001f9f9 Cache expirado removido: 0b840461221dbe3a9c50b9c73382c22f7e350617bd7efee204fb6cfaa12cba9b.pkl.gz
+2025-10-21 09:51:58,351 - INFO - \U0001f9f9 Cache expirado removido: 0b8afad63918b08152d7362d096b7df1cad4121fd6ae341acec28296fc8f74b3.pkl.gz
+2025-10-21 09:51:58,353 - INFO - \U0001f9f9 Cache expirado removido: 0ca0e98e1f67637087375a1cba45ddb99594cfce4bcc4c0fdd5c709dbf8709e5.pkl.gz
+2025-10-21 09:51:58,355 - INFO - \U0001f9f9 Cache expirado removido: 0cb98dfb34b12dfae6f399fc128080add61bd01e775a5b99ed8850877c6599e4.pkl.gz
+2025-10-21 09:51:58,357 - INFO - \U0001f9f9 Cache expirado removido: 0cd8cd778e2ecefed3fc04b92606c559204e50c4408bf7ca6ffe51df41a0628b.pkl.gz
+2025-10-21 09:51:58,360 - INFO - \U0001f9f9 Cache expirado removido: 0ce2844c7714c674d0605b31b42105f3751d29209e6fc88547a1ad14d4b4186f.pkl.gz
+2025-10-21 09:51:58,362 - INFO - \U0001f9f9 Cache expirado removido: 0d0f51e5f655ae9f32d003d0982f633d3a9e09e464b4008598b1d5508b97ad33.pkl.gz
+2025-10-21 09:51:58,366 - INFO - \U0001f9f9 Cache expirado removido: 0d28d5dd46d5aa31e822e342e596b9e936e3f5f69f3737c83f188fe5873f88e2.pkl.gz
+2025-10-21 09:51:58,368 - INFO - \U0001f9f9 Cache expirado removido: 0d8eed0d59bc86f29e80d290f452037df0ccddf6d0e058f8eac25a09622833c7.pkl.gz
+2025-10-21 09:51:58,369 - INFO - \U0001f9f9 Cache expirado removido: 0d95dd3fb3fcb97c33f52ac400752f59599ebe41a9afab140594d9d6403434a3.pkl.gz
+2025-10-21 09:51:58,371 - INFO - \U0001f9f9 Cache expirado removido: 0ec6163a230372bd9b0c8654ccbdc3d9350f596d38c79e526c81a1f736a1fe5d.pkl.gz
+2025-10-21 09:51:58,390 - INFO - \U0001f9f9 Cache expirado removido: 0ef7a6617680cc3e35bae8e6ffb1804ac0f6ffbcf717e8d776c72aeb3a342488.pkl.gz
+2025-10-21 09:51:58,394 - INFO - \U0001f9f9 Cache expirado removido: 0fbb6c4336dfc78317a2597e194589ec45d0840e57902ef0959e31acfa1f2eb2.pkl.gz
+2025-10-21 09:51:58,397 - INFO - \U0001f9f9 Cache expirado removido: 0fdb8bf3a6e683bfb6396b99d923a6c727dd5c431b7b4f493a2e171ceb2c1575.pkl.gz
+2025-10-21 09:51:58,398 - INFO - \U0001f9f9 Cache expirado removido: 102b517b6681c6dcfe49f2cfb56c2cbd13103d5231cd5d1f5a210d53b3fc4310.pkl.gz
+2025-10-21 09:51:58,401 - INFO - \U0001f9f9 Cache expirado removido: 10b4f5e7b46206f08c3a691f57e5d3a075515f0a617af51c383012c3cb3a0e3f.pkl.gz
+2025-10-21 09:51:58,404 - INFO - \U0001f9f9 Cache expirado removido: 114be37699332c131efb699b229ce4d2af8b1a4f85b138c0da5aa9d126e6ac01.pkl.gz
+2025-10-21 09:51:58,407 - INFO - \U0001f9f9 Cache expirado removido: 1240b9d76239a908c6b406433b5e389bc44c275318388923a5145352c1db3fae.pkl.gz
+2025-10-21 09:51:58,410 - INFO - \U0001f9f9 Cache expirado removido: 126a0297f4abf0f14ebd57bd1a18acf262a3053732b4a55317d37e941a46613c.pkl.gz
+2025-10-21 09:51:58,412 - INFO - \U0001f9f9 Cache expirado removido: 1416149391c7ce33fc528d1d17e6187748d0d68795f06431a19f5eda58003c5c.pkl.gz
+2025-10-21 09:51:58,416 - INFO - \U0001f9f9 Cache expirado removido: 148ca02a9fcaceb92c029a6612e1d9972e521ac40dabc91eb5178a567db8e358.pkl.gz
+2025-10-21 09:51:58,418 - INFO - \U0001f9f9 Cache expirado removido: 14c7c8f77fc2e69beb5fb23fe3e491ff03d2fa401bbce5bca422e56a3bbda46b.pkl.gz
+2025-10-21 09:51:58,421 - INFO - \U0001f9f9 Cache expirado removido: 14f2a9227c13429fd3b4a2a44da1c938882ca5e5262240dc4e9c6d3d860d4a66.pkl.gz
+2025-10-21 09:51:58,423 - INFO - \U0001f9f9 Cache expirado removido: 1593349a45deac9a9a15d281875aa72037235f9da945d71f2a6f7c4b0cca3ec9.pkl.gz
+2025-10-21 09:51:58,425 - INFO - \U0001f9f9 Cache expirado removido: 15d0e2309c8f69cd96d582bcb472dcfb7d6f62e76d2278a3c7aee835d7112862.pkl.gz
+2025-10-21 09:51:58,427 - INFO - \U0001f9f9 Cache expirado removido: 168ccdb7c2ddcf09b6a5297ffdd50c6a44afdce035c89de1c8482ddb78e69f47.pkl.gz
+2025-10-21 09:51:58,429 - INFO - \U0001f9f9 Cache expirado removido: 16d4140a5c9975e573e6a424ebd0d4b1126cc01c0a4ccd192d36a02f40868d2d.pkl.gz
+2025-10-21 09:51:58,432 - INFO - \U0001f9f9 Cache expirado removido: 17a524ddd7409024966f6e5e3f89e35b6f9afa6abc6eef3d785c49a4a1b1fe72.pkl.gz
+2025-10-21 09:51:58,470 - INFO - \U0001f9f9 Cache expirado removido: 180816c35f01acadcf9a85de4f91c042dacfa5f6237f4f522c81d0ccf3e99227.pkl.gz
+2025-10-21 09:51:58,475 - INFO - \U0001f9f9 Cache expirado removido: 1883d13c27576d5bbeb5f56ae8ec7b610c61d24fbd19913fcf93a5e30bfe7ee2.pkl.gz
+2025-10-21 09:51:58,477 - INFO - \U0001f9f9 Cache expirado removido: 191cd7bdee75ac598ad550370d22a301d3248a2db067e26bff33b0090e0eae67.pkl.gz
+2025-10-21 09:51:58,479 - INFO - \U0001f9f9 Cache expirado removido: 1954b5e8b863d6630c802289e129322050eed37ec90c089fd40cbbf69133cc46.pkl.gz
+2025-10-21 09:51:58,482 - INFO - \U0001f9f9 Cache expirado removido: 1970ca7d337d67dad808d489ea5fb425871db1bd64d6410a6f5f3c8904b414f8.pkl.gz
+2025-10-21 09:51:58,485 - INFO - \U0001f9f9 Cache expirado removido: 197a39fd70c53e92dbe6927ed17762921ea55dca6b98f5b378b2c110b2c04841.pkl.gz
+2025-10-21 09:51:58,487 - INFO - \U0001f9f9 Cache expirado removido: 1a0bf5dcd5fe2e3192917277f50ec384a353b4247aa40034e1fbef49e43ae1e9.pkl.gz
+2025-10-21 09:51:58,490 - INFO - \U0001f9f9 Cache expirado removido: 1a82df300775743f67a2e9c0ab5270123924087c452ba74ee41b4f6e05a900c4.pkl.gz
+2025-10-21 09:51:58,492 - INFO - \U0001f9f9 Cache expirado removido: 1b373f09ec7516309a7d692f14c83de4bb9c38a6712890b231e22240a3ec48dc.pkl.gz
+2025-10-21 09:51:58,494 - INFO - \U0001f9f9 Cache expirado removido: 1b6da0a48d8f2cda334613ad547be0e5b238f64f40864baadf4fff21b6acd080.pkl.gz
+2025-10-21 09:51:58,498 - INFO - \U0001f9f9 Cache expirado removido: 1b7966c5884fb93d2c7812980fece0aabb12c571861f3682751fda458cc69b79.pkl.gz
+2025-10-21 09:51:58,499 - INFO - \U0001f9f9 Cache expirado removido: 1c31bc959f7db13579fa0d03bc6d02499126b9ce5c91e329f6de294a976660a3.pkl.gz
+2025-10-21 09:51:58,501 - INFO - \U0001f9f9 Cache expirado removido: 1cdd83e823869aa42b1488500bf2430a7d3338d630d992a0bcd3829d95d5a0c0.pkl.gz
+2025-10-21 09:51:58,503 - INFO - \U0001f9f9 Cache expirado removido: 1d41ebe996fbde4d116f8a1ca2cb371e07c8a5e723ecf755cab91bd58a0a5660.pkl.gz
+2025-10-21 09:51:58,506 - INFO - \U0001f9f9 Cache expirado removido: 1d621c1d650bdc9be59a41fa6c17db4f6a453791a5d7b5172c54bc1fed76aa28.pkl.gz
+2025-10-21 09:51:58,507 - INFO - \U0001f9f9 Cache expirado removido: 1ebe1f2294ef5528eee0f31c2ae0660667dd5d25e9e80a89971f5cf91dbaf7ec.pkl.gz
+2025-10-21 09:51:58,509 - INFO - \U0001f9f9 Cache expirado removido: 1f01afec554d0863938d62714829097d3e1aee04c7633237a1165b0632de0604.pkl.gz
+2025-10-21 09:51:58,512 - INFO - \U0001f9f9 Cache expirado removido: 203b32bc0bc436abb6bbf76b9e8a1239f70b0376507e5248306b621fd58cdf17.pkl.gz
+2025-10-21 09:51:58,515 - INFO - \U0001f9f9 Cache expirado removido: 215fa10fbca21092e06e89da931ab29d288a9f223c0b4d9b82b611f23fcf8642.pkl.gz
+2025-10-21 09:51:58,518 - INFO - \U0001f9f9 Cache expirado removido: 2252adf32077621cc971ab6fc4fdc388d7b2c2e80b76ae3cdeb3a17b2d0db745.pkl.gz
+2025-10-21 09:51:58,519 - INFO - \U0001f9f9 Cache expirado removido: 2366df2b98120f7c68c5a4405697fc2cebc5b8e2acd10ef17d511b247a78a4ee.pkl.gz
+2025-10-21 09:51:58,522 - INFO - \U0001f9f9 Cache expirado removido: 24da14ab620f649f7572768253bcbe807a93e679e81d03c56dab3c0618c64983.pkl.gz
+2025-10-21 09:51:58,557 - INFO - \U0001f9f9 Cache expirado removido: 252df5890f31597ad860133d283de6a4644ba821bed1406b8d3c981e1531a7ad.pkl.gz
+2025-10-21 09:51:58,561 - INFO - \U0001f9f9 Cache expirado removido: 2567224ac5394e7e19cc00c0eef9f68575e178ea9668fa5ac78ebabb75d71f64.pkl.gz
+2025-10-21 09:51:58,563 - INFO - \U0001f9f9 Cache expirado removido: 2670bc60e9358bff0776b3deda1990d4f92c2ab8b60377999dcf01b90f03601b.pkl.gz
+2025-10-21 09:51:58,566 - INFO - \U0001f9f9 Cache expirado removido: 270987343da305deb67194eb5f1df3e7de3ab6c8e39976137e2929b28c746f21.pkl.gz
+2025-10-21 09:51:58,568 - INFO - \U0001f9f9 Cache expirado removido: 28db1cfd79189370c0846b288a1c864ed5e9aede0f8d5c703c6911674a1a84b2.pkl.gz
+2025-10-21 09:51:58,571 - INFO - \U0001f9f9 Cache expirado removido: 299f162adc8182f0c6d73f83745b438313256d99d16894499e76d1f4fe9aeb60.pkl.gz
+2025-10-21 09:51:58,574 - INFO - \U0001f9f9 Cache expirado removido: 2a4bee8548eee50c88455584e33e34fde25da370f62827c3f499b0fdeab89d6e.pkl.gz
+2025-10-21 09:51:58,576 - INFO - \U0001f9f9 Cache expirado removido: 2a54ba5c5234918cbc1558bb83cb81583b82bd56b2a13890122679e269e4b40d.pkl.gz
+2025-10-21 09:51:58,577 - INFO - \U0001f9f9 Cache expirado removido: 2aa9188f4738e09a693f1d4079484f4ae7d758da6f472448db45741513960711.pkl.gz
+2025-10-21 09:51:58,579 - INFO - \U0001f9f9 Cache expirado removido: 2ac0cf7b17923b42429aaefd6f61b669f05e57d8984a4d2f1cd4aabc9e1feceb.pkl.gz
+2025-10-21 09:51:58,581 - INFO - \U0001f9f9 Cache expirado removido: 2aee9abf89e990609fa6ad6748a9fba85307c1478cb85bd763e151fee5170e45.pkl.gz
+2025-10-21 09:51:58,583 - INFO - \U0001f9f9 Cache expirado removido: 2b2b2ca9c58ddd28d1179d4793b4bdb854379dba2bb38a32c40e90dbb30c18a4.pkl.gz
+2025-10-21 09:51:58,586 - INFO - \U0001f9f9 Cache expirado removido: 2c396862bb3f1c84b2c0ef0d2328fb3e1c2b126018657f25b58b3cb2868741b6.pkl.gz
+2025-10-21 09:51:58,589 - INFO - \U0001f9f9 Cache expirado removido: 2cb621f7d2cefcf6d5edd90bebd983ca5256474fe1daf88e9027d7bfa5b9346d.pkl.gz
+2025-10-21 09:51:58,591 - INFO - \U0001f9f9 Cache expirado removido: 2d3d4e79a7cc302af72e098f24812ba1b68148861e3d0a2f10f3da625b9ea4a2.pkl.gz
+2025-10-21 09:51:58,598 - INFO - \U0001f9f9 Cache expirado removido: 2dfd78d8b1156b3641030e58ca9aa2702d7c98bc9a9fec8819e6bcb9f925027b.pkl.gz
+2025-10-21 09:51:58,601 - INFO - \U0001f9f9 Cache expirado removido: 2e7ee30cdc3203a6d7c8b2907788981977dc2866c17c148c482f482dc976a872.pkl.gz
+2025-10-21 09:51:58,603 - INFO - \U0001f9f9 Cache expirado removido: 2f080a2720bd805077de49d26983d3cc0eb497217731b634ee429610d0a2a47f.pkl.gz
+2025-10-21 09:51:58,606 - INFO - \U0001f9f9 Cache expirado removido: 2f25dec22604fce4f1ad1a801ca843f389a6fac16a0097b5f37ac749df48df8a.pkl.gz
+2025-10-21 09:51:58,610 - INFO - \U0001f9f9 Cache expirado removido: 2ff58b85328638f619e2ffd244e392b867a68dee6541206ea468617d5e4fbae3.pkl.gz
+2025-10-21 09:51:58,612 - INFO - \U0001f9f9 Cache expirado removido: 3063e4b99dc105f1e20b927fcc12057d1fd87be542702fec9db70e677fc715c4.pkl.gz
+2025-10-21 09:51:58,615 - INFO - \U0001f9f9 Cache expirado removido: 30adb69a4106dd4a251fd84c5112d1bc3752b441ab87f1730a39213286c26960.pkl.gz
+2025-10-21 09:51:58,617 - INFO - \U0001f9f9 Cache expirado removido: 319b23ad5160bd08312b7f87c50c61555b73e47b03e81b3472612825915d86aa.pkl.gz
+2025-10-21 09:51:58,620 - INFO - \U0001f9f9 Cache expirado removido: 31d9d433a1feedd5e9c7339b8c6a41158e0c574d15b5dd8fb1e979a875d8e949.pkl.gz
+2025-10-21 09:51:58,623 - INFO - \U0001f9f9 Cache expirado removido: 32c1e49a28d35de3e12b30f1bda111fc687b061602a7644fe66f8b248ff51ebf.pkl.gz
+2025-10-21 09:51:58,626 - INFO - \U0001f9f9 Cache expirado removido: 3438df6043ba21c56a608ed43526ce7d66ab7680e2d38263cae38e0c670bdcc2.pkl.gz
+2025-10-21 09:51:58,627 - INFO - \U0001f9f9 Cache expirado removido: 343b0351beb16895381acab5286c57cb1292af0ba54b8378605d9d53a1a7c5e4.pkl.gz
+2025-10-21 09:51:58,630 - INFO - \U0001f9f9 Cache expirado removido: 348a8ae6bdd0e466b3a3a817466d623f5814e548494b66a6a35a8daae2951955.pkl.gz
+2025-10-21 09:51:58,632 - INFO - \U0001f9f9 Cache expirado removido: 34d4f74f07e837b8c38e19016a40befec56dd493da821ef4a66e12c506994ab8.pkl.gz
+2025-10-21 09:51:58,635 - INFO - \U0001f9f9 Cache expirado removido: 35909ae243e4f17687274a0dc0167246db3f210f569a288b7577e52f494a7233.pkl.gz
+2025-10-21 09:51:58,638 - INFO - \U0001f9f9 Cache expirado removido: 361598fd0f3618beeb83fea2b2ad18aff222e33f34b426c7c33e56ac0c9fa4c7.pkl.gz
+2025-10-21 09:51:58,639 - INFO - \U0001f9f9 Cache expirado removido: 362eb836d2003ba1f15ba05c6614bb8ffe2a19a7c79b7b02b0ee4d56f3ce8765.pkl.gz
+2025-10-21 09:51:58,641 - INFO - \U0001f9f9 Cache expirado removido: 36c2ea5303074ff0d8fd67002118b1c68295b4657071d5c79b9d6876e9ffce93.pkl.gz
+2025-10-21 09:51:58,643 - INFO - \U0001f9f9 Cache expirado removido: 37ca55822f9c0f80c62c594de580e178a7fd8473cd61233b32a5fe7dc1190a66.pkl.gz
+2025-10-21 09:51:58,646 - INFO - \U0001f9f9 Cache expirado removido: 383cccb0ffaaaad0e5c3b92d25b6d6ee00d63048988dc809ed3e23b78f3d77a3.pkl.gz
+2025-10-21 09:51:58,647 - INFO - \U0001f9f9 Cache expirado removido: 38dcab9976524751c2bf61573bba2f46333aa5d48698fff51f4e3041b4d88132.pkl.gz
+2025-10-21 09:51:58,650 - INFO - \U0001f9f9 Cache expirado removido: 3ab5d5d9d43a2e8a3f5c694ded149471575238f3d171ca89b9ceabd098622bb4.pkl.gz
+2025-10-21 09:51:58,654 - INFO - \U0001f9f9 Cache expirado removido: 3b02622c72df52bbce04f1ebfe4c18afd41263d4e61282d75c70f7f706780380.pkl.gz
+2025-10-21 09:51:58,656 - INFO - \U0001f9f9 Cache expirado removido: 3ba1fcbbc352d417a2642cbd05300e5f997b7e01e50a98ab35c88e1c16cdca8b.pkl.gz
+2025-10-21 09:51:58,657 - INFO - \U0001f9f9 Cache expirado removido: 3bd2a8740bf17e3705adba03f21f08f92a0a2205c4c349cdfca24859ec3661ef.pkl.gz
+2025-10-21 09:51:58,660 - INFO - \U0001f9f9 Cache expirado removido: 3c1926b60bf0ed3f4be283dd58ecb8170a9586001d0533bb752f0817c84264bd.pkl.gz
+2025-10-21 09:51:58,666 - INFO - \U0001f9f9 Cache expirado removido: 3c62c21764af58f4cf6932b4a601aa8fe7ca8c0959ba3b36988c3d5e136874bd.pkl.gz
+2025-10-21 09:51:58,668 - INFO - \U0001f9f9 Cache expirado removido: 3dcb53ae2c3a5c34c268b75f8a3bb0bd704d3e00551875530ddcd71cbf33f3c6.pkl.gz
+2025-10-21 09:51:58,670 - INFO - \U0001f9f9 Cache expirado removido: 3e7d3a8d3ff8876deda91a26383bed5509cda57d0ce3f299785c9540744efed2.pkl.gz
+2025-10-21 09:51:58,672 - INFO - \U0001f9f9 Cache expirado removido: 3ef18730567814dd434fafc53f44512ae299f0eb8a3c1b332e777094e3bbfb37.pkl.gz
+2025-10-21 09:51:58,674 - INFO - \U0001f9f9 Cache expirado removido: 3ff9140efdcab95365c48ff49245ac53c4eabebd375a31e2165a8a2fccc6827d.pkl.gz
+2025-10-21 09:51:58,676 - INFO - \U0001f9f9 Cache expirado removido: 405c185ec2aa86c039c3dba6df2df3fbcac6aede2836ae4ddaf204b1c90df07e.pkl.gz
+2025-10-21 09:51:58,678 - INFO - \U0001f9f9 Cache expirado removido: 408e19122572762dbe45196ef7a337cd8b3c0d9611d2761ae61758ebc681b022.pkl.gz
+2025-10-21 09:51:58,680 - INFO - \U0001f9f9 Cache expirado removido: 40e3f534b9897fbf2873c4a0c20b9f09681bc9c84fce8a44e55d85d32cabb51f.pkl.gz
+2025-10-21 09:51:58,683 - INFO - \U0001f9f9 Cache expirado removido: 40f87a2f7fc8fa839dd4d984476f82828b5ebdb4f870b6963d54cd413d656b84.pkl.gz
+2025-10-21 09:51:58,686 - INFO - \U0001f9f9 Cache expirado removido: 41724ae1dc0c41c2c01a022de4753d1ed405ad3241638b06d0391006e61eff71.pkl.gz
+2025-10-21 09:51:58,688 - INFO - \U0001f9f9 Cache expirado removido: 417b2b9993d7789e8584ca29049030318fc4ca50ca0540acf228a184750eb10d.pkl.gz
+2025-10-21 09:51:58,690 - INFO - \U0001f9f9 Cache expirado removido: 41b612e1e11ff5ca2984c7e817fc79712d1a6dc68e036c18a251a71ba9b8f94f.pkl.gz
+2025-10-21 09:51:58,692 - INFO - \U0001f9f9 Cache expirado removido: 4237f94218e1c1bc04b478d7e7af2e6a37ac5da4654d654f6a3a8e9edfb04a1a.pkl.gz
+2025-10-21 09:51:58,695 - INFO - \U0001f9f9 Cache expirado removido: 424abdf66eddf3d0b6e87b42f5a2091308311b44195b5fd54fd0a6fa1978c786.pkl.gz
+2025-10-21 09:51:58,697 - INFO - \U0001f9f9 Cache expirado removido: 42ebaf95748f35bdee5608aa407a6993fe3d32cd4e37b051e8f3b23134258dcd.pkl.gz
+2025-10-21 09:51:58,700 - INFO - \U0001f9f9 Cache expirado removido: 42fb01893a5a97811d89be9d0bb6f5637d06eaa3d71525976021b430e8114805.pkl.gz
+2025-10-21 09:51:58,702 - INFO - \U0001f9f9 Cache expirado removido: 430e467ec9c4a6b4027c703b3bd6bf3b47221c3d3eff9f45ad0b2b85a7cce02c.pkl.gz
+2025-10-21 09:51:58,705 - INFO - \U0001f9f9 Cache expirado removido: 43b1dcafcce8fac04fe7c6cc4ef6b0e8b1168000cba49f403efcc76aafb331ad.pkl.gz
+2025-10-21 09:51:58,707 - INFO - \U0001f9f9 Cache expirado removido: 441cd82da70d18dbefc4487745c7c5270d24610326e275cafe5439cb8e83e571.pkl.gz
+2025-10-21 09:51:58,710 - INFO - \U0001f9f9 Cache expirado removido: 4442c752a9c4b18f8d9506d057aa63e065562f4618de79af7c57675cecafb901.pkl.gz
+2025-10-21 09:51:58,713 - INFO - \U0001f9f9 Cache expirado removido: 4496e78de32a14da6b6aacb313bfd4beae3bda46cc355549ac9d97fe7bfbc1b6.pkl.gz
+2025-10-21 09:51:58,715 - INFO - \U0001f9f9 Cache expirado removido: 451b3114240ee78cfb0408d73a23b9a87a20aea94dcc66baf0a11d75a0098f7e.pkl.gz
+2025-10-21 09:51:58,717 - INFO - \U0001f9f9 Cache expirado removido: 4522ffece02618dcfba7eed06bad8704dd3347c9f07f94a57b825bd409165c1b.pkl.gz
+2025-10-21 09:51:58,720 - INFO - \U0001f9f9 Cache expirado removido: 45b0b105c161173f8aa3d68684b55bac47b1e36dd601902b6adc9f022bc2af92.pkl.gz
+2025-10-21 09:51:58,723 - INFO - \U0001f9f9 Cache expirado removido: 4651ca51022db3affab4761ba8b09ef9b266ecac34da48951bd25c93bc01bbda.pkl.gz
+2025-10-21 09:51:58,727 - INFO - \U0001f9f9 Cache expirado removido: 4691abe7f9b8eda4ac0b70c807499a572b277cabcd2ccc72545af240d9efa051.pkl.gz
+2025-10-21 09:51:58,730 - INFO - \U0001f9f9 Cache expirado removido: 47500b29b717348722b805a00eff61fc5a8dee039b31cf91b550abbd27f2525c.pkl.gz
+2025-10-21 09:51:58,732 - INFO - \U0001f9f9 Cache expirado removido: 4915a92cd05275c637c0af7b115109d3ef3b22aaa7bcb386bf3989554ffeb3fc.pkl.gz
+2025-10-21 09:51:58,734 - INFO - \U0001f9f9 Cache expirado removido: 4923f29fc937f48ebee28d6e2e5b42c22957c29cee697dddebad8a121cf84689.pkl.gz
+2025-10-21 09:51:58,736 - INFO - \U0001f9f9 Cache expirado removido: 497ac202f59dc9c3f5e747363475484669751606444022a1fe81432d29dd8fa5.pkl.gz
+2025-10-21 09:51:58,739 - INFO - \U0001f9f9 Cache expirado removido: 4999f022f98d6f404d78b52017fc3b0643c9092c3fa2481fc2aed8d9f806e59c.pkl.gz
+2025-10-21 09:51:58,740 - INFO - \U0001f9f9 Cache expirado removido: 4b8c7cae6f557f28d0ffb9df4e841065e171ce9feefa9465bd14babe09d15981.pkl.gz
+2025-10-21 09:51:58,742 - INFO - \U0001f9f9 Cache expirado removido: 4b93cc1c61b50f7f6669c0e7bd2cdef6d2c93153a53889aa87facd8bde73c7bc.pkl.gz
+2025-10-21 09:51:58,745 - INFO - \U0001f9f9 Cache expirado removido: 4c0b2c298b5fb546fac2aae421ac957fae82a29c81b0a4a48c54eadc71be1054.pkl.gz
+2025-10-21 09:51:58,748 - INFO - \U0001f9f9 Cache expirado removido: 4d1cbae25879d319a3d89a8dddd0240a8e4d617425e70187d85a546711d94ebd.pkl.gz
+2025-10-21 09:51:58,749 - INFO - \U0001f9f9 Cache expirado removido: 4d9bfed935c7154e5b38be01851db3a86c3738ee28f0ad2d028f403a00a731c2.pkl.gz
+2025-10-21 09:51:58,751 - INFO - \U0001f9f9 Cache expirado removido: 4e0eaae92f8f009c9fa1e93891c4f88cf65296de2b1e52e9caf46a6d3ba7fcae.pkl.gz
+2025-10-21 09:51:58,753 - INFO - \U0001f9f9 Cache expirado removido: 4e9ac0e6f3828c5ce52cd05842e814cf0eed28cd9c2caf8513ce95ba39b91621.pkl.gz
+2025-10-21 09:51:58,755 - INFO - \U0001f9f9 Cache expirado removido: 5091d2fd83553b9c44ab811c2ad011d047768ca1a1c215fb54c9e419fe4099c5.pkl.gz
+2025-10-21 09:51:58,757 - INFO - \U0001f9f9 Cache expirado removido: 50940c5ea0d31acc14879a849ae20abc44c8d1742d827994207d9fe8773010ed.pkl.gz
+2025-10-21 09:51:58,760 - INFO - \U0001f9f9 Cache expirado removido: 50b9a8f0b5a672540556ed4a3105faf90fdcb60f6ae6310ccb13454651335b00.pkl.gz
+2025-10-21 09:51:58,763 - INFO - \U0001f9f9 Cache expirado removido: 50f4a04517439868850d956e9283eb550535d192bb6087fa61e17a1a9b242351.pkl.gz
+2025-10-21 09:51:58,765 - INFO - \U0001f9f9 Cache expirado removido: 511e04563b69defbdfa9185d62a069ce1b332b1f3a3a505a7c7ba57b518e688b.pkl.gz
+2025-10-21 09:51:58,767 - INFO - \U0001f9f9 Cache expirado removido: 51e8b850c98d3d8a4fbf85e7ee322fe3cd06216b782881f9174956a485dcbdc1.pkl.gz
+2025-10-21 09:51:58,770 - INFO - \U0001f9f9 Cache expirado removido: 51f6204b4316a908d6832bd60eb53a866319e3a32c2e780b3b3943ea4dd3927d.pkl.gz
+2025-10-21 09:51:58,772 - INFO - \U0001f9f9 Cache expirado removido: 5216de6be327680d6fd3bf1eb7445ff2059b7cfa4c82c81a859d34489c8cf25a.pkl.gz
+2025-10-21 09:51:58,775 - INFO - \U0001f9f9 Cache expirado removido: 521e106907865199df66d297b1b9ae38a5e412f8b43a714116803aa54b9ec117.pkl.gz
+2025-10-21 09:51:58,778 - INFO - \U0001f9f9 Cache expirado removido: 523fbc0f0f609547c1e5970c60878a2be2c371d2c933c6d6d28d68eea28aece3.pkl.gz
+2025-10-21 09:51:58,780 - INFO - \U0001f9f9 Cache expirado removido: 535e3044d2fd84e8399aa47a43b2019d1601e53d438d15f27a5a030cd4b60cc0.pkl.gz
+2025-10-21 09:51:58,783 - INFO - \U0001f9f9 Cache expirado removido: 545e18dd93a2dacb95124f795d7616118fda91e524101c4dbc5fa91f0de7f1d6.pkl.gz
+2025-10-21 09:51:58,785 - INFO - \U0001f9f9 Cache expirado removido: 5471ddd46c53c144966ff67a80f7d7eb3fedced9e4200068265b487ff7f7b7f0.pkl.gz
+2025-10-21 09:51:58,787 - INFO - \U0001f9f9 Cache expirado removido: 54d16104d9c491404584ac376aecafab04858dc13831f75498dd4f4d7412ac88.pkl.gz
+2025-10-21 09:51:58,789 - INFO - \U0001f9f9 Cache expirado removido: 54dfd8093d5f8f7f14d992843b650d6d2179882ff0abd33598753fe3d1af2370.pkl.gz
+2025-10-21 09:51:58,791 - INFO - \U0001f9f9 Cache expirado removido: 54e83d0fa0c6ae6ea32192d1433c4690b959e3b83134668493bdef51722405b2.pkl.gz
+2025-10-21 09:51:58,794 - INFO - \U0001f9f9 Cache expirado removido: 56752cbb4a88d84e940fe9cc3264b90ad16e6fca636e1a31f3ecc7f722b43186.pkl.gz
+2025-10-21 09:51:58,797 - INFO - \U0001f9f9 Cache expirado removido: 579dff523c1487058a57c3d4c6569f08486e442bdc6b7a60ace207bc682f6bb5.pkl.gz
+2025-10-21 09:51:58,799 - INFO - \U0001f9f9 Cache expirado removido: 58d11a09294f07698de45a8e575431634077763069078115995a9ff4de6d7bad.pkl.gz
+2025-10-21 09:51:58,801 - INFO - \U0001f9f9 Cache expirado removido: 58e15ca0bf62cb6f48ab01501516f186281446024e8351af3fe1ab6e6fbd77e3.pkl.gz
+2025-10-21 09:51:58,804 - INFO - \U0001f9f9 Cache expirado removido: 5b5594e24fc061eea4df1e8c96bbacc728ebc23fed1de1a24d6dab444c1830aa.pkl.gz
+2025-10-21 09:51:58,806 - INFO - \U0001f9f9 Cache expirado removido: 5bf00f59bab817fc7b8543f5fe0908ffeb5aaacbff20d300810feec8ae775e6c.pkl.gz
+2025-10-21 09:51:58,808 - INFO - \U0001f9f9 Cache expirado removido: 5c246289db99beb982967772292ed423e44c281756b8b219ee6943d7b1183f74.pkl.gz
+2025-10-21 09:51:58,810 - INFO - \U0001f9f9 Cache expirado removido: 5d6e9445475894eaadd485c059c082ba8cfdf24d38ee820d1ee6b8176fd5f23c.pkl.gz
+2025-10-21 09:51:58,815 - INFO - \U0001f9f9 Cache expirado removido: 5e8d2ff1b4a903bc8cd85e468cde2dc5a52d63e4fc1dd67b2b4a8d79fd2eea5e.pkl.gz
+2025-10-21 09:51:58,816 - INFO - \U0001f9f9 Cache expirado removido: 6078b978cbef0e4d7eacaf70e1d6268e8d72a5334ce1ccb32cfafc841d24ec43.pkl.gz
+2025-10-21 09:51:58,820 - INFO - \U0001f9f9 Cache expirado removido: 608a47ada16b2a3694e2ae1693c84e1283191f7b15bc9b557b44a95a2c572220.pkl.gz
+2025-10-21 09:51:58,823 - INFO - \U0001f9f9 Cache expirado removido: 60f5740252edc732ceee2459950d5fafeb905d4c904dea9e52e843658db96783.pkl.gz
+2025-10-21 09:51:58,828 - INFO - \U0001f9f9 Cache expirado removido: 61b0b6cabfefc2a684380023291682fc1cad7065ca21678428dc70b72b2efea9.pkl.gz
+2025-10-21 09:51:58,831 - INFO - \U0001f9f9 Cache expirado removido: 623263ecd31d3c1760fafffd6acc8689b4a635ca4df997f8253da7dbeb884ceb.pkl.gz
+2025-10-21 09:51:58,832 - INFO - \U0001f9f9 Cache expirado removido: 625d8049ecfbba46ee86465d625b6a1bd450a6265cc5696d12457cb072289d19.pkl.gz
+2025-10-21 09:51:58,835 - INFO - \U0001f9f9 Cache expirado removido: 62d75b1cc6c042b90f109b6409da1f6b2b8542cc3b7196e9e9319985c20323f8.pkl.gz
+2025-10-21 09:51:58,837 - INFO - \U0001f9f9 Cache expirado removido: 630c1b1c8c78f57a84e777e793a78d29d80daead7d963b8484e934a8db1a00bb.pkl.gz
+2025-10-21 09:51:58,840 - INFO - \U0001f9f9 Cache expirado removido: 6322bb9b76810ab99d830fbe619ea5afa8fe1e57530371cc8a768c929c8e453b.pkl.gz
+2025-10-21 09:51:58,843 - INFO - \U0001f9f9 Cache expirado removido: 637313317db01a83ed86e5325775f63ceacd3ea85d6c6d4badf2d7592c5821d1.pkl.gz
+2025-10-21 09:51:58,845 - INFO - \U0001f9f9 Cache expirado removido: 637da5e9c93e275566327a57cc4c9ddca59afd59ce9a052b23ad97836ff652a6.pkl.gz
+2025-10-21 09:51:58,848 - INFO - \U0001f9f9 Cache expirado removido: 63872e1201deff33262d0f70cb133478bf8e5443bfbc1c8623150e3a1eedc2cf.pkl.gz
+2025-10-21 09:51:58,851 - INFO - \U0001f9f9 Cache expirado removido: 642a1705aa320be349fc2db185a5f7fa09f0347076a1d99be11eaa6459f886b2.pkl.gz
+2025-10-21 09:51:58,854 - INFO - \U0001f9f9 Cache expirado removido: 645aa35a521724d8612fd9485e3eeb89ab114a7195feb21aa8e4696841807d65.pkl.gz
+2025-10-21 09:51:58,856 - INFO - \U0001f9f9 Cache expirado removido: 64dec91c88c5a34ad99e25f877dad9ee012d20884fbd8ebe0890681ef0790f54.pkl.gz
+2025-10-21 09:51:58,858 - INFO - \U0001f9f9 Cache expirado removido: 64f63560b0843965e813dce84c645ab02f6f51ed026f006ab225f8922c910740.pkl.gz
+2025-10-21 09:51:58,860 - INFO - \U0001f9f9 Cache expirado removido: 65822a6060eb06db6e40d7c41cba89bf0b728770b93011cc6378ad8d477356e3.pkl.gz
+2025-10-21 09:51:58,862 - INFO - \U0001f9f9 Cache expirado removido: 65ec23aecfbc4c2dee9cb40299d60f057f07417b486bf4abc8de561251dc8ed1.pkl.gz
+2025-10-21 09:51:58,865 - INFO - \U0001f9f9 Cache expirado removido: 6605f345e75495dd5e79b6e1027794fe70c170934aa32d5dfdbc2ec6093a6de8.pkl.gz
+2025-10-21 09:51:58,868 - INFO - \U0001f9f9 Cache expirado removido: 665a909444c392acd4956b391373384064731155f6675fd58dea691be353c1e7.pkl.gz
+2025-10-21 09:51:58,870 - INFO - \U0001f9f9 Cache expirado removido: 66ac014b06aa409e58ed5fe1f74944ad1a191c2d36c161a7295fac2538dafed7.pkl.gz
+2025-10-21 09:51:58,872 - INFO - \U0001f9f9 Cache expirado removido: 6788a5a60cb380b61b59e1dd61e28d3c385ba6df158f276838662c35aaaff7f4.pkl.gz
+2025-10-21 09:51:58,874 - INFO - \U0001f9f9 Cache expirado removido: 681048b85339c41d0140ce02190ae6f7c22a76ccb19ede4f9b019496a3f609ca.pkl.gz
+2025-10-21 09:51:58,876 - INFO - \U0001f9f9 Cache expirado removido: 681aeb1d913892132aeaced26cdb84b5fbc07ad51ee94a0017e45bf8d4363478.pkl.gz
+2025-10-21 09:51:58,878 - INFO - \U0001f9f9 Cache expirado removido: 684d7b63b81b8b33cb45c327a7da1a8bdc36bb0cc87d187cb941abebbfcee6ec.pkl.gz
+2025-10-21 09:51:58,881 - INFO - \U0001f9f9 Cache expirado removido: 6862d1a6f5862d6d55118a5848c53d5a2d891c833adabb0de0c06775d8648074.pkl.gz
+2025-10-21 09:51:58,884 - INFO - \U0001f9f9 Cache expirado removido: 6883da736750989bb68bc7738ac28c6411e6ddc5f437e44a61e8faedd0e95738.pkl.gz
+2025-10-21 09:51:58,887 - INFO - \U0001f9f9 Cache expirado removido: 691e1cb0575d9bf518b2519208948133da7d0a75fff69f8a4a606ae3cb2532f1.pkl.gz
+2025-10-21 09:52:00,178 - INFO - \U0001f9f9 Cache expirado removido: 6a38285e75bdfec0a700c30d706f09e67a8925b4fa30cd4bec6e8717fb3bb6ba.pkl.gz
+2025-10-21 09:52:00,183 - INFO - \U0001f9f9 Cache expirado removido: 6a475b7786a3dbbbcc34f399ef9c183fe068cf410d15a7515b9385526c477d0b.pkl.gz
+2025-10-21 09:52:00,186 - INFO - \U0001f9f9 Cache expirado removido: 6ac6c330a69494a9a435c7a4f795e6e171421b27b3ef2d928f35449d38205d08.pkl.gz
+2025-10-21 09:52:00,188 - INFO - \U0001f9f9 Cache expirado removido: 6ae41dfcd591e2de682f35c65b792f03e127fcba3f14e2979ba52a735fa83e12.pkl.gz
+2025-10-21 09:52:00,189 - INFO - \U0001f9f9 Cache expirado removido: 6b62db54d98b71c25533b9ec898af2aa76fc81ac6c0a34e8ecef945c4e397b99.pkl.gz
+2025-10-21 09:52:00,191 - INFO - \U0001f9f9 Cache expirado removido: 6c7a7202c1fcf38d550cf9536f660e54843a9e386cce74fc319f755f84817083.pkl.gz
+2025-10-21 09:52:00,194 - INFO - \U0001f9f9 Cache expirado removido: 6c7f8280617c87f1956c071fb8afa98fd1ca65737a6c9016f0a5c13d7b50264a.pkl.gz
+2025-10-21 09:52:00,195 - INFO - \U0001f9f9 Cache expirado removido: 6c81040a7e42d86a79cce79615a4885b912a3fca72f322bd09e71f4ea53db9ea.pkl.gz
+2025-10-21 09:52:00,197 - INFO - \U0001f9f9 Cache expirado removido: 6cd26f80a3cfc2ca88471944c9c7371e5c30e67d1f3f596e04fb303e1372e3fa.pkl.gz
+2025-10-21 09:52:00,200 - INFO - \U0001f9f9 Cache expirado removido: 6d95bfc8330351226ba09715c57441881a713faeee0157cad8e2e316b60cd411.pkl.gz
+2025-10-21 09:52:00,202 - INFO - \U0001f9f9 Cache expirado removido: 6d9d4c9b0397277b613ec3b966d0756d9729445ca6e7cd035b2e4add85c23d95.pkl.gz
+2025-10-21 09:52:00,203 - INFO - \U0001f9f9 Cache expirado removido: 6e8b212ad287b0fe1d122bafdcbce1031637f7d439efdc859c78326d02925d9d.pkl.gz
+2025-10-21 09:52:00,206 - INFO - \U0001f9f9 Cache expirado removido: 6ee340eb4fc7cabeea825cec13bfcbcb0fc14c70b6f86f7c59df57846f42651a.pkl.gz
+2025-10-21 09:52:00,208 - INFO - \U0001f9f9 Cache expirado removido: 6f89a60cd7fb01d383d02c66a0b0d7d1a16d74dcb0111dba7e2fc1c2cd8204a9.pkl.gz
+2025-10-21 09:52:00,210 - INFO - \U0001f9f9 Cache expirado removido: 6fc148c4c326a1465b224fe295a3009ac2a1d959ce5032ef57989c46ce0c2c83.pkl.gz
+2025-10-21 09:52:00,212 - INFO - \U0001f9f9 Cache expirado removido: 7131fb7bd27d2c288d2586d52d824ff18aedda2976ffa439008d55d612203db9.pkl.gz
+2025-10-21 09:52:00,215 - INFO - \U0001f9f9 Cache expirado removido: 7134f23a6aed1828906af98c6bc8f787d733fdb8f0f8da6ef03c95893dcaa6ec.pkl.gz
+2025-10-21 09:52:00,217 - INFO - \U0001f9f9 Cache expirado removido: 7190eed0aa7b963a2c8a6f8fea18915575b65f478cfa0e93d0ccba2731419c1c.pkl.gz
+2025-10-21 09:52:00,219 - INFO - \U0001f9f9 Cache expirado removido: 7207ffa404ebfc1bc35f4af414284b3509ca7982e824bda7a238ca5f0881a6a1.pkl.gz
+2025-10-21 09:52:00,221 - INFO - \U0001f9f9 Cache expirado removido: 72974c41e10c200bd416d2ee3972d9079946a5d747ae94ff2cd21bf5857ee8d5.pkl.gz
+2025-10-21 09:52:00,222 - INFO - \U0001f9f9 Cache expirado removido: 73bb290a01a431cc93ccad08b226b78708a66b1c24b352718c50d04064edcb9f.pkl.gz
+2025-10-21 09:52:00,225 - INFO - \U0001f9f9 Cache expirado removido: 73dbe6e373e08fd8c34a7e546dd367ebad9ff13395766e3560a91bb6b208df1f.pkl.gz
+2025-10-21 09:52:00,227 - INFO - \U0001f9f9 Cache expirado removido: 747d011180fc69aeb4e7b98c02b646c9d7c8b793d8905ee965d331ac524731ac.pkl.gz
+2025-10-21 09:52:00,228 - INFO - \U0001f9f9 Cache expirado removido: 759cae2be65f93c14a89735a953af5c2dc78c4f6cc7af3117dc8a3437502b6a3.pkl.gz
+2025-10-21 09:52:00,230 - INFO - \U0001f9f9 Cache expirado removido: 75ec2b4dc76079279c5afd78b8e4c71f29e85ab2851e00930b388cfaef3178be.pkl.gz
+2025-10-21 09:52:00,232 - INFO - \U0001f9f9 Cache expirado removido: 7653068eb1fe507cdf1b9a5a0194cb50534390703f0e6e129aed5f09ace03cbe.pkl.gz
+2025-10-21 09:52:00,234 - INFO - \U0001f9f9 Cache expirado removido: 769cf26ad9f18aef5ce2412079c3804a60e92c04606b1bf6a58d007bd0045c66.pkl.gz
+2025-10-21 09:52:00,236 - INFO - \U0001f9f9 Cache expirado removido: 775c5576684a45f9808079287a2625dcd449ec44e6b3e61e450bfdaeee8a4a31.pkl.gz
+2025-10-21 09:52:00,238 - INFO - \U0001f9f9 Cache expirado removido: 77d48b0e778e72cc4d884f3e542402f720b2f1a8f08f93cdf04146685dedc298.pkl.gz
+2025-10-21 09:52:00,240 - INFO - \U0001f9f9 Cache expirado removido: 7956733f3cd4dee7c758179370f50a00fc46bc01ba3cfabc2a24dde563723be3.pkl.gz
+2025-10-21 09:52:00,243 - INFO - \U0001f9f9 Cache expirado removido: 795ee381e4abfd6eb647cc0276e5ca2e566ad56b2c7a9161f4fd0c180412841e.pkl.gz
+2025-10-21 09:52:00,245 - INFO - \U0001f9f9 Cache expirado removido: 798dbe9e05c94d79d77f7975d1d459d41a53fa0f1477a20eb598d5cc1cf178dd.pkl.gz
+2025-10-21 09:52:00,247 - INFO - \U0001f9f9 Cache expirado removido: 7b82d7354b94e0a3802c2cb13c371c7c76ac1e305c8965ee96fb3b36bf3392b5.pkl.gz
+2025-10-21 09:52:00,248 - INFO - \U0001f9f9 Cache expirado removido: 7bd40026e9dc9c522abd9b09d7c3ed0878d1cf15ff1c1aa7fbd083f8516d3976.pkl.gz
+2025-10-21 09:52:00,250 - INFO - \U0001f9f9 Cache expirado removido: 7c1c1639835c9ff2b3998a9f8a86c3fb7da4cdcdfd714b243c7e2b08d5f822fe.pkl.gz
+2025-10-21 09:52:00,252 - INFO - \U0001f9f9 Cache expirado removido: 7c4df19966d1328c45b8d59ec092d78d9faa31c04b4cacab5427687360486a88.pkl.gz
+2025-10-21 09:52:00,255 - INFO - \U0001f9f9 Cache expirado removido: 7c7ecb57798aae9eb379c652567310dac0851e7e1706ac35a0400919680ab6b5.pkl.gz
+2025-10-21 09:52:00,257 - INFO - \U0001f9f9 Cache expirado removido: 7d856c908a8bfb7bbbbc4ae8e25218adecea6f2d0e7e654768bb973e8a7c25b3.pkl.gz
+2025-10-21 09:52:00,258 - INFO - \U0001f9f9 Cache expirado removido: 7e856ee182fdab5a3b5870c0623cbff57871a3cfd2de7cc2aec310d235315628.pkl.gz
+2025-10-21 09:52:00,260 - INFO - \U0001f9f9 Cache expirado removido: 7ec517a3196ae2a52686aec18cb7efec3205e512893b00873d02a6c7e7ff80ad.pkl.gz
+2025-10-21 09:52:00,262 - INFO - \U0001f9f9 Cache expirado removido: 7f0977f5c7e7b10d146b865a1070c008054fedda8c0322a618e027506ef39265.pkl.gz
+2025-10-21 09:52:00,264 - INFO - \U0001f9f9 Cache expirado removido: 7f137ac5aea088768e257b7344c47b990e11a03de0a035ba101ca87c54b70229.pkl.gz
+2025-10-21 09:52:00,266 - INFO - \U0001f9f9 Cache expirado removido: 8129c08d1af84f0c12fb9396e1bd51941b7cad1c9d3f12ebbe789d1da4192199.pkl.gz
+2025-10-21 09:52:00,268 - INFO - \U0001f9f9 Cache expirado removido: 81ad7f393a51c2c096ff5071fa7f176c92e36d8a6627c6d29e17d8ad4f4d2432.pkl.gz
+2025-10-21 09:52:00,270 - INFO - \U0001f9f9 Cache expirado removido: 8234dab1df0d4ceb499463945bb601190395e82c26319eced39340a972e1cb5e.pkl.gz
+2025-10-21 09:52:00,273 - INFO - \U0001f9f9 Cache expirado removido: 82ae96cf52f99ca388d49f52905804c974cbd3959c08c7f6b4a9bdfebedebd76.pkl.gz
+2025-10-21 09:52:00,275 - INFO - \U0001f9f9 Cache expirado removido: 8488be26b62d189b45a8731995b84ccc02769cb7f89dc4b1b66158e6a6777834.pkl.gz
+2025-10-21 09:52:00,278 - INFO - \U0001f9f9 Cache expirado removido: 84d101d48e8044950cc25efcfc22c8f26e7651b96201bdc1a482f6fa0140a3e1.pkl.gz
+2025-10-21 09:52:00,280 - INFO - \U0001f9f9 Cache expirado removido: 84fd1d49a7e73a39748832b6ad185ed21d986552b5ba7cb69ab78811567d6ce8.pkl.gz
+2025-10-21 09:52:00,281 - INFO - \U0001f9f9 Cache expirado removido: 851de299cb5cd881708f95f9b586143c9d19abe1c4e03928df578bef4d0e2885.pkl.gz
+2025-10-21 09:52:00,282 - INFO - \U0001f9f9 Cache expirado removido: 853038428f77e0960defefb45e2c2c6a8ff3f5ee984ba19a5bcbf31cecb1be10.pkl.gz
+2025-10-21 09:52:00,286 - INFO - \U0001f9f9 Cache expirado removido: 86ba800bc7f88a8d55bc9d9b2a389f3209207495080bf9d0b1a7bfd562486a41.pkl.gz
+2025-10-21 09:52:00,288 - INFO - \U0001f9f9 Cache expirado removido: 87806ab5501880f64abc5fc9357ece163245237a311d87c6c9664a7f11e466e5.pkl.gz
+2025-10-21 09:52:00,290 - INFO - \U0001f9f9 Cache expirado removido: 87d1f8f38acdb95fc61f83e0953820404b1b324da70d5efe42f110f653cb922e.pkl.gz
+2025-10-21 09:52:00,292 - INFO - \U0001f9f9 Cache expirado removido: 881474a764b397f6bb6918cd7a123d32607092af475657479c0db8b43c9513af.pkl.gz
+2025-10-21 09:52:00,295 - INFO - \U0001f9f9 Cache expirado removido: 882b98706c5353dd57b8e38af3068e327b5b107ded25993da94552362148771b.pkl.gz
+2025-10-21 09:52:00,296 - INFO - \U0001f9f9 Cache expirado removido: 8869e947c269f3bef8469b66eb2f568f8701caa83545e43a7988868665069b56.pkl.gz
+2025-10-21 09:52:00,298 - INFO - \U0001f9f9 Cache expirado removido: 888b5ffca4982a6e7a1fae6e3bc30018c9fbe8d55db8fe72aba56b387ddec10d.pkl.gz
+2025-10-21 09:52:00,300 - INFO - \U0001f9f9 Cache expirado removido: 8a1b45f5377a924e310cd08f20d71acae9c18b474d474c3dd9f6e6ff2640977b.pkl.gz
+2025-10-21 09:52:00,302 - INFO - \U0001f9f9 Cache expirado removido: 8b446d7dfe7a7d44a6256f56a3fc5348ae8959fca32d643b1bed189e6a6c0fc3.pkl.gz
+2025-10-21 09:52:00,305 - INFO - \U0001f9f9 Cache expirado removido: 8bb7c533cafbfa64474f097b48fa8031d0def72854fabf5c56d9ffb01a38d1cc.pkl.gz
+2025-10-21 09:52:00,307 - INFO - \U0001f9f9 Cache expirado removido: 8bcc5d1afc6673158e8b16c013e765b869f304fd38a17e645e96b0de8dbf14c3.pkl.gz
+2025-10-21 09:52:00,308 - INFO - \U0001f9f9 Cache expirado removido: 8bcd7c36713499402fd74acaf6f4835af731a493f3b2c473260be9c294df614e.pkl.gz
+2025-10-21 09:52:00,310 - INFO - \U0001f9f9 Cache expirado removido: 8e46016cc9fb8216008396f3596200694a4b1b4ba8e2e49a7765b7c2f97252ae.pkl.gz
+2025-10-21 09:52:00,311 - INFO - \U0001f9f9 Cache expirado removido: 8e5f6e2b85277e93f02b1706fbeefd7ed16de87b95435b153d6434254de72318.pkl.gz
+2025-10-21 09:52:00,312 - INFO - \U0001f9f9 Cache expirado removido: 8f2ec88843b7acd8c57ff4cc223dd2524ce813422e1dbb2ccb2ea9d63b01fb88.pkl.gz
+2025-10-21 09:52:00,314 - INFO - \U0001f9f9 Cache expirado removido: 907097e14f9402677573a6e849227d24776b8b3113620e52705d3b4c3e7cecd5.pkl.gz
+2025-10-21 09:52:00,316 - INFO - \U0001f9f9 Cache expirado removido: 911a2e54539e0280beeaf16dc40ba724e27f61fb08ade1e3fb2afa2554d14c9a.pkl.gz
+2025-10-21 09:52:00,320 - INFO - \U0001f9f9 Cache expirado removido: 922364a83d4632bbe1cd51676a577a07e25b13da5e8ba63326560521c9e97e94.pkl.gz
+2025-10-21 09:52:00,322 - INFO - \U0001f9f9 Cache expirado removido: 92fd13aa180596d7e60915d9390656964fc87b22e47fcea942fc5cf19ee3fadd.pkl.gz
+2025-10-21 09:52:00,324 - INFO - \U0001f9f9 Cache expirado removido: 93cb8d213dc991596cff38df33a7dfdcfeadf9b186a531cf548874d76c023938.pkl.gz
+2025-10-21 09:52:00,326 - INFO - \U0001f9f9 Cache expirado removido: 982d9316613c92d37262237d9bd70bccf32d3f3fa72459c09b9651182557814f.pkl.gz
+2025-10-21 09:52:00,328 - INFO - \U0001f9f9 Cache expirado removido: 98c8193bd2d8c3888f57ae090541757854c002d16a5cf99801e9bb685f9475ab.pkl.gz
+2025-10-21 09:52:00,329 - INFO - \U0001f9f9 Cache expirado removido: 98d8d2c1ec2bead2087c85cb0c40ed3ba33be613fe6b7630e4db9a044e34cd29.pkl.gz
+2025-10-21 09:52:00,330 - INFO - \U0001f9f9 Cache expirado removido: 991e4161fa477b24465a9b5430939fc1df6a5e41e7abf4bd9287bdb0ac04bfd8.pkl.gz
+2025-10-21 09:52:00,332 - INFO - \U0001f9f9 Cache expirado removido: 99c6ebe98bd4c103c7b03f0c43f801f8ef09e98f89d4cb69e0bfda716191ed0c.pkl.gz
+2025-10-21 09:52:00,334 - INFO - \U0001f9f9 Cache expirado removido: 99daf676014f1c45c05f94a348ce9a9311a7888efbe50ebcf4c50a2e460d27fd.pkl.gz
+2025-10-21 09:52:00,337 - INFO - \U0001f9f9 Cache expirado removido: 9ab56f608ff18c1555dd3eae8087b7fab29fef446f1b1f9b0c352139a3a2f3fd.pkl.gz
+2025-10-21 09:52:00,338 - INFO - \U0001f9f9 Cache expirado removido: 9b5291f3231bfb300db7478037e9dbe9980ba42ec8653133f84fb6c541f4c99c.pkl.gz
+2025-10-21 09:52:00,340 - INFO - \U0001f9f9 Cache expirado removido: 9c1b80ad176e7b21fd07bd7701c47ad38b35236a8d486f5107f0cbca4a15c325.pkl.gz
+2025-10-21 09:52:00,342 - INFO - \U0001f9f9 Cache expirado removido: 9c25ab087b4ac7d8b85a79cab39f0576d53c1f8a4f36383d7ef7dc7ac3484730.pkl.gz
+2025-10-21 09:52:00,344 - INFO - \U0001f9f9 Cache expirado removido: 9cafffa200ddb4a797acc8ea2e12425b86c839f9ff2f4b2f86b89731caab3eb3.pkl.gz
+2025-10-21 09:52:00,346 - INFO - \U0001f9f9 Cache expirado removido: 9cf68fc57c9e19bb6f3509ebde985b95d85ba8374dfc2c28ad331cb95a301c2d.pkl.gz
+2025-10-21 09:52:00,348 - INFO - \U0001f9f9 Cache expirado removido: 9d439a2eddc29a97ae0a840ac6d55d0e6047f9366cea625b63f682d6cbb7ef54.pkl.gz
+2025-10-21 09:52:00,350 - INFO - \U0001f9f9 Cache expirado removido: 9d7f67e8224c939af95b8f23798ea754e5dcf391cbe1908f8c62bb1004f13df1.pkl.gz
+2025-10-21 09:52:00,351 - INFO - \U0001f9f9 Cache expirado removido: 9e08e79f69bdf13f02415958a8b4dcf76f9fdc4262d198d108526276aa85725b.pkl.gz
+2025-10-21 09:52:00,353 - INFO - \U0001f9f9 Cache expirado removido: 9e6815bbf38e9f20424393e7442235e8f47d8a7a190c6d481e03eb02c7080781.pkl.gz
+2025-10-21 09:52:00,355 - INFO - \U0001f9f9 Cache expirado removido: 9eb840e9a98b1ec0a1081899acbc44f51bfd2636684a244b975834573b1276e0.pkl.gz
+2025-10-21 09:52:00,357 - INFO - \U0001f9f9 Cache expirado removido: 9ec5fcec8c780c1c5b38682f9991cdaeca33c68e38b2c06ea59a525dd7f01f5b.pkl.gz
+2025-10-21 09:52:00,358 - INFO - \U0001f9f9 Cache expirado removido: 9f7b90febfacdc0ece4bebc74e0c09f6b2ffcd0a2f512829122c5b7e1c22331c.pkl.gz
+2025-10-21 09:52:00,360 - INFO - \U0001f9f9 Cache expirado removido: 9f8178d69377155f9684d3f4beb511657e6b97cd020a5b56c83a91f21ee51406.pkl.gz
+2025-10-21 09:52:00,362 - INFO - \U0001f9f9 Cache expirado removido: a06072f750c8a0c6d8dd6ef8c6c5b86c1152895515a1b59284f85b9db46ffad7.pkl.gz
+2025-10-21 09:52:00,364 - INFO - \U0001f9f9 Cache expirado removido: a0616836bc135cf6792994d3da5b08441115dde8c969aaa332f39302715aaa77.pkl.gz
+2025-10-21 09:52:00,366 - INFO - \U0001f9f9 Cache expirado removido: a11fd19dc283c0bebbfc930e271b4a48f9b89d3d489a5b9d9e7d136fc28b1330.pkl.gz
+2025-10-21 09:52:00,368 - INFO - \U0001f9f9 Cache expirado removido: a153b452881c202ca38a5c5ecaaf707e5ea3968f788ccb60872977ee5f2b556f.pkl.gz
+2025-10-21 09:52:00,370 - INFO - \U0001f9f9 Cache expirado removido: a19413aabae73defa1c4d46ce7972c81163a0fc8892598fd98379da96d9f3b19.pkl.gz
+2025-10-21 09:52:00,372 - INFO - \U0001f9f9 Cache expirado removido: a1e861889321c472fbd5a0b9ed0a0cfa43f0546c722e0d716462f5752993813c.pkl.gz
+2025-10-21 09:52:00,374 - INFO - \U0001f9f9 Cache expirado removido: a2889a45746d7f87e2d67de3b7592b653b79169c68660f36177c414e58920e4d.pkl.gz
+2025-10-21 09:52:00,376 - INFO - \U0001f9f9 Cache expirado removido: a3195b8859b7af161dfedead2e994fcec3bd95cd4a3788d446f85ec215c7d9c9.pkl.gz
+2025-10-21 09:52:00,377 - INFO - \U0001f9f9 Cache expirado removido: a397ace08ec6f2eb6ee68a26ef3aac3b4e4dc4759d6dcc1775c9d48e7454ae4d.pkl.gz
+2025-10-21 09:52:00,379 - INFO - \U0001f9f9 Cache expirado removido: a43840e6d92520ddde7fbe9dd70bf928e5c42e5c90b45d83aa7b8a6131c30a9a.pkl.gz
+2025-10-21 09:52:00,381 - INFO - \U0001f9f9 Cache expirado removido: a5006edd5f29d39df3f36a89cdaf56b052f41506d13b498aa1e50d7eb95100c8.pkl.gz
+2025-10-21 09:52:00,383 - INFO - \U0001f9f9 Cache expirado removido: a5cca74136867fa0885bdca0fa7ae1077859c4247cdf5834fcad9d17626ab663.pkl.gz
+2025-10-21 09:52:00,385 - INFO - \U0001f9f9 Cache expirado removido: a6756b1c53940adc98ca8687c08c6af0aa4ace6775f41b433e4d745b5721bea0.pkl.gz
+2025-10-21 09:52:00,387 - INFO - \U0001f9f9 Cache expirado removido: a6e2ad19030e65e2a1ee9628fb4b5d497872298abef76f4ccffaeccf097a0fe1.pkl.gz
+2025-10-21 09:52:00,389 - INFO - \U0001f9f9 Cache expirado removido: a78e7b13c4cbc993ea50d19b19252c2c0a1811596dfd1a195bc9224cc39a62f0.pkl.gz
+2025-10-21 09:52:00,391 - INFO - \U0001f9f9 Cache expirado removido: a7985fa62d1ae139dcec8bb05097c8c12fe7d6f33eb640f8442de5f166a7419c.pkl.gz
+2025-10-21 09:52:00,393 - INFO - \U0001f9f9 Cache expirado removido: a7b3a83c600c6b08f53ade0f36abb9eecb53deebdd79855ceab8c351fbf32169.pkl.gz
+2025-10-21 09:52:00,396 - INFO - \U0001f9f9 Cache expirado removido: a7bc8a3984698afdd46b25119936cfce0d228a651df5bd7447e9f63839ef00e9.pkl.gz
+2025-10-21 09:52:00,398 - INFO - \U0001f9f9 Cache expirado removido: aa97bff81c7489d35eb8eaac799bf5a27f8485a1b940d19f3d39501411fb29ef.pkl.gz
+2025-10-21 09:52:00,405 - INFO - \U0001f9f9 Cache expirado removido: aaad7ba222360475d99a2a83a58d47ca1e5bfcdc34d0b8afc9736a649e82dde2.pkl.gz
+2025-10-21 09:52:00,426 - INFO - \U0001f9f9 Cache expirado removido: ab12b6b03726c3c710d8a734e68437b4c24b18b1155cc2724e943e337832f89d.pkl.gz
+2025-10-21 09:52:00,428 - INFO - \U0001f9f9 Cache expirado removido: abc05dbbd40eb1ad3aa66b9aa25c9e660949d8afcf35c518b7f05ab6a291f858.pkl.gz
+2025-10-21 09:52:00,430 - INFO - \U0001f9f9 Cache expirado removido: abc6440ce99df3b2d66917344e43a933afa8c4e44056aabc0b718eeb0b902517.pkl.gz
+2025-10-21 09:52:00,432 - INFO - \U0001f9f9 Cache expirado removido: abcdb565dd70527ca39f4c727172dd2c610c654a6bf84c485322f32f515d0e02.pkl.gz
+2025-10-21 09:52:00,434 - INFO - \U0001f9f9 Cache expirado removido: abefb244d94843488cde75fcad80f0b48a2d252a17fe233193107dfea8831059.pkl.gz
+2025-10-21 09:52:00,437 - INFO - \U0001f9f9 Cache expirado removido: abffbfd1b9650881e01b88b05c26443281c54b90bc40d2c259db12c8d0894965.pkl.gz
+2025-10-21 09:52:00,438 - INFO - \U0001f9f9 Cache expirado removido: ac03cbb33ed77c4ccf0d0144b9a0a993cb9537c6220d7ad4c0b8d4e4a623ca4e.pkl.gz
+2025-10-21 09:52:00,440 - INFO - \U0001f9f9 Cache expirado removido: ac0bbe18d37066ebfc60e2596ff9bcded3d64f43d37d44e8318e67886edfe5b3.pkl.gz
+2025-10-21 09:52:00,443 - INFO - \U0001f9f9 Cache expirado removido: ad0d5f16c2c1561a982a5dfe56dac5ff770484313d11af84897f650221c4c072.pkl.gz
+2025-10-21 09:52:00,445 - INFO - \U0001f9f9 Cache expirado removido: ade638f1574a3b76ea8141b8716f9601c31fa05ae6a7db230cbd83c34766e001.pkl.gz
+2025-10-21 09:52:00,446 - INFO - \U0001f9f9 Cache expirado removido: adf48330220fab5cef5e20f4895b38f0180385d617e613c18670f86ab69c16bc.pkl.gz
+2025-10-21 09:52:00,448 - INFO - \U0001f9f9 Cache expirado removido: ae3c393b3ae2b46a627cb51ef6bc7ddb657ec9ee8a9634a4aacf325a0298c8b6.pkl.gz
+2025-10-21 09:52:00,450 - INFO - \U0001f9f9 Cache expirado removido: ae5cc3482a9987473ec78fb757da7926ab9ba544c08cedca3d47f6896fc09758.pkl.gz
+2025-10-21 09:52:00,452 - INFO - \U0001f9f9 Cache expirado removido: aedd34fde0c23cca5a412aaeca7edc62e389beb8babd58da60b1d603a8c04f7b.pkl.gz
+2025-10-21 09:52:00,454 - INFO - \U0001f9f9 Cache expirado removido: aefcec2b547daff1c75a664f795402078502e52f193ec7747932b5122380fa32.pkl.gz
+2025-10-21 09:52:00,456 - INFO - \U0001f9f9 Cache expirado removido: af0013597385ac403707ca89696a6146f8b1e14497cabaac3f7ba6dae375ad83.pkl.gz
+2025-10-21 09:52:00,457 - INFO - \U0001f9f9 Cache expirado removido: afd47b35fced37fa5e753b9c189d88c10f19360f43fc4c8a84145ae99e1c70ad.pkl.gz
+2025-10-21 09:52:00,461 - INFO - \U0001f9f9 Cache expirado removido: b0f6a1ffea473ad3522e521b4a0824bd652f6b7be7b697edd308043808994b0c.pkl.gz
+2025-10-21 09:52:00,462 - INFO - \U0001f9f9 Cache expirado removido: b1d504da6aeabe5f758897d0fc292871eb7c09d71a2371dbb41f4ee0b47865a0.pkl.gz
+2025-10-21 09:52:00,464 - INFO - \U0001f9f9 Cache expirado removido: b2741945808391d8941eb5d2919b696f6190060e3ec6ec83a072642c19438ef7.pkl.gz
+2025-10-21 09:52:00,467 - INFO - \U0001f9f9 Cache expirado removido: b291cb8fba0fb9860c62a449446de7f889ead8f50cac7d92b5af741bee874136.pkl.gz
+2025-10-21 09:52:00,469 - INFO - \U0001f9f9 Cache expirado removido: b31885435650e1d1af8d1300730d79a2d27839e45659c853f51aa7b8c89e6f60.pkl.gz
+2025-10-21 09:52:00,471 - INFO - \U0001f9f9 Cache expirado removido: b3475bea9a33505f9f04eeda920b38ed6780da888d642e4ba00ef3193b2e5d76.pkl.gz
+2025-10-21 09:52:00,472 - INFO - \U0001f9f9 Cache expirado removido: b3e33cf758117768a4aa3a8d5d79ccfcbfe02fb758d996fbaf30cddbd83782f5.pkl.gz
+2025-10-21 09:52:00,475 - INFO - \U0001f9f9 Cache expirado removido: b4124cdf9ea9f831de057325a8f9693c5249dcabf98d56b9b5510b821ae6d317.pkl.gz
+2025-10-21 09:52:00,480 - INFO - \U0001f9f9 Cache expirado removido: b4366c7d180b93acca07cbcf0a441d393e316e39edc21e33a316222e0e23e2ea.pkl.gz
+2025-10-21 09:52:00,482 - INFO - \U0001f9f9 Cache expirado removido: b4dc55f911dc9b3514a97426d53dd5ad6130c206701a194948d513202adc6032.pkl.gz
+2025-10-21 09:52:00,484 - INFO - \U0001f9f9 Cache expirado removido: b4e8c2d655b394e1f0f0188c69286206eecea5dd2c33b114658bb2641ac5a379.pkl.gz
+2025-10-21 09:52:00,496 - INFO - \U0001f9f9 Cache expirado removido: b55d27806691916140c1a4c4e85e392582be667d44d99401cfe4b9ec6b3d8dbb.pkl.gz
+2025-10-21 09:52:00,498 - INFO - \U0001f9f9 Cache expirado removido: b567aefdd23a7f9f7874f5229086398ddf07c4a00726c7a40dd6ef6ac41898c2.pkl.gz
+2025-10-21 09:52:00,501 - INFO - \U0001f9f9 Cache expirado removido: b56c74d7176c994f315ecfad9044853794f2d7d9e7e7aed4fdf33ebdb8a73cca.pkl.gz
+2025-10-21 09:52:00,503 - INFO - \U0001f9f9 Cache expirado removido: b6fa6d7c398c54330871c19fb31c6a6b234df3b00487f7ab97d91138898fea16.pkl.gz
+2025-10-21 09:52:00,509 - INFO - \U0001f9f9 Cache expirado removido: b7b6b3900168565ef19d6cd49de70850007be27f0807932cd7109713d3ba4120.pkl.gz
+2025-10-21 09:52:00,512 - INFO - \U0001f9f9 Cache expirado removido: b804315eb0d33f86daff80b692f8194eb7ebd0bb9a7fc0cc27d798c6552b9556.pkl.gz
+2025-10-21 09:52:00,514 - INFO - \U0001f9f9 Cache expirado removido: b8261d9d1855d38fdfd61234ab076a3718f26fe6b2b4ed7a19118b229d6fd783.pkl.gz
+2025-10-21 09:52:00,517 - INFO - \U0001f9f9 Cache expirado removido: b843537c862209fc0ac65d788724b8fa5cc3cb63aa866273531e08a05cda378c.pkl.gz
+2025-10-21 09:52:00,519 - INFO - \U0001f9f9 Cache expirado removido: b870b15c9a71d4f13fb6828b2ff310a387df2d7af521676c3063a486c7977ce7.pkl.gz
+2025-10-21 09:52:00,520 - INFO - \U0001f9f9 Cache expirado removido: b8d82195296a0755749a91b900826dcd6f1ee5840f09b7c62146aa772b372014.pkl.gz
+2025-10-21 09:52:00,522 - INFO - \U0001f9f9 Cache expirado removido: b8f4659692d2e4d890a3c0f5500fcb12711db48459e8be8f333cac2e2bdba0e1.pkl.gz
+2025-10-21 09:52:00,525 - INFO - \U0001f9f9 Cache expirado removido: b8ff57939bf5aef6fa86d8925ab736334d9cf5474ff828c835a9fb95909449b9.pkl.gz
+2025-10-21 09:52:00,526 - INFO - \U0001f9f9 Cache expirado removido: baa8c65f61bde744bda6a41e1e5461f5a691a221085e0cbfd682aa9539cf93b4.pkl.gz
+2025-10-21 09:52:00,528 - INFO - \U0001f9f9 Cache expirado removido: bb8c5872f84351a4ec9a5774de9498e0a17c45571ee8ed443208ee7efd6e1246.pkl.gz
+2025-10-21 09:52:00,530 - INFO - \U0001f9f9 Cache expirado removido: bbf7c2efce65b091bf0d5ee1f3d38439c1e1282995fb86bc45f771ce40e6fbe8.pkl.gz
+2025-10-21 09:52:00,532 - INFO - \U0001f9f9 Cache expirado removido: bdfb36f2c0a8b7849528408b8985e7ba96856930990b99fdc948d9789dc7c11f.pkl.gz
+2025-10-21 09:52:00,535 - INFO - \U0001f9f9 Cache expirado removido: be1a427ea808ea64d9ce62a4dbbe70e971fc4b57964f7385bdf0325ef2893f07.pkl.gz
+2025-10-21 09:52:00,537 - INFO - \U0001f9f9 Cache expirado removido: bee8937f087e67237c058a80f4d183cbc3052e78eed4b83ee2d3a3133a789b9c.pkl.gz
+2025-10-21 09:52:00,539 - INFO - \U0001f9f9 Cache expirado removido: bf3631ed7488c130424a06b7910a5703f34f09e931ce8058a9d441fa682f1633.pkl.gz
+2025-10-21 09:52:00,541 - INFO - \U0001f9f9 Cache expirado removido: bf45873a65129b06c9dc81d14f183a8b616703adcfdcb82d00eb81a1a3895276.pkl.gz
+2025-10-21 09:52:00,544 - INFO - \U0001f9f9 Cache expirado removido: bf6360820984fe21a366118fe777c025054b1acdf709e4129d8e719056ce64de.pkl.gz
+2025-10-21 09:52:00,547 - INFO - \U0001f9f9 Cache expirado removido: bf7ee2d5e7513b0b9c8484e66fda380a279b65ddd2941ae9743e8c4345da4822.pkl.gz
+2025-10-21 09:52:00,550 - INFO - \U0001f9f9 Cache expirado removido: c104aeb2c76312cf2b53e0fd93e55ac63a29e1a03e86df5a294a39ade4c3c280.pkl.gz
+2025-10-21 09:52:00,553 - INFO - \U0001f9f9 Cache expirado removido: c125ab1f1cfe5117072de826d8559bd65bdf5e30d1c5c66a9fac3c5f798a4b6c.pkl.gz
+2025-10-21 09:52:00,556 - INFO - \U0001f9f9 Cache expirado removido: c1d3cac47f8481fb9a16c6d69d7c351a449b78a3ad5ba2f85b826941126ca58e.pkl.gz
+2025-10-21 09:52:00,558 - INFO - \U0001f9f9 Cache expirado removido: c1f4d6098942a9debcc45a0138612194cc6a66cb7826d6dd0698246dedbf8dfb.pkl.gz
+2025-10-21 09:52:00,560 - INFO - \U0001f9f9 Cache expirado removido: c27943918ec3d57fb8f0d2cf802cdd6652831c4d6f5e700536aec4c62405bba1.pkl.gz
+2025-10-21 09:52:00,561 - INFO - \U0001f9f9 Cache expirado removido: c2c20407dbe985c34d4ecdd88e7ed77f3aa985806b73721d8f5883abd834d025.pkl.gz
+2025-10-21 09:52:00,563 - INFO - \U0001f9f9 Cache expirado removido: c38a764948ad482d37ffca823d626fc3e4a37d4adb26ea36ce15aa450b80a4c0.pkl.gz
+2025-10-21 09:52:00,566 - INFO - \U0001f9f9 Cache expirado removido: c4db07cfcac3d0be21352df7767422d5eb1e43f7f0069220133777dda96f4d9d.pkl.gz
+2025-10-21 09:52:00,568 - INFO - \U0001f9f9 Cache expirado removido: c5dc904b13c1da4b275a9196ddab0d25adc4390c0c0dff9a020b60f8d01ad7fd.pkl.gz
+2025-10-21 09:52:00,570 - INFO - \U0001f9f9 Cache expirado removido: c64add97996e1915bbe1844b8111a644b3278ff1628733424dfeff1de7012020.pkl.gz
+2025-10-21 09:52:00,571 - INFO - \U0001f9f9 Cache expirado removido: c65ad386c9f5d10463d543d422667c677a7856a84e388a92a55a514ce4035909.pkl.gz
+2025-10-21 09:52:00,573 - INFO - \U0001f9f9 Cache expirado removido: c687e6d162b17d85b23d979bdf83ebf5e49789b01dc8967cd41f30fc57a7c510.pkl.gz
+2025-10-21 09:52:00,576 - INFO - \U0001f9f9 Cache expirado removido: c89e581fe90f9ed5edf249aa5fda041eaf7ba9d36b888e3ccf6606d219549dff.pkl.gz
+2025-10-21 09:52:00,578 - INFO - \U0001f9f9 Cache expirado removido: c8a2760b8b8152ebae28a74c5457974cabbe16282bacdb1d97a85883c1fd1f4f.pkl.gz
+2025-10-21 09:52:00,579 - INFO - \U0001f9f9 Cache expirado removido: c9442b66f657969b82a1fbba4d7b4494b108fb77be48ad7d7b10106571999baa.pkl.gz
+2025-10-21 09:52:00,581 - INFO - \U0001f9f9 Cache expirado removido: c95af0b3126f41308d5cf10e0df1eec6f821ade6178cf5438aae70df2970fbca.pkl.gz
+2025-10-21 09:52:00,582 - INFO - \U0001f9f9 Cache expirado removido: c967977a1949ff217c70b011f7f023e7b82fa3ee08ba27b2b62db1fd62149344.pkl.gz
+2025-10-21 09:52:00,586 - INFO - \U0001f9f9 Cache expirado removido: ca80696bba1dfbad7fe616e7bb7ac9e4cb5ea10d1a977daedaea69bdb116434c.pkl.gz
+2025-10-21 09:52:00,588 - INFO - \U0001f9f9 Cache expirado removido: cbb8acb96a3612a31b5034b982d91399e3ec85a00d5a08fab73f50894519dfc3.pkl.gz
+2025-10-21 09:52:00,589 - INFO - \U0001f9f9 Cache expirado removido: cbbbf185717b2f2920f1c26aced8412256b3cdf7f857a368a4b45575aac90ed4.pkl.gz
+2025-10-21 09:52:00,592 - INFO - \U0001f9f9 Cache expirado removido: cc4872cea64db91fa8a10c1df9ee35a36871463146a4ab6051ff120bec8c301e.pkl.gz
+2025-10-21 09:52:00,596 - INFO - \U0001f9f9 Cache expirado removido: cc5c6bde7fef8388702c6cd2bf27b579c1c329384090191956c24afcf53ecad4.pkl.gz
+2025-10-21 09:52:00,598 - INFO - \U0001f9f9 Cache expirado removido: cdfca72ef3e50f11d4229dfda589f61b411f4f027d97ced1c9d86f4ca0edbd46.pkl.gz
+2025-10-21 09:52:00,600 - INFO - \U0001f9f9 Cache expirado removido: cedd81e0736b3923060cbe801f63a5d1075e130b733d25a8218a08cecb9feda5.pkl.gz
+2025-10-21 09:52:00,601 - INFO - \U0001f9f9 Cache expirado removido: cf16a6d76e7e741e977a068d6b6e69ef43bd53a14897e9836d30598859c6c285.pkl.gz
+2025-10-21 09:52:00,603 - INFO - \U0001f9f9 Cache expirado removido: cf7996698c756e12470dc7a19726fc1d76c3940246bc29ae8c933463f0c37fd7.pkl.gz
+2025-10-21 09:52:00,606 - INFO - \U0001f9f9 Cache expirado removido: cfeceab144b30153bf6e6d6908b22e7880c1cec9bd6697c3ae4506956328f9e2.pkl.gz
+2025-10-21 09:52:00,607 - INFO - \U0001f9f9 Cache expirado removido: d1536af8b05dbdd62b4cdd9d587bff610463b82a10c7f836b7641b728bca5804.pkl.gz
+2025-10-21 09:52:00,609 - INFO - \U0001f9f9 Cache expirado removido: d1fffe3b8fe03ba0c4de2274c8ee72cd95db72ac942cbd4f5a70be223cd73d84.pkl.gz
+2025-10-21 09:52:00,611 - INFO - \U0001f9f9 Cache expirado removido: d2434a8926fc5f8a2e6f21caa28e093eba0ffc5e792cfa5d19145cd2e696ffca.pkl.gz
+2025-10-21 09:52:00,613 - INFO - \U0001f9f9 Cache expirado removido: d34a8ec993d17ab10619627a797eadd7ba5e3d8c091ed24f44658619abbd2db9.pkl.gz
+2025-10-21 09:52:00,616 - INFO - \U0001f9f9 Cache expirado removido: d3d1f1e8cfcc0d3f27783b52dd938e7621dae1dcfa83b8aa68f79161cb3f0c4d.pkl.gz
+2025-10-21 09:52:00,618 - INFO - \U0001f9f9 Cache expirado removido: d5565add91ec94c072707ddbb1553438d8441834a134e940f2ef54a758e7a1de.pkl.gz
+2025-10-21 09:52:00,620 - INFO - \U0001f9f9 Cache expirado removido: d58e8e96a7e2c106eadb06d30e66db2677ca2e71dc0419c50669b109d0a8e61b.pkl.gz
+2025-10-21 09:52:00,621 - INFO - \U0001f9f9 Cache expirado removido: d5b66abd4f3d6c61feefaa552adf5187d0962644c76c5c5060971573478e80be.pkl.gz
+2025-10-21 09:52:00,625 - INFO - \U0001f9f9 Cache expirado removido: d7c783382617bf1600b176b7c7529d56ce0f5bd9d94f29a8820de42c917027b4.pkl.gz
+2025-10-21 09:52:00,627 - INFO - \U0001f9f9 Cache expirado removido: d89734b87916d0fb659601af44487347d67e877005f7e403716c0536117d6e06.pkl.gz
+2025-10-21 09:52:00,629 - INFO - \U0001f9f9 Cache expirado removido: d9a1e465e00b1e119df546a7ccacc57d33218a595be727a401c5764424d4069a.pkl.gz
+2025-10-21 09:52:00,631 - INFO - \U0001f9f9 Cache expirado removido: d9f4d771bc6941d64dc298dbcf34a7daa8a487537f5efab44ded0946c486a6f7.pkl.gz
+2025-10-21 09:52:00,633 - INFO - \U0001f9f9 Cache expirado removido: da607f02222798bad89e420080b2e668926df6e15dbfd8da279be7c4b37b1942.pkl.gz
+2025-10-21 09:52:00,636 - INFO - \U0001f9f9 Cache expirado removido: da98c40e5248ebdb5db3ce01dfab92541580d18cffa5cb6d7c2f261253fcf208.pkl.gz
+2025-10-21 09:52:00,637 - INFO - \U0001f9f9 Cache expirado removido: dba974ad3a4846b011da0ecfdbb557ce990750e4432dfce2ee3db0990f6b7389.pkl.gz
+2025-10-21 09:52:00,640 - INFO - \U0001f9f9 Cache expirado removido: dc6e0b7023bf88f4ce488813fb60d2b816f17e7163faac4abb96e1b66c60918c.pkl.gz
+2025-10-21 09:52:00,642 - INFO - \U0001f9f9 Cache expirado removido: dd2f461b47d5ad23c563093d2183e1fedbb199a08c95d847156728f8ad742a23.pkl.gz
+2025-10-21 09:52:00,643 - INFO - \U0001f9f9 Cache expirado removido: dd48d6f8488d205683872ac7401d5e5307e1f18647436d6ecaa2715127cb0a28.pkl.gz
+2025-10-21 09:52:00,647 - INFO - \U0001f9f9 Cache expirado removido: ddaf4b977961e307f03c424a19d840e59ea5d558aec72123fc8018e5df9468a8.pkl.gz
+2025-10-21 09:52:00,649 - INFO - \U0001f9f9 Cache expirado removido: ddb241e31a4073974e953a2c112efb9688066be41bf0cd7b44b04839cf403545.pkl.gz
+2025-10-21 09:52:00,651 - INFO - \U0001f9f9 Cache expirado removido: ddf44ece8a48ee871b3d86074fde8dd84cb4cc482817d20c29506dbf21f165d6.pkl.gz
+2025-10-21 09:52:00,653 - INFO - \U0001f9f9 Cache expirado removido: de18d78cc4b6fe1a1b89c1d96293d2255d12f59e6f216cfea3ce98818a89089f.pkl.gz
+2025-10-21 09:52:00,656 - INFO - \U0001f9f9 Cache expirado removido: de1fbb34d2f204f6a5081b2439d48a723cf7a6862e0e0b9c546462f61bec9c97.pkl.gz
+2025-10-21 09:52:00,658 - INFO - \U0001f9f9 Cache expirado removido: de43a4fc3cd6fde12765603c9ac5d222b1e6231a15225e2b349cf455f3a4334f.pkl.gz
+2025-10-21 09:52:00,659 - INFO - \U0001f9f9 Cache expirado removido: df0233588661a8a1089df27b102a904123b401d384539dfb90f2b06b84e6a34a.pkl.gz
+2025-10-21 09:52:00,661 - INFO - \U0001f9f9 Cache expirado removido: e16c7bf0cbd068440fa0fac73e5759b95d285bb1534e7f8468d492c0f01e689d.pkl.gz
+2025-10-21 09:52:00,664 - INFO - \U0001f9f9 Cache expirado removido: e3daa4c9d6ebeb0f44721b722ae4be10bb5e3d272af261e1641f1e23b4d28169.pkl.gz
+2025-10-21 09:52:00,666 - INFO - \U0001f9f9 Cache expirado removido: e45368bf317bc1673eeb31f175b289bcdde807bcda9b6b436201f7b23c0bfb40.pkl.gz
+2025-10-21 09:52:00,667 - INFO - \U0001f9f9 Cache expirado removido: e54b20646cf85a1d63968de8c21e06eadcc098b0a55cf886ffd1b6f5a3c0662d.pkl.gz
+2025-10-21 09:52:00,669 - INFO - \U0001f9f9 Cache expirado removido: e5662be7449bc51a984676f5a721140442e502356a0a186c213560b7e09ac8bc.pkl.gz
+2025-10-21 09:52:00,671 - INFO - \U0001f9f9 Cache expirado removido: e593bc011f87ccec452251d84fc433a3f8cbbb4089cff5040c043bad7858817b.pkl.gz
+2025-10-21 09:52:00,672 - INFO - \U0001f9f9 Cache expirado removido: e5a74e88c08dcbe63e84faf60d41b626c5b2e730f71b66a294286a0e63fed5c6.pkl.gz
+2025-10-21 09:52:00,675 - INFO - \U0001f9f9 Cache expirado removido: e5e762c5988ba82e345200eb77175da931181b3c136eeedc6ebf7fef57aaa808.pkl.gz
+2025-10-21 09:52:00,677 - INFO - \U0001f9f9 Cache expirado removido: e6afa934954c2324d7bf3a12919e94d06b965ba98f8958fd9de9b5d8b95a3111.pkl.gz
+2025-10-21 09:52:00,680 - INFO - \U0001f9f9 Cache expirado removido: e728b777c58fdb1a84966185439332dbf717269fab837cc7ef75983a926ebd8e.pkl.gz
+2025-10-21 09:52:00,681 - INFO - \U0001f9f9 Cache expirado removido: e7cb18e67a94f601fad47e6e3faa597778572e600ab9546d3d075265b03b473b.pkl.gz
+2025-10-21 09:52:00,683 - INFO - \U0001f9f9 Cache expirado removido: e7f982b483aef23a7accdf9145209005cd972cbf98e30224da6d53a1465c742a.pkl.gz
+2025-10-21 09:52:00,685 - INFO - \U0001f9f9 Cache expirado removido: e8181bc461bf1c779cb7c4e11a9cd9421ff9c52ea729686c0047ec2422f77482.pkl.gz
+2025-10-21 09:52:00,687 - INFO - \U0001f9f9 Cache expirado removido: e86b93a88717fef3e6066e22e88ec6d3efab48d3b6ae47c3b67a3336e298d6a2.pkl.gz
+2025-10-21 09:52:00,688 - INFO - \U0001f9f9 Cache expirado removido: e8cdbace6926144169df2a3f71395480da4a369c784dd91a5c7b1f6ea2f859ab.pkl.gz
+2025-10-21 09:52:00,689 - INFO - \U0001f9f9 Cache expirado removido: e96c4481e2edc0c20f363267cf0424d2f49e981665c1f020303599313d58d913.pkl.gz
+2025-10-21 09:52:00,692 - INFO - \U0001f9f9 Cache expirado removido: e98228900baa71f2411fe53093aaff171eea282a83805c41e42c0d29355b1776.pkl.gz
+2025-10-21 09:52:00,694 - INFO - \U0001f9f9 Cache expirado removido: ea69e8b83e8743fb986c7f076e68b400d85d5301db43c6dc9f6fb461c02d400c.pkl.gz
+2025-10-21 09:52:00,696 - INFO - \U0001f9f9 Cache expirado removido: eabec497fecf206fbe3881815c04c56c92b60579328fd2793254b7bac89f4606.pkl.gz
+2025-10-21 09:52:00,698 - INFO - \U0001f9f9 Cache expirado removido: eacbc90852d2b3ff6b64cd6e81c2c8453389cbe2e496955ccc140078b2991db5.pkl.gz
+2025-10-21 09:52:00,700 - INFO - \U0001f9f9 Cache expirado removido: ec12b1fdf396bb7c1309e51ececde9a66c7337c3269a7ad540e41299c3c43368.pkl.gz
+2025-10-21 09:52:00,701 - INFO - \U0001f9f9 Cache expirado removido: ec924b24c4e05c914a27f7ddf38865c5d229ba2437f7e20c50cc569f4fb78261.pkl.gz
+2025-10-21 09:52:00,703 - INFO - \U0001f9f9 Cache expirado removido: ecb7ea4f1c1f8074d04c827dea9d09f8f2006421e97a7d5bd17cddec7296c63d.pkl.gz
+2025-10-21 09:52:00,705 - INFO - \U0001f9f9 Cache expirado removido: ed168c9c20545b475664e97f2d44249a5c4cc033a9af9dd1f0e49e1980390e04.pkl.gz
+2025-10-21 09:52:00,707 - INFO - \U0001f9f9 Cache expirado removido: edf1b49bde54e64f999be60e79d9ea1d141466e018d0878068f9beb170955b3f.pkl.gz
+2025-10-21 09:52:00,709 - INFO - \U0001f9f9 Cache expirado removido: ee34bc8553e3dff4cd11d1bf5d1b0ffdbcf9cb06bff8e07e2d9fa6a83a1dd144.pkl.gz
+2025-10-21 09:52:00,711 - INFO - \U0001f9f9 Cache expirado removido: ee69a5e0a81eb8dd54567914cfcb18b00924a6bd476ac308fc89963d33cd5cfa.pkl.gz
+2025-10-21 09:52:00,713 - INFO - \U0001f9f9 Cache expirado removido: ee86fb2a18c4a4b998036b3558ab643a1a283d92db5153b877b7f8dec0525336.pkl.gz
+2025-10-21 09:52:00,717 - INFO - \U0001f9f9 Cache expirado removido: ef107dba11b5daa7bcadacc658800bd6a362326fac99e158124a52bf1de494e4.pkl.gz
+2025-10-21 09:52:00,719 - INFO - \U0001f9f9 Cache expirado removido: ef69d13ce0af30e91df8fd183df75bf4caa6e8a1151ee8b2275100814d3ec2dc.pkl.gz
+2025-10-21 09:52:00,720 - INFO - \U0001f9f9 Cache expirado removido: f0e7d83bdcd1e1a89a0658a414cfdb2db11d760c943051758557541d643d2dc8.pkl.gz
+2025-10-21 09:52:00,722 - INFO - \U0001f9f9 Cache expirado removido: f11deffa1361aa354be2ff36cff8ae3625c13f01fa537cb810f567eb50ce069e.pkl.gz
+2025-10-21 09:52:00,724 - INFO - \U0001f9f9 Cache expirado removido: f11eb38bfbb7573fa340ad82f94a44d460aaa3cf7c9ce78a0bd21be8de6f9043.pkl.gz
+2025-10-21 09:52:00,726 - INFO - \U0001f9f9 Cache expirado removido: f1eb931063fdd81e0a347a90566be79b61dba7245ef7ef42c69de57c30e1f59d.pkl.gz
+2025-10-21 09:52:00,727 - INFO - \U0001f9f9 Cache expirado removido: f29e79753dfc1b3c1886cd3d80449d9720cf9ab12cb17bd8d1c1712856de0e56.pkl.gz
+2025-10-21 09:52:00,730 - INFO - \U0001f9f9 Cache expirado removido: f2a5658234c04495f24ecc9a4e0978ba5c47dfdcbeec5dd61722353f978cda1b.pkl.gz
+2025-10-21 09:52:00,732 - INFO - \U0001f9f9 Cache expirado removido: f3262b1fd25b2e966315f52dd216d0017cac2cf3215550cad686618d4c9138a7.pkl.gz
+2025-10-21 09:52:00,733 - INFO - \U0001f9f9 Cache expirado removido: f36717d11ba20eab39b35f8d8b6b21ee7f4fe4817f57d4e566eb7fbdb5119c8b.pkl.gz
+2025-10-21 09:52:00,735 - INFO - \U0001f9f9 Cache expirado removido: f39c680deed7f9819213abfa257de6b66a4eae3db2b9941976d9bddbb85c4526.pkl.gz
+2025-10-21 09:52:00,736 - INFO - \U0001f9f9 Cache expirado removido: f4462db876d4945c725074a3c6d069ff9327360513f90a75550fff12a1f61820.pkl.gz
+2025-10-21 09:52:00,738 - INFO - \U0001f9f9 Cache expirado removido: f4c08b9f2e61088ce2a8ec515c72083b1a366a9755e8e5cf094cb8217aa18233.pkl.gz
+2025-10-21 09:52:00,740 - INFO - \U0001f9f9 Cache expirado removido: f5be925158039e8aaaffdb337ed3927f49e3cba02984951b6f766e4be5ce9c1f.pkl.gz
+2025-10-21 09:52:00,742 - INFO - \U0001f9f9 Cache expirado removido: f74628685894abb80d6b2e67d255095c5f5c182cd44215a7dd98be26327178d5.pkl.gz
+2025-10-21 09:52:00,743 - INFO - \U0001f9f9 Cache expirado removido: f7943e880de24f6abee0707ebd0fa205f14d9f43de58b9e63404518da3ef14a7.pkl.gz
+2025-10-21 09:52:00,745 - INFO - \U0001f9f9 Cache expirado removido: f84fe5b5b6f370b904eb579d78ed3cf9c326c221d79cc95fd6ed4ec2758bc678.pkl.gz
+2025-10-21 09:52:00,747 - INFO - \U0001f9f9 Cache expirado removido: f8ee9d00a2d57c29a97163a8395a6624980bceb28bcd141f6c9e98ea98300cee.pkl.gz
+2025-10-21 09:52:00,750 - INFO - \U0001f9f9 Cache expirado removido: f9db39b9e55ec6f64d39aa13f98794643e416aca9d0f381884e7048ca41cb2ec.pkl.gz
+2025-10-21 09:52:00,752 - INFO - \U0001f9f9 Cache expirado removido: fb29970fade0669c3f8aafee68c648647c77f4b98449428dd708a072fb499146.pkl.gz
+2025-10-21 09:52:00,753 - INFO - \U0001f9f9 Cache expirado removido: fb6873203051f0959c971e96ea3c868c4830dfc394c21c8fcdbb4fe4c265a3b2.pkl.gz
+2025-10-21 09:52:00,756 - INFO - \U0001f9f9 Cache expirado removido: fb937ab1299573306a2db27816ae1b7e85fb6ae37fd72599a3fe40cf55231889.pkl.gz
+2025-10-21 09:52:00,758 - INFO - \U0001f9f9 Cache expirado removido: fbfe7318398a29227866ac50146ff61ae0c3730a82cf85aedbee5e67666e529f.pkl.gz
+2025-10-21 09:52:00,759 - INFO - \U0001f9f9 Cache expirado removido: fcef7eaefc1f4bae59322aeee2fa8cd8f2a8cc184f64addb61b8766c200220c6.pkl.gz
+2025-10-21 09:52:00,762 - INFO - \U0001f9f9 Cache expirado removido: fd06126d95421681e6465c35314a987fb0e80e56043de83d699cfa092ae8c984.pkl.gz
+2025-10-21 09:52:00,764 - INFO - \U0001f9f9 Cache expirado removido: fd4c368399333f1367e98e3cb6f612d130027b13d8bc0b34721396103b7f6ace.pkl.gz
+2025-10-21 09:52:00,766 - INFO - \U0001f9f9 Cache expirado removido: fe5136dfc9bc6778790e8e6ae63eeba63ddb96c6073634a1e0b57aee4d055a0f.pkl.gz
+2025-10-21 09:52:00,768 - INFO - \U0001f9f9 Cache expirado removido: fe77eb2e60c21f6dce8a298c7caf080da5d14d29b7ea141bf57dd9bb84480071.pkl.gz
+2025-10-21 09:52:00,770 - INFO - \U0001f9f9 Cache expirado removido: ff18fe20841d5a2c2349e8d2b4a0b41bcf924ea375e06b006802b06312ed0852.pkl.gz
+2025-10-21 09:52:00,773 - INFO - \U0001f9f9 Cache expirado removido: ff78c25dbf6f99dcd1cbda9d3ed0b3f0cbe2a2717a16f0d42900cc6918c8b8de.pkl.gz
+2025-10-21 09:52:00,773 - INFO - \U0001f9fe Total de 476/477 caches expirados removidos.
+2025-10-21 10:21:26,721 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-21 10:21:26,730 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-21 10:21:27,124 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 10:21:48,497 - INFO - \U0001f4e1 Verificando conexão ativa do conexão 2
+2025-10-21 10:21:48,543 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-10-21 10:21:48,544 - INFO - \U0001f50d Buscando conexão com ID 2
+2025-10-21 10:21:48,834 - INFO - \U0001f504 Status da conexão 'siga ugs qualidade' atualizado para o usuário 1
+2025-10-21 10:21:48,941 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 2
+2025-10-21 10:21:48,954 - INFO - \u2705 Conexão ativa definida: user=1, conn=2
+2025-10-21 10:21:48,996 - INFO - \U0001f4d1 Log criado \u2192 conexão=2, ação='Conexão ativada', status='success', usuário=1
+2025-10-21 10:21:49,060 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-21 10:21:49,260 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 10:21:51,845 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 10:21:57,507 - INFO - query_payload:baseTable='t_conta_corrente_empresa' joins={'t_empresa_convenio': AdvancedJoinOption(conditions=[JoinCondition(table='t_empresa_convenio', leftColumn='t_conta_corrente_empresa.codigo_empresa', operator='=', rightColumn='t_empresa_convenio.id', rightValue=None, valueColumnType='int', useValue=False, logicalOperator='AND', caseSensitive=None, collation=None, functionLeft=None, functionRight=None)], alias=None, typeJoin='INNER JOIN', groupStart=None, groupEnd=None)} table_list=['t_conta_corrente_empresa', 't_empresa_convenio'] select=[] aliaisTables={'t_conta_corrente_empresa.id': 't_conta_corrente_empresa.id', 't_conta_corrente_empresa.data_movimento': 't_conta_corrente_empresa.data_movimento', 't_conta_corrente_empresa.valor': 't_conta_corrente_empresa.valor', 't_conta_corrente_empresa.valor_anterior': 't_conta_corrente_empresa.valor_anterior', 't_conta_corrente_empresa.codigo_ano_lectivo': 't_conta_corrente_empresa.codigo_ano_lectivo', 't_conta_corrente_empresa.codigo_empresa': 't_conta_corrente_empresa.codigo_empresa', 't_empresa_convenio.designacao': 't_empresa_convenio.designacao'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2025-10-21 10:21:57,748 - INFO - Consulta criada com sucesso (ID=109, UserID=1, ConnID=2)
+2025-10-21 10:21:57,748 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=2, Duração=34ms, Tabelas=['t_conta_corrente_empresa', 't_empresa_convenio'], Linhas=51, Status=success
+2025-10-21 10:21:57,891 - INFO - Consulta criada com sucesso (ID=110, UserID=1, ConnID=2)
+2025-10-21 10:21:57,891 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=2, Duração=26ms, Tabelas=['t_conta_corrente_empresa', 't_empresa_convenio'], Linhas=51, Status=success
+2025-10-21 10:22:47,655 - INFO - query_payload:baseTable='t_conta_corrente_empresa' joins={'t_empresa_convenio': AdvancedJoinOption(conditions=[JoinCondition(table='t_empresa_convenio', leftColumn='t_conta_corrente_empresa.codigo_empresa', operator='=', rightColumn='t_empresa_convenio.id', rightValue=None, valueColumnType='int', useValue=False, logicalOperator='AND', caseSensitive=None, collation=None, functionLeft=None, functionRight=None)], alias=None, typeJoin='INNER JOIN', groupStart=None, groupEnd=None)} table_list=['t_conta_corrente_empresa', 't_empresa_convenio'] select=[] aliaisTables={'t_conta_corrente_empresa.id': 't_conta_corrente_empresa.id', 't_conta_corrente_empresa.data_movimento': 't_conta_corrente_empresa.data_movimento', 't_conta_corrente_empresa.valor_anterior': 't_conta_corrente_empresa.valor_anterior', 't_conta_corrente_empresa.codigo_ano_lectivo': 't_conta_corrente_empresa.codigo_ano_lectivo', 't_conta_corrente_empresa.codigo_empresa': 't_conta_corrente_empresa.codigo_empresa', 't_empresa_convenio.designacao': 't_empresa_convenio.designacao', 't_empresa_convenio.contribuinte': 't_empresa_convenio.contribuinte'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2025-10-21 10:22:47,847 - INFO - Consulta criada com sucesso (ID=111, UserID=1, ConnID=2)
+2025-10-21 10:22:47,847 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=2, Duração=55ms, Tabelas=['t_conta_corrente_empresa', 't_empresa_convenio'], Linhas=51, Status=success
+2025-10-21 10:22:48,000 - ERROR - Exception closing connection <AdaptedConnection <aioodbc.connection.Connection object at 0x000002D93F9D5250>>
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 376, in _close_connection
+    self._dialect.do_close(connection)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 712, in do_close
+    dbapi_connection.close()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\aioodbc.py", line 87, in close
+    super().close()
+    ~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 207, in close
+    self.await_(self._connection.close())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\aioodbc\connection.py", line 137, in close
+    c = await self._execute(self._conn.close)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError: Cancelled by cancel scope 2d93f552990
+2025-10-21 10:52:00,794 - INFO - \U0001f9f9 Cache expirado removido: 006632b3b612f34935bf73c2f1967e3ce175c0944632751a3662614a3d8a7410.pkl.gz
+2025-10-21 10:52:00,800 - INFO - \U0001f9f9 Cache expirado removido: 4a050dc486dd5260132889b449b372f13533fde3ab7e7d75d55c8d4170ad4050.pkl.gz
+2025-10-21 10:52:00,871 - ERROR - Unclosed connection
+connection: <aioodbc.connection.Connection object at 0x000002D93F9D5250>
+2025-10-21 10:52:00,919 - INFO - \U0001f9f9 Cache expirado removido: 55241893343cf6feb2977c9b4c5eb05aacecf173025c6c639bca7cde8e2fc451.pkl.gz
+2025-10-21 10:52:00,923 - INFO - \U0001f9f9 Cache expirado removido: 6774f09d1b32b360eb5b4123f10ca1a4a44593511ed125bbf5eeae15ecabf575.pkl.gz
+2025-10-21 10:52:00,926 - INFO - \U0001f9f9 Cache expirado removido: 677befe3624f2d373ba044aaa7e60f1c74482bcc2b7b8497cb27d705f9c7c65e.pkl.gz
+2025-10-21 10:52:00,957 - INFO - \U0001f9f9 Cache expirado removido: 7cc761a1f11db0bcd20390a3e5ea613533f5c3bc0121ddf53636aeb93f85f1ee.pkl.gz
+2025-10-21 10:52:00,966 - INFO - \U0001f9f9 Cache expirado removido: c9addd1ab2e484628783fc3789fca883c5127ea805c3fc7dc141367f14c16802.pkl.gz
+2025-10-21 10:52:00,966 - INFO - \U0001f9fe Total de 7/7 caches expirados removidos.
+2025-10-21 11:23:02,823 - INFO - query_payload:baseTable='t_conta_corrente_empresa' joins={'t_empresa_convenio': AdvancedJoinOption(conditions=[JoinCondition(table='t_empresa_convenio', leftColumn='t_conta_corrente_empresa.codigo_empresa', operator='=', rightColumn='t_empresa_convenio.id', rightValue=None, valueColumnType='int', useValue=False, logicalOperator='AND', caseSensitive=None, collation=None, functionLeft=None, functionRight=None)], alias=None, typeJoin='INNER JOIN', groupStart=None, groupEnd=None)} table_list=['t_conta_corrente_empresa', 't_empresa_convenio'] select=[] aliaisTables={'t_conta_corrente_empresa.id': 't_conta_corrente_empresa.id', 't_conta_corrente_empresa.data_movimento': 't_conta_corrente_empresa.data_movimento', 't_conta_corrente_empresa.valor_anterior': 't_conta_corrente_empresa.valor_anterior', 't_conta_corrente_empresa.codigo_ano_lectivo': 't_conta_corrente_empresa.codigo_ano_lectivo', 't_conta_corrente_empresa.codigo_empresa': 't_conta_corrente_empresa.codigo_empresa', 't_empresa_convenio.designacao': 't_empresa_convenio.designacao', 't_empresa_convenio.contribuinte': 't_empresa_convenio.contribuinte'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2025-10-21 11:23:03,151 - INFO - Consulta criada com sucesso (ID=112, UserID=1, ConnID=2)
+2025-10-21 11:23:03,151 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=2, Duração=26ms, Tabelas=['t_conta_corrente_empresa', 't_empresa_convenio'], Linhas=51, Status=success
+2025-10-21 11:23:03,303 - ERROR - Exception closing connection <AdaptedConnection <aioodbc.connection.Connection object at 0x000002D93F9F6470>>
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 376, in _close_connection
+    self._dialect.do_close(connection)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 712, in do_close
+    dbapi_connection.close()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\aioodbc.py", line 87, in close
+    super().close()
+    ~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 207, in close
+    self.await_(self._connection.close())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\aioodbc\connection.py", line 137, in close
+    c = await self._execute(self._conn.close)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError: Cancelled by cancel scope 2d93f550aa0
+2025-10-21 11:23:11,169 - INFO - \U0001f4e5 Processando relatório de query (formato: pdf)...
+2025-10-21 11:23:11,177 - INFO - \U0001f4ca Relatório construído com 24 elementos
+2025-10-21 11:23:11,329 - INFO - \u2705 Relatório gerado com sucesso: temp_reports\relatorio_query_1_20251021_112311.pdf
+2025-10-21 11:23:11,329 - INFO - \u2705 PDF de query gerado: relatorio_query_1_20251021_112311.pdf
+2025-10-21 11:23:11,332 - INFO - \u2705 Relatório query PDF entregue em 0.17s
+2025-10-21 11:23:11,333 - INFO - \U0001f4e6 Preparando resposta do arquivo:
+ • Caminho: temp_reports\relatorio_query_1_20251021_112311.pdf
+ • Tipo MIME: application/pdf
+ • Nome do Arquivo: relatorio_query_1_20251021_112311.pdf
+ • Cabeçalhos: {
+  "X-Tempo-Geracao": "0.17s",
+  "X-Formato": "pdf",
+  "Content-Disposition": "attachment; filename=\"relatorio_query_1_20251021_112311.pdf\""
+}
+2025-10-21 11:24:48,102 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-21 11:24:48,102 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-21 11:24:48,269 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 11:24:54,513 - INFO - \U0001f4e1 Verificando conexão ativa do conexão 6
+2025-10-21 11:24:54,527 - INFO - \U0001f512 1 conexões desativadas para o usuário 1
+2025-10-21 11:24:54,527 - INFO - \U0001f50d Buscando conexão com ID 6
+2025-10-21 11:24:54,761 - INFO - \U0001f504 Status da conexão 'siga Namibe qualidade' atualizado para o usuário 1
+2025-10-21 11:24:54,778 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 6
+2025-10-21 11:24:54,787 - INFO - \u2705 Conexão ativa definida: user=1, conn=6
+2025-10-21 11:24:54,807 - INFO - \U0001f4d1 Log criado \u2192 conexão=6, ação='Conexão ativada', status='success', usuário=1
+2025-10-21 11:24:54,839 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-21 11:24:54,974 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 11:24:56,531 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-21 11:25:00,835 - INFO - query_payload:baseTable='t_conta_corrente_empresa' joins={'t_empresa_convenio': AdvancedJoinOption(conditions=[JoinCondition(table='t_empresa_convenio', leftColumn='t_conta_corrente_empresa.codigo_empresa', operator='=', rightColumn='t_empresa_convenio.id', rightValue=None, valueColumnType='int', useValue=False, logicalOperator='AND', caseSensitive=None, collation=None, functionLeft=None, functionRight=None)], alias=None, typeJoin='INNER JOIN', groupStart=None, groupEnd=None)} table_list=['t_conta_corrente_empresa', 't_empresa_convenio'] select=[] aliaisTables={'t_conta_corrente_empresa.id': 't_conta_corrente_empresa.id', 't_conta_corrente_empresa.data_movimento': 't_conta_corrente_empresa.data_movimento', 't_conta_corrente_empresa.valor_anterior': 't_conta_corrente_empresa.valor_anterior', 't_conta_corrente_empresa.codigo_ano_lectivo': 't_conta_corrente_empresa.codigo_ano_lectivo', 't_conta_corrente_empresa.codigo_empresa': 't_conta_corrente_empresa.codigo_empresa', 't_empresa_convenio.designacao': 't_empresa_convenio.designacao', 't_empresa_convenio.contribuinte': 't_empresa_convenio.contribuinte'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2025-10-21 11:25:00,974 - INFO - Consulta criada com sucesso (ID=113, UserID=1, ConnID=6)
+2025-10-21 11:25:00,974 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=6, Duração=25ms, Tabelas=['t_conta_corrente_empresa', 't_empresa_convenio'], Linhas=43, Status=success
+2025-10-21 11:25:59,449 - INFO - query_payload:baseTable='t_conta_corrente_empresa' joins={'t_empresa_convenio': AdvancedJoinOption(conditions=[JoinCondition(table='t_empresa_convenio', leftColumn='t_conta_corrente_empresa.codigo_empresa', operator='=', rightColumn='t_empresa_convenio.id', rightValue=None, valueColumnType='int', useValue=False, logicalOperator='AND', caseSensitive=None, collation=None, functionLeft=None, functionRight=None)], alias=None, typeJoin='INNER JOIN', groupStart=None, groupEnd=None)} table_list=['t_conta_corrente_empresa', 't_empresa_convenio'] select=[] aliaisTables={'t_conta_corrente_empresa.id': 't_conta_corrente_empresa.id', 't_conta_corrente_empresa.data_movimento': 't_conta_corrente_empresa.data_movimento', 't_conta_corrente_empresa.valor_anterior': 't_conta_corrente_empresa.valor_anterior', 't_conta_corrente_empresa.codigo_ano_lectivo': 't_conta_corrente_empresa.codigo_ano_lectivo', 't_conta_corrente_empresa.codigo_empresa': 't_conta_corrente_empresa.codigo_empresa', 't_empresa_convenio.designacao': 't_empresa_convenio.designacao', 't_empresa_convenio.contribuinte': 't_empresa_convenio.contribuinte'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2025-10-21 11:25:59,531 - INFO - Consulta criada com sucesso (ID=114, UserID=1, ConnID=6)
+2025-10-21 11:25:59,532 - INFO - \u2705 Histórico detalhado salvo: User=1, Conn=6, Duração=17ms, Tabelas=['t_conta_corrente_empresa', 't_empresa_convenio'], Linhas=43, Status=success
+2025-10-21 11:25:59,663 - ERROR - Exception closing connection <AdaptedConnection <aioodbc.connection.Connection object at 0x000002D93F283150>>
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 376, in _close_connection
+    self._dialect.do_close(connection)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 712, in do_close
+    dbapi_connection.close()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\aioodbc.py", line 87, in close
+    super().close()
+    ~~~~~~~~~~~~~^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\connectors\asyncio.py", line 207, in close
+    self.await_(self._connection.close())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\aioodbc\connection.py", line 137, in close
+    c = await self._execute(self._conn.close)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError: Cancelled by cancel scope 2d93f5507e0
+2025-10-21 11:26:02,603 - INFO - \U0001f4e5 Processando relatório de query (formato: pdf)...
+2025-10-21 11:26:02,604 - INFO - \U0001f4ca Relatório construído com 24 elementos
+2025-10-21 11:26:02,688 - INFO - \u2705 Relatório gerado com sucesso: temp_reports\relatorio_query_1_20251021_112602.pdf
+2025-10-21 11:26:02,688 - INFO - \u2705 PDF de query gerado: relatorio_query_1_20251021_112602.pdf
+2025-10-21 11:26:02,689 - INFO - \u2705 Relatório query PDF entregue em 0.09s
+2025-10-21 11:26:02,689 - INFO - \U0001f4e6 Preparando resposta do arquivo:
+ • Caminho: temp_reports\relatorio_query_1_20251021_112602.pdf
+ • Tipo MIME: application/pdf
+ • Nome do Arquivo: relatorio_query_1_20251021_112602.pdf
+ • Cabeçalhos: {
+  "X-Tempo-Geracao": "0.09s",
+  "X-Formato": "pdf",
+  "Content-Disposition": "attachment; filename=\"relatorio_query_1_20251021_112602.pdf\""
+}
+2025-10-21 11:52:01,021 - INFO - \U0001f9f9 Cache expirado removido: 070e671fde15f5e9d9ac5124cead2aa0bd8de24807e2dea66bcc922c6130cb32.pkl.gz
+2025-10-21 11:52:01,053 - INFO - \U0001f9f9 Cache expirado removido: 4f1815fe5df57a24584b556737842a63c46a322d8d1a3c56e3fc8d2b38093512.pkl.gz
+2025-10-21 11:52:01,055 - INFO - \U0001f9f9 Cache expirado removido: 85df3fbfad0514269baef02e2bea037696ae6ba754b72e4a2c84918179a70d12.pkl.gz
+2025-10-21 11:52:01,057 - INFO - \U0001f9f9 Cache expirado removido: 8a86db907feb3ca609fd8b60b810eb53a66604dcf9ca42023d5de25c118bfcb0.pkl.gz
+2025-10-21 11:52:01,152 - INFO - \U0001f9f9 Cache expirado removido: 8f54e3ed19e021cf5754d7c6d24e1ead54f51e31473e756b816cf62e066eee86.pkl.gz
+2025-10-21 11:52:01,156 - INFO - \U0001f9f9 Cache expirado removido: a7490df339a48ca5b85a0db0d95ececfee1ea86f695f49885591e67fcf1a8aa4.pkl.gz
+2025-10-21 11:52:02,226 - INFO - \U0001f9f9 Cache expirado removido: dcd294f13ac46869d5efe7c2525d2ff40204aef682e1f2c8f9f1472f7cfe5d76.pkl.gz
+2025-10-21 11:52:02,226 - INFO - \U0001f9fe Total de 7/8 caches expirados removidos.
+2025-10-21 12:52:02,337 - INFO - \U0001f9f9 Cache expirado removido: 151ecf97f50e0868a1a06292daa273a20ae7dd645d4615a13062ec3bf6b25b66.pkl.gz
+2025-10-21 12:52:02,351 - INFO - \U0001f9fe Total de 1/1 caches expirados removidos.
+2025-10-21 15:36:17,349 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-21 15:36:17,575 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-21 15:36:17,590 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-21 15:36:17,595 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-21 15:36:17,609 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-21 15:36:17,614 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-21 15:36:17,618 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-21 15:36:17,633 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-21 15:36:17,633 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-21 15:36:17,634 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-21 15:36:48,366 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2025-10-21 15:54:08,300 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-21 15:54:22,624 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com

@@ -14,7 +14,7 @@ from app.services.query_executor import is_safe_identifier
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
-from app.ultils.logica_de_join_advance import build_join_clause
+from app.ultils.logica_de_join_advance import build_join_clause_for_delete
 
 
 class DeleteOperationService:
@@ -55,10 +55,10 @@ class DeleteOperationService:
         tabela_base = getattr(query_payload, "baseTable", None)
         if not tabela_base:
             raise ValueError("Tabela base não informada no QueryPayload")
-
+        print("saffsdf: 1")
         if not is_safe_identifier(tabela_base):
             raise ValueError(f"Tabela insegura: {tabela_base}")
-
+        print("saffsdf: 12")
         engine, connection = self.connection_manager.ensure_connection(db, current_user_id)
         dialect = self.detect_dialect(engine)
         params: Dict[str, Any] = {}
@@ -69,7 +69,8 @@ class DeleteOperationService:
             sql_parts = [f"DELETE FROM {tabela_base}"]
 
         # 🔗 JOINs e WHERE
-        join_clauses = build_join_clause(connection.type, tabela_base, query_payload.joins, query_payload.table_list)
+        
+        join_clauses = build_join_clause_for_delete(db_type=connection.type, base_table= tabela_base,joins= query_payload.joins, table_list=query_payload.table_list, is_delete=True)
         filter_builder = QueryFilterBuilder()
         filters, params = await filter_builder.build_where_clause(
             query_payload.where or [], connection.type

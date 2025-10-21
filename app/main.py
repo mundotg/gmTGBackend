@@ -84,4 +84,5 @@ if __name__ == "__main__":
 
     host = get_env("HOST", "0.0.0.0")
     port = int(get_env("PORT", 8000))
+    print(f"a prota que o servidor está rodando : {port}")
     uvicorn.run("app.main:app", host=host, port=port, reload=True)

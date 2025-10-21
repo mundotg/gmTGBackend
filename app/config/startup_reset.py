@@ -29,18 +29,18 @@ def mark_initialized():
 
 
 def reset_database():
-    print("🔁 Resetando banco de dados...")
-    with engine.connect() as conn:
-        # Elimina o schema inteiro (remove tudo)
-        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
-        # Recria o schema vazio
-        conn.execute(text("CREATE SCHEMA public"))
-        # (Opcional) remove a tabela de controle de migrações, se quiser garantir
-        conn.execute(text("DROP TABLE IF EXISTS alembic_version CASCADE"))
-        # (Opcional) recria permissões padrão
-        conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
-        conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
-        conn.commit()
+    # print("🔁 Resetando banco de dados...")
+    # with engine.connect() as conn:
+    #     # Elimina o schema inteiro (remove tudo)
+    #     conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+    #     # Recria o schema vazio
+    #     conn.execute(text("CREATE SCHEMA public"))
+    #     # (Opcional) remove a tabela de controle de migrações, se quiser garantir
+    #     conn.execute(text("DROP TABLE IF EXISTS alembic_version CASCADE"))
+    #     # (Opcional) recria permissões padrão
+    #     conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+    #     conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
+    #     conn.commit()
             # conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
     try:
         for base in [

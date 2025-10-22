@@ -22,3 +22,16 @@
 2025-10-22 10:31:06,030 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
 2025-10-22 10:31:06,030 - INFO - \U0001f331 Seed concluído com sucesso!
 2025-10-22 10:31:06,030 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 10:53:18,667 - INFO - [LOG PATH] Sistema: windows, Ambiente: Azure App Service, Hostname: DESKTOP-4UGL8JL, IP: 192.168.243.68, Caminho: C:\logs\logs.txt
+2025-10-22 10:53:18,668 - INFO - \U0001f4c4 Log file: C:\logs\logs.txt
+2025-10-22 10:53:18,669 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2025-10-22 10:53:18,669 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 10:53:23,393 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 10:53:26,989 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 10:53:27,221 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 10:53:30,371 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 10:53:31,054 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 10:53:31,286 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-22 10:53:31,737 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 10:53:31,737 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 10:53:31,738 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s

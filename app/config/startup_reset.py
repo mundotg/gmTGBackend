@@ -120,6 +120,7 @@ def apply_model_updates():
     except Exception as e:
         log_message(f"❌ Erro inesperado ao sincronizar o banco: {e}", "error")
         return False
+
 def get_log_path() -> Path:
     """
     Retorna o caminho correto para o arquivo de logs, de acordo com:
@@ -127,6 +128,12 @@ def get_log_path() -> Path:
     - Ambiente (Local / Azure App Service)
     - Hostname e IP
     """
+    import os
+    import socket
+    import platform
+    from pathlib import Path
+    from app.ultils.logger import log_message
+
     try:
         hostname = socket.gethostname()
         current_ip = socket.gethostbyname(hostname)
@@ -137,7 +144,7 @@ def get_log_path() -> Path:
     system_os = platform.system().lower()
     local_ips = {"127.0.0.1", "localhost"}
 
-    # 🔹 Detecta se é ambiente Azure (Linux ou Windows)
+    # 🔹 Detecta se é ambiente Azure
     is_azure = (
         "WEBSITE_SITE_NAME" in os.environ
         or "WEBSITE_INSTANCE_ID" in os.environ
@@ -145,37 +152,36 @@ def get_log_path() -> Path:
         or os.path.exists("D:\\home\\LogFiles")
     )
 
-    # 🔹 Detecta ambiente local
-    is_local = (
-        current_ip in local_ips
-        or hostname.startswith("dev")
-        or not is_azure  # fallback se não detectar Azure
-    )
+    # 🔹 Caminhos candidatos
+    azure_path_windows = Path("D:/home/LogFiles/Application")
+    azure_path_linux = Path("/home/LogFiles/Application")
 
-    # 🔹 Define diretório de logs
+    # 🔹 Decide o diretório
     if is_azure:
-        log_dir = Path(
-            "D:/home/LogFiles/Application"
-            if system_os == "windows"
-            else "/home/LogFiles/Application"
-        )
-    elif is_local:
-        log_dir = Path("logs" if system_os == "windows" else "/tmp/logs")
+        if system_os == "windows" and azure_path_windows.drive and os.path.exists(azure_path_windows.drive + "\\"):
+            log_dir = azure_path_windows
+        elif system_os == "linux" and azure_path_linux.exists():
+            log_dir = azure_path_linux
+        else:
+            # fallback se Azure não estiver acessível localmente
+            log_dir = Path("C:/logs" if system_os == "windows" else "/tmp/logs")
     else:
-        # Ambiente desconhecido (fallback)
-        log_dir = Path("/var/log/app" if system_os == "linux" else "C:/logs")
+        # Ambiente local
+        log_dir = Path("logs" if system_os == "windows" else "/tmp/logs")
 
-    log_dir.mkdir(parents=True, exist_ok=True)
+    # 🔹 Cria o diretório
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        # fallback de emergência
+        log_dir = Path("C:/logs" if system_os == "windows" else "/tmp/logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_message(f"⚠️ Falha ao criar diretório original, fallback para {log_dir}: {e}", "warning")
+
     log_path = log_dir / "logs.txt"
 
     # 🔹 Log informativo
-    env_label = (
-        "Azure App Service"
-        if is_azure
-        else "Localhost"
-        if is_local
-        else "Outro ambiente"
-    )
+    env_label = "Azure App Service" if is_azure else "Localhost"
     log_message(
         f"[LOG PATH] Sistema: {system_os}, Ambiente: {env_label}, "
         f"Hostname: {hostname}, IP: {current_ip}, Caminho: {log_path}",

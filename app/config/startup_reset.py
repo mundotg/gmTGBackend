@@ -4,6 +4,7 @@ import pkgutil
 import importlib
 import pickle
 import socket
+import platform
 from pathlib import Path
 from sqlalchemy.exc import SQLAlchemyError
 from app.config.dotenv import get_env
@@ -28,8 +29,15 @@ def mark_initialized():
     """Marca o banco como inicializado."""
     os.makedirs(os.path.dirname(FLAG_FILE), exist_ok=True)
     with open(FLAG_FILE, "wb") as f:
-        pickle.dump({"initialized": True}, f)
+        pickle.dump({"initialized": True, "timestamp": os.path.getctime(__file__)}, f)
     log_message(f"📦 Flag de inicialização criada em {FLAG_FILE}", "info")
+
+
+def clear_initialization_flag():
+    """Remove a flag de inicialização (útil para testes)."""
+    if os.path.exists(FLAG_FILE):
+        os.remove(FLAG_FILE)
+        log_message("🗑️ Flag de inicialização removida", "info")
 
 
 # -----------------------------------------------------------
@@ -46,15 +54,23 @@ def load_all_models():
         package = importlib.import_module(MODELS_PACKAGE)
     except ImportError as e:
         log_message(f"❌ Falha ao importar pacote base de models: {e}", "error")
-        return
+        return False
 
+    success_count = 0
+    error_count = 0
+    
     for _, module_name, is_pkg in pkgutil.iter_modules(package.__path__, package.__name__ + "."):
         if not is_pkg:
             try:
                 importlib.import_module(module_name)
                 log_message(f"✅ Módulo importado: {module_name}", "success")
+                success_count += 1
             except Exception as e:
                 log_message(f"⚠️ Erro ao importar módulo {module_name}: {e}", "error")
+                error_count += 1
+    
+    log_message(f"📊 Carregamento concluído: {success_count} sucessos, {error_count} erros", "info")
+    return error_count == 0
 
 
 # -----------------------------------------------------------
@@ -67,40 +83,124 @@ def apply_model_updates():
     """
     log_message("🔄 Aplicando alterações de models no banco de dados...", "info")
 
-    load_all_models()
+    if not load_all_models():
+        log_message("❌ Falha no carregamento de models, abortando sincronização", "error")
+        return False
 
     try:
         from app.models import Base
-    except ImportError:
-        log_message("❌ Erro: não foi possível importar Base de app.models.", "error")
-        return
+    except ImportError as e:
+        log_message(f"❌ Erro: não foi possível importar Base de app.models: {e}", "error")
+        return False
 
     try:
-        Base.metadata.create_all(bind=engine)
-        log_message("✅ Estrutura de banco sincronizada com sucesso.", "success")
+        # Lista tabelas existentes antes da criação
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        log_message(f"📋 Tabelas existentes: {len(existing_tables)}", "info")
+        
+        # Cria novas tabelas
+        Base.metadata.create_all(bind=engine, checkfirst=True)
+        
+        # Lista tabelas após criação
+        new_tables = inspector.get_table_names()
+        created_tables = set(new_tables) - set(existing_tables)
+        
+        if created_tables:
+            log_message(f"✅ {len(created_tables)} novas tabelas criadas: {list(created_tables)}", "success")
+        else:
+            log_message("ℹ️ Nenhuma nova tabela criada (todas já existiam)", "info")
+            
+        return True
+        
     except SQLAlchemyError as e:
         log_message(f"❌ Erro de SQLAlchemy ao sincronizar o banco: {e}", "error")
+        return False
     except Exception as e:
         log_message(f"❌ Erro inesperado ao sincronizar o banco: {e}", "error")
-
-
+        return False
 def get_log_path() -> Path:
-    hostname = socket.gethostname()
-    local_ips = ["127.0.0.1", "localhost"]
-    print("dgfgfdgd xsdgssd afsd")
+    """
+    Retorna o caminho correto para o arquivo de logs, de acordo com:
+    - Sistema operacional (Windows / Linux)
+    - Ambiente (Local / Azure App Service)
+    - Hostname e IP
+    """
     try:
+        hostname = socket.gethostname()
         current_ip = socket.gethostbyname(hostname)
     except socket.error:
+        hostname = "localhost"
         current_ip = "127.0.0.1"
 
-    # Se estiver local, usa /tmp
-    if current_ip in local_ips or hostname.startswith("dev"):
-        log_dir = Path("/tmp/logs")
+    system_os = platform.system().lower()
+    local_ips = {"127.0.0.1", "localhost"}
+
+    # 🔹 Detecta se é ambiente Azure (Linux ou Windows)
+    is_azure = (
+        "WEBSITE_SITE_NAME" in os.environ
+        or "WEBSITE_INSTANCE_ID" in os.environ
+        or os.path.exists("/home/LogFiles")
+        or os.path.exists("D:\\home\\LogFiles")
+    )
+
+    # 🔹 Detecta ambiente local
+    is_local = (
+        current_ip in local_ips
+        or hostname.startswith("dev")
+        or not is_azure  # fallback se não detectar Azure
+    )
+
+    # 🔹 Define diretório de logs
+    if is_azure:
+        log_dir = Path(
+            "D:/home/LogFiles/Application"
+            if system_os == "windows"
+            else "/home/LogFiles/Application"
+        )
+    elif is_local:
+        log_dir = Path("logs" if system_os == "windows" else "/tmp/logs")
     else:
-        log_dir = Path("/home/LogFiles/Application")
+        # Ambiente desconhecido (fallback)
+        log_dir = Path("/var/log/app" if system_os == "linux" else "C:/logs")
 
     log_dir.mkdir(parents=True, exist_ok=True)
-    return log_dir / "logs.txt"
+    log_path = log_dir / "logs.txt"
+
+    # 🔹 Log informativo
+    env_label = (
+        "Azure App Service"
+        if is_azure
+        else "Localhost"
+        if is_local
+        else "Outro ambiente"
+    )
+    log_message(
+        f"[LOG PATH] Sistema: {system_os}, Ambiente: {env_label}, "
+        f"Hostname: {hostname}, IP: {current_ip}, Caminho: {log_path}",
+        "info",
+    )
+
+    return log_path
+
+
+def should_run_initialization() -> bool:
+    """
+    Determina se a inicialização deve ser executada.
+    """
+    env = get_env("ENV", "dev").lower()
+    force_reset = get_env("FORCE_DB_RESET", "false").lower() == "true"
+    
+    if env != "dev" and not force_reset:
+        log_message(f"🚫 Sincronização automática desativada (ENV={env}, FORCE_DB_RESET={force_reset})", "warning")
+        return False
+    
+    if force_reset:
+        log_message("🚨 FORCE_DB_RESET ativado - reinicializando banco", "warning")
+        clear_initialization_flag()
+    
+    return True
 
 
 # -----------------------------------------------------------
@@ -108,22 +208,51 @@ def get_log_path() -> Path:
 # -----------------------------------------------------------
 def init_on_startup():
     """
-    Executa durante o startup da aplicação (apenas no ambiente de desenvolvimento).
-    Evita recriação em produção.
+    Executa durante o startup da aplicação.
     """
     LOG_FILE = get_log_path()
-    log_message(f"📄 Log file: {LOG_FILE}","warning")
-    env = get_env("ENV", "dev").lower()
-
-    if env != "dev":
-        log_message("🚫 Sincronização automática desativada (ENV != dev).", "warning")
+    log_message(f"📄 Log file: {LOG_FILE}", "info")
+    
+    if not should_run_initialization():
         return
 
     if not already_initialized():
-        recreate_db()
-        apply_model_updates()
-        mark_initialized()
-
-        log_message("📦 Inicialização concluída e marcada.", "success")
+        log_message("🔧 Iniciando processo de inicialização do banco...", "info")
+        
+        if recreate_db():
+            if apply_model_updates():
+                mark_initialized()
+                log_message("🎉 Inicialização concluída com sucesso!", "success")
+            else:
+                log_message("❌ Falha na aplicação das atualizações do modelo", "error")
+        else:
+            log_message("❌ Falha na recriação do banco", "error")
     else:
         log_message("🔒 Banco já inicializado anteriormente — sem alterações.", "info")
+        # Aplica apenas atualizações incrementais em produção
+        if get_env("ENV", "dev").lower() == "prod":
+            log_message("🔄 Verificando atualizações incrementais...", "info")
+            apply_model_updates()
+
+
+def get_initialization_status() -> dict:
+    """
+    Retorna o status atual da inicialização.
+    """
+    status = {
+        "initialized": already_initialized(),
+        "flag_file": FLAG_FILE,
+        "flag_exists": os.path.exists(FLAG_FILE),
+        "environment": get_env("ENV", "dev"),
+        "log_path": str(get_log_path())
+    }
+    
+    if status["flag_exists"]:
+        try:
+            with open(FLAG_FILE, "rb") as f:
+                flag_data = pickle.load(f)
+            status["flag_data"] = flag_data
+        except Exception as e:
+            status["flag_error"] = str(e)
+    
+    return status

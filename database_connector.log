@@ -1,0 +1,29 @@
+2025-10-22 08:37:35,905 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 08:37:36,153 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 08:37:36,172 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 08:37:36,177 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 08:37:36,198 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 08:37:36,205 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 08:37:36,210 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-22 08:37:36,224 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 08:37:36,224 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 08:37:36,224 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 08:37:36,230 - INFO - \U0001f9f9 Cache expirado removido: 1eb1907b23de75e7c3099cc965c11487178de3b06801fab9602507f00cfe2c22.pkl.gz
+2025-10-22 08:37:36,233 - INFO - \U0001f9f9 Cache expirado removido: 2cc0f81656ee53618aad93fcf59f7f42629b80a318f1daaa57e8145f844be967.pkl.gz
+2025-10-22 08:37:36,235 - INFO - \U0001f9f9 Cache expirado removido: 35fd1a54cca55e5937d6750bf83c24624877ff5c92d459301ffcd52684a1e5b3.pkl.gz
+2025-10-22 08:37:36,238 - INFO - \U0001f9f9 Cache expirado removido: 3c7e875ea8b95cd0ab6de62638c13883efebf9ad518a3d69008875663f9710ce.pkl.gz
+2025-10-22 08:37:36,239 - INFO - \U0001f9f9 Cache expirado removido: 566f088fbd6c12e319ce017bbd9d514d86a7566a30da2e283878ca674b1a4fc8.pkl.gz
+2025-10-22 08:37:36,241 - INFO - \U0001f9f9 Cache expirado removido: 5d0c298727b5021b7bc3af2ee869adefc7f015967129bcc0ccd669eee76944a1.pkl.gz
+2025-10-22 08:37:36,243 - INFO - \U0001f9f9 Cache expirado removido: 7a8141207759f54b3cbfd62b880caaed3a280baab11a792c345c6aff727fb887.pkl.gz
+2025-10-22 08:37:36,246 - INFO - \U0001f9f9 Cache expirado removido: 7abdaced17343198344cde8f2ebfb6a4a12100ed4d68f2441307978b1931827d.pkl.gz
+2025-10-22 08:37:36,248 - INFO - \U0001f9f9 Cache expirado removido: 96302d0bb7b3a98673b16958c33e054b34c8d37aee34bb3cd14a7d7cf44a8d35.pkl.gz
+2025-10-22 08:37:36,250 - INFO - \U0001f9f9 Cache expirado removido: a40a7e7416177656b9ff185675557c42a86d8206ba0f905d1702151edac85e02.pkl.gz
+2025-10-22 08:37:36,252 - INFO - \U0001f9f9 Cache expirado removido: b58fabbcce2078799e5ef7b45e8bbf54e732636d1027a5ed70d6aed3a0778e22.pkl.gz
+2025-10-22 08:37:36,254 - INFO - \U0001f9f9 Cache expirado removido: b9ba879e31aae3978f07fc94d6d3a84c052e873698d1a632643e6c76f7461a06.pkl.gz
+2025-10-22 08:37:36,256 - INFO - \U0001f9f9 Cache expirado removido: c0764050aa8b443aee4ae15fb7652d2960dc635c3d5e850f32ddbc55735fc79e.pkl.gz
+2025-10-22 08:37:36,257 - INFO - \U0001f9f9 Cache expirado removido: c6d8915529cab478f1f33879d85b426065e6173b43ece06295c8f716b7d52510.pkl.gz
+2025-10-22 08:37:36,258 - INFO - \U0001f9f9 Cache expirado removido: d456c7b8ae83c8733994a30fd6582eb2b88bff469d98dcf46efafbe412a63887.pkl.gz
+2025-10-22 08:37:36,260 - INFO - \U0001f9f9 Cache expirado removido: e01116afd272f86a92e7a47e1c591e82f0e42adcf708ce30cea151fcb9d0e99d.pkl.gz
+2025-10-22 08:37:36,261 - INFO - \U0001f9f9 Cache expirado removido: e01d8f52bf4cc69a876a2f0a9a3037f4876d9d7905766aa3c99c35fd7017544d.pkl.gz
+2025-10-22 08:37:36,263 - INFO - \U0001f9f9 Cache expirado removido: f051973294ad1bdb52c8978f6f6c055eca9b8e71ae7504ff7de3bf94b522a7c6.pkl.gz
+2025-10-22 08:37:36,263 - INFO - \U0001f9fe Total de 18/20 caches expirados removidos.

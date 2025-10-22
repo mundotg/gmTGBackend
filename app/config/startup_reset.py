@@ -4,7 +4,7 @@ import pkgutil
 import importlib
 import pickle
 import socket
-from fastapi import Path
+from pathlib import Path
 from sqlalchemy.exc import SQLAlchemyError
 from app.config.dotenv import get_env
 from app.config.reset_db import recreate_db
@@ -87,7 +87,7 @@ def apply_model_updates():
 def get_log_path() -> Path:
     hostname = socket.gethostname()
     local_ips = ["127.0.0.1", "localhost"]
-
+    print("dgfgfdgd xsdgssd afsd")
     try:
         current_ip = socket.gethostbyname(hostname)
     except socket.error:

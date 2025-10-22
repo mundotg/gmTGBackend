@@ -40,7 +40,6 @@ __pycache__/
 *.bin
 *.pid
 database_connector.log
-init_done.bin
 
 # -------------------------------
 # 4. Dados de build e pacotes

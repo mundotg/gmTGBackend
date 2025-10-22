@@ -27,3 +27,134 @@
 2025-10-22 08:37:36,261 - INFO - \U0001f9f9 Cache expirado removido: e01d8f52bf4cc69a876a2f0a9a3037f4876d9d7905766aa3c99c35fd7017544d.pkl.gz
 2025-10-22 08:37:36,263 - INFO - \U0001f9f9 Cache expirado removido: f051973294ad1bdb52c8978f6f6c055eca9b8e71ae7504ff7de3bf94b522a7c6.pkl.gz
 2025-10-22 08:37:36,263 - INFO - \U0001f9fe Total de 18/20 caches expirados removidos.
+2025-10-22 08:41:03,794 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-22 08:41:03,821 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-22 08:41:03,976 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-22 08:41:04,323 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2025-10-22 08:41:12,011 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2025-10-22 08:41:12,066 - INFO - \U0001f50d Buscando conexões do usuário 1 | Página 1, Limite 10
+2025-10-22 08:41:12,105 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2025-10-22 08:41:34,959 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 08:50:12,423 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 08:53:03,325 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 08:55:58,694 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 08:56:32,390 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:01:26,184 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:03:28,065 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:03:33,042 - INFO - \U0001f3e2 Empresa criada: OkayulaTech Lda
+2025-10-22 09:03:40,352 - INFO - \U0001f4bc Cargos criados: Admin, Gerente, Desenvolvedor, Analista, Designer UX/UI, Engenheiro de Dados, DevOps Engineer, Product Owner, Scrum Master, QA Tester, Analista de Suporte, Gestor Financeiro, Recursos Humanos, Marketing Digital, Consultor Técnico
+2025-10-22 09:03:42,097 - INFO - \u2705 Usuário administrador criado: admin@okayulaTech.com
+2025-10-22 09:03:48,364 - INFO - \U0001f3ad Roles criadas: admin, manager, user, developer, qa_tester, product_owner, scrum_master, data_analyst, devops, security_officer, support_agent, hr_manager, finance_manager
+2025-10-22 09:03:49,820 - INFO - \U0001f4e6 Tipos de projeto criados: Interno, Externo, Pesquisa
+2025-10-22 09:03:51,689 - INFO - \u2705 Usuário administrador de tarefas criado: admin.tasks@okayulaTech.com
+2025-10-22 09:03:52,159 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 09:03:52,159 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 09:03:52,161 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 09:03:52,164 - INFO - \U0001f9f9 Cache expirado removido: 00e3bd400f1b7b667c5bd8714a8f479cd0e91060018b2c8ee3fa8fb8aa34a9c5.pkl.gz
+2025-10-22 09:03:52,168 - INFO - \U0001f9f9 Cache expirado removido: 151c1a41cac94c2e378b146d9160bf4ce5da6b76cbde515529e896c207997c1e.pkl.gz
+2025-10-22 09:03:52,170 - INFO - \U0001f9f9 Cache expirado removido: 20a707b8fbe95d002641a0040eae4fe8867a9659d5fff6364ed1ecc8cc87235f.pkl.gz
+2025-10-22 09:03:52,172 - INFO - \U0001f9f9 Cache expirado removido: 2d682b89a876405ddd4eb7a6b865472873f5f1418fa99af25cbee011ec381830.pkl.gz
+2025-10-22 09:03:52,174 - INFO - \U0001f9f9 Cache expirado removido: b6362a200aee34f8f981444860647f4beaedb95213fb1f72fa44eeef81764687.pkl.gz
+2025-10-22 09:03:52,179 - INFO - \U0001f9f9 Cache expirado removido: d07e15a9a92a87f524644dfeba05204363044b497ccb7ae1c2b1dc12e189a2d2.pkl.gz
+2025-10-22 09:03:52,179 - INFO - \U0001f9fe Total de 6/6 caches expirados removidos.
+2025-10-22 09:06:15,191 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:06:15,287 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:06:19,736 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 09:06:20,233 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 09:06:23,293 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 09:06:23,524 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 09:06:23,766 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 09:06:23,999 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 09:06:27,010 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 09:06:27,126 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 09:06:27,710 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 09:06:27,948 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 09:06:27,989 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-22 09:06:28,206 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-22 09:06:28,447 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 09:06:28,447 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 09:06:28,448 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 09:06:28,660 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 09:06:28,661 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 09:06:28,663 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 09:16:16,011 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2025-10-22 09:16:16,020 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:16:21,371 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 09:16:21,387 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 09:16:24,867 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 09:16:24,905 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 09:16:25,100 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 09:16:25,139 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 09:16:28,656 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 09:16:28,659 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 09:16:29,386 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 09:16:29,402 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 09:16:29,626 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-22 09:16:29,631 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-22 09:16:30,086 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 09:16:30,086 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 09:16:30,087 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 09:16:30,121 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 09:16:30,121 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 09:16:30,122 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 09:19:39,981 - INFO - \U0001f504 Aplicando alterações de models no banco de dados...
+2025-10-22 09:19:39,981 - INFO - \U0001f4e6 Carregando modelos do pacote: app.models
+2025-10-22 09:19:39,982 - INFO - \u2705 Módulo importado: app.models.connection_models
+2025-10-22 09:19:39,982 - INFO - \u2705 Módulo importado: app.models.dbstatistics_models
+2025-10-22 09:19:39,982 - INFO - \u2705 Módulo importado: app.models.dbstructure_models
+2025-10-22 09:19:39,982 - INFO - \u2705 Módulo importado: app.models.geral_model
+2025-10-22 09:19:39,982 - INFO - \u2705 Módulo importado: app.models.queryhistory_models
+2025-10-22 09:19:39,982 - INFO - \u2705 Módulo importado: app.models.task_models
+2025-10-22 09:19:39,982 - INFO - \u2705 Módulo importado: app.models.user_model
+2025-10-22 09:19:39,983 - ERROR - \u274c Erro: não foi possível importar Base de app.models.
+2025-10-22 09:19:39,984 - INFO - \U0001f4e6 Flag de inicialização criada em app/config/initialized.pkl
+2025-10-22 09:19:39,984 - INFO - \U0001f4e6 Inicialização concluída e marcada.
+2025-10-22 09:19:39,984 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:19:40,057 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2025-10-22 09:19:40,057 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:19:44,396 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 09:19:44,421 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 09:19:47,913 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 09:19:47,930 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 09:19:48,149 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 09:19:48,161 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 09:19:51,151 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 09:19:51,160 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 09:19:51,859 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 09:19:51,859 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 09:19:52,090 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-22 09:19:52,543 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 09:19:52,543 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 09:19:52,544 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 09:19:52,549 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 09:19:52,549 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 09:19:52,550 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 09:20:53,411 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2025-10-22 09:20:53,411 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:20:54,137 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2025-10-22 09:20:54,137 - INFO - \U0001f680 Iniciando seed de dados...
+2025-10-22 09:20:57,772 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 09:20:58,506 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
+2025-10-22 09:21:01,296 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 09:21:01,528 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 09:21:02,502 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
+2025-10-22 09:21:02,730 - INFO - \U0001f464 Usuário administrador já existe.
+2025-10-22 09:21:04,615 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 09:21:05,303 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 09:21:05,533 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-22 09:21:05,760 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
+2025-10-22 09:21:05,982 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 09:21:05,982 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 09:21:05,983 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 09:21:06,450 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
+2025-10-22 09:21:06,680 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
+2025-10-22 09:21:07,133 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
+2025-10-22 09:21:07,133 - INFO - \U0001f331 Seed concluído com sucesso!
+2025-10-22 09:21:07,134 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2025-10-22 09:21:21,714 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-22 09:21:32,053 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-22 09:24:01,353 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-22 09:27:58,917 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-22 09:28:02,433 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-22 09:32:54,199 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com
+2025-10-22 09:33:57,317 - INFO - \U0001f50d Buscando usuário com email: gelson23tg@gmail.com

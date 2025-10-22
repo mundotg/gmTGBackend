@@ -1,74 +1,106 @@
+# config/startup_reset.py
 import os
+import pkgutil
+import importlib
 import pickle
-from sqlalchemy import text
-# from sqlalchemy.exc import SQLAlchemyError
-from app.config.dotenv import get_env  # ou ajuste conforme seu projeto
+from sqlalchemy.exc import SQLAlchemyError
+from app.config.dotenv import get_env
+from app.config.reset_db import recreate_db
 from app.database import sync_engine as engine
-from app.models import (
-    user_model,
-    geral_model,
-    connection_models,
-    task_models,
-    dbstatistics_models,
-    queryhistory_models,
-    dbstructure_models,
-)
-# from app.ultils.logger import log_message
+from app.ultils.logger import log_message
 
+# Caminho da pasta de models
+MODELS_PACKAGE = "app.models"
 FLAG_FILE = get_env("FLAG_FILE", "app/config/initialized.pkl")
 
 
-def already_initialized():
+# -----------------------------------------------------------
+# ⚙️ Funções utilitárias
+# -----------------------------------------------------------
+def already_initialized() -> bool:
+    """Verifica se o banco já foi inicializado anteriormente."""
     return os.path.exists(FLAG_FILE)
 
 
 def mark_initialized():
-    with open((FLAG_FILE), "wb") as f:
+    """Marca o banco como inicializado."""
+    os.makedirs(os.path.dirname(FLAG_FILE), exist_ok=True)
+    with open(FLAG_FILE, "wb") as f:
         pickle.dump({"initialized": True}, f)
+    log_message(f"📦 Flag de inicialização criada em {FLAG_FILE}", "info")
 
 
+# -----------------------------------------------------------
+# 🧩 Carregamento dinâmico de models
+# -----------------------------------------------------------
+def load_all_models():
+    """
+    Importa dinamicamente todos os módulos dentro de app.models.
+    Assim, qualquer novo model adicionado será incluído automaticamente.
+    """
+    log_message(f"📦 Carregando modelos do pacote: {MODELS_PACKAGE}", "info")
 
-def reset_database():
-    # print("🔁 Resetando banco de dados...")
-    # with engine.connect() as conn:
-    #     # Elimina o schema inteiro (remove tudo)
-    #     conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
-    #     # Recria o schema vazio
-    #     conn.execute(text("CREATE SCHEMA public"))
-    #     # (Opcional) remove a tabela de controle de migrações, se quiser garantir
-    #     conn.execute(text("DROP TABLE IF EXISTS alembic_version CASCADE"))
-    #     # (Opcional) recria permissões padrão
-    #     conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
-    #     conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
-    #     conn.commit()
-            # conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
     try:
-        for base in [
-            user_model.Base,
-            geral_model.Base,
-            connection_models.Base,
-            task_models.Base,
-            dbstatistics_models.Base,
-            queryhistory_models.Base,
-            dbstructure_models.Base,
-        ]:
-            base.metadata.drop_all(bind=engine)
-        print("🗑️ Todas as tabelas removidas com sucesso.")
-    except Exception as e:
-        print(f"⚠️ Erro ao apagar tabelas: {e}")
+        package = importlib.import_module(MODELS_PACKAGE)
+    except ImportError as e:
+        log_message(f"❌ Falha ao importar pacote base de models: {e}", "error")
+        return
 
-    # Passo 2: Criar novamente
+    for _, module_name, is_pkg in pkgutil.iter_modules(package.__path__, package.__name__ + "."):
+        if not is_pkg:
+            try:
+                importlib.import_module(module_name)
+                log_message(f"✅ Módulo importado: {module_name}", "success")
+            except Exception as e:
+                log_message(f"⚠️ Erro ao importar módulo {module_name}: {e}", "error")
+
+
+# -----------------------------------------------------------
+# 🧱 Aplicação de atualizações de schema
+# -----------------------------------------------------------
+def apply_model_updates():
+    """
+    Cria tabelas ausentes de todos os modelos detectados.
+    Não apaga nem altera dados existentes.
+    """
+    log_message("🔄 Aplicando alterações de models no banco de dados...", "info")
+
+    load_all_models()
+
     try:
-        for base in [
-            user_model.Base,
-            geral_model.Base,
-            connection_models.Base,
-            task_models.Base,
-            dbstatistics_models.Base,
-            queryhistory_models.Base,
-            dbstructure_models.Base,
-        ]:
-            base.metadata.create_all(bind=engine)
-        print("✅ Banco de dados recriado com sucesso!")
+        from app.models import Base
+    except ImportError:
+        log_message("❌ Erro: não foi possível importar Base de app.models.", "error")
+        return
+
+    try:
+        Base.metadata.create_all(bind=engine)
+        log_message("✅ Estrutura de banco sincronizada com sucesso.", "success")
+    except SQLAlchemyError as e:
+        log_message(f"❌ Erro de SQLAlchemy ao sincronizar o banco: {e}", "error")
     except Exception as e:
-        print(f"❌ Erro ao recriar tabelas: {e}")
+        log_message(f"❌ Erro inesperado ao sincronizar o banco: {e}", "error")
+
+
+# -----------------------------------------------------------
+# 🚀 Inicialização no startup
+# -----------------------------------------------------------
+def init_on_startup():
+    """
+    Executa durante o startup da aplicação (apenas no ambiente de desenvolvimento).
+    Evita recriação em produção.
+    """
+    env = get_env("ENV", "dev").lower()
+
+    if env != "dev":
+        log_message("🚫 Sincronização automática desativada (ENV != dev).", "warning")
+        return
+
+    if not already_initialized():
+        recreate_db()
+        apply_model_updates()
+        mark_initialized()
+
+        log_message("📦 Inicialização concluída e marcada.", "success")
+    else:
+        log_message("🔒 Banco já inicializado anteriormente — sem alterações.", "info")

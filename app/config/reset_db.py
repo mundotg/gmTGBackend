@@ -38,7 +38,7 @@ def recreate_db():
             base.metadata.create_all(bind=database.sync_engine)
         print("✅  Banco de dados recriado com sucesso!\n")
 
-        print("📦 Engine usada:", database.DATABASE_URL)
+        # print("📦 Engine usada:", database.DATABASE_URL)
         print("🌱 Pronto para inserção de dados iniciais.")
     except Exception as e:
         print(f"❌  Erro ao recriar o banco de dados: {e}")

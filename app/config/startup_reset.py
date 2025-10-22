@@ -3,6 +3,8 @@ import os
 import pkgutil
 import importlib
 import pickle
+import socket
+from fastapi import Path
 from sqlalchemy.exc import SQLAlchemyError
 from app.config.dotenv import get_env
 from app.config.reset_db import recreate_db
@@ -82,6 +84,25 @@ def apply_model_updates():
         log_message(f"❌ Erro inesperado ao sincronizar o banco: {e}", "error")
 
 
+def get_log_path() -> Path:
+    hostname = socket.gethostname()
+    local_ips = ["127.0.0.1", "localhost"]
+
+    try:
+        current_ip = socket.gethostbyname(hostname)
+    except socket.error:
+        current_ip = "127.0.0.1"
+
+    # Se estiver local, usa /tmp
+    if current_ip in local_ips or hostname.startswith("dev"):
+        log_dir = Path("/tmp/logs")
+    else:
+        log_dir = Path("/home/LogFiles/Application")
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "logs.txt"
+
+
 # -----------------------------------------------------------
 # 🚀 Inicialização no startup
 # -----------------------------------------------------------
@@ -90,6 +111,8 @@ def init_on_startup():
     Executa durante o startup da aplicação (apenas no ambiente de desenvolvimento).
     Evita recriação em produção.
     """
+    LOG_FILE = get_log_path()
+    log_message(f"📄 Log file: {LOG_FILE}","warning")
     env = get_env("ENV", "dev").lower()
 
     if env != "dev":

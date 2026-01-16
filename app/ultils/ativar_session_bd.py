@@ -1,15 +1,14 @@
 import traceback
 from typing import Optional, Tuple
-from unittest import result
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.config.dependencies import EngineManager, get_session_by_connection
-from app.cruds.connection_cruds import create_db_connection, disconnect_active_connection, get_active_connection_by_userid, get_db_connection_by_id
+from app.cruds.connection_cruds import create_db_connection, disconnect_active_connection, get_db_connection_by_id
 from app.cruds.dbstatistics_crud import get_statistics_by_connection_geral
 from app.cruds.queryhistory_crud import get_ultima_consulta
 from app.models.connection_models import ActiveConnection, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
-from app.schemas.users_chemas import Db_on
+from app.schemas.users_chemas import DbInfoSchema
 from app.ultils.logger import log_message
 from datetime import datetime
 
@@ -25,7 +24,7 @@ def reativar_connection(id_user: int, db: Session) -> dict:
     Returns:
         dict: {
             "success": bool,
-            "config": Db_on | None
+            "config": DbInfoSchema | None
         }
     """
     try:
@@ -46,7 +45,7 @@ def reativar_connection(id_user: int, db: Session) -> dict:
         data_ultima = ultima_consulta.executed_at if ultima_consulta else None
         duracao_ultima = ultima_consulta.duration_ms if ultima_consulta else None
 
-        db_on = Db_on(
+        db_on = DbInfoSchema(
             id_connection=conexao.id,
             name_db=conexao.database_name,
             data=activated_at,
@@ -130,24 +129,7 @@ def desativar_connection(id_user: int, conn: int, db: Session) -> dict:
         f"StackTrace:\n{traceback.format_exc()}", "error")
         return {"success": False, "message": "Erro ao desativar a conexão."}
 
-# def get_connection_current(db: Session, id_user: int) -> Tuple[Optional[DBConnection], Optional[datetime]]:
-#     """
-#     Retorna a conexão ativa do usuário, se existir, e a data de ativação.
 
-#     :param db: Sessão do banco de dados
-#     :param id_user: ID do usuário
-#     :return: Uma tupla contendo (conexão, data de ativação) ou (None, None)
-#     """
-#     conexao_ativa = get_active_connection_by_userid(db, id_user)
-#     if not conexao_ativa or not conexao_ativa.status:
-#         return None, None
-
-#     conexao = get_db_connection_by_id(db, conexao_ativa.connection_id)
-    
-#     if not conexao:
-#         return None, None
-
-#     return conexao, conexao_ativa.activated_at
 
 def get_connection_current(db: Session, id_user: int) -> Tuple[Optional[DBConnection], Optional[datetime]]:
     """
@@ -165,6 +147,17 @@ def get_connection_current(db: Session, id_user: int) -> Tuple[Optional[DBConnec
         return None, None
     connection, activated_at = connection
     return connection, activated_at
+
+def get_connection_by_id(db: Session, id_user: int, id_conn:int) -> Optional[DBConnection]:
+    """
+    Retorna a conexão ativa do usuário, se existir, e a data de ativação.
+    Agora com apenas 1 consulta ao banco.
+    """
+    return (
+        db.query(DBConnection)
+        .filter(DBConnection.user_id == id_user, DBConnection.id == id_conn)
+        .first()
+    )
 
 from sqlalchemy.ext.asyncio import AsyncSession
 async def get_connection_current_async(
@@ -188,3 +181,53 @@ async def get_connection_current_async(
 
     db_connection, activated_at = connection
     return db_connection, activated_at
+
+
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
+
+async def get_connection_id_async(
+    db: AsyncSession,
+    id_user: int,
+    id_connection: int
+) -> Optional[DBConnection]:
+    """
+    Retorna uma conexão específica do usuário, se existir.
+    Valida se o AsyncSession está funcional antes de executar a consulta.
+    """
+    try:
+        # 1️⃣ Verifica se o db está funcional
+        try:
+            from sqlalchemy import text
+            await db.execute(text("SELECT 1"))
+        except OperationalError as e:
+            log_message(f"[ERRO] Sessão de banco inválida ou desconectada: {e}", "error")
+            return None
+        except Exception as e:
+            log_message(f"[ERRO] Falha ao validar AsyncSession: {e}{traceback.format_exc()}", "error")
+            return None
+
+        # 2️⃣ Busca a conexão no banco
+        stmt = (
+            select(DBConnection)
+            .where(
+                DBConnection.id == id_connection,
+                DBConnection.user_id == id_user
+            )
+        )
+        result = await db.execute(stmt)
+        connection = result.scalar_one_or_none()
+
+        if connection is None:
+            log_message(f"[WARN] Conexão {id_connection} não encontrada para o usuário {id_user}")
+            return None
+        # print("existe")
+        return connection
+
+    except SQLAlchemyError as db_err:
+        log_message(f"[ERRO] Erro SQL ao buscar conexão {id_connection}: {db_err}{traceback.format_exc()}", "error")
+        return None
+    except Exception as e:
+        log_message(f"[ERRO] Erro inesperado em get_connection_id_async: {e}{traceback.format_exc()}", "error")
+        return None
+
+   

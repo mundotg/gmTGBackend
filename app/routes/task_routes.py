@@ -9,7 +9,7 @@ from app.config.cache_manager import cache_result
 from app.schemas.task_schema import TaskSchema, TaskStatsSchema
 from app.database import get_db
 from app.services import task_service
-from app.ultils.get_current_user_id_task import get_current_user_id_task
+from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
 router = APIRouter(tags=["Tasks"])
@@ -58,7 +58,7 @@ def retrieve_task_cached(db: Session, project_id: str, task_id: str, user_id: in
 def list_project_tasks(
     project_id: str,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id_task)
+    user: str = Depends(get_current_user_id)
 ):
     """Lista todas as tarefas de um projeto."""
     try:
@@ -73,7 +73,7 @@ def add_new_task(
     project_id: str,
     task: TaskSchema,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id_task)
+    user: str = Depends(get_current_user_id)
 ):
     """Adiciona uma nova tarefa ao projeto."""
     try:
@@ -90,7 +90,7 @@ def update_existing_task(
     task_id: str,
     task: TaskSchema,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id_task)
+    user: str = Depends(get_current_user_id)
 ):
     """Atualiza uma tarefa existente."""
     try:
@@ -106,7 +106,7 @@ def delete_existing_task(
     project_id: str,
     task_id: str,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id_task),
+    user: str = Depends(get_current_user_id),
 ):
     """Deleta uma tarefa existente."""
     try:
@@ -124,7 +124,7 @@ def delegar_task(
     task_id: str,
     assigned_to: Optional[str] = Query(None, description="ID do usuário para quem delegar a tarefa"),
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id_task)
+    user: str = Depends(get_current_user_id)
 ):
     """
     Delegar (atribuir) uma tarefa a outro utilizador.
@@ -148,7 +148,7 @@ def task_stats_route(
     project_id: Optional[str] = Query(None, description="Filtrar por ID do projeto"),
     sprint_id: Optional[str] = Query(None, description="Filtrar por ID da sprint"),
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id_task)  # opcional
+    user_id: str = Depends(get_current_user_id)  # opcional
 ):
     """
     Retorna estatísticas das tarefas filtradas por projeto e/ou sprint.
@@ -170,7 +170,7 @@ def validar_task(
     aprovado: bool = Query(True, description="Define se a tarefa foi validada com sucesso"),
     comentario: str | None = Query(None, description="Comentário opcional sobre a validação"),
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id_task)
+    user: str = Depends(get_current_user_id)
 ):
     """
     Valida (aprova ou reprova) uma tarefa.
@@ -194,7 +194,7 @@ def validar_task(
 # -----------------------------
 # 🔍 Paginação Geral
 # -----------------------------
-@router.get("/geral/paginate/")
+@router.get("/geral/paginate")
 def listar_elementos(
     tipo: str = Query("user", description="Tipo de entidade: user, project, task ou sprint"),
     search: str | None = Query(None, description="Texto para pesquisa"),
@@ -202,7 +202,7 @@ def listar_elementos(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id_task)
+    user: str = Depends(get_current_user_id)
 ):
     """Paginação genérica de entidades."""
     filters = None

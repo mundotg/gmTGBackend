@@ -2,11 +2,12 @@ from datetime import datetime, timezone
 import traceback
 from typing import Any, Dict, Optional
 from fastapi import HTTPException
+from app.models.user_model import User
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.connection_models import ActiveConnection, ConnectionLog, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
-from app.schemas.users_chemas import PaginacaoOutput
+from app.schemas.users_chemas import PaginationOutput
 from app.ultils.logger import log_message
 
 
@@ -156,28 +157,92 @@ def get_db_connections(db: Session, user_id: int):
     log_message(f"🔍 Buscando conexões do usuário {user_id}", "info")
     return db.query(DBConnection).filter(DBConnection.user_id == user_id).all()
 
-def get_db_connections_pagination(
-    db: Session, user_id: int,
-    page: int = 1, limit: int = 10) ->PaginacaoOutput:
-    log_message(f"🔍 Buscando conexões do usuário {user_id} | Página {page}, Limite {limit}", "info")
+# def get_db_connections_pagination(
+#     db: Session, user_id: int,
+#     page: int = 1, limit: int = 10) ->PaginationOutput:
+#     log_message(f"🔍 Buscando conexões do usuário {user_id} | Página {page}, Limite {limit}", "info")
     
-    offset = (page - 1) * limit
+#     offset = (page - 1) * limit
 
-    total = db.query(DBConnection).filter(DBConnection.user_id == user_id).count()
+#     total = db.query(DBConnection).filter(DBConnection.user_id == user_id).count()
+#     sub_last_used = (
+#         db.query(
+#             ConnectionLog.connection_id,
+#             func.max(ConnectionLog.timestamp).label("last_used")
+#         )
+#         .group_by(ConnectionLog.connection_id)
+#         .subquery()
+#     )
+
+#     connections = (
+#         db.query(DBConnection, sub_last_used.c.last_used)
+#         .outerjoin(sub_last_used, DBConnection.id == sub_last_used.c.connection_id)
+#         .filter(DBConnection.user_id == user_id)
+#         .offset(offset)
+#         .limit(limit)
+#         .all()
+#     )
+
+#     return {
+#         "page": page,
+#         "limit": limit,
+#         "total": total,
+#         "results": connections
+#     }
+
+
+
+def get_db_connections_pagination_v1(
+    db: Session,
+    user_id: int,
+    page: int = 1,
+    limit: int = 10,
+):
+    log_message(
+        f"🔍 Buscando conexões | user={user_id} | page={page} | limit={limit}",
+        "info",
+    )
+
+    offset = (page - 1) * limit
+    user = db.query(User).filter(User.id == user_id).first()
+
+    # 🔹 Subquery: último uso da conexão
     sub_last_used = (
         db.query(
             ConnectionLog.connection_id,
-            func.max(ConnectionLog.timestamp).label("last_used")
+            func.max(ConnectionLog.timestamp).label("last_used"),
         )
         .group_by(ConnectionLog.connection_id)
         .subquery()
     )
 
-    connections = (
+    # 🔹 Query base
+    query = (
         db.query(DBConnection, sub_last_used.c.last_used)
-        .outerjoin(sub_last_used, DBConnection.id == sub_last_used.c.connection_id)
-        .filter(DBConnection.user_id == user_id)
-        .offset(offset)
+        .outerjoin(
+            sub_last_used,
+            DBConnection.id == sub_last_used.c.connection_id,
+        )
+        .join(User, DBConnection.user_id == User.id)
+    )
+
+    # 🔐 Regra de permissão
+    if user.role and user.role.name == "admin":
+        # Admin vê tudo da empresa
+        query = query.filter(User.empresa_id == user.empresa_id)
+    else:
+        # Usuário normal:
+        # - conexões que ele criou
+        # - e da mesma empresa
+        query = query.filter(
+            DBConnection.user_id == user.id,
+            User.empresa_id == user.empresa_id,
+        )
+
+    total = query.count()
+
+    results = (
+        query.offset(offset)
         .limit(limit)
         .all()
     )
@@ -186,8 +251,9 @@ def get_db_connections_pagination(
         "page": page,
         "limit": limit,
         "total": total,
-        "results": connections
+        "results": results,
     }
+
 
 
 def get_db_connection_by_id(db: Session, connection_id: int)->DBConnection|None:
@@ -235,7 +301,7 @@ def get_connection_logs(db: Session, connection_id: int):
 def get_connection_logs_pagination(
     db: Session,user_id: int ,
     connection_id: int = None,
-    page: int = 1, limit: int = 10)->PaginacaoOutput:
+    page: int = 1, limit: int = 10)->PaginationOutput:
     log_message(f"📜 Buscando logs | Conexão: {connection_id or 'todas'} | Página {page}, Limite {limit}", "info")
 
     query = db.query(ConnectionLog).join(DBConnection).filter(DBConnection.user_id == user_id)

@@ -17,9 +17,14 @@ from app.cruds.dbstructure_crud import (
     get_structure_by_id_and_name,
     update_db_structure,
 )
+
 # from app.models.dbstructure_models import DBStructure
 from app.schemas.dbstructure_schema import DBStructureOut, DBStructureCreate
 from app.schemas.dbstatistics_schema import DBStatisticsDict
+from app.services.field_info import (
+    # sincronizar_metadados_da_tabela,
+    sincronizar_metadados_da_tabela_simple,
+)
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
@@ -29,6 +34,7 @@ from app.ultils.logger import log_message
 # 🔍 Funções de Estrutura de Banco de Dados
 
 # ============================================================
+
 
 def verificar_ou_atualizar_estrutura(
     db: Session, connection_id: int, table_name: str, schema_name: str | None = None
@@ -40,7 +46,7 @@ def verificar_ou_atualizar_estrutura(
     try:
         estrutura = get_structure_by_id_and_name(db, connection_id, table_name)
         structure = None  # Corrigido nome da variável (era "struture")
-        
+
         if not estrutura:
             nova = DBStructureCreate(
                 db_connection_id=connection_id,
@@ -51,7 +57,9 @@ def verificar_ou_atualizar_estrutura(
             )
             structure = create_db_structure(db, nova)
             log_message(f"🆕 Estrutura registrada: {table_name}", "info")
-            return DBStructureOut.model_validate(structure)  # Corrigido nome da variável
+            return DBStructureOut.model_validate(
+                structure
+            )  # Corrigido nome da variável
 
         update_needed = False
         if estrutura.schema_name != schema_name:
@@ -66,11 +74,13 @@ def verificar_ou_atualizar_estrutura(
             log_message(f"🔄 Estrutura atualizada: {table_name}", "info")
         else:
             structure = estrutura  # Usar a estrutura existente se não houve atualização
-            
+
         return DBStructureOut.model_validate(structure)  # Corrigido nome da variável
 
     except Exception as e:
-        log_message(f"⚠️ Erro ao gerenciar estrutura da tabela '{table_name}': {e}", "warning")
+        log_message(
+            f"⚠️ Erro ao gerenciar estrutura da tabela '{table_name}': {e}", "warning"
+        )
         return None
 
 
@@ -81,14 +91,19 @@ def get_table_names_with_count(connection_id: int, id_user: int, db: Session):
     """
     table_info = get_cached_row_count_all(db, connection_id)
     if table_info:
-        log_message(f"🔍 Usando cache para {len(table_info)} tabelas na conexão {connection_id}", "info")
+        log_message(
+            f"🔍 Usando cache para {len(table_info)} tabelas na conexão {connection_id}",
+            "info",
+        )
         return sorted(
             [{"name": row.table_name, "rowcount": row.row_count} for row in table_info],
             key=lambda x: x["name"].lower(),
         )
 
     try:
-        engine = EngineManager.get(id_user) or get_session_by_connection_id(connection_id, db)
+        engine = EngineManager.get(id_user) or get_session_by_connection_id(
+            connection_id, db
+        )
         inspector = inspect(engine)
         table_names = inspector.get_table_names()
         schema = getattr(inspector, "default_schema_name", None)
@@ -117,7 +132,9 @@ def get_table_names(connection_id: int, id_user: int, db: Session):
     if structures:
         return [s.table_name for s in structures]
 
-    engine = EngineManager.get(id_user) or get_session_by_connection_id(connection_id, db)
+    engine = EngineManager.get(id_user) or get_session_by_connection_id(
+        connection_id, db
+    )
     inspector = inspect(engine)
 
     try:
@@ -149,15 +166,27 @@ def get_table_names(connection_id: int, id_user: int, db: Session):
     return all_table_names
 
 
-def get_strutures_names(connection_id: int, id_user: int, db: Session) -> list[DBStructureOut]:
+def get_strutures_names(
+    connection_id: int, id_user: int, db: Session
+) -> list[DBStructureOut]:
     """
     Retorna todas as tabelas e views de uma conexão, atualizando estruturas no banco local.
     """
+    
     structures = get_db_structures(db, connection_id)
     if structures:
+        for strut in structures:
+            sincronizar_metadados_da_tabela_simple(
+                db=db,
+                table_name=strut.table_name,
+                user_id=id_user,
+                connection_id=connection_id,
+            )
         return [DBStructureOut.model_validate(s) for s in structures]
 
-    engine = EngineManager.get(id_user) or get_session_by_connection_id(connection_id, db)
+    engine = EngineManager.get(id_user) or get_session_by_connection_id(
+        connection_id, db
+    )
     inspector = inspect(engine)
 
     try:
@@ -176,21 +205,32 @@ def get_strutures_names(connection_id: int, id_user: int, db: Session) -> list[D
             tables = []
         tablesStructure = []  # Corrigido nome da variável
         for table in tables:
-            structure = verificar_ou_atualizar_estrutura(db, connection_id, table, schema)
+            structure = verificar_ou_atualizar_estrutura(
+                db, connection_id, table, schema
+            )
+
             if structure:  # Verificar se não é None
+                sincronizar_metadados_da_tabela_simple(
+                    db=db,
+                    table_name=structure.table_name,
+                    user_id=id_user,
+                    connection_id=connection_id,
+                )
                 tablesStructure.append(structure)
-                
+
         all_table_names.extend(tablesStructure)
         viewsStructure = []  # Corrigido nome da variável
         try:
             views = inspector.get_view_names(schema=schema)
-            
+
             for v in views:
-                structure = verificar_ou_atualizar_estrutura(db, connection_id, v, schema)  # Corrigido: era "views" em vez de "v"
+                structure = verificar_ou_atualizar_estrutura(
+                    db, connection_id, v, schema
+                )  # Corrigido: era "views" em vez de "v"
                 if structure:  # Verificar se não é None
                     viewsStructure.append(structure)
         except Exception as e:
-            log_message(f"⚠️ Erro ao obter views do schema '{schema}': {e}", "warning")
+            log_message(f"⚠️ Erro ao obter views do schema '{schema}': {e}{traceback.format_exc()}", "warning")
         all_table_names.extend(viewsStructure)
 
     return all_table_names
@@ -202,12 +242,17 @@ def get_strutures_names(connection_id: int, id_user: int, db: Session) -> list[D
 
 # ============================================================
 
-def get_table_count(connection_id: int, table_name: str, db: Session, id_user: int) -> int:
+
+def get_table_count(
+    connection_id: int, table_name: str, db: Session, id_user: int
+) -> int:
     """
     Retorna a contagem de registros de uma tabela.
     Retorna 0 se for view. Retorna -1 em caso de erro.
     """
-    engine = EngineManager.get(id_user) or get_session_by_connection_id(connection_id, db)
+    engine = EngineManager.get(id_user) or get_session_by_connection_id(
+        connection_id, db
+    )
 
     try:
         inspector = inspect(engine)
@@ -221,7 +266,10 @@ def get_table_count(connection_id: int, table_name: str, db: Session, id_user: i
 
     except SQLAlchemyError as e:
         error_type = _lidar_com_erro_sql(e)
-        log_message(f"⚠️ Erro ao contar registros da tabela '{table_name}': {error_type} - {e}", "error")
+        log_message(
+            f"⚠️ Erro ao contar registros da tabela '{table_name}': {error_type} - {e}",
+            "error",
+        )
         return -1
 
 
@@ -230,6 +278,7 @@ def get_table_count(connection_id: int, table_name: str, db: Session, id_user: i
 # 📈 Coleta e Atualização de Estatísticas
 
 # ============================================================
+
 
 def collect_statistics(engine: Engine, db_type: str) -> DBStatisticsDict:
     """
@@ -273,48 +322,117 @@ def collect_statistics(engine: Engine, db_type: str) -> DBStatisticsDict:
                 log_message(f"⚠️ Erro ao obter versão do servidor: {e}", "warning")
 
         if dialect == "postgresql":
-            stats["procedure_count"] = conn.execute(text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'p'")).scalar() or 0
-            stats["function_count"] = conn.execute(text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'f'")).scalar() or 0
-            stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM pg_trigger WHERE NOT tgisinternal")).scalar() or 0
-            stats["index_count"] = conn.execute(text("SELECT COUNT(*) FROM pg_indexes")).scalar() or 0
+            stats["procedure_count"] = (
+                conn.execute(
+                    text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'p'")
+                ).scalar()
+                or 0
+            )
+            stats["function_count"] = (
+                conn.execute(
+                    text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'f'")
+                ).scalar()
+                or 0
+            )
+            stats["trigger_count"] = (
+                conn.execute(
+                    text("SELECT COUNT(*) FROM pg_trigger WHERE NOT tgisinternal")
+                ).scalar()
+                or 0
+            )
+            stats["index_count"] = (
+                conn.execute(text("SELECT COUNT(*) FROM pg_indexes")).scalar() or 0
+            )
 
         elif dialect == "mysql":
-            stats["procedure_count"] = conn.execute(
-                text("SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='PROCEDURE'")
-            ).scalar() or 0
-            stats["function_count"] = conn.execute(
-                text("SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='FUNCTION'")
-            ).scalar() or 0
-            stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM information_schema.TRIGGERS")).scalar() or 0
-            stats["index_count"] = conn.execute(text("SELECT COUNT(*) FROM information_schema.STATISTICS")).scalar() or 0
+            stats["procedure_count"] = (
+                conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='PROCEDURE'"
+                    )
+                ).scalar()
+                or 0
+            )
+            stats["function_count"] = (
+                conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='FUNCTION'"
+                    )
+                ).scalar()
+                or 0
+            )
+            stats["trigger_count"] = (
+                conn.execute(
+                    text("SELECT COUNT(*) FROM information_schema.TRIGGERS")
+                ).scalar()
+                or 0
+            )
+            stats["index_count"] = (
+                conn.execute(
+                    text("SELECT COUNT(*) FROM information_schema.STATISTICS")
+                ).scalar()
+                or 0
+            )
 
         elif dialect == "sqlite":
-            stats["trigger_count"] = conn.execute(
-                text("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger'")
-            ).scalar() or 0
-            stats["index_count"] = conn.execute(
-                text("SELECT COUNT(*) FROM sqlite_master WHERE type='index'")
-            ).scalar() or 0
+            stats["trigger_count"] = (
+                conn.execute(
+                    text("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger'")
+                ).scalar()
+                or 0
+            )
+            stats["index_count"] = (
+                conn.execute(
+                    text("SELECT COUNT(*) FROM sqlite_master WHERE type='index'")
+                ).scalar()
+                or 0
+            )
 
         elif dialect in ["mssql", "sql server", "sqlserver"]:
-            stats["procedure_count"] = conn.execute(text("SELECT COUNT(*) FROM sys.procedures")).scalar() or 0
-            stats["function_count"] = conn.execute(
-                text("SELECT COUNT(*) FROM sys.objects WHERE type IN ('FN', 'TF', 'IF')")
-            ).scalar() or 0
-            stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM sys.triggers")).scalar() or 0
-            stats["index_count"] = conn.execute(
-                text("SELECT COUNT(*) FROM sys.indexes WHERE name IS NOT NULL")
-            ).scalar() or 0
+            stats["procedure_count"] = (
+                conn.execute(text("SELECT COUNT(*) FROM sys.procedures")).scalar() or 0
+            )
+            stats["function_count"] = (
+                conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM sys.objects WHERE type IN ('FN', 'TF', 'IF')"
+                    )
+                ).scalar()
+                or 0
+            )
+            stats["trigger_count"] = (
+                conn.execute(text("SELECT COUNT(*) FROM sys.triggers")).scalar() or 0
+            )
+            stats["index_count"] = (
+                conn.execute(
+                    text("SELECT COUNT(*) FROM sys.indexes WHERE name IS NOT NULL")
+                ).scalar()
+                or 0
+            )
 
         elif dialect == "oracle":
-            stats["procedure_count"] = conn.execute(
-                text("SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'PROCEDURE'")
-            ).scalar() or 0
-            stats["function_count"] = conn.execute(
-                text("SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'FUNCTION'")
-            ).scalar() or 0
-            stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM ALL_TRIGGERS")).scalar() or 0
-            stats["index_count"] = conn.execute(text("SELECT COUNT(*) FROM ALL_INDEXES")).scalar() or 0
+            stats["procedure_count"] = (
+                conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'PROCEDURE'"
+                    )
+                ).scalar()
+                or 0
+            )
+            stats["function_count"] = (
+                conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'FUNCTION'"
+                    )
+                ).scalar()
+                or 0
+            )
+            stats["trigger_count"] = (
+                conn.execute(text("SELECT COUNT(*) FROM ALL_TRIGGERS")).scalar() or 0
+            )
+            stats["index_count"] = (
+                conn.execute(text("SELECT COUNT(*) FROM ALL_INDEXES")).scalar() or 0
+            )
 
     return stats
 
@@ -335,7 +453,9 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
                 if k in stats and k != "db_connection_id"
             },
         )
-        log_message(f"🆕 Criando novas estatísticas para a conexão {connection_id}.", "info")
+        log_message(
+            f"🆕 Criando novas estatísticas para a conexão {connection_id}.", "info"
+        )
         return create_statistics(db, data_create) or "created"
 
     changed = any(
@@ -358,7 +478,9 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
         update_statistics(db, connection_id, data_update)
         return "updated"
 
-    log_message(f"ℹ️ Nenhuma mudança nas estatísticas da conexão {connection_id}.", "info")
+    log_message(
+        f"ℹ️ Nenhuma mudança nas estatísticas da conexão {connection_id}.", "info"
+    )
     return "unchanged"
 
 
@@ -374,13 +496,19 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
 
         stats = collect_statistics(engine, connection.type)
         if not stats:
-            log_message(f"⚠️ Nenhuma estatística coletada para a conexão {connection.id}.", "warning")
+            log_message(
+                f"⚠️ Nenhuma estatística coletada para a conexão {connection.id}.",
+                "warning",
+            )
             return None
 
         log_message(f"📊 Estatísticas coletadas: {stats}", "info")
         action = save_or_update_statistics(connection.id, stats, db)
 
-        log_message(f"✅ Estatísticas '{action}' registradas para conexão ID={connection.id}.", "success")
+        log_message(
+            f"✅ Estatísticas '{action}' registradas para conexão ID={connection.id}.",
+            "success",
+        )
         stats["connection_name"] = connection.name
         return stats
 
@@ -388,7 +516,9 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
         error_type = type(e).__name__
         error_message = str(e)
         stack_trace = traceback.format_exc()
-        connection_id = getattr(connection, 'id', '?') if 'connection' in locals() else '?'
+        connection_id = (
+            getattr(connection, "id", "?") if "connection" in locals() else "?"
+        )
         log_message(
             f"❌ Erro ao sincronizar estatísticas da conexão ID={connection_id}, usuário ID={id_user}:\n"
             f"Tipo: {error_type}\nMensagem: {error_message}\nStackTrace:\n{stack_trace}",

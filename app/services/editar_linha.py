@@ -127,6 +127,29 @@ def _convert_column_type_for_string_one(value, col_type):
     except Exception as e:
         log_message(f"Erro ao converter valor '{value}' para {col_type}: {e}", "error")
         return "NULL"
+    
+def _convert_column_type_for_string_one_V1(value, col_type):
+    """Converte o valor baseado no tipo da coluna e retorna valor Python (não string SQL)."""
+    if value is None or value == "" or value == "NULL":
+        return None
+
+    converter = _map_column_type(col_type)
+    try:
+        converted = converter(value)
+
+        # ✅ Deixar tipos especiais como objetos Python
+        from datetime import datetime, date
+        import uuid, json
+
+        if isinstance(converted, (bool, datetime, date, uuid.UUID, dict, list, bytes)):
+            return converted
+        
+        # ✅ Retorno como string normal sem aspas extras — asyncpg coloca aspas sozinho
+        return str(converted)
+
+    except Exception as e:
+        log_message(f"Erro ao converter valor '{value}' para {col_type}: {e}", "error")
+        return None
 
 def quote_identifier(db_type: str, identifier: str) -> str:
     """

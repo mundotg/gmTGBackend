@@ -1,0 +1,135 @@
+Perfeito 👍 Vou **transformar tudo isso em uma lista de tarefas (checklist)** para você usar como **guia de verificação do projeto**.
+A ideia é simples: **se não tiver → implemente**.
+Você pode até copiar isso para o Notion / README e ir marcando ✅.
+
+---
+
+# ✅ CHECKLIST – Projeto de Base de Dados como Portfólio de Cientista de Dados
+
+## 🎯 1. Narrativa do Projeto
+
+* [ V] O projeto **não é apresentado apenas como “gestão de base de dados”**
+* [ V] O título/descritivo fala em **pipeline de dados / análise / tomada de decisão**
+* [V ] Existe um **problema de negócio claro** descrito
+
+---
+
+## 🧱 2. Pipeline de Dados (End-to-End)
+
+### 🔹 2.1 Coleta / Ingestão
+
+* [V ] Fonte dos dados está clara (CSV, API, sistema, etc.)
+* [V ] Existe processo de **ETL ou ELT** mais falta alguns com acha duplicado, e nulo ainda apartir do app o usuario faz no app sem ser algo automatico do app
+* [V ] Uso de **SQL e/ou Python** documentado
+* [ V] Scripts de ingestão versionados no GitHub
+* [ V] Validação de esquema ou formato dos dados
+
+---
+
+### 🔹 2.2 Modelagem do Banco
+
+* [X ] Modelo de dados documentado (diagrama ou explicação)
+* [V ] Uso de modelo:
+
+  * [V ] Relacional
+  * [ V] Estrela
+  * [V ] Snowflake
+* [V ] Normalização (ex: 3FN) **ou** desnormalização para analytics
+* [V ] Chaves primárias definidas
+* [ V] Chaves estrangeiras definidas
+* [ V] Índices criados
+* [V ] Preocupação com performance explicada
+
+---
+
+### 🔹 2.3 Limpeza e Qualidade de Dados
+
+* [ + ou -] Tratamento de valores nulos
+* [ X] Remoção ou tratamento de duplicatas
+* [ V] Regras de validação (ex: valores inválidos)
+* [V ] Logs ou controle de erros
+* [ X] Justificativa das decisões de limpeza
+
+---
+
+## 📊 3. Análise e Geração de Valor
+
+### 🔹 3.1 Análise Exploratória (EDA)
+
+* [X ] Uso de Python (pandas)
+* [X ] Gráficos de distribuição
+* [X ] Análise de correlação
+* [X ] Identificação de tendências
+* [ X] Identificação de outliers
+* [ X] Interpretação escrita dos gráficos (insights)
+
+---
+
+### 🔹 3.2 Métricas e KPIs
+
+* [ X] KPIs definidos com contexto de negócio
+* [X ] Métricas de desempenho (ex: tempo, volume, taxa)
+* [ X ] Métricas de qualidade de dados
+* [ X] Cálculo dos KPIs reproduzível (SQL ou Python)
+* [X ] Explicação do *porquê* de cada métrica
+
+---
+
+### 🔹 3.3 Dashboards
+
+* [ X] Dashboard criado (Tableau / Looker / Power BI / Streamlit)
+* [ X] Dashboard responde perguntas de negócio
+* [ X] Visualizações claras e bem nomeadas
+* [ X] Prints salvos no repositório
+* [ X] Link público do dashboard (se possível)
+
+---
+
+## 🤖 4. Ciência de Dados / Machine Learning (Opcional, mas forte)
+
+* [ V] Pelo menos **um modelo simples** implementado:
+
+  * [ X] Regressão
+  * [ X] Classificação
+  * [ X] Clusterização (K-means)
+  * [X ] Detecção de anomalias
+* [ X] Justificativa da escolha do modelo
+* [X ] Avaliação do modelo (métrica simples)
+* [ X] Conclusão prática (o que o modelo ajuda a decidir?)
+
+---
+
+## 🗂️ 5. Organização do GitHub
+
+* [ V] Repositório público
+* [ V] Estrutura organizada:
+
+  * [X ] `/data`
+  * [ V] `/sql`
+  * [ X] `/dashboards`
+* [V ] Código comentado
+* [ X] Commits claros (não tudo em um commit só)
+
+---
+
+### 📄 README.md (obrigatório)
+
+* [ V] Descrição do problema
+* [V ] Fonte dos dados
+* [V ] Arquitetura do projeto
+* [ V] Tecnologias usadas
+* [ X] Principais insights
+* [X ] Resultados obtidos
+* [ X] Próximos passos / melhorias futuras
+
+---
+
+## 🌐 6. Portfólio Online
+
+* [ X] Projeto linkado no GitHub
+* [ X] GitHub Pages **ou** site pessoal simples
+* [ X] Notebooks acessíveis
+* [ X] Dashboard publicado ou demonstrado
+* [ X] (Opcional) Artigo no Medium explicando o projeto
+
+

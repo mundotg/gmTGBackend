@@ -25,10 +25,10 @@ def create_db_structure(db: Session, structure_in: DBStructureCreate) -> DBStruc
         db.commit()
         db.refresh(structure)
 
-        log_message(
-            f"✅ Estrutura '{structure.table_name}' criada (Conexão ID: {structure.db_connection_id})",
-            "success",
-        )
+        # log_message(
+        #     f"✅ Estrutura '{structure.table_name}' criada (Conexão ID: {structure.db_connection_id})",
+        #     "success",
+        # )
         return structure
 
     except Exception as e:
@@ -45,7 +45,7 @@ def update_db_structure(db: Session, estrutura: DBStructure) -> DBStructure:
         db.add(estrutura)
         db.commit()
         db.refresh(estrutura)
-        log_message(f"✅ Estrutura atualizada: {estrutura.table_name}", "info")
+        # log_message(f"✅ Estrutura atualizada: {estrutura.table_name}", "info")
         return estrutura
     except Exception as e:
         db.rollback()
@@ -155,10 +155,10 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
 
             db.commit()
             db.refresh(existing_field)
-            log_message(
-                f"🔄 Campo '{field_in.name}' atualizado na estrutura ID {structure_id}",
-                "info",
-            )
+            # log_message(
+            #     f"🔄 Campo '{field_in.name}' atualizado na estrutura ID {structure_id}",
+            #     "info",
+            # )
             return existing_field
 
         # Criação de novo campo
@@ -167,7 +167,7 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
         db.commit()
         db.refresh(field)
 
-        log_message(f"🟢 Campo '{field.name}' criado na estrutura ID {structure_id}", "info")
+        # log_message(f"🟢 Campo '{field.name}' criado na estrutura ID {structure_id}", "info")
         return field
 
     except Exception as e:
@@ -248,20 +248,20 @@ def create_enum_field(db: Session, data: DBEnumField) -> DBEnumField:
     """
     Cria um novo valor ENUM para um campo, se ainda não existir.
     """
-    existing = db.query(DBEnumField).filter_by(field_id=data.field_id, valor=data.valor).first()
+    existing = db.query(DBEnumField).filter_by(field_id=data.field_id, value=data.value).first()
     if existing:
-        log_message(f"⚠️ Valor ENUM '{data.valor}' já existe para field ID {data.field_id}", "warning")
+        log_message(f"⚠️ Valor ENUM '{data.value}' já existe para field ID {data.field_id}", "warning")
         return existing
 
     db.add(data)
     db.commit()
     db.refresh(data)
-    log_message(f"🆕 Valor ENUM '{data.valor}' criado para field ID {data.field_id}", "info")
+    # log_message(f"🆕 Valor ENUM '{data.value}' criado para field ID {data.field_id}", "info")
     return data
 
 
 def get_enum_field(db: Session, field_id: int, valor: str) -> Optional[DBEnumField]:
-    return db.query(DBEnumField).filter_by(field_id=field_id, valor=valor).first()
+    return db.query(DBEnumField).filter_by(field_id=field_id, value=valor).first()
 
 
 def list_enum_fields(db: Session) -> List[DBEnumField]:

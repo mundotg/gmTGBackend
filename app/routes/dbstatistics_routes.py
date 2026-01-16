@@ -1,3 +1,4 @@
+import traceback
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Any, List, Dict
@@ -41,29 +42,29 @@ def _validate_table_name(table_name: str):
 # Funções com Cache
 # -----------------------------
 
-@cache_result(ttl=300, user_id="user_{user_id}")  # 5 minutos de cache
+@cache_result(ttl=300, user_id="user_1{user_id}")  # 5 minutos de cache
 def get_tables_with_count_cached(connection_id: int, user_id: int, db: Session) -> List[Dict]:
     """Obtém tabelas com contagem com cache"""
     return get_table_names_with_count(connection_id, user_id, db)
 
-@cache_result(ttl=600, user_id="user_{user_id}")  # 10 minutos de cache
+@cache_result(ttl=600, user_id="user_2{user_id}")  # 10 minutos de cache
 def get_tables_names_cached(connection_id: int, user_id: int, db: Session) -> List[str]:
     """Obtém nomes de tabelas com cache"""
     return get_table_names(connection_id, user_id, db)
 
 
 
-@cache_result(ttl=600, user_id="user_{user_id}")  # 10 minutos de cache
+@cache_result(ttl=600)
 def get_strutures_names_cached(connection_id: int, user_id: int, db: Session) -> List[DBStructureOut]:
     """Obtém nomes de tabelas com cache"""
     return get_strutures_names(connection_id, user_id, db)
 
-@cache_result(ttl=180, user_id="user_{user_id}")  # 3 minutos de cache (contagens mudam frequentemente)
+@cache_result(ttl=180, user_id="user_3{user_id}") 
 def get_table_count_cached(connection_id: int, table_name: str, db: Session, user_id: int) -> int:
     """Obtém contagem de tabela com cache"""
     return get_table_count(connection_id, table_name, db, user_id)
 
-@cache_result(ttl=1800, user_id="user_{user_id}")  # 30 minutos de cache para estatísticas
+@cache_result(ttl=1800, user_id="user_4{user_id}")  
 def sync_connection_stats_cached(user_id: int, db: Session) -> Any:
     """Sincroniza estatísticas com cache"""
     stats = sync_connection_statistics(user_id, db)
@@ -95,7 +96,7 @@ def get_tables_with_count(
     except HTTPException:
         raise
     except Exception as e:
-        log_message(f"❌ Erro ao obter tabelas com contagem: {e}", level="error")
+        log_message(f"❌ Erro ao obter tabelas com contagem: {e}{traceback.format_exc()}", level="error")
         raise HTTPException(
             status_code=500, 
             detail="Erro interno ao buscar tabelas com contagem."
@@ -126,7 +127,7 @@ def get_tables(
         )
         
 @router.get("/structures", response_model=ResponseWrapper[List[DBStructureOut]])  # Corrigido: era "/strutures"
-def get_structures(  # Corrigido: nome da função era "get_tables"
+def get_structures( 
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
@@ -136,16 +137,16 @@ def get_structures(  # Corrigido: nome da função era "get_tables"
     """
     try:
         active = _get_active_connection_or_400(db, user_id)
-        structures = get_strutures_names_cached(active.connection_id, user_id, db)  # Corrigido: variável "names" para "structures"
+        structures = get_strutures_names_cached(connection_id=active.connection_id, user_id=user_id, db=db)
         
-        return ResponseWrapper(success=True, data=structures)  # Corrigido: "names" para "structures"
+        return ResponseWrapper(success=True, data=structures)  
     except HTTPException:
         raise
     except Exception as e:
-        log_message(f"❌ Erro ao obter estruturas de tabelas: {e}", level="error")  # Corrigido mensagem
+        log_message(f"❌ Erro ao obter estruturas de tabelas: {e}{traceback.format_exc()}", level="error") 
         raise HTTPException(
             status_code=500, 
-            detail="Erro interno ao buscar estruturas das tabelas."  # Corrigido mensagem
+            detail="Erro interno ao buscar estruturas das tabelas."  
         )
 
 

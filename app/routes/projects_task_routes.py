@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.config.cache_manager import cache_result
 from app.schemas.project_schemas import ProjectResponseSchema, ProjectSchema
 from app.database import get_db
-from app.ultils.get_current_user_id_task import get_current_user_id_task
+from app.ultils.get_id_by_token import get_current_user_id
 from app.services import project_service
 from app.ultils.logger import log_message
 
@@ -30,36 +30,36 @@ def handle_service_error(context: str, error: Exception, status_code: int = 500)
         raise HTTPException(status_code=status_code, detail=f"Erro interno em {context}")
 
 @cache_result(ttl=300, user_id="user_{user_id}")
-def list_projects_cached(db: Session, user_id: int,user_id_principal: int = Depends(get_current_user_id_task)):
+def list_projects_cached(db: Session, user_id: int = Depends(get_current_user_id)):
     """Lista projetos com cache."""
     return project_service.list_projects_service(db)
 
 @cache_result(ttl=600, user_id="user_{user_id}")
-def retrieve_project_cached(db: Session, project_id: str, user_id: int,user_id_principal: int = Depends(get_current_user_id_task)):
+def retrieve_project_cached(db: Session, project_id: str, user_id: int = Depends(get_current_user_id)):
     """Obtém projeto específico com cache."""
     return project_service.retrieve_project_service(db, project_id)
 
 
 
 @router.get("/projects/", response_model=List[ProjectResponseSchema])
-def list_projects(db: Session = Depends(get_db), user: str = Depends(get_current_user_id_task)):
+def list_projects(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     """Lista todos os projetos do usuário."""
     try:
-        return list_projects_cached(db, user)
+        return list_projects_cached(db, user_id)
     except Exception as e:
         handle_service_error("listar projetos", e)
 
 @router.get("/projects/{project_id}", response_model=ProjectResponseSchema)
-def retrieve_project(project_id: str, db: Session = Depends(get_db), user: str = Depends(get_current_user_id_task)):
+def retrieve_project(project_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     """Obtém projeto por ID."""
     try:
-        return retrieve_project_cached(db, project_id, user)
+        return retrieve_project_cached(db, project_id, user_id)
     except Exception as e:
         handle_service_error(f"buscar projeto {project_id}", e)
 
 @router.post("/projects/", response_model=ProjectResponseSchema)
 def create_new_project(project: ProjectSchema, db: Session = Depends(get_db), 
-                       user: str = Depends(get_current_user_id_task)):
+                       user: str = Depends(get_current_user_id)):
     """Cria um novo projeto e limpa o cache."""
     try:
         result = project_service.create_project_service(db, project, user)
@@ -71,7 +71,7 @@ def create_new_project(project: ProjectSchema, db: Session = Depends(get_db),
 
 @router.put("/projects/{project_id}", response_model=ProjectResponseSchema)
 def update_existing_project(project_id: str, project: ProjectSchema, db: Session = Depends(get_db), 
-                            user_id: int = Depends(get_current_user_id_task)):
+                            user_id: int = Depends(get_current_user_id)):
     """Atualiza projeto existente."""
     try:
         result = project_service.update_project_service(db, project_id, project)
@@ -83,7 +83,7 @@ def update_existing_project(project_id: str, project: ProjectSchema, db: Session
 
 @router.delete("/projects/{project_id}")
 def delete_existing_project(project_id: str, db: Session = Depends(get_db), 
-                            user: str = Depends(get_current_user_id_task)):
+                            user: str = Depends(get_current_user_id)):
     """Deleta projeto e limpa cache relacionado."""
     try:
         result = project_service.delete_project_service(db, project_id)

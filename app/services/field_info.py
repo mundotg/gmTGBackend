@@ -4,6 +4,7 @@ from typing import Dict, List
 from sqlalchemy import  MetaData, inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
+# from app.config.cache_manager import cache_result
 from app.cruds.dbstructure_crud import create_db_field, create_db_structure, delete_structure_by_name, get_db_structures_by_conn_id_and_table, get_fields_by_structure
 from app.models.dbstructure_models import   DBField,  DBStructure
 from app.schemas.dbstructure_schema import  CampoDetalhado, DBFieldCreate, DBStructureCreate, MetadataTableResponse
@@ -77,6 +78,61 @@ def sincronizar_metadados_da_tabela(
         # traceback.print_exc()
         log_message(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}", "error")
         raise RuntimeError(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}")
+    
+    
+# @cache_result(ttl=150800, user_id="user_{user_id}")    
+def sincronizar_metadados_da_tabela_simple(
+    db: Session, table_name: str, user_id: int,connection_id:int
+) -> dict:
+    try:
+        # 1. Obtém conexão ativa do usuário
+        engine,connection = ConnectionManager.ensure_idConn_connection(db, user_id,connection_id)
+
+        # 2. Obtém o tipo do banco de dados
+        db_type = connection.type if connection else "postgresql"  # fallback seguro
+
+        # 3. Busca ou cria a estrutura da tabela
+        structure = buscar_estrutura_tabela(
+            db=db,
+            table_name=table_name,
+            db_connection_id=connection.id,
+            engine=engine,
+            db_type=db_type
+        )
+        
+        # 4. Busca ou cria os campos
+        fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine)
+
+        # 5. Busca valores ENUM por coluna
+        enum_map: Dict[str, List[str]] = _fetch_enum_values(db,fields_table, engine, structure, db_type)
+        # print(f"{enum_map}")
+
+        # 6. Processa e sincroniza campos ENUM
+        resposta_colunas = processar_enum_fields(
+            columns=fields_table,
+            enum_map=enum_map
+        )
+
+        # 7. Monta e retorna a resposta final
+        return montar_resposta_sincronizacao(
+            db_connection_id=connection.id,
+            schema_name=structure.schema_name,
+            table_name=table_name,
+            resposta_colunas=resposta_colunas,
+            total_adicionado=len(resposta_colunas)
+        )
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        # traceback.print_exc()
+        log_message(f"❌ Erro de banco de dados ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}", "error")
+        raise RuntimeError(f"❌ Erro de banco de dados ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}")
+
+    except Exception as e:
+        db.rollback()
+        # traceback.print_exc()
+        log_message(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}", "error")
+        raise RuntimeError(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}")
 
 
 def montar_resposta_sincronizacao(
@@ -193,7 +249,7 @@ def buscar_ou_criar_campos_tabela(
     insere todos os campos com base nos metadados do banco de dados.
     """
     # Verifica se já existem campos locais
-    campos_existentes = None #get_fields_by_structure(db, structure.id)
+    campos_existentes = get_fields_by_structure(db, structure.id)
     if campos_existentes:
         return campos_existentes
 

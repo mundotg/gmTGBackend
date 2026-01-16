@@ -1,11 +1,19 @@
 from datetime import datetime
-from typing import Any, Optional, Annotated
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
+from typing import Any, Optional, List
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    StringConstraints,
+    field_validator,
+)
+from typing_extensions import Annotated
 
 
-# -----------------------------
+# =============================
 # 🏢 Empresa Schema
-# -----------------------------
+# =============================
 class EmpresaSchema(BaseModel):
     id: Optional[int] = None
     nome: str = Field(..., alias="company")
@@ -13,38 +21,71 @@ class EmpresaSchema(BaseModel):
     nif: Optional[str] = None
     endereco: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+    )
+# -----------------------------
+# 🛡️ Permission Schema
+# -----------------------------
+class PermissionSchema(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
 
+    model_config = ConfigDict(from_attributes=True)
 
 # -----------------------------
+# 🔑 Role Schema
+# -----------------------------
+class RoleSchema(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    permissions: list[PermissionSchema] = []
+
+    model_config = ConfigDict(from_attributes=True)
+    
+# -----------------------------
+# 🔑 Role Simple (UserOut)
+# -----------------------------
+class RoleSimpleSchema(BaseModel):
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# =============================
 # 🧩 Cargo Schema
-# -----------------------------
+# =============================
 class CargoSchema(BaseModel):
     id: Optional[int] = None
     nome: str = Field(..., alias="position")
     descricao: Optional[str] = None
     nivel: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+    )
 
 
-# -----------------------------
+# =============================
 # 👤 User Create Schema
-# -----------------------------
+# =============================
 class UserCreate(BaseModel):
-    nome: str = Field(..., alias="firstName")
-    apelido: str = Field(..., alias="lastName")
+    nome: str = Field(..., alias="firstName", min_length=2)
+    apelido: str = Field(..., alias="lastName", min_length=2)
     email: EmailStr
     telefone: str = Field(..., alias="phone")
-    # userName: str =Field(...,)
-    # telefone2 =Column(String(30), nullable=True)
 
-    # Substitui campos diretos por objetos relacionados
     empresa: EmpresaSchema = Field(..., alias="companyData")
     cargo: Optional[CargoSchema] = Field(None, alias="positionData")
 
     senha: Annotated[str, StringConstraints(min_length=8)] = Field(..., alias="password")
-    confirmar_senha: Annotated[str, StringConstraints(min_length=8)] = Field(..., alias="confirmPassword")
+    confirmar_senha: Annotated[str, StringConstraints(min_length=8)] = Field(
+        ..., alias="confirmPassword"
+    )
     concorda_termos: bool = Field(..., alias="terms")
 
     model_config = ConfigDict(
@@ -57,32 +98,42 @@ class UserCreate(BaseModel):
                 "phone": "+244900000000",
                 "companyData": {
                     "company": "Empresa Lda",
-                    "companySize": "11-50"
+                    "companySize": "11-50",
                 },
                 "positionData": {
                     "position": "CEO",
-                    "descricao": "Diretor Executivo"
+                    "descricao": "Diretor Executivo",
                 },
                 "password": "SenhaForte@123",
                 "confirmPassword": "SenhaForte@123",
-                "terms": True
+                "terms": True,
             }
-        }
+        },
     )
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str):
+        return v.strip().lower()
+
+    @field_validator("nome", "apelido")
+    @classmethod
+    def normalize_name(cls, v: str):
+        return " ".join(v.strip().title().split())
 
     @field_validator("confirmar_senha")
     @classmethod
     def passwords_match(cls, v, info):
         senha = info.data.get("senha")
         if senha and v != senha:
-            raise ValueError("As senhas não coincidem.")
+            raise ValueError("Passwords do not match.")
         return v
 
 
-# -----------------------------
+# =============================
 # 💾 DB Info Schema
-# -----------------------------
-class Db_on(BaseModel):
+# =============================
+class DbInfoSchema(BaseModel):
     id_connection: int
     name_db: str
     data: datetime
@@ -96,31 +147,31 @@ class Db_on(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# -----------------------------
-# 👤 User Output Schema
-# -----------------------------
+# =============================
+# 👤 User Output Schema (FINAL)
+# =============================
 class UserOut(BaseModel):
-    id: int
-    email: EmailStr
-    # userName: str =Field(...,)
-    # telefone2 =Column(String(30), nullable=True)
+    id: str
     nome: str
     apelido: str
+    email: EmailStr
     telefone: Optional[str] = None
+
     empresa: Optional[EmpresaSchema] = None
     cargo: Optional[CargoSchema] = None
-    InfPlus: Optional[Db_on] = None
+
+    role: Optional[RoleSimpleSchema] = None
+    permissions: list[str] = []
+
+    info_extra: Optional[DbInfoSchema] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# -----------------------------
-# 🔐 Login e Token Schemas
-# -----------------------------
-class LoginResponse(BaseModel):
-    user: UserOut
 
-
+# =============================
+# 🔐 Auth Schemas
+# =============================
 class UserLogin(BaseModel):
     email: EmailStr
     senha: str
@@ -129,21 +180,26 @@ class UserLogin(BaseModel):
 class TokenOut(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: str
+    token_type: str = "bearer"
+
+
+class LoginResponse(BaseModel):
+    user: UserOut
+    tokens: Optional[TokenOut] = None
 
 
 class AccessTokenOut(BaseModel):
     access_token: str
-    token_type: str
+    token_type: Optional[str] = "cookie"
 
 
-# -----------------------------
+# =============================
 # 📄 Paginação Genérica
-# -----------------------------
-class PaginacaoOutput(BaseModel):
+# =============================
+class PaginationOutput(BaseModel):
     page: int
     limit: int
     total: int
-    results: list[Any]
+    results: List[Any]
 
     model_config = ConfigDict(from_attributes=True)

@@ -22,7 +22,7 @@ from app.schemas.query_select_upAndInsert_schema import (
     ParametrosRelatorioSchema,
     QueryResultType,
 )
-from app.ultils.get_current_user_id_task import get_current_user_id_task
+from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
@@ -365,7 +365,7 @@ async def gerar_relatorio_tarefas_endpoint(
     request: Request,
     db: Session = Depends(get_db),
     # user_id: int = Depends(get_current_user_id),
-    user_id: int = Depends(get_current_user_id_task),
+    user_id: int = Depends(get_current_user_id),
 ):
     """Gera relatório completo de gestão de tarefas."""
     start = datetime.now()

@@ -8,12 +8,14 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.cruds.project_cruds import get_project
 from app.models.connection_models import DBConnection
-from app.models.task_models import Project, Role, Sprint, Task as TaskORM, TaskStats, TypeProjecto, Usuario
+from app.models.task_models import Project,  Sprint, Task as TaskORM, TaskStats, TypeProjecto
+from app.models.user_model import Role, User
 from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.project_schemas import ProjectResponseSchema, TypeProjectoSchema
 from app.schemas.sprint_schemas import SprintSchema
 from app.schemas.task_schema import TaskSchema, TaskStatsSchema
-from app.schemas.userTask_schemas import RoleSchema, UsuarioResponseSchema
+from app.schemas.userTask_schemas import RoleSchema
+from app.schemas.users_chemas import UserOut
 from app.ultils.logger import log_message
 
 T = TypeVar("T")
@@ -37,7 +39,7 @@ def add_task(db: Session, project_id: str, task_data: TaskSchema) -> Optional[Ta
         db.add(task)
         db.commit()
 
-        log_message(f"Tarefa criada com sucesso: {task.id} (Projeto {project_id})", "info")
+        # log_message(f"Tarefa criada com sucesso: {task.id} (Projeto {project_id})", "info")
         return task
 
     except SQLAlchemyError as e:
@@ -86,7 +88,7 @@ def update_task(db: Session, project_id: str, task_id: str, task_data: TaskSchem
             setattr(task, attr, value)
 
         db.commit()
-        log_message(f"Tarefa {task_id} atualizada no projeto {project_id}", "info")
+        # log_message(f"Tarefa {task_id} atualizada no projeto {project_id}", "info")
         return task
 
     except SQLAlchemyError as e:
@@ -113,7 +115,7 @@ def delete_task(db: Session, project_id: str, task_id: str) -> bool:
 
         db.delete(task)
         db.commit()
-        log_message(f"Tarefa {task_id} deletada do projeto {project_id}", "info")
+        # log_message(f"Tarefa {task_id} deletada do projeto {project_id}", "info")
         return True
 
     except SQLAlchemyError as e:
@@ -139,7 +141,7 @@ def delegate_task(db: Session, task_id: str, new_user_id: str) -> Optional[TaskO
 
         task.delegated_to_id = new_user_id
         db.commit()
-        log_message(f"Tarefa {task_id} delegada para usuário {new_user_id}", "info")
+        # log_message(f"Tarefa {task_id} delegada para usuário {new_user_id}", "info")
         return task
 
     except SQLAlchemyError as e:
@@ -167,7 +169,7 @@ def validate_task(db: Session, task_id: str,aprovado:bool=True, validator_id: Op
         #     task.delegated_to_id = validator_id
 
         db.commit()
-        log_message(f"Tarefa {task_id} validada com sucesso", "info")
+        # log_message(f"Tarefa {task_id} validada com sucesso", "info")
         return task
 
     except SQLAlchemyError as e:
@@ -222,7 +224,7 @@ def get_paginated_query(
         if items:
            
             full_schema_map = {
-                Usuario: UsuarioResponseSchema,
+                User: UserOut,
                 Project: ProjectResponseSchema, 
                 TaskORM: TaskSchema,
                 Sprint: SprintSchema,
@@ -242,11 +244,11 @@ def get_paginated_query(
                     else:
                         resultado = [schema_class.model_validate(items)]
                 except ValidationError as e:
-                    log_message(f"Erro de validação ao converter para schema: {e}", "error")
+                    # log_message(f"Erro de validação ao converter para schema: {e}", "error")
                     resultado = items
             else:
                 resultado = items
-                log_message(f"Schema não definido para o modelo {model.__name__}", "info")
+                # log_message(f"Schema não definido para o modelo {model.__name__}", "info")
 
         return {
             "items": resultado,

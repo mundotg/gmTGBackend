@@ -7,7 +7,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.schemas.project_schemas import ProjectSchema
 from app.ultils.logger import log_message
 from app.models.connection_models import DBConnection
-from app.models.task_models import TypeProjecto as TypeProjectORM,Usuario as UsuarioORM, Project as ProjectORM
+from app.models.task_models import TypeProjecto as TypeProjectORM, Project as ProjectORM
+from app.models.user_model import User as UsuarioORM
 
 
 # -----------------------------

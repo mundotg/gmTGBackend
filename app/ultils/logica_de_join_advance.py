@@ -1,6 +1,10 @@
 from typing import Optional
 from app.schemas.query_select_upAndInsert_schema import AdvancedJoinOption
-from app.services.editar_linha import _convert_column_type_for_string_one, _map_column_type, quote_identifier
+from app.services.editar_linha import (
+    _convert_column_type_for_string_one,
+    _map_column_type,
+    quote_identifier,
+)
 
 
 def build_join_clause(
@@ -22,10 +26,30 @@ def build_join_clause(
                 left = quote_identifier(db_type, cond.leftColumn)
 
                 if cond.useValue:
-                    right = _convert_column_type_for_string_one(
-                        _map_column_type(cond.valueColumnType.lower())(cond.rightValue),
-                        cond.valueColumnType.lower()
-                    )
+                    if cond.operator in ["IN", "NOT IN"]:
+                        not_ = "NOT " if cond.operator == "NOT IN" else ""
+                        values_list = [
+                            _convert_column_type_for_string_one(
+                                _map_column_type(cond.valueColumnType.lower())(
+                                    v.strip()
+                                ),
+                                cond.valueColumnType.lower(),
+                            )
+                            for v in cond.rightValue.split(",")
+                            if v.strip()
+                        ]
+                        if not values_list:
+                            raise ValueError(
+                                f"Lista vazia para operação '{cond.operator}' em '{left}'."
+                            )
+                        right = f"({', '.join(values_list)})"
+                    else:
+                        right = _convert_column_type_for_string_one(
+                            _map_column_type(cond.valueColumnType.lower())(
+                                cond.rightValue
+                            ),
+                            cond.valueColumnType.lower(),
+                        )
                 else:
                     right = quote_identifier(db_type, cond.rightColumn)
 
@@ -67,6 +91,7 @@ def build_join_clause(
 
     return join_sql
 
+
 def build_join_clause_for_delete(
     db_type: str,
     base_table: str,
@@ -93,7 +118,7 @@ def build_join_clause_for_delete(
     """
     join_sql = ""
     db_type = db_type.lower()
-    print("saffsdf: ",db_type)
+    print("saffsdf: ", db_type)
     # === 1️⃣ ORACLE: DELETE não aceita JOIN, usa EXISTS ===
     if is_delete and "oracle" in db_type and joins:
         where_parts = []
@@ -104,8 +129,12 @@ def build_join_clause_for_delete(
 
                 # ✅ Suporte a colunas e valores fixos
                 if cond.useValue:
-                    right_value = _map_column_type(cond.valueColumnType.lower())(cond.rightValue)
-                    right = _convert_column_type_for_string_one(right_value, cond.valueColumnType.lower())
+                    right_value = _map_column_type(cond.valueColumnType.lower())(
+                        cond.rightValue
+                    )
+                    right = _convert_column_type_for_string_one(
+                        right_value, cond.valueColumnType.lower()
+                    )
                 else:
                     right = quote_identifier(db_type, cond.rightColumn)
 
@@ -119,7 +148,7 @@ def build_join_clause_for_delete(
             )
 
         return " WHERE " + " AND ".join(where_parts)
-    print("saffsdf: ",db_type)
+    print("saffsdf: ", db_type)
     # === 2️⃣ PostgreSQL: usa USING ===
     if is_delete and db_type in ["postgres", "postgresql"]:
         join_parts = []
@@ -129,7 +158,8 @@ def build_join_clause_for_delete(
         elif table_list:
             join_parts = [
                 f"USING {quote_identifier(db_type, t)}"
-                for t in table_list if t != base_table
+                for t in table_list
+                if t != base_table
             ]
         return " " + " ".join(join_parts) if join_parts else ""
 
@@ -143,8 +173,12 @@ def build_join_clause_for_delete(
 
                 if cond.useValue:
                     # ✅ Suporte seguro a valores literais
-                    right_value = _map_column_type(cond.valueColumnType.lower())(cond.rightValue)
-                    right = _convert_column_type_for_string_one(right_value, cond.valueColumnType.lower())
+                    right_value = _map_column_type(cond.valueColumnType.lower())(
+                        cond.rightValue
+                    )
+                    right = _convert_column_type_for_string_one(
+                        right_value, cond.valueColumnType.lower()
+                    )
                 else:
                     right = quote_identifier(db_type, cond.rightColumn)
 
@@ -161,8 +195,7 @@ def build_join_clause_for_delete(
 
     elif table_list:
         join_tables = [
-            quote_identifier(db_type, t)
-            for t in table_list if t != base_table
+            quote_identifier(db_type, t) for t in table_list if t != base_table
         ]
         join_sql = ", " + ", ".join(join_tables) if join_tables else ""
 

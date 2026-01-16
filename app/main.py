@@ -7,6 +7,10 @@ from app.config.startup_reset import init_on_startup
 from app.database import SessionLocal
 from app.routes import (
     auth_routes,
+    delete_registro_routes,
+    ocr_routes,
+    projects_task_routes,
+    sprint_task_routes,
     user_routes,
     geral_routes,
     connection_routes,
@@ -14,20 +18,22 @@ from app.routes import (
     query_routes,
     task_routes,
     dbstatistics_routes,
-    delete_routes,
     connection_logs_routes,
-    userTask_routes,
-    sprint_routes,
-    projects_routes,
     gerar_relatorio_routes,
+    database_intro_routes,
+    deadlock_monitory_route
 )
-from app.seed_admin import seed_data
+import os
+
+from app.seed_new import seed_data
+os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
 # ------------------------------------------------------------
 
 # Configuração principal do aplicativo
 
 # ------------------------------------------------------------
+# 
 
 app = FastAPI(title="API de Autenticação com FastAPI")
 
@@ -62,12 +68,14 @@ app.include_router(dbInfo_routes.router)
 app.include_router(query_routes.router)
 app.include_router(task_routes.router)
 app.include_router(dbstatistics_routes.router)
-app.include_router(delete_routes.router)
+app.include_router(delete_registro_routes.router)
 app.include_router(connection_logs_routes.router)
-app.include_router(userTask_routes.router)
-app.include_router(sprint_routes.router)
-app.include_router(projects_routes.router)
+app.include_router(sprint_task_routes.router)
+app.include_router(projects_task_routes.router)
 app.include_router(gerar_relatorio_routes.router)
+app.include_router(database_intro_routes.router)
+app.include_router(deadlock_monitory_route.router)
+app.include_router(ocr_routes.router)
 
 # ------------------------------------------------------------
 
@@ -81,7 +89,6 @@ def on_startup():
     print("🚀 Inicializando aplicação...")
     # Sincroniza models automaticamente (apenas em dev)
     init_on_startup()
-
     # Popula dados iniciais (como admin padrão)
     db = SessionLocal()
     seed_data(db)

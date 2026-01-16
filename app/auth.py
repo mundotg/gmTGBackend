@@ -48,16 +48,3 @@ def decode_token(token: str) -> str | None:
         return None
 
 
-def decode_token_task(token: str) -> str | None:
-    if not token:
-        return None
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = (
-            payload.get("user_id")
-            or payload.get("sub")  # 👈 Token usa "sub" como identificador
-            or payload.get("id")
-        )
-        return user_id
-    except JWTError:
-        return None

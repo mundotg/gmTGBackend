@@ -10,7 +10,7 @@ from app.cruds.connection_cruds import (
     get_active_connection_by_connid, get_active_connection_by_userid, 
     get_connection_logs, get_connection_logs_pagination, 
     get_db_connection_by_id, get_db_connections, 
-    get_db_connections_pagination, map_status, set_active_connection, upsert_db_connection
+    get_db_connections_pagination_v1, map_status, set_active_connection, upsert_db_connection
 )
 from app.database import get_db
 from app.schemas.connetion_schema import (
@@ -33,7 +33,7 @@ def get_db_connections_cached(db: Session, user_id: int):
 @cache_result(ttl=300, user_id="user_{user_id}")
 def get_db_connections_pagination_cached(db: Session, user_id: int, page: int, limit: int):
     """Obtém conexões paginadas com cache"""
-    return get_db_connections_pagination(db, user_id, page, limit)
+    return get_db_connections_pagination_v1(db, user_id, page, limit)
 
 @cache_result(ttl=600, user_id="user_{user_id}")
 def get_connection_logs_cached(db: Session, user_id: int):

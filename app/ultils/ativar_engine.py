@@ -19,9 +19,9 @@ async def test_session_connection(async_session: AsyncSession):
     try:
         result = await async_session.execute(text("SELECT 1"))
         value = result.scalar_one()
-        print("✅ Conexão bem-sucedida! Retorno:", value)
+        log_message(f"✅ Conexão bem-sucedida! Retorno: {value}", "info")
     except Exception as e:
-        print("❌ Erro ao testar sessão:", e)
+        log_message(f"❌ Erro ao testar sessão: {e}", "error")
 
 
 class ConnectionManager:
@@ -51,7 +51,7 @@ class ConnectionManager:
         connection = get_connection_by_id(db, user_id, id_connection)
         engine = get_session_by_connection(connection)
         if not engine:
-            log_message(f"Reativando conexão para usuário {user_id}", "info")
+            log_message(f"Reativando conexão para usuário {user_id}", "error")
             raise HTTPException(status_code=400, detail="Conexão do banco de dados não encontrada")
 
         return engine, connection
@@ -78,8 +78,6 @@ class ConnectionManager:
 
         if not connection:
             raise HTTPException(status_code=400, detail="Conexão não encontrada")
-
-        # print(f"✅ Conexão encontrada (ID={connection.id}, Tipo={connection.type}, Host={connection.host})")
 
         return await ConnectionManager._create_async_engine(connection, engineManager)
 
@@ -117,7 +115,6 @@ class ConnectionManager:
                 # Configura SSL apenas se for remoto
                 if config["host"] in ["localhost", "127.0.0.1"]:
                     connect_args = { "ssl": False,}  # ❌ não incluir "ssl" de forma alguma
-                    # print("🔒 Conexão PostgreSQL local detectada — SSL totalmente desativado")
                 else:
                     import ssl
                     ssl_context = None

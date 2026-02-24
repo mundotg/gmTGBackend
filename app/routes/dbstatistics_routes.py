@@ -1,18 +1,25 @@
 import traceback
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
 from typing import Any, List, Dict
 from app.config.cache_manager import cache_result
 from app.database import get_db
+from app.models.dbstructure_models import DBField
 from app.routes.connection_routes import get_current_user_id
-from app.schemas.dbstructure_schema import DBStructureOut
+from app.schemas.dbstructure_schema import DBFieldOut, DBStructureOut, FieldsBulkRequest
 from app.schemas.responsehttp_schema import ResponseWrapper
 from app.schemas.queryhistory_schemas import TableInfo
-from app.cruds.connection_cruds import get_active_connection_by_userid, get_db_connection_by_id
+from app.cruds.connection_cruds import (
+    get_active_connection_by_userid,
+    get_db_connection_by_id,
+)
 from app.services.stream_tables_counts_servvice import get_table_count_streams
 from app.ultils.logger import log_message
 from app.services.database_inspector import (
+    get_fields_info_Buk_cached,
+    get_fields_info_cached,
     get_strutures_names,
+    get_strutures_names_only,
     get_table_names_with_count,
     get_table_names,
     get_table_count,
@@ -29,8 +36,12 @@ def _get_active_connection_or_400(db: Session, user_id: int):
     """Retorna a conexão ativa ou lança exceção HTTP 400"""
     active = get_active_connection_by_userid(db, user_id)
     if not active:
-        raise HTTPException(status_code=400, detail="Nenhuma conexão ativa encontrada para este usuário.")
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhuma conexão ativa encontrada para este usuário.",
+        )
     return active
+
 
 def _validate_table_name(table_name: str):
     """Valida o nome da tabela"""
@@ -38,14 +49,19 @@ def _validate_table_name(table_name: str):
         raise HTTPException(status_code=422, detail="O nome da tabela é obrigatório.")
     return table_name.strip()
 
+
 # -----------------------------
 # Funções com Cache
 # -----------------------------
 
+
 @cache_result(ttl=300, user_id="user_1{user_id}")  # 5 minutos de cache
-def get_tables_with_count_cached(connection_id: int, user_id: int, db: Session) -> List[Dict]:
+def get_tables_with_count_cached(
+    connection_id: int, user_id: int, db: Session
+) -> List[Dict]:
     """Obtém tabelas com contagem com cache"""
     return get_table_names_with_count(connection_id, user_id, db)
+
 
 @cache_result(ttl=600, user_id="user_2{user_id}")  # 10 minutos de cache
 def get_tables_names_cached(connection_id: int, user_id: int, db: Session) -> List[str]:
@@ -53,18 +69,47 @@ def get_tables_names_cached(connection_id: int, user_id: int, db: Session) -> Li
     return get_table_names(connection_id, user_id, db)
 
 
+@cache_result(ttl=600)
+def get_fields_info_bulk_cached(
+    connection_id: int, user_id: int, table_names: list[str], db: Session
+) -> Dict[str, List[DBFieldOut]]:
+    """Obtém nomes de tabelas com cache"""
+    return get_fields_info_Buk_cached(connection_id=connection_id, table_names=table_names, user_id=user_id,db= db)
+
 
 @cache_result(ttl=600)
-def get_strutures_names_cached(connection_id: int, user_id: int, db: Session) -> List[DBStructureOut]:
+def get_fields_info_cached_wrapper(
+    connection_id: int, user_id: int, table_name: str, db: Session
+) -> List[DBFieldOut]:
+    """Obtém nomes de tabelas com cache"""
+    return get_fields_info_cached(connection_id, table_name, user_id, db)
+
+
+@cache_result(ttl=600)
+def get_strutures_names_Only_cached(
+    connection_id: int, user_id: int, db: Session
+) -> List[DBStructureOut]:
+    """Obtém nomes de tabelas com cache"""
+    return get_strutures_names_only(connection_id, user_id, db)
+
+
+@cache_result(ttl=600)
+def get_strutures_names_cached(
+    connection_id: int, user_id: int, db: Session
+) -> List[DBStructureOut]:
     """Obtém nomes de tabelas com cache"""
     return get_strutures_names(connection_id, user_id, db)
 
-@cache_result(ttl=180, user_id="user_3{user_id}") 
-def get_table_count_cached(connection_id: int, table_name: str, db: Session, user_id: int) -> int:
+
+@cache_result(ttl=180, user_id="user_3{user_id}")
+def get_table_count_cached(
+    connection_id: int, table_name: str, db: Session, user_id: int
+) -> int:
     """Obtém contagem de tabela com cache"""
     return get_table_count(connection_id, table_name, db, user_id)
 
-@cache_result(ttl=1800, user_id="user_4{user_id}")  
+
+@cache_result(ttl=1800, user_id="user_4{user_id}")
 def sync_connection_stats_cached(user_id: int, db: Session) -> Any:
     """Sincroniza estatísticas com cache"""
     stats = sync_connection_statistics(user_id, db)
@@ -72,14 +117,15 @@ def sync_connection_stats_cached(user_id: int, db: Session) -> Any:
         stats = {k: v for k, v in stats.__dict__.items() if not k.startswith("_")}
     return stats
 
+
 # -----------------------------
 # Endpoints
 # -----------------------------
 
+
 @router.get("/tables-with-count", response_model=ResponseWrapper[List[TableInfo]])
 def get_tables_with_count(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)
 ):
     """
     Retorna lista de tabelas da conexão ativa com a contagem de registros.
@@ -88,7 +134,7 @@ def get_tables_with_count(
     try:
         active = _get_active_connection_or_400(db, user_id)
         tables = get_tables_with_count_cached(active.connection_id, user_id, db)
-        
+
         return ResponseWrapper(
             success=True,
             data=[TableInfo(name=t["name"], rowcount=t["rowcount"]) for t in tables],
@@ -96,17 +142,18 @@ def get_tables_with_count(
     except HTTPException:
         raise
     except Exception as e:
-        log_message(f"❌ Erro ao obter tabelas com contagem: {e}{traceback.format_exc()}", level="error")
+        log_message(
+            f"❌ Erro ao obter tabelas com contagem: {e}{traceback.format_exc()}",
+            level="error",
+        )
         raise HTTPException(
-            status_code=500, 
-            detail="Erro interno ao buscar tabelas com contagem."
+            status_code=500, detail="Erro interno ao buscar tabelas com contagem."
         )
 
 
 @router.get("/tables", response_model=ResponseWrapper[List[str]])
 def get_tables(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)
 ):
     """
     Retorna apenas os nomes das tabelas da conexão ativa.
@@ -115,21 +162,22 @@ def get_tables(
     try:
         active = _get_active_connection_or_400(db, user_id)
         names = get_tables_names_cached(active.connection_id, user_id, db)
-        
+
         return ResponseWrapper(success=True, data=names)
     except HTTPException:
         raise
     except Exception as e:
         log_message(f"❌ Erro ao obter nomes de tabelas: {e}", level="error")
         raise HTTPException(
-            status_code=500, 
-            detail="Erro interno ao buscar nomes das tabelas."
+            status_code=500, detail="Erro interno ao buscar nomes das tabelas."
         )
-        
-@router.get("/structures", response_model=ResponseWrapper[List[DBStructureOut]])  # Corrigido: era "/strutures"
-def get_structures( 
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+
+
+@router.get(
+    "/structures", response_model=ResponseWrapper[List[DBStructureOut]]
+)  # Corrigido: era "/strutures"
+def get_structures(
+    db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)
 ):
     """
     Retorna as estruturas das tabelas da conexão ativa.
@@ -137,16 +185,124 @@ def get_structures(
     """
     try:
         active = _get_active_connection_or_400(db, user_id)
-        structures = get_strutures_names_cached(connection_id=active.connection_id, user_id=user_id, db=db)
-        
-        return ResponseWrapper(success=True, data=structures)  
+        structures = get_strutures_names_Only_cached(
+            connection_id=active.connection_id, user_id=user_id, db=db
+        )
+
+        return ResponseWrapper(success=True, data=structures)
     except HTTPException:
         raise
     except Exception as e:
-        log_message(f"❌ Erro ao obter estruturas de tabelas: {e}{traceback.format_exc()}", level="error") 
+        log_message(
+            f"❌ Erro ao obter estruturas de tabelas: {e}{traceback.format_exc()}",
+            level="error",
+        )
         raise HTTPException(
-            status_code=500, 
-            detail="Erro interno ao buscar estruturas das tabelas."  
+            status_code=500, detail="Erro interno ao buscar estruturas das tabelas."
+        )
+
+
+@router.get(
+    "/all/structures/{connection_id}",
+    response_model=ResponseWrapper[List[DBStructureOut]],
+)  # Corrigido: era "/strutures"
+def get_structures_por_connection_id(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+    connection_id: int = Path(..., description="ID da conexão"),
+):
+    """
+    Retorna as estruturas das tabelas da conexão ativa.
+    Cache: 10 minutos
+    """
+    try:
+        # active = _get_active_connection_or_400(db, user_id)
+        # structures = get_strutures_names_cached(connection_id=connection_id, user_id=user_id, db=db)
+        structures = get_strutures_names_Only_cached(connection_id, user_id, db)
+
+        return ResponseWrapper(success=True, data=structures)
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_message(
+            f"❌ Erro ao obter estruturas de tabelas: {e}{traceback.format_exc()}",
+            level="error",
+        )
+        raise HTTPException(
+            status_code=500, detail="Erro interno ao buscar estruturas das tabelas."
+        )
+
+
+@router.get(
+    "/field/{connection_id}/{table_name}", response_model=ResponseWrapper[List[DBFieldOut]]
+)  # Corrigido: era "/strutures"
+def get_fields_por_connection_id(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+    connection_id: int = Path(..., description="ID da conexão"),
+    table_name: str = Path(..., description="Nome da tabela"),
+):
+    """
+    Retorna as estruturas das tabelas da conexão ativa.
+    Cache: 10 minutos
+    """
+    try:
+        # active = _get_active_connection_or_400(db, user_id)
+        # structures = get_strutures_names_cached(connection_id=connection_id, user_id=user_id, db=db)
+        structures = get_fields_info_cached_wrapper(
+            connection_id, table_name, user_id, db
+        )
+
+        return ResponseWrapper(success=True, data=structures)
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_message(
+            f"❌ Erro ao obter estruturas de tabelas: {e}{traceback.format_exc()}",
+            level="error",
+        )
+        raise HTTPException(
+            status_code=500, detail="Erro interno ao buscar estruturas das tabelas."
+        )
+
+
+@router.post(
+    "/fields/{connection_id}", response_model=ResponseWrapper[Dict[str, List[DBFieldOut]]]
+)
+def get_fields_por_connection_id_and_table_names(
+    payload: FieldsBulkRequest,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+    connection_id: int = Path(..., description="ID da conexão"),
+):
+    """
+    Retorna as fields (colunas) de VÁRIAS tabelas da conexão (bulk).
+    Ideal para Step3Mapping.
+    Cache: 10 minutos (se você estiver usando *_cached).
+    """
+    try:
+        table_names = [
+            t.strip() for t in (payload.table_names or []) if t and t.strip()
+        ]
+        if not table_names:
+            return ResponseWrapper(success=True, data={})
+
+        # ✅ CHAME A FUNÇÃO BULK AQUI
+        # Sugestões de nomes (use o que você já tem):
+        # - get_fields_of_tables_bulk(db, table_names, user_id, connection_id)
+        # - get_fields_info_bulk_cached(connection_id, table_names, user_id, db)
+        fields_by_table = get_fields_info_bulk_cached(connection_id=connection_id, table_names=table_names, user_id=user_id, db=db)
+
+        return ResponseWrapper(success=True, data=fields_by_table)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_message(
+            f"❌ Erro ao obter fields bulk: {e}{traceback.format_exc()}", level="error"
+        )
+        raise HTTPException(
+            status_code=500, detail="Erro interno ao buscar fields das tabelas."
         )
 
 
@@ -154,7 +310,7 @@ def get_structures(
 def get_table_count_endpoint(
     table_name: str,
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    user_id: int = Depends(get_current_user_id),
 ):
     """
     Retorna a contagem de registros de uma tabela específica da conexão ativa.
@@ -167,21 +323,22 @@ def get_table_count_endpoint(
 
         count = get_table_count_cached(active.connection_id, table_name, db, user_id)
         return ResponseWrapper(success=True, data=count)
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        log_message(f"❌ Erro ao contar registros da tabela '{table_name}': {e}", level="error")
+        log_message(
+            f"❌ Erro ao contar registros da tabela '{table_name}': {e}", level="error"
+        )
         raise HTTPException(
-            status_code=500, 
-            detail=f"Erro interno ao contar registros da tabela '{table_name}'."
+            status_code=500,
+            detail=f"Erro interno ao contar registros da tabela '{table_name}'.",
         )
 
 
 @router.get("/sync", response_model=ResponseWrapper[Any])
 def sync_connection_stats(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)
 ):
     """
     Sincroniza e salva estatísticas da conexão ativa (tabelas, views, procedures, etc.).
@@ -190,21 +347,20 @@ def sync_connection_stats(
     try:
         stats = sync_connection_stats_cached(user_id, db)
         return ResponseWrapper(success=True, data=stats)
-        
+
     except HTTPException:
         raise
     except Exception as e:
         log_message(f"❌ Erro ao sincronizar estatísticas: {e}", level="error")
         raise HTTPException(
-            status_code=500, 
-            detail="Erro interno ao sincronizar estatísticas da conexão."
+            status_code=500,
+            detail="Erro interno ao sincronizar estatísticas da conexão.",
         )
 
 
 @router.get("/stream/tables/counts")
 async def stream_table_counts(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)
 ):
     """
     Stream em tempo real das contagens de tabelas.
@@ -213,14 +369,13 @@ async def stream_table_counts(
     try:
         print("Iniciando stream de contagem de tabelas...")
         return get_table_count_streams(db, user_id)
-        
+
     except HTTPException:
         raise
     except Exception as e:
         log_message(f"❌ Erro no stream de contagem de tabelas: {e}", level="error")
         raise HTTPException(
-            status_code=500, 
-            detail="Erro interno no stream de contagem de tabelas."
+            status_code=500, detail="Erro interno no stream de contagem de tabelas."
         )
 
 
@@ -228,10 +383,10 @@ async def stream_table_counts(
 # Endpoints de Gerenciamento de Cache
 # -----------------------------
 
+
 @router.post("/cache/clear")
 def clear_cache_endpoint(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)
 ):
     """
     Limpa o cache das consultas do usuário atual.
@@ -239,71 +394,69 @@ def clear_cache_endpoint(
     """
     try:
         from app.config.cache_manager import clear_cache_for_function
-        
+
         # Limpa cache das principais funções
         functions_to_clear = [
             "get_tables_with_count_cached",
-            "get_tables_names_cached", 
+            "get_tables_names_cached",
             "get_table_count_cached",
-            "sync_connection_stats_cached"
+            "sync_connection_stats_cached",
         ]
-        
+
         cleared_count = 0
         for func_name in functions_to_clear:
             cleared_count += clear_cache_for_function(func_name)
-        
-        log_message(f"✅ Cache limpo para usuário {user_id}: {cleared_count} funções", level="info")
-        
+
+        log_message(
+            f"✅ Cache limpo para usuário {user_id}: {cleared_count} funções",
+            level="info",
+        )
+
         return ResponseWrapper(
             success=True,
             data={"cleared_functions": cleared_count},
-            message="Cache limpo com sucesso"
+            message="Cache limpo com sucesso",
         )
-        
+
     except Exception as e:
         log_message(f"❌ Erro ao limpar cache: {e}", level="error")
-        raise HTTPException(
-            status_code=500, 
-            detail="Erro interno ao limpar cache."
-        )
+        raise HTTPException(status_code=500, detail="Erro interno ao limpar cache.")
 
 
 @router.get("/cache/info")
 def get_cache_info_endpoint(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)
 ):
     """
     Retorna informações sobre o cache das consultas.
     """
     try:
         from app.config.cache_manager import get_function_cache_info
-        
+
         cache_info = {}
         functions_to_check = [
             "get_tables_with_count_cached",
             "get_tables_names_cached",
-            "get_table_count_cached", 
-            "sync_connection_stats_cached"
+            "get_table_count_cached",
+            "sync_connection_stats_cached",
         ]
-        
+
         for func_name in functions_to_check:
             try:
                 cache_info[func_name] = get_function_cache_info(func_name)
             except Exception as e:
                 cache_info[func_name] = {"error": str(e)}
-        
+
         return ResponseWrapper(
             success=True,
             data=cache_info,
-            message="Informações do cache obtidas com sucesso"
+            message="Informações do cache obtidas com sucesso",
         )
-        
+
     except Exception as e:
         log_message(f"❌ Erro ao obter informações do cache: {e}", level="error")
         raise HTTPException(
-            status_code=500, 
-            detail="Erro interno ao obter informações do cache."
+            status_code=500, detail="Erro interno ao obter informações do cache."
         )
 
 
@@ -311,18 +464,18 @@ def get_cache_info_endpoint(
 # Health Check e Status
 # -----------------------------
 
+
 @router.get("/health")
 def health_check(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+    db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)
 ):
     """
     Health check da conexão do usuário.
     """
     try:
         active = _get_active_connection_or_400(db, user_id)
-        connection = get_db_connection_by_id(db, active.connection_id)
-        
+        connection = get_db_connection_by_id(db, active.connection_id) # type: ignore
+
         return ResponseWrapper(
             success=True,
             data={
@@ -330,19 +483,16 @@ def health_check(
                 "active_connection": {
                     "connection_id": active.connection_id,
                     "database_name": connection.database_name if connection else "N/A",
-                    "connection_type": connection.type if connection else "N/A"
+                    "connection_type": connection.type if connection else "N/A",
                 },
                 "cache_enabled": True,
-                "status": "healthy"
+                "status": "healthy",
             },
-            message="Conexão ativa e saudável"
+            message="Conexão ativa e saudável", # type: ignore
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         log_message(f"❌ Health check falhou: {e}", level="error")
-        raise HTTPException(
-            status_code=500, 
-            detail="Erro no health check da conexão."
-        )
+        raise HTTPException(status_code=500, detail="Erro no health check da conexão.")

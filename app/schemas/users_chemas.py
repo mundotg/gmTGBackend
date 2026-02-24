@@ -160,7 +160,7 @@ class UserOut(BaseModel):
     empresa: Optional[EmpresaSchema] = None
     cargo: Optional[CargoSchema] = None
 
-    role: Optional[RoleSimpleSchema] = None
+    roles: Optional[RoleSimpleSchema] = None
     permissions: list[str] = []
 
     info_extra: Optional[DbInfoSchema] = None

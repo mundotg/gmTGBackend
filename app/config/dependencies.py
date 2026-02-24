@@ -1,3 +1,5 @@
+import traceback
+from aiosqlite import OperationalError
 from fastapi import Depends, HTTPException
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
@@ -43,32 +45,38 @@ def get_session_by_connection_id(connection_id: int, db: Session = Depends(get_d
         return engine
 
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao conectar ao banco de dados: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao conectar ao banco de dados: {str(e)} {traceback.format_exc()}")
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro inesperado: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro inesperado: {str(e)}{traceback.format_exc()}")
 
 def get_session_by_connection(connection: DBConnection):
     """
     Cria e testa uma conexão com o banco de dados com base nas configurações fornecidas.
 
     Retorna:
-        sqlalchemy.engine.Engine ou None em caso de erro.
+        sqlalchemy.engine.Engine
+
+    Lança:
+        HTTPException (400/503/500) com motivo real.
     """
 
-    # 1. Montar a configuração da conexão
+    if not connection:
+        raise HTTPException(status_code=404, detail="Conexão não encontrada")
+
+    # 1) Montar config (sem logar password)
     config = {
         "user": connection.username,
         "password": connection.password,
         "host": connection.host,
         "port": connection.port,
         "database": connection.database_name,
-        "service": connection.service,  # Para bancos que requerem
+        "service": connection.service,
         "sslmode": connection.sslmode,
-        "trustServerCertificate": connection.trustServerCertificate
+        "trustServerCertificate": connection.trustServerCertificate,
     }
 
-    # 2. Verificar se o tipo do banco é suportado
+    # 2) Tipo suportado?
     db_config = defaults.get(connection.type)
     if not db_config:
         raise HTTPException(
@@ -77,28 +85,39 @@ def get_session_by_connection(connection: DBConnection):
         )
 
     try:
-        # 3. Criar o engine
+        # 3) Criar engine
         engine = DatabaseManager.get_engine(db_config, config)
 
-        # 4. Criar a sessão local para teste
-        SessionLocal = sessionmaker(bind=engine)
-
-        # 5. Testar a conexão
-        with SessionLocal() as session:
-            session.execute(text("SELECT 1"))
+        # 4) Teste leve: connect() em vez de Session ORM
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
 
         return engine
+
+    except OperationalError as e:
+        # ✅ normalmente pega timeouts/host/porta/instância/firewall
+        log_message("❌ Falha de conexão (OperationalError) ao conectar ao banco", level="error")
+        log_message(str(e), level="error")
+        raise HTTPException(
+            status_code=503,
+            detail="Não foi possível conectar ao banco (timeout/host/porta/instância/firewall)."
+        )
 
     except SQLAlchemyError as e:
         log_message("❌ Erro SQLAlchemy ao conectar ao banco", level="error")
         log_message(str(e), level="error")
+        raise HTTPException(
+            status_code=503,
+            detail="Falha ao conectar ao banco de dados."
+        )
 
     except Exception as e:
         log_message("❌ Erro inesperado ao conectar ao banco", level="error")
         log_message(str(e), level="error")
-
-    return None
-
+        raise HTTPException(
+            status_code=500,
+            detail="Erro interno ao criar/testar engine."
+        )
     
 def get_test_by_connection(conn_data: DBConnection, db: Session):
     config = {

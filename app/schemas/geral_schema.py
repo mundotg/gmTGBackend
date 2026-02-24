@@ -1,6 +1,6 @@
 ### ✅ `schemas/geral.py`
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+from typing import Literal, Optional
 from datetime import datetime
 
 
@@ -30,3 +30,5 @@ class Settings(SettingsBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True) 
+    
+type OptionTipoModel =Literal["user", "project", "task", "sprint", "type_project", "Role", "project_team_association", "AuditLog", "TaskStats", "DBConnection"]

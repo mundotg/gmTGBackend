@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import traceback
+from typing import Optional
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import Engine, inspect, text
 from sqlalchemy.orm import Session
@@ -22,7 +23,8 @@ from app.cruds.dbstructure_crud import (
 from app.schemas.dbstructure_schema import DBStructureOut, DBStructureCreate
 from app.schemas.dbstatistics_schema import DBStatisticsDict
 from app.services.field_info import (
-    # sincronizar_metadados_da_tabela,
+    get_fields_of_table,
+    get_fields_of_tables_bulk,
     sincronizar_metadados_da_tabela_simple,
 )
 from app.ultils.ativar_engine import ConnectionManager
@@ -37,50 +39,67 @@ from app.ultils.logger import log_message
 
 
 def verificar_ou_atualizar_estrutura(
-    db: Session, connection_id: int, table_name: str, schema_name: str | None = None
-) -> DBStructureOut | None:  # Adicionado | None no retorno
+    db: Session, 
+    connection_id: int, 
+    table_name: str, 
+    schema_name: Optional[str] = None
+) -> Optional[DBStructureOut]:
     """
-    Verifica se a estrutura da tabela já existe. Se não existir, cria.
-    Se o schema estiver diferente ou description for nula, atualiza.
+    Verifica se a estrutura da tabela já existe. 
+    - Se não existir: Cria.
+    - Se existir: Verifica se precisa atualizar schema ou descrição.
     """
     try:
-        estrutura = get_structure_by_id_and_name(db, connection_id, table_name)
-        structure = None  # Corrigido nome da variável (era "struture")
+        # 1. Busca estrutura existente
+        # Padronizei o nome da variável para inglês para manter consistência com o resto
+        existing_structure = get_structure_by_id_and_name(db, connection_id, table_name)
 
-        if not estrutura:
-            nova = DBStructureCreate(
+        # CENÁRIO 1: CRIAÇÃO (INSERT)
+        if not existing_structure:
+            # ATENÇÃO: Chamamos a função passando argumentos NOMEADOS (keyword arguments).
+            # Não passamos o objeto Pydantic 'nova', pois a função 'create_db_structure' 
+            # do passo anterior espera parâmetros soltos (int, str, etc).
+            new_structure = create_db_structure(
+                db=db,
                 db_connection_id=connection_id,
                 table_name=table_name,
                 schema_name=schema_name,
-                description="",
-                created_at=datetime.now(timezone.utc),
+                description="", # Default
             )
-            structure = create_db_structure(db, nova)
+            
             log_message(f"🆕 Estrutura registrada: {table_name}", "info")
-            return DBStructureOut.model_validate(
-                structure
-            )  # Corrigido nome da variável
+            return DBStructureOut.model_validate(new_structure)
 
+        # CENÁRIO 2: ATUALIZAÇÃO (UPDATE)
         update_needed = False
-        if estrutura.schema_name != schema_name:
-            estrutura.schema_name = schema_name
+        
+        # Normaliza para comparação (trata None como string vazia se necessário)
+        current_schema = existing_structure.schema_name
+        current_desc = existing_structure.description
+
+        if current_schema != schema_name:
+            existing_structure.schema_name = schema_name
             update_needed = True
-        if estrutura.description is None:
-            estrutura.description = ""
+            
+        if not current_desc: # Se for None ou Vazio
+            existing_structure.description = ""
             update_needed = True
 
         if update_needed:
-            structure = update_db_structure(db, estrutura)  # Corrigido nome da variável
+            # Assume que update_db_structure faz o db.commit() e db.refresh()
+            updated_structure = update_db_structure(db, existing_structure)
             log_message(f"🔄 Estrutura atualizada: {table_name}", "info")
-        else:
-            structure = estrutura  # Usar a estrutura existente se não houve atualização
-
-        return DBStructureOut.model_validate(structure)  # Corrigido nome da variável
+            return DBStructureOut.model_validate(updated_structure)
+        
+        # Se nada mudou, retorna o existente validado
+        return DBStructureOut.model_validate(existing_structure)
 
     except Exception as e:
         log_message(
             f"⚠️ Erro ao gerenciar estrutura da tabela '{table_name}': {e}", "warning"
         )
+        # Importante: Em caso de erro, talvez seja melhor propagar o erro (raise) 
+        # dependendo da sua estratégia, ou retornar None como feito aqui.
         return None
 
 
@@ -128,7 +147,7 @@ def get_table_names(connection_id: int, id_user: int, db: Session):
     """
     Retorna todas as tabelas e views de uma conexão, atualizando estruturas no banco local.
     """
-    structures = get_db_structures(db, connection_id)
+    structures = None #get_db_structures(db, connection_id)
     if structures:
         return [s.table_name for s in structures]
 
@@ -166,19 +185,70 @@ def get_table_names(connection_id: int, id_user: int, db: Session):
     return all_table_names
 
 
+def get_fields_info_cached(
+    connection_id: int, table_name: str, user_id: int, db: Session
+):
+    """_summary_
+
+    Args:
+        connection_id (int): _description_
+        table_name (str): _description_
+        user_id (int): _description_
+        db (Session): _description_
+    """
+    try:
+
+        return get_fields_of_table(
+            db=db,
+            table_name=table_name,
+            user_id=user_id,
+            connection_id=connection_id,
+        )
+    except Exception as e:
+        log_message(
+            f"❌ Erro ao obter informações de campos para '{table_name}': {e}", "error"
+        )
+        return []
+
+
+def get_fields_info_Buk_cached(
+    connection_id: int, table_names: list[str], user_id: int, db: Session
+):
+    """_summary_
+
+    Args:
+        connection_id (int): _description_
+        table_name (str): _description_
+        user_id (int): _description_
+        db (Session): _description_
+    """
+    try:
+        return get_fields_of_tables_bulk(
+            db=db,
+            table_names=table_names,
+            user_id=user_id,
+            connection_id=connection_id,
+        )
+    except Exception as e:
+        log_message(
+            f"❌ Erro ao obter informações de campos para '{table_names}': {e}{traceback.format_exc()}", "error"
+        )
+        raise e
+
+
 def get_strutures_names(
     connection_id: int, id_user: int, db: Session
 ) -> list[DBStructureOut]:
     """
     Retorna todas as tabelas e views de uma conexão, atualizando estruturas no banco local.
     """
-    
+
     structures = get_db_structures(db, connection_id)
     if structures:
         for strut in structures:
             sincronizar_metadados_da_tabela_simple(
                 db=db,
-                table_name=strut.table_name,
+                table_name=strut.table_name,  # type: ignore
                 user_id=id_user,
                 connection_id=connection_id,
             )
@@ -192,7 +262,7 @@ def get_strutures_names(
     try:
         schemas = inspector.get_schema_names()
     except Exception as e:
-        log_message(f"⚠️ Erro ao obter schemas: {e}", "warning")
+        log_message(f"⚠️ Erro ao obter schemas: {e}{traceback.format_exc()}", "warning")
         schemas = [getattr(inspector, "default_schema_name", None)]
 
     all_table_names: list[DBStructureOut] = []
@@ -201,7 +271,10 @@ def get_strutures_names(
         try:
             tables = inspector.get_table_names(schema=schema)
         except Exception as e:
-            log_message(f"⚠️ Erro ao obter tabelas do schema '{schema}': {e}", "warning")
+            log_message(
+                f"⚠️ Erro ao obter tabelas do schema '{schema}': {e}{traceback.format_exc()}",
+                "warning",
+            )
             tables = []
         tablesStructure = []  # Corrigido nome da variável
         for table in tables:
@@ -230,7 +303,10 @@ def get_strutures_names(
                 if structure:  # Verificar se não é None
                     viewsStructure.append(structure)
         except Exception as e:
-            log_message(f"⚠️ Erro ao obter views do schema '{schema}': {e}{traceback.format_exc()}", "warning")
+            log_message(
+                f"⚠️ Erro ao obter views do schema '{schema}': {e}{traceback.format_exc()}",
+                "warning",
+            )
         all_table_names.extend(viewsStructure)
 
     return all_table_names
@@ -490,11 +566,11 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
     """
     try:
         engine, connection = ConnectionManager.ensure_connection(db, id_user)
-        existing = get_statistics_by_connection(db, connection.id)
+        existing = get_statistics_by_connection(db, connection.id) # type: ignore
         if existing:
             return existing
 
-        stats = collect_statistics(engine, connection.type)
+        stats = collect_statistics(engine, connection.type) # type: ignore
         if not stats:
             log_message(
                 f"⚠️ Nenhuma estatística coletada para a conexão {connection.id}.",
@@ -503,21 +579,21 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
             return None
 
         log_message(f"📊 Estatísticas coletadas: {stats}", "info")
-        action = save_or_update_statistics(connection.id, stats, db)
+        action = save_or_update_statistics(connection.id, stats, db) # type: ignore
 
         log_message(
             f"✅ Estatísticas '{action}' registradas para conexão ID={connection.id}.",
             "success",
         )
-        stats["connection_name"] = connection.name
-        return stats
+        stats["connection_name"] = connection.name # type: ignore
+        return stats # type: ignore
 
     except Exception as e:
         error_type = type(e).__name__
         error_message = str(e)
         stack_trace = traceback.format_exc()
         connection_id = (
-            getattr(connection, "id", "?") if "connection" in locals() else "?"
+            getattr(connection, "id", "?") if "connection" in locals() else "?" # type: ignore
         )
         log_message(
             f"❌ Erro ao sincronizar estatísticas da conexão ID={connection_id}, usuário ID={id_user}:\n"
@@ -525,3 +601,63 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
             "error",
         )
         return None
+
+
+def get_strutures_names_only(
+    connection_id: int, id_user: int, db: Session
+) -> list[DBStructureOut]:
+    """
+    Retorna todas as tabelas e views de uma conexão, atualizando estruturas no banco local.
+    """
+
+    structures = get_db_structures(db, connection_id)
+    if structures:
+        return [DBStructureOut.model_validate(s) for s in structures]
+
+    engine = EngineManager.get(id_user) or get_session_by_connection_id(
+        connection_id, db
+    )
+    inspector = inspect(engine)
+
+    try:
+        schemas = inspector.get_schema_names()
+    except Exception as e:
+        log_message(f"⚠️ Erro ao obter schemas: {e}{traceback.format_exc()}", "warning")
+        schemas = [getattr(inspector, "default_schema_name", None)]
+
+    all_table_names: list[DBStructureOut] = []
+
+    for schema in schemas:
+        try:
+            tables = inspector.get_table_names(schema=schema)
+        except Exception as e:
+            log_message(
+                f"⚠️ Erro ao obter tabelas do schema '{schema}': {e}{traceback.format_exc()}",
+                "warning",
+            )
+            tables = []
+        tablesStructure = []  # Corrigido nome da variável
+        for table in tables:
+            structure = verificar_ou_atualizar_estrutura(
+                db, connection_id, table, schema
+            )
+
+        all_table_names.extend(tablesStructure)
+        viewsStructure = []  # Corrigido nome da variável
+        try:
+            views = inspector.get_view_names(schema=schema)
+
+            for v in views:
+                structure = verificar_ou_atualizar_estrutura(
+                    db, connection_id, v, schema
+                )  # Corrigido: era "views" em vez de "v"
+                if structure:  # Verificar se não é None
+                    viewsStructure.append(structure)
+        except Exception as e:
+            log_message(
+                f"⚠️ Erro ao obter views do schema '{schema}': {e}{traceback.format_exc()}",
+                "warning",
+            )
+        all_table_names.extend(viewsStructure)
+
+    return all_table_names

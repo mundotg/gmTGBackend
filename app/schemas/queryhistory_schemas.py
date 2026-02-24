@@ -16,6 +16,15 @@ class QueryType(str, Enum):
     DROP = "DROP"
     OTHER = "OTHER"
     COUNT = "COUNT"
+    ADDCOLUMN = "ADD COLUMN"
+    REMOVECOLUMN = "REMOVE COLUMN"
+    ALTERCOLUMN = "ALTER COLUMN"
+    ADDFK = "ADD FK"
+    REMOVEFK = "REMOVE FK"
+    CREATETABLE = "CREATETABLE"
+    ALTERTABLE = "ALTERTABLE"
+    DROPTABLE = "DROPTABLE"
+    
 
 
 # --------- BASE ---------

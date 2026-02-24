@@ -15,14 +15,15 @@ class RefreshToken(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String, unique=True, index=True, nullable=False)
-
+    user_IP = Column(String(45), nullable=True)  # Armazena o IP do usuário (opcional)
+    user_agent = Column(String(500), nullable=True)  # Armazena o User-Agent do usuário (opcional)
     user_id = Column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
         index=True
     )
-
+    is_active = Column(Boolean, default=True)
     revoked = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     expires_at = Column(DateTime, nullable=False)
@@ -45,7 +46,7 @@ class Empresa(Base):
     nif = Column(String(50), unique=True)
     endereco = Column(String(255))
     criado_em = Column(DateTime, default=datetime.utcnow)
-
+    is_active = Column(Boolean, default=True)
     users = relationship("User", back_populates="empresa")
 
     def __repr__(self):
@@ -63,7 +64,7 @@ class Cargo(Base):
     descricao = Column(String(255))
     nivel = Column(String(50))
     criado_em = Column(DateTime, default=datetime.utcnow)
-
+    is_active = Column(Boolean, default=True)
     users = relationship("User", back_populates="cargo")
 
     def __repr__(self):
@@ -79,7 +80,7 @@ class Role(Base):
     name = Column(String(50), unique=True, nullable=False)
     description = Column(String(200))
     created_at = Column(DateTime, default=datetime.utcnow)
-
+    is_active = Column(Boolean, default=True)
     users = relationship("User", back_populates="role")
 
     permissions = relationship(

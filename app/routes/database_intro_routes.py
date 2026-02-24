@@ -1,19 +1,15 @@
-"""
-Rotas otimizadas para execução de queries, backup, restore e transferência com SSE.
-Versão 100% GET — compatível com EventSource (SSE).
-"""
-
 import asyncio
-import traceback
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, AsyncGenerator
+from typing import Any, Dict, Optional, AsyncGenerator, List
 from contextlib import asynccontextmanager
 
+from pydantic import BaseModel, Field
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Body
 )
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,27 +19,52 @@ from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
 # ============================================================
-# 🔧 GERENCIADOR DE CANAIS DE QUERY
+# 📦 SCHEMAS PARA CRIAÇÃO/EDIÇÃO DE COLUNAS
+# ============================================================
+
+class FieldDefinition(BaseModel):
+    connection_id: int
+    table_name: str
+    original_name: Optional[str] = Field(None, description="Se preenchido, indica edição. Se None, é criação.")
+    nome: str
+    tipo: str
+    length: Optional[int] = None
+    scale: Optional[int] = None
+    is_nullable: bool = True
+    is_unique: bool = False
+    is_primary_key: bool = False
+    is_auto_increment: bool = False
+    default_value: Optional[str] = None
+    comentario: Optional[str] = None
+    enum_values: List[str] = []
+    referenced_table: Optional[str] = None
+    field_references: Optional[str] = None
+    on_delete_action: str = "NO ACTION"
+    on_update_action: str = "NO ACTION"
+
+
+# ============================================================
+# 🔧 GERENCIADOR DE CANAIS DE TASK (STATEFUL)
 # ============================================================
 
 class QueryChannelManager:
-    """Gerencia canais de execução de query com expiração automática."""
+    """Gerencia canais de execução de tasks pesadas com expiração automática."""
 
     def __init__(self, ttl_minutes: int = 30):
         self.channels: Dict[str, Dict[str, Any]] = {}
         self.ttl_minutes = ttl_minutes
 
-    def create_channel(self, user_id: int, query: Any) -> str:
+    def create_channel(self, user_id: int, payload: Any) -> str:
         channel_id = str(uuid.uuid4())
         self.channels[channel_id] = {
             "user_id": user_id,
-            "query": query,
+            "payload": payload,
             "created_at": datetime.utcnow(),
+            "status": "pending"
         }
         return channel_id
 
     def get_channel(self, channel_id: str, user_id: int) -> Optional[Dict[str, Any]]:
-        """Recupera um canal, validando o dono e a expiração."""
         channel = self.channels.get(channel_id)
         if not channel or channel["user_id"] != user_id:
             return None
@@ -75,27 +96,27 @@ class QueryChannelManager:
 channel_manager = QueryChannelManager()
 
 # ============================================================
-# 🧹 HELPERS
+# 🧹 HELPERS DE STREAMING
 # ============================================================
 
 @asynccontextmanager
 async def handle_db_transaction(db: AsyncSession):
-    """Contexto seguro para rollback automático."""
+    """Contexto seguro para rollback automático em caso de falha DDL."""
     try:
         yield db
+        await db.commit()
     except Exception:
-        db.rollback()
+        await db.rollback()
         raise
 
-
 async def sse_stream(generator: AsyncGenerator[str, None]) -> AsyncGenerator[str, None]:
-    """Converte logs em formato Server-Sent Events."""
+    """Padroniza a saída para o formato Server-Sent Events (SSE)."""
     try:
         async for message in generator:
             yield f"data: {message}\n\n"
         yield "data: ✅ Operação concluída\n\n"
     except Exception as e:
-        yield f"data: ❌ Erro: {str(e)}\n\n"
+        yield f"data: ❌ Erro Crítico: {str(e)}\n\n"
     finally:
         yield "event: close\ndata: done\n\n"
 
@@ -105,137 +126,28 @@ async def sse_stream(generator: AsyncGenerator[str, None]) -> AsyncGenerator[str
 
 router = APIRouter(prefix="/database", tags=["Database Operations"])
 
+
 # ============================================================
-# 💾 BACKUP STREAM
+# 🛠️ ENDPOINTS DE FIELD (CREATE / EDIT)
 # ============================================================
 
-@router.get("/backup/{connection_id}/stream")
-async def backup_stream(
-    connection_id: int, 
-    db: AsyncSession = Depends(get_db_async),
+@router.post("/field/task")
+async def register_field_task(
+    field_data: FieldDefinition = Body(...),
     user_id: int = Depends(get_current_user_id)
 ):
-    """Executa backup com streaming SSE."""
-    
-    async def generator():
-        try:
-            yield "🚀 Iniciando backup..."
-            await asyncio.sleep(0.3)
-            await log_message(f"[User {user_id}] Iniciando backup para conexão {connection_id}")
-            
-            from importantConfig.db_backup_restore import backup_database
-            
-            yield "📦 Criando arquivo de backup..."
-            path = backup_database(db, user_id, connection_id)
-            
-            yield f"✅ Backup concluído: {path}"
-            
-        except Exception as e:
-            error_msg = f"❌ Erro no backup: {str(e)}"
-            await log_message(f"[User {user_id}] {error_msg}{traceback.format_exc()}")
-            yield error_msg
-
-    return StreamingResponse(sse_stream(generator()), media_type="text/event-stream")
+    """
+    Passo 1: Registra a intenção de criar/editar uma coluna e retorna um channel_id.
+    Isso contorna o limite de enviar JSONs complexos via GET no SSE.
+    """
+    try:
+        channel_id = channel_manager.create_channel(user_id=user_id, payload=field_data.dict())
+        return {"success": True, "channel_id": channel_id, "message": "Task registrada. Inicie o stream."}
+    except Exception as e:
+        log_message(f"Erro ao registrar task de field: {e}", level="error")
+        raise HTTPException(status_code=500, detail="Não foi possível registrar a operação.")
 
 
-# ============================================================
-# ♻️ RESTORE STREAM (convertido para GET)
-# ============================================================
-
-@router.get("/restore/{connection_id}/stream")
-async def restore_stream(
-    connection_id: int,
-    filepath: str,
-    db: AsyncSession = Depends(get_db_async),
-    user_id: int = Depends(get_current_user_id)
-):
-    """Executa restauração via SSE usando caminho de arquivo GET param."""
-    
-    async def generator():
-        try:
-            yield "🚀 Iniciando restauração..."
-            await asyncio.sleep(0.3)
-            await log_message(f"[User {user_id}] Restauração iniciada para conexão {connection_id}")
-            
-            from importantConfig.db_backup_restore import restore_backup
-            
-            yield "🔧 Executando restauração..."
-            restore_backup(db, user_id, connection_id, filepath)
-            
-            yield "✅ Restauração concluída!"
-            await log_message(f"[User {user_id}] Restauração concluída")
-            
-        except Exception as e:
-            error_msg = f"❌ Erro na restauração: {str(e)}"
-            await log_message(f"[User {user_id}] {error_msg}{traceback.format_exc()}")
-            yield error_msg
-
-    return StreamingResponse(sse_stream(generator()), media_type="text/event-stream")
-
-
-# ============================================================
-# 🔁 TRANSFER STREAM (convertido para GET)
-# ============================================================
-
-@router.get("/transfer/stream")
-async def transfer_stream(
-    id_connectio_origen: int,
-    id_connectio_distino: int,
-    tables_origen: str,
-    db: AsyncSession = Depends(get_db_async),
-    user_id: int = Depends(get_current_user_id),
-):
-    """Monitora a transferência de dados via SSE."""
-
-    async def event_stream():
-        start_time = datetime.now()
-        try:
-            yield "data: 👤 Iniciando transferência...\n\n"
-            log_message(f"[User {user_id}] Iniciando transferência")
-            await asyncio.sleep(0.3)
-
-            yield "data: 🔍 Validando conexões origem/destino...\n\n"
-            await asyncio.sleep(0.3)
-
-            from importantConfig.db_transfer import transfer_data,converter_tables_origen
-            # print("tables_origen:",tables_origen)
-
-            async for progress_msg in transfer_data(
-                id_user=user_id,
-                db=db,
-                id_connectio_origen=id_connectio_origen,
-                id_connectio_distino=id_connectio_distino,
-                tables_origen=converter_tables_origen(tables_origen),
-            ):
-                yield f"data: {progress_msg}\n\n"
-                await asyncio.sleep(0.1)
-
-            yield "data: ✅ Transferência concluída!\n\n"
-            log_message(f"[User {user_id}] Transferência concluída com sucesso")
-
-        except Exception as e:
-            error_msg = f"❌ Erro: {str(e)}"
-            log_message(f"[User {user_id}] {error_msg}\n{traceback.format_exc()}")
-            yield f"data: {error_msg}\n\n"
-
-        finally:
-            # ⚠️ Fecha a sessão mesmo se erro ocorrer
-            try:
-                await db.close()
-                log_message(f"[User {user_id}] Sessão encerrada corretamente.")
-            except Exception as close_err:
-                log_message(f"[User {user_id}] Erro ao encerrar sessão: {close_err}")
-
-            duration = (datetime.now() - start_time).total_seconds()
-            yield f"data: ⏱️ Finalizado em {duration:.2f}s\n\n"
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
-
-
-
-# ============================================================
-# 🧹 CONTROLE DE CANAIS E HEALTH
-# ============================================================
 
 @router.get("/channel/{channel_id}/status")
 async def channel_status(channel_id: str, user_id: int = Depends(get_current_user_id)):
@@ -254,12 +166,11 @@ async def channel_status(channel_id: str, user_id: int = Depends(get_current_use
 
     return {
         "exists": True,
-        "status": "active",
+        "status": channel.get("status", "active"),
         "createdAt": created.isoformat(),
         "expiresAt": expires.isoformat(),
         "remainingTime": str(remaining),
     }
-
 
 @router.get("/channels/cleanup")
 async def cleanup_channels():
@@ -267,9 +178,8 @@ async def cleanup_channels():
     return {
         "cleaned": cleaned,
         "remaining": len(channel_manager.channels),
-        "message": f"{cleaned} canais expirados removidos",
+        "message": f"{cleaned} canais inativos foram expurgados da memória."
     }
-
 
 @router.get("/health")
 async def health_check():
@@ -277,5 +187,5 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "active_channels": len(channel_manager.channels),
-        "service": "database_operations"
+        "service": "OrionForgeNexus_DB_Operations"
     }

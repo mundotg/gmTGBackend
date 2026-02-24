@@ -7,6 +7,7 @@ from app.models.connection_models import ActiveConnection, ConnectionLog, DBConn
 from app.models.dbstructure_models import DBEnumField, DBField, DBStructure
 from app.models.queryhistory_models import QueryHistory
 from app.models.user_model import Cargo, Empresa, RefreshToken, User
+from app.schemas.geral_schema import OptionTipoModel
 from app.ultils.logger import log_message
 
 def get_paginacao_service(
@@ -14,7 +15,7 @@ def get_paginacao_service(
     search: Optional[str] = None,
     page: int = 1,
     limit: int = 5,
-    options: Literal["user", "project", "task", "sprint", "type_project", "Role", "project_team_association", "AuditLog", "TaskStats", "DBConnection"] = "user",
+    options: OptionTipoModel = "user",
     filters: Optional[Dict[str, Any]] = None,
     load_relations: bool = False,
 ):

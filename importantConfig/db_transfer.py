@@ -1,59 +1,18 @@
 # app/importantConfig/db_transfer.py
-import json
-from typing import Dict, AsyncGenerator
+from __future__ import annotations
+
+from typing import Dict, AsyncGenerator, List
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
-from app.schemas.db_transfer_schema import ColumnMapping, TableMapping
+
+from app.schemas.db_transfer_schema import TableMapping, ColumnMapping
 from app.services.editar_linha import (
     _convert_column_type_for_string_one,
     quote_identifier,
 )
-import traceback
-
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
-
-
-def converter_tables_origen(tables_origen_str: str) -> Dict[str, TableMapping]:
-    """Converte JSON do payload para Dict[id_tabela_origem, TableMapping]"""
-
-    data = json.loads(tables_origen_str)
-    result: Dict[str, TableMapping] = {}
-
-    for table_id, table_data in data.items():
-        if not table_data.get("tabela_name_destino"):
-            continue  # ignorar tabelas sem destino definido
-
-        colunas = [
-            ColumnMapping(
-                coluna_origen_name=c.get("coluna_origen_name"),
-                coluna_distino_name=c.get("coluna_distino_name"),
-                type_coluna_origem=c.get("type_coluna_origem"),
-                type_coluna_destino=c.get("type_coluna_destino"),
-                id_coluna_origem=(
-                    str(c.get("id_coluna_origem"))
-                    if c.get("id_coluna_origem")
-                    else None
-                ),
-                id_coluna_destino=(
-                    str(c.get("id_coluna_destino"))
-                    if c.get("id_coluna_destino")
-                    else None
-                ),
-                enabled=c.get("enabled", False),
-            )
-            for c in table_data.get("colunas_relacionados_para_transacao", [])
-        ]
-
-        result[table_id] = TableMapping(
-            tabela_name_origem=table_data.get("tabela_name_origem"),
-            tabela_name_destino=table_data.get("tabela_name_destino"),
-            id_tabela_origen=table_data.get("id_tabela_origen"),
-            id_tabela_destino=table_data.get("id_tabela_destino"),
-            colunas_relacionados_para_transacao=colunas,
-        )
-
-    return result
+import traceback
 
 
 async def transfer_data(
@@ -64,123 +23,199 @@ async def transfer_data(
     tables_origen: Dict[str, TableMapping],
     batch_size: int = 5000,
 ) -> AsyncGenerator[str, None]:
-    """Transfere dados entre duas conexões usando AsyncEngine com SSE feedback."""
+    """
+    Transfere dados entre duas conexões usando AsyncEngine com feedback via SSE.
+    Debug total: print em todas as etapas.
+    """
+
+    print("========== 🚀 INÍCIO transfer_data ==========")
+    print(f"user={id_user} origem={id_connectio_origen} destino={id_connectio_distino}")
+    print(f"tabelas recebidas={len(tables_origen)} batch_size={batch_size}")
 
     source_engine: AsyncEngine | None = None
     target_engine: AsyncEngine | None = None
 
     try:
+        print("🔌 Obtendo engine ORIGEM...")
         source_engine, conn1 = await ConnectionManager.get_engine_idconn_async(
             db=db, user_id=id_user, id_connection=id_connectio_origen
         )
+        print("✅ Engine ORIGEM obtida")
+
+        print("🔌 Obtendo engine DESTINO...")
         target_engine, conn2 = await ConnectionManager.get_engine_idconn_async(
             db=db, user_id=id_user, id_connection=id_connectio_distino
         )
-        # print(f"tables_origen: {tables_origen.values()}")
+        print("✅ Engine DESTINO obtida")
 
-        async with source_engine.connect() as src_conn, target_engine.begin() as tgt_conn:
+        src_type = str(conn1.type)
+        dst_type = str(conn2.type)
+
+        print(f"🧠 Tipos DB: origem={src_type} destino={dst_type}")
+
+        async with source_engine.connect() as src_conn, target_engine.connect() as tgt_conn:
+            print("🔓 Conexões abertas com sucesso")
+
             for table_id, tbl_map in tables_origen.items():
+                print("\n--------------------------------------------")
+                print(f"📄 Processando tabela id={table_id}")
+
                 origem = tbl_map.tabela_name_origem
                 destino = tbl_map.tabela_name_destino
                 columns_map = tbl_map.colunas_relacionados_para_transacao or []
 
-                if not destino:
-                    yield f"⚠️ Tabela destino não mapeada para origem '{origem}'. Pulando."
-                    continue
+                print(f"➡️ origem={origem} destino={destino}")
+                print(f"🧱 colunas mapeadas={len(columns_map)}")
 
-                quoted_table_src = quote_identifier(conn1.type, origem)
-                quoted_table_dst = quote_identifier(conn2.type, destino)
+                if not destino:
+                    msg = f"⚠️ Tabela destino não mapeada para '{origem}'. Pulando."
+                    print(msg)
+                    yield msg
+                    continue
 
                 yield f"🔄 Transferindo {origem} → {destino}"
 
+                # filtra colunas válidas
                 columns_valid = [
                     c for c in columns_map
                     if c.enabled and c.coluna_origen_name and c.coluna_distino_name
                 ]
 
-                colunas_origem = [
-                    (c.coluna_origen_name, quote_identifier(conn1.type, c.coluna_origen_name))
-                    for c in columns_valid
-                ]
+                print(f"✅ colunas válidas={len(columns_valid)}")
 
-                colunas_destino = []
-                seen_dest = set()
-                for c in columns_valid:
-                    dest = quote_identifier(conn2.type, c.coluna_distino_name)
-                    if dest not in seen_dest:
-                        seen_dest.add(dest)
-                        colunas_destino.append(dest)
-
-                if not colunas_origem:
-                    yield f"⚠️ Nenhuma coluna habilitada. Pulando {origem}."
+                if not columns_valid:
+                    msg = f"⚠️ Nenhuma coluna habilitada. Pulando {origem}."
+                    print(msg)
+                    yield msg
                     continue
 
-                # Busca dados
-                select_cols = ", ".join([q for (_, q) in colunas_origem])
-                fetch_query = text(f"SELECT {select_cols} FROM {quoted_table_src}")
-                result_stream = await src_conn.stream(fetch_query)
+                # quote tables
+                quoted_table_src = quote_identifier(src_type, origem)
+                quoted_table_dst = quote_identifier(dst_type, destino)
 
-                batch = []
+                print(f"🧾 tabela origem quoted={quoted_table_src}")
+                print(f"🧾 tabela destino quoted={quoted_table_dst}")
+
+                # remove duplicação destino
+                seen_dest = set()
+                aligned_cols: List[ColumnMapping] = []
+
+                for c in columns_valid:
+                    key = c.coluna_distino_name.strip().lower()
+                    if key in seen_dest:
+                        print(f"⚠️ coluna destino duplicada ignorada: {c.coluna_distino_name}")
+                        continue
+                    seen_dest.add(key)
+                    aligned_cols.append(c)
+
+                print(f"🔗 colunas alinhadas={len(aligned_cols)}")
+                for c in aligned_cols:
+                    print(f"   {c.coluna_origen_name} -> {c.coluna_distino_name} ({c.type_coluna_destino})")
+
+                # colunas origem/destino
+                src_cols_raw = [c.coluna_origen_name for c in aligned_cols]
+                src_cols_quoted = [quote_identifier(src_type, c.coluna_origen_name) for c in aligned_cols]
+                dst_cols_quoted = [quote_identifier(dst_type, c.coluna_distino_name) for c in aligned_cols]
+
+                # SELECT
+                select_cols = ", ".join(src_cols_quoted)
+                fetch_query = text(f"SELECT {select_cols} FROM {quoted_table_src}")
+
+                print(f"📤 SELECT SQL: {fetch_query}")
+
+                result_stream = await src_conn.stream(fetch_query)
+                # print(f"result_stream obtido, iniciando leitura... {result_stream}")
+                # INSERT parametrizado
+                placeholders = [f":p{i}" for i in range(len(dst_cols_quoted))]
+                insert_sql = (
+                    f"INSERT INTO {quoted_table_dst} "
+                    f"({', '.join(dst_cols_quoted)}) "
+                    f"VALUES ({', '.join(placeholders)})"
+                )
+                insert_query = text(insert_sql)
+
+                print(f"📥 INSERT SQL: {insert_sql}")
+
+                batch_params: List[dict] = []
                 total = 0
 
                 async for row in result_stream:
-                    row_values = []
+                    print(f"🔄 Lendo linha {total + 1} de {row}")
+                    row_map = row._mapping
+                    params = {}
 
-                    for idx, (orig_raw, _) in enumerate(colunas_origem):
-                        dest_type = columns_valid[idx].type_coluna_destino
-                        formatted_value = _convert_column_type_for_string_one(
-                            row._mapping[orig_raw], dest_type
+                    for i, c in enumerate(aligned_cols):
+                        raw_value = row_map.get(c.coluna_origen_name)
+                        converted = _convert_column_type_for_string_one(
+                            raw_value, c.type_coluna_destino
                         )
-                        row_values.append(formatted_value)
+                        params[f"p{i}"] = converted
 
-                    batch.append(f"({', '.join(row_values)})")
+                    batch_params.append(params)
 
-                    # ✅ Só cria a query quando o batch enche
-                    if len(batch) >= batch_size:
+                    if len(batch_params) >= batch_size:
+                        print(f"📦 Executando batch ({len(batch_params)}) em {destino}")
                         try:
-                            insert_query = text(
-                                f"INSERT INTO {quoted_table_dst} ({', '.join(colunas_destino)}) VALUES "
-                                + ", ".join(batch)
-                            )
-                            await tgt_conn.execute(insert_query)
-                            await tgt_conn.commit()  # ✅ Confirma o batch
-                            total += len(batch)
-                            yield f"📦 {total} registros inseridos em {destino}"
+                            await tgt_conn.execute(insert_query, batch_params)
+                            await tgt_conn.commit()
+                            total += len(batch_params)
+                            msg = f"📦 {total} registros inseridos em {destino}"
+                            print(msg)
+                            yield msg
                         except Exception as batch_err:
-                            await tgt_conn.rollback()  # ❌ Só desfaz esse batch
-                            yield f"⚠️ Falha no batch, continuando... Erro: {batch_err}"
-                            log_message(f"Erro na transferência posi batch {total}: {batch_err} {traceback.format_exc()}", "error")
-                        batch.clear()
+                            await tgt_conn.rollback()
+                            err = f"⚠️ Falha no batch ({destino}): {batch_err}"
+                            print(err)
+                            log_message(
+                                f"[User {id_user}] {err}\n{traceback.format_exc()}",
+                                "error",
+                            )
+                            yield err
+                        finally:
+                            batch_params.clear()
 
-                # ✅ Insere o restante
-                if batch:
+                print(f"🧮 Fim do stream SELECT ({origem}) restante={len(batch_params)}")
+
+                # resto do batch
+                if batch_params:
+                    print(f"📦 Inserindo resto do batch ({len(batch_params)})")
                     try:
-                        insert_query = text(
-                            f"INSERT INTO {quoted_table_dst} ({', '.join(colunas_destino)}) VALUES "
-                            + ", ".join(batch)
-                        )
-                        await tgt_conn.execute(insert_query)
+                        await tgt_conn.execute(insert_query, batch_params)
                         await tgt_conn.commit()
-                        total += len(batch)
+                        total += len(batch_params)
                     except Exception as batch_err:
                         await tgt_conn.rollback()
-                        yield f"⚠️ Falha ao inserir restante do batch: {batch_err}"
-                        log_message(f"Erro na transferência posi batch {total}: {batch_err} {traceback.format_exc()}", "error")
+                        err = f"⚠️ Falha resto batch ({destino}): {batch_err}"
+                        print(err)
+                        log_message(
+                            f"[User {id_user}] {err}\n{traceback.format_exc()}",
+                            "error",
+                        )
+                        yield err
+                    finally:
+                        batch_params.clear()
 
-                yield f"✅ Concluído {origem} → {destino}: {total} registros."
+                msg = f"✅ Concluído {origem} → {destino}: {total} registros."
+                print(msg)
+                yield msg
 
+        print("🎉 Transferência finalizada com sucesso")
         yield "🚀 Transferência finalizada com sucesso"
-
 
     except Exception as e:
         err = f"❌ Erro na transferência: {e}"
+        print(err)
+        print(traceback.format_exc())
         yield err
-        log_message(f"Erro na transferência: {e} {traceback.format_exc()}", "error")
+        log_message(f"[User {id_user}] {err}\n{traceback.format_exc()}", "error")
 
     finally:
-        if db:
-            await db.close()
+        print("🧹 Finalizando engines")
         if source_engine:
             await source_engine.dispose()
+            print("🔌 Engine origem liberada")
         if target_engine:
             await target_engine.dispose()
+            print("🔌 Engine destino liberada")
+
+        print("========== 🏁 FIM transfer_data ==========")

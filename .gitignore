@@ -18,6 +18,7 @@ env.bak/
 .env.development
 .env.production
 .env.test
+backups/
 
 # -------------------------------
 # 2. Cache e arquivos compilados

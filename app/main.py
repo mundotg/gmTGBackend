@@ -1,3 +1,6 @@
+import asyncio
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,10 +10,13 @@ from app.config.startup_reset import init_on_startup
 from app.database import SessionLocal
 from app.routes import (
     auth_routes,
+    backup_restore_routes,
+    database_operations_routes,
     delete_registro_routes,
     ocr_routes,
     projects_task_routes,
     sprint_task_routes,
+    transfer_data_routes,
     user_routes,
     geral_routes,
     connection_routes,
@@ -26,6 +32,8 @@ from app.routes import (
 import os
 
 from app.seed_new import seed_data
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
 # ------------------------------------------------------------
@@ -76,6 +84,9 @@ app.include_router(gerar_relatorio_routes.router)
 app.include_router(database_intro_routes.router)
 app.include_router(deadlock_monitory_route.router)
 app.include_router(ocr_routes.router)
+app.include_router(transfer_data_routes.router)
+app.include_router(database_operations_routes.router)
+app.include_router(backup_restore_routes.router)
 
 # ------------------------------------------------------------
 
@@ -107,7 +118,7 @@ def on_startup():
 if __name__ == "__main__":
     import uvicorn
 
-    host = get_env("HOST", "0.0.0.0")
-    port = int(get_env("PORT", 8000))
+    host = get_env("HOST", "0.0.0.0") or "localhost"
+    port = int(get_env("PORT") or "8000")
     print(f"📡 Servidor rodando em: http://{host}:{port}")
     uvicorn.run("app.main:app", host=host, port=port, reload=True)

@@ -1,10 +1,14 @@
 from sqlalchemy import (
-    Column, Index, Integer, String, Boolean, ForeignKey, DateTime, Text,
+    Column, Enum, Index, Integer, String, Boolean, ForeignKey, DateTime, Text,
     UniqueConstraint, func
 )
 from sqlalchemy.orm import relationship, validates
 from app.database import Base
-
+STATUS_ACTIVE = "active"
+STATUS_INACTIVE = "inactive"
+STATUS_DELETED = "deleted"
+STATUS_ERROR = "error"
+_STATUS_CHOICES = {STATUS_ACTIVE, STATUS_INACTIVE, STATUS_DELETED, STATUS_ERROR}
 
 class DBStructure(Base):
     __tablename__ = "db_structures"
@@ -12,13 +16,26 @@ class DBStructure(Base):
         UniqueConstraint("db_connection_id", "table_name", "schema_name", name="uq_structure_connection_table"),
         Index("ix_db_structures_connection", "db_connection_id"),
     )
-
+    _STATUS_CHOICES = {STATUS_ACTIVE, STATUS_INACTIVE, STATUS_DELETED, STATUS_ERROR}
+    # O asterisco (*) desempacota a lista/tupla _STATUS_CHOICES
+    status = Column(String(20), default=STATUS_ACTIVE, nullable=False)
+    
+    @validates("status")
+    def validate_status(self, key, value):
+        if not value or not value.strip():
+            return self.STATUS_ACTIVE
+        v = value.strip().lower()
+        if v not in self._STATUS_CHOICES:
+            raise ValueError(f"Status inválido: {value}")
+        return v
     id = Column(Integer, primary_key=True, index=True)
     db_connection_id = Column(Integer, ForeignKey("db_connections.id", ondelete="CASCADE"), nullable=False)
     table_name = Column(String, nullable=False)
     schema_name = Column(String, nullable=True)
     description = Column(Text, nullable=True)
-
+    Engine = Column(String(50), nullable=True)
+    Charset = Column(String(50), nullable=True)
+    Collation = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
     is_deleted = Column(Boolean, default=False)
@@ -32,7 +49,7 @@ class DBStructure(Base):
 
     @property
     def full_table_name(self) -> str:
-        return f"{self.schema_name}.{self.table_name}" if self.schema_name else self.table_name
+        return f"{self.schema_name}.{self.table_name}" if self.schema_name else self.table_name # type: ignore
 
     @validates("table_name")
     def validate_table_name(self, key, value):
@@ -56,7 +73,7 @@ class DBField(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-
+    status = Column(String(20), default=STATUS_ACTIVE, nullable=False)
     # FK para a estrutura/tabela que contém este campo
     structure_id = Column(
         Integer,
@@ -161,7 +178,7 @@ class DBEnumField(Base):
         index=True
     )
     value = Column(String(255), primary_key=True, nullable=False)
-
+    status = Column(String(20), default=STATUS_ACTIVE, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
 

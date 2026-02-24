@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 import traceback
 from typing import Dict, List
-from sqlalchemy import  MetaData, inspect
+from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 # from app.config.cache_manager import cache_result
 from app.cruds.dbstructure_crud import create_db_field, create_db_structure, delete_structure_by_name, get_db_structures_by_conn_id_and_table, get_fields_by_structure
 from app.models.dbstructure_models import   DBField,  DBStructure
-from app.schemas.dbstructure_schema import  CampoDetalhado, DBFieldCreate, DBStructureCreate, MetadataTableResponse
+from app.schemas.dbstructure_schema import  CampoDetalhado, DBFieldCreate, MetadataTableResponse
 from app.services.fields_estruture import  _is_system_field_from_column, obter_schema_do_engine
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.buscar_enum_bd import _fetch_enum_values
@@ -50,7 +50,6 @@ def sincronizar_metadados_da_tabela(
 
         # 5. Busca valores ENUM por coluna
         enum_map: Dict[str, List[str]] = _fetch_enum_values(db,fields_table, engine, structure, db_type)
-        # print(f"{enum_map}")
 
         # 6. Processa e sincroniza campos ENUM
         resposta_colunas = processar_enum_fields(
@@ -69,15 +68,99 @@ def sincronizar_metadados_da_tabela(
 
     except SQLAlchemyError as e:
         db.rollback()
-        # traceback.print_exc()
         log_message(f"❌ Erro de banco de dados ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}", "error")
         raise RuntimeError(f"❌ Erro de banco de dados ao sincronizar a tabela '{table_name}': {str(e)}")
 
     except Exception as e:
         db.rollback()
-        # traceback.print_exc()
         log_message(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}", "error")
         raise RuntimeError(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}")
+    
+def get_fields_of_table(
+    db: Session, table_name: str, user_id: int,connection_id:int
+) -> List[DBField]:
+    """
+    Obtém os campos de uma tabela específica para um usuário e conexão.
+    """
+    # 1. Obtém conexão ativa do usuário
+    engine,connection = ConnectionManager.ensure_idConn_connection(db, user_id,connection_id)
+
+    # 2. Obtém o tipo do banco de dados
+    db_type = connection.type if connection else "postgresql"  # fallback seguro
+
+    # 3. Busca ou cria a estrutura da tabela
+    structure = buscar_estrutura_tabela(
+        db=db,
+        table_name=table_name,
+        db_connection_id=connection.id,
+        engine=engine,
+        db_type=db_type
+    )
+    
+    # 4. Busca ou cria os campos
+    fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine)
+
+    return fields_table
+
+
+def get_fields_of_tables_bulk(
+    db: Session,
+    table_names: List[str],
+    user_id: int,
+    connection_id: int,
+) -> Dict[str, List[DBField]]:
+    """
+    Obtém os campos de várias tabelas (bulk) para um usuário e conexão.
+    Retorna um dicionário: { table_name: [DBField, ...] }
+    """
+
+    if not table_names:
+        return {}
+
+    # 1️⃣ Obtém engine e conexão UMA ÚNICA VEZ
+    engine, connection = ConnectionManager.ensure_idConn_connection(
+        db=db, user_id=user_id, id_connection=connection_id
+    )
+
+    db_type = connection.type if connection else "postgresql"
+
+    result: Dict[str, List[DBField]] = {}
+
+    # 2️⃣ Processa tabela por tabela, reaproveitando engine
+    for table_name in table_names:
+        try:
+            # 3️⃣ Busca ou cria estrutura da tabela
+            structure = buscar_estrutura_tabela(
+                db=db,
+                table_name=table_name,
+                db_connection_id=connection.id,
+                engine=engine,
+                db_type=db_type,
+            )
+
+            if not structure:
+                result[table_name] = []
+                continue
+
+            # 4️⃣ Busca ou cria campos da tabela
+            fields_table: List[DBField] = buscar_ou_criar_campos_tabela(
+                db=db,
+                structure=structure,
+                engine=engine,
+            )
+
+            result[table_name] = fields_table or []
+
+        except Exception as e:
+            # ⚠️ erro isolado não quebra o batch inteiro
+            log_message(
+                f"❌ Erro ao obter campos da tabela '{table_name}': {str(e)}{traceback.format_exc()}",
+                "error"
+            )
+            result[table_name] = []
+
+    return result
+
     
     
 # @cache_result(ttl=150800, user_id="user_{user_id}")    
@@ -105,7 +188,6 @@ def sincronizar_metadados_da_tabela_simple(
 
         # 5. Busca valores ENUM por coluna
         enum_map: Dict[str, List[str]] = _fetch_enum_values(db,fields_table, engine, structure, db_type)
-        # print(f"{enum_map}")
 
         # 6. Processa e sincroniza campos ENUM
         resposta_colunas = processar_enum_fields(
@@ -124,13 +206,11 @@ def sincronizar_metadados_da_tabela_simple(
 
     except SQLAlchemyError as e:
         db.rollback()
-        # traceback.print_exc()
         log_message(f"❌ Erro de banco de dados ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}", "error")
         raise RuntimeError(f"❌ Erro de banco de dados ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}")
 
     except Exception as e:
         db.rollback()
-        # traceback.print_exc()
         log_message(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}", "error")
         raise RuntimeError(f"❌ Erro inesperado ao sincronizar a tabela '{table_name}': {str(e)}{traceback.format_exc()}")
 
@@ -201,7 +281,11 @@ def processar_enum_fields(
     return resposta_colunas
 
 def buscar_estrutura_tabela(
-    db: Session, table_name: str, db_connection_id: int,engine:Engine,db_type: str
+    db: Session, 
+    table_name: str, 
+    db_connection_id: int, 
+    engine: Engine, 
+    db_type: str
 ) -> DBStructure:
     """
     Busca ou cria a estrutura da tabela na base local.
@@ -211,12 +295,22 @@ def buscar_estrutura_tabela(
     if not structure:
         # Usa o schema da conexão, se possível
         schema_name = obter_schema_do_engine(engine, db_type)
-        # Cria a estrutura da tabela localmente
+        
+        # Opcional: Se 'create_db_structure' já lida com reativação de deletados, 
+        # essa linha abaixo pode ser redundante, mas mantive conforme seu código original.
         delete_structure_by_name(db, table_name, db_connection_id)
+        
+        # --- CORREÇÃO AQUI ---
+        # Removemos o DBStructureCreate(...) e passamos os argumentos nomeados diretamente.
         structure = create_db_structure(
-            db,
-            DBStructureCreate( table_name=table_name, schema_name=schema_name, db_connection_id=db_connection_id)
+            db=db,
+            db_connection_id=db_connection_id,
+            table_name=table_name,
+            schema_name=schema_name
+            # Se sua função create_db_structure tiver outros campos obrigatórios 
+            # (como description, charset, etc), adicione-os aqui.
         )
+        
     return structure
 
 def map_column_type(col_type: str, db_type: str) -> str:
@@ -233,7 +327,6 @@ def map_column_type(col_type: str, db_type: str) -> str:
     # regra especial para SQL Server
     if db_typelower in ("sqlserver", "mssql"):
         if col_typelower == "integer":
-            # print("Convertendo 'integer' para 'int'")
             return "int"
     # retorna mapeado ou o próprio tipo se não achar
     return col_type.strip('"')
@@ -304,7 +397,6 @@ def buscar_ou_criar_campos_tabela(
                 "onupdate": fk.get("options", {}).get("onupdate"),
             }
             relations_map[col_origem] = relation
-    # print(f"column {columns}")
     
     
     # Processa cada coluna
@@ -321,8 +413,6 @@ def buscar_ou_criar_campos_tabela(
         tipo = column_type.compile(dialect=engine.dialect)
         default_value =column.get("default")
         is_auto_incremento = _is_system_field_from_column(tipo, column,is_foreign_key)
-        # print(f"tipo={tipo}  || column_type={column_type}")
-        # print(f"coluna_reference={relation}  || is_foreign_key={is_foreign_key}")
         # Cria o novo campo
         field_in = DBFieldCreate(
             name=col_name,

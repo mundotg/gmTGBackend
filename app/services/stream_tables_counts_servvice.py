@@ -144,9 +144,9 @@ def get_table_rowcount(
             log_message(f"⚠️ Não foi possível obter contagem para '{table_name}'", level="warning")
 
     # Atualiza cache
-    update_or_create_cache(db, connection_id, table_name, count)
+        update_or_create_cache(db, connection_id, table_name, count)
 
-    return count
+        return { "name": table_name, "rowcount": count }
 
 def get_table_count_streams(db: Session, id_user: int) -> StreamingResponse:
     """

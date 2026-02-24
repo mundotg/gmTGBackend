@@ -7,7 +7,7 @@ from sqlalchemy.sql import text
 from sqlalchemy.exc import SQLAlchemyError
 from app.schemas.query_delete_schema import PayloadDeleteRow, DeleteResponse
 from app.schemas.query_select_upAndInsert_schema import QueryPayload
-from app.schemas.queryhistory_schemas import QueryHistoryCreate
+from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryType
 from app.cruds.queryhistory_crud import create_query_history
 from app.services.cloudeAi_execute_query import QueryFilterBuilder
 from app.services.query_executor import is_safe_identifier
@@ -102,7 +102,7 @@ class DeleteOperationService:
                 user_id=current_user_id,
                 db_connection_id=connection.id,
                 query=sql,
-                query_type="DELETE",
+                query_type=QueryType.DELETE,
                 executed_at=start,
                 updated_at=datetime.now(timezone.utc),
                 duration_ms=duration_ms,
@@ -209,7 +209,7 @@ class DeleteOperationService:
                 user_id=current_user_id,
                 db_connection_id=connection.id,
                 query="DELETE (batch)",
-                query_type="DELETE",
+                query_type=QueryType.DELETE,
                 executed_at=start,
                 updated_at=datetime.now(timezone.utc),
                 duration_ms=duration_ms,

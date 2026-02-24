@@ -272,29 +272,56 @@ def build_select_view(db_type: str, select: Optional[list[str]], aliases: Option
     
 from typing import Optional, Union
 
-def format_order_by(db_type: str, order_by: Optional[list[Union[dict, "OrderByOption"]]] = None) -> str:
+from typing import Optional, Union, List
+
+def format_order_by(
+    db_type: str,
+    order_by: Optional[List[Union[dict, "OrderByOption"]]] = None,
+) -> str:
     """
-    Monta a cláusula ORDER BY a partir de uma lista de dicts ou objetos OrderByOption.
+    Garante ORDER BY válido.
+    - Ignora colunas vazias
+    - Normaliza direction
+    - Se nada sobrar, usa fallback universal
     """
+
+    def fallback() -> str:
+        return "ORDER BY (SELECT NULL)"
+
     if not order_by:
-        return ""
+        print("🟡 ORDER BY ausente → usando fallback")
+        return fallback()
+
+    print(f"🧮 Formatando ORDER BY {order_by}")
 
     order_parts = []
+
     for item in order_by:
-        # Caso venha como objeto Pydantic
-        if hasattr(item, "column") and hasattr(item, "direction"):
+        if hasattr(item, "column"):
             col = item.column
             direction = item.direction or "ASC"
-        else:  # Caso venha como dict
+        else:
             col = item.get("column")
             direction = item.get("direction", "ASC")
 
-        if not col:
+        # 🔴 coluna vazia → ignora
+        if not col or not str(col).strip():
+            print("⚠️ ORDER BY ignorado: coluna vazia")
             continue
 
-        order_parts.append(f"{quote_identifier(db_type, col)} {direction.upper()}")
+        direction = direction.upper()
+        if direction not in ("ASC", "DESC"):
+            direction = "ASC"
 
-    return "ORDER BY " + ", ".join(order_parts) if order_parts else ""
+        order_parts.append(f"{quote_identifier(db_type, col)} {direction}")
+
+    # 🔴 nada válido sobrou
+    if not order_parts:
+        print("🟡 Nenhum ORDER BY válido → usando fallback")
+        return fallback()
+
+    return "ORDER BY " + ", ".join(order_parts)
+
 
 
 

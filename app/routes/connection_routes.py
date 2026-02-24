@@ -1,3 +1,4 @@
+import json
 import traceback
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ from app.cruds.connection_cruds import (
     get_active_connection_by_connid, get_active_connection_by_userid, 
     get_connection_logs, get_connection_logs_pagination, 
     get_db_connection_by_id, get_db_connections, 
-    get_db_connections_pagination_v1, map_status, set_active_connection, upsert_db_connection
+    get_db_connections_pagination_v1, map_status, query_connections_simple, set_active_connection, upsert_db_connection
 )
 from app.database import get_db
 from app.schemas.connetion_schema import (
@@ -328,3 +329,31 @@ def test_connection_by_id(
         )
         raise HTTPException(status_code=400, detail=f"Erro ao testar conexão: {str(e)}")
     return DbConnectionOutput(connect=True, message="Conexão testada com sucesso!")
+
+
+@router.get("/paginate")
+def listar_elementos_conections(
+    search: str | None = Query(None, description="Texto para pesquisa"),
+    filtro: str | None = Query(None, description="Filtro opcional em formato JSON"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: str = Depends(get_current_user_id)
+):
+    """Paginação genérica de entidades."""
+    filters = None
+    if filtro:
+        try:
+            filters = json.loads(filtro)
+            if filters is None:
+                filters = {}
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Formato inválido de filtro JSON.")
+    return query_connections_simple(
+        db,
+        user_id=int(user),
+        search=search,
+        page=page,
+        limit=limit,
+        filters=filters
+    )

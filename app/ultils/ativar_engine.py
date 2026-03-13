@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from typing import Any, Dict, Tuple
 from app.config.dependencies import EngineManager, defaults, get_session_by_connection
 from app.models.connection_models import DBConnection
+from app.services.crypto_utils import aes_decrypt
 from app.ultils.ativar_session_bd import (
     get_connection_by_id, get_connection_current, get_connection_current_async,
     get_connection_id_async, reativar_connection
@@ -88,9 +89,9 @@ class ConnectionManager:
     async def _create_async_engine(connection: DBConnection, engineManager: DatabaseManager):
         """Cria e testa uma engine assíncrona segura."""
         config = {
-            "user": connection.username,
-            "password": connection.password,
-            "host": connection.host,
+            "user": aes_decrypt(connection.username),
+            "password": aes_decrypt(connection.password),
+            "host": aes_decrypt(connection.host),
             "port": connection.port,
             "database": connection.database_name,
             "service": connection.service or "",

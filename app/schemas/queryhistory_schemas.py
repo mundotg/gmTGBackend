@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Any, Dict, List, Literal, Optional
 from datetime import datetime, timezone
@@ -148,3 +150,18 @@ class QueryHistoryOut(QueryHistoryBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+    
+    
+@dataclass
+class QueryExecutionResult:
+    """Resultado da execução de uma query."""
+    success: bool
+    query: str
+    duration_ms: int
+    cached: bool = False
+    error_message: Optional[str] = None
+    # Para queries SELECT
+    columns: Optional[List[str]] = None
+    preview: Optional[List[Dict]] = None
+    params: Optional[Dict[str, Any]] = None
+    count: Optional[int] = None

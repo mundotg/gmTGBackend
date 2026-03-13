@@ -122,7 +122,7 @@ def insert_row_service_auto(
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
-        create_query_history(db=db, data=historico)
+        create_query_history(db=db, user_id=user_id, data=historico)
         log_message("🗃️ Histórico de inserção salvo com sucesso.", "success")
 
     except Exception as hist_err:

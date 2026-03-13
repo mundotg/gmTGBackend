@@ -34,13 +34,13 @@ def handle_service_error(context: str, error: Exception, status_code: int = 500)
 # -----------------------------
 # 💾 Funções com Cache
 # -----------------------------
-@cache_result(ttl=300, user_id="user_{user_id}")
+@cache_result(ttl=300, user_id="user_list_tasks_{user_id}")
 def list_tasks_cached(db: Session, project_id: str, user_id: int):
     """Lista tarefas com cache."""
     return task_service.list_tasks_service(db, project_id)
 
 
-@cache_result(ttl=600, user_id="user_{user_id}")
+@cache_result(ttl=600, user_id="user_retrieve_task_{user_id}")
 def retrieve_task_cached(db: Session, project_id: str, task_id: str, user_id: int):
     """Obtém tarefa específica com cache."""
     tasks = task_service.list_tasks_service(db, project_id)

@@ -1,12 +1,8 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 import uuid
-from sqlalchemy import Boolean, Date, DateTime, Engine, Numeric, text
-from app.cruds.queryhistory_crud import create_query_history
-from app.schemas.query_select_upAndInsert_schema import AdvancedJoinOption, DistinctList, JoinOption, OrderByOption, UpdateRequest
-from app.schemas.queryhistory_schemas import  QueryHistoryCreate
+from sqlalchemy import Boolean, Date, DateTime, Numeric, TextClause, text
+from app.schemas.query_select_upAndInsert_schema import AdvancedJoinOption, DistinctList, JoinOption, OrderByOption
 from app.services.editar_linha import _convert_column_type_for_string_one, quote_identifier
-from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
-from app.ultils.logger import log_message
 from app.ultils.logica_de_join_advance import build_join_clause
 
 def is_valid_uuid(value: str) -> bool:
@@ -70,6 +66,70 @@ def build_contains_condition(
     # Caso não seja suportado
     raise ValueError(f"Operação '{operation}' não suportada para tipo '{col_type}'.")
 
+def _normalize_table_name(table_name: Optional[str]) -> str:
+    if not table_name:
+        return ""
+
+    normalized = table_name.strip().replace('"', "").lower()
+
+    # mantém schema+tabela se existir
+    if "." in normalized:
+        parts = [p.strip() for p in normalized.split(".") if p.strip()]
+        return ".".join(parts)
+
+    return normalized
+
+
+def _normalize_table_variants(table_name: Optional[str]) -> set[str]:
+    """
+    Gera variantes para comparar:
+    - public.query_history
+    - query_history
+    """
+    normalized = _normalize_table_name(table_name)
+    if not normalized:
+        return set()
+
+    variants = {normalized}
+
+    if "." in normalized:
+        variants.add(normalized.split(".")[-1])
+
+    return variants
+
+
+def _sanitize_table_list(
+    base_table: str,
+    table_list: Optional[List[str]],
+) -> List[str]:
+    """
+    Remove duplicados e remove a base_table da table_list.
+    """
+    if not table_list:
+        return []
+
+    base_variants = _normalize_table_variants(base_table)
+    seen: set[str] = set()
+    result: list[str] = []
+
+    for table in table_list:
+        normalized = _normalize_table_name(table)
+        if not normalized:
+            continue
+
+        short_name = normalized.split(".")[-1]
+        candidates = {normalized, short_name}
+
+        if candidates & base_variants:
+            continue
+
+        if normalized in seen:
+            continue
+
+        seen.add(normalized)
+        result.append(table)
+
+    return result
 
 def get_filter_condition_with_operation(
     col_name: str,
@@ -245,34 +305,46 @@ def get_filter_condition_with_operation(
 
 def format_column(db_type: str, col: str, alias: Optional[str] = None) -> str:
     """
-    Formata uma coluna com quote e alias (se existir).
+    Formata uma coluna com quote e alias.
     """
-    if alias and alias != col:
-        return f"{quote_identifier(db_type, col)} AS {quote_identifier(db_type, alias)}"
-    return quote_identifier(db_type, col)
+    # Ex: "public"."db_fields"."id"
+    col_quoted = quote_identifier(db_type, col)
+    
+    if alias:
+        # O alias precisa ser tratado como uma string ÚNICA literal.
+        # Não podemos usar quote_identifier aqui se o alias tiver pontos (.), 
+        # senão o banco de dados recusa a query.
+        quote_char = "`" if db_type.lower() == "mysql" else '"'
+        return f"{col_quoted} AS {quote_char}{alias}{quote_char}"
+        
+    return col_quoted
 
-def build_select_view(db_type: str, select: Optional[list[str]], aliases: Optional[dict[str, str]]) -> str:
+def build_select_view(
+    db_type: str,
+    select: Optional[list[str]],
+    aliases: Optional[dict[str, str]],
+) -> str:
     """
-    Monta o SELECT, considerando select explícito e aliases.
-    - Se select foi enviado → usa select.
-    - Se select é None/[] e aliases existe → usa aliases como fonte.
-    - Caso contrário → usa '*'.
+    Monta o SELECT.
+    - Se select foi enviado → usa select
+    - Aplica alias apenas quando existir alias real
+    - Se select vazio e aliases existir → usa aliases como fonte
+    - Caso contrário → usa '*'
     """
     if select and len(select) > 0:
-        return ", ".join(
-            format_column(db_type, col, aliases.get(col) if aliases else None)
-            for col in select
-        )
-    elif aliases:
-        return ", ".join(
-            format_column(db_type, col, alias) for col, alias in aliases.items()
-        )
-    else:
-        return "*"
-    
-from typing import Optional, Union
+        parts = []
+        for col in select:
+            alias = aliases.get(col) if aliases else None
+            parts.append(format_column(db_type, col, alias))
+        return ", ".join(parts)
 
-from typing import Optional, Union, List
+    if aliases:
+        return ", ".join(
+            format_column(db_type, col, alias)
+            for col, alias in aliases.items()
+        )
+
+    return "*" 
 
 def format_order_by(
     db_type: str,
@@ -280,49 +352,33 @@ def format_order_by(
 ) -> str:
     """
     Garante ORDER BY válido.
-    - Ignora colunas vazias
-    - Normaliza direction
-    - Se nada sobrar, usa fallback universal
     """
-
-    def fallback() -> str:
-        return "ORDER BY (SELECT NULL)"
-
     if not order_by:
-        print("🟡 ORDER BY ausente → usando fallback")
-        return fallback()
-
-    print(f"🧮 Formatando ORDER BY {order_by}")
+        return "ORDER BY (SELECT NULL)"
 
     order_parts = []
 
     for item in order_by:
         if hasattr(item, "column"):
-            col = item.column
-            direction = item.direction or "ASC"
+            col = item.column  # type: ignore
+            direction = item.direction or "ASC"  # type: ignore
         else:
-            col = item.get("column")
-            direction = item.get("direction", "ASC")
+            col = item.get("column") # type: ignore
+            direction = item.get("direction", "ASC") # type: ignore
 
-        # 🔴 coluna vazia → ignora
         if not col or not str(col).strip():
-            print("⚠️ ORDER BY ignorado: coluna vazia")
             continue
 
-        direction = direction.upper()
+        direction = str(direction).upper()
         if direction not in ("ASC", "DESC"):
             direction = "ASC"
 
         order_parts.append(f"{quote_identifier(db_type, col)} {direction}")
 
-    # 🔴 nada válido sobrou
     if not order_parts:
-        print("🟡 Nenhum ORDER BY válido → usando fallback")
-        return fallback()
+        return "ORDER BY (SELECT NULL)"
 
     return "ORDER BY " + ", ".join(order_parts)
-
-
 
 
 def get_query_string(
@@ -347,6 +403,7 @@ def get_query_string(
     quoted_base_table = quote_identifier(db_type, base_table)
     # JOINs
     if joins:
+        print("join.type:",joins)
         join_sql = " " + " ".join(
             f"{join.type.upper()} {quote_identifier(db_type, join.table)} ON {join.on}"
             for join in joins
@@ -380,7 +437,7 @@ def get_query_string(
 
     # ORDER BY
     if order_by and len(order_by) > 0:
-        query += f" {format_order_by(db_type, order_by)}"
+        query += f" {format_order_by(db_type, order_by)}" # type: ignore
 
     # Paginação
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
@@ -412,7 +469,7 @@ def get_query_string_advance(
     filters: Optional[str] = None,
     select: Optional[List[str]] = None,
     table_list: Optional[List[str]] = None,
-    max_rows: int = 1000,
+    max_rows: Optional[int] = 1000,
     db_type: str = "mysql",
     order_by: Optional[list[OrderByOption]] = None,
     offset: Optional[int] = None,
@@ -420,48 +477,62 @@ def get_query_string_advance(
     aliases: Optional[dict[str, str]] = None,
 ) -> str:
     """
-    Gera uma query SQL adaptada ao tipo de banco de dados,
-    com DISTINCT, filtros, joins, ordenação e paginação.
+    Gera query SQL adaptada ao banco, com JOIN, filtros, ordenação, DISTINCT e paginação.
     """
     db_type = db_type.lower()
     quoted_base_table = quote_identifier(db_type, base_table)
 
-    # --- JOINs ---
-    join_sql = build_join_clause(db_type, base_table, joins, table_list)
+    safe_table_list = _sanitize_table_list(base_table, table_list)
 
-    
-    # SELECT
+    join_sql = build_join_clause(
+        db_type=db_type,
+        base_table=base_table,
+        joins=joins,
+        table_list=safe_table_list,
+    )
+
     select_view = build_select_view(db_type, select, aliases)
 
     if distinct and distinct.useDistinct:
-        distinct_cols = ", ".join(quote_identifier(db_type, col) for col in distinct.distinct_columns)
+        distinct_cols = ", ".join(
+            quote_identifier(db_type, col)
+            for col in distinct.distinct_columns
+        )
+
         if db_type in {"postgres", "postgresql"} and distinct_cols:
-            query = f"SELECT DISTINCT ON ({distinct_cols}) {select_view} FROM {quoted_base_table}{join_sql}"
+            query = (
+                f"SELECT DISTINCT ON ({distinct_cols}) "
+                f"{select_view} "
+                f"FROM {quoted_base_table}{join_sql}"
+            )
         else:
             query = f"SELECT DISTINCT {select_view} FROM {quoted_base_table}{join_sql}"
     else:
         query = f"SELECT {select_view} FROM {quoted_base_table}{join_sql}"
 
-    # WHERE
     if filters:
         query += f" {filters}"
 
-    # ORDER BY
     if order_by and len(order_by) > 0:
-        query += f" {format_order_by(db_type, order_by)}"
+        query += f" {format_order_by(db_type, order_by)}" # type: ignore
 
-    # Paginação
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
-        query += f" LIMIT {max_rows}"
+        if max_rows is not None:
+            query += f" LIMIT {max_rows}"
         if offset is not None:
             query += f" OFFSET {offset}"
-    
-    elif db_type in {"mssql", "sql server","sqlserver"}:
+
+    elif db_type in {"mssql", "sql server", "sqlserver"}:
         if not order_by or len(order_by) == 0:
-            query += f" ORDER BY (SELECT NULL)"  # fallback
-        query += f" OFFSET {offset or 0} ROWS FETCH NEXT {max_rows} ROWS ONLY"
+            query += " ORDER BY (SELECT NULL)"
+        query += f" OFFSET {offset or 0} ROWS"
+        if max_rows is not None:
+            query += f" FETCH NEXT {max_rows} ROWS ONLY"
 
     elif db_type == "oracle":
+        if max_rows is None:
+            max_rows = 1000
+
         if offset is not None:
             query = (
                 f"SELECT * FROM (SELECT a.*, ROWNUM rnum FROM ({query}) a "
@@ -472,10 +543,9 @@ def get_query_string_advance(
 
     return query
 
-
 def get_count_query(
     base_table: str,
-    joins: Optional[List[JoinOption]] = None,
+    joins: Optional[dict[str, AdvancedJoinOption]] = None,
     filters: Optional[str] = None,
     distinct: Optional[DistinctList] = None,
     db_type: str = "mysql"
@@ -506,7 +576,7 @@ def get_count_query(
 
     return query
 
-def build_update_query(table_name, db_type, updated_values, primary_key, primary_value):
+def build_update_query(table_name, db_type, updated_values, primary_key, primary_value) -> TextClause | None:
     """Constrói a query de atualização dinâmica."""
     set_clauses = []
     for col, info in updated_values.items():
@@ -524,148 +594,3 @@ def build_update_query(table_name, db_type, updated_values, primary_key, primary
         WHERE {quote_identifier(db_type, primary_key)} = {primary_value_formatted};
     """)
     return query
-
-from sqlalchemy.orm import Session
-def update_row_service(
-    data: UpdateRequest,
-    engine: Engine,
-    user_id: int,
-    db_type: str,
-    connection_id: str,
-    db: Session,
-    client_ip: str = None,
-    app_source: str = "API",
-    executed_by: str = "sistema",
-    modified_by: str = None,
-):
-    """
-    Atualiza registros existentes em uma ou mais tabelas e salva no histórico completo.
-
-    Args:
-        data (UpdateRequest): Dados contendo as tabelas, chaves primárias e colunas a atualizar.
-        engine (Engine): Conexão SQLAlchemy para execução da query.
-        user_id (int): ID do usuário executando a operação.
-        db_type (str): Tipo de banco (ex: 'postgres', 'mysql', 'sqlite').
-        connection_id (str): ID da conexão do banco de dados.
-        db (Session): Sessão SQLAlchemy para salvar histórico.
-        client_ip (str, optional): Endereço IP do cliente.
-        app_source (str, optional): Origem da execução (ex: API, Console, UI).
-        executed_by (str, optional): Nome de quem executou (usuário ou sistema).
-        modified_by (str, optional): Usuário que modificou o registro.
-
-    Returns:
-        dict: Resumo da operação com status e linhas afetadas.
-    """
-    import time
-    from datetime import datetime, timezone
-
-    resposta_query = ""
-    query_string = ""
-    duration_ms = 0
-    start = time.time()
-
-    try:
-        with engine.begin() as conn:
-            for table_name, primary_key_data in data.tables_primary_keys_values.items():
-                # ✅ Validação da chave primária
-                primary_key = primary_key_data.get("primaryKey")
-                primary_value = primary_key_data.get("valor")
-                if not primary_key or primary_value is None:
-                    raise ValueError(f"Tabela '{table_name}' não contém chave primária válida")
-
-                # ✅ Obtenção e estruturação dos dados a atualizar
-                raw_values = data.updatedRow.get(table_name, {})
-                updated_values = {
-                    col: {
-                        "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
-                        "type_column": field.get("type_column", "text") if isinstance(field, dict) else getattr(field, "type_column", "text")
-                    }
-                    for col, field in raw_values.items()
-                }
-
-                if not updated_values:
-                    raise ValueError(f"Tabela '{table_name}': Nenhuma coluna para atualizar")
-
-                # ✅ Monta a query SQL final
-                query = build_update_query(
-                    table_name=table_name,
-                    db_type=db_type,
-                    updated_values=updated_values,
-                    primary_key=primary_key,
-                    primary_value=primary_value
-                )
-
-                # ✅ Execução da query
-                query_string += f"{table_name}: {query}\n"
-                rs = conn.execute(query)
-                resposta_query += f"\n{table_name}: {rs.rowcount} linha(s) atualizada(s)"
-
-        duration_ms = int((time.time() - start) * 1000)
-
-        # ✅ Criação do histórico completo
-        historico = QueryHistoryCreate(
-            user_id=user_id,
-            db_connection_id=connection_id,
-            query=query_string.strip(),
-            query_type="UPDATE",
-            executed_at=datetime.now(timezone.utc),
-            duration_ms=duration_ms,
-            result_preview=resposta_query or "Nenhuma linha atualizada",
-            error_message=None,
-            is_favorite=False,
-            tags="update",
-            app_source=app_source,
-            client_ip=client_ip,
-            executed_by=executed_by,
-            modified_by=modified_by or executed_by,
-            meta_info={
-                "db_type": db_type,
-                "tables_updated": list(data.updatedRow.keys()),
-                "primary_keys": data.tables_primary_keys_values,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        )
-
-        create_query_history(db=db, data=historico)
-        log_message(f"Atualização concluída: {resposta_query}")
-
-        return {
-            "status": resposta_query or "Nenhuma linha atualizada",
-            "updated": data.updatedRow,
-            "response": resposta_query
-        }
-
-    except Exception as e:
-        duration_ms = int((time.time() - start) * 1000)
-        error_msg = _lidar_com_erro_sql(e)
-
-        # ✅ Log e histórico de erro completo
-        log_message(f"Erro ao atualizar registro: {error_msg}", "error")
-
-        historico = QueryHistoryCreate(
-            user_id=user_id,
-            db_connection_id=connection_id,
-            query=query_string.strip() or "UPDATE falhou antes de montar a query",
-            query_type="UPDATE",
-            executed_at=datetime.now(timezone.utc),
-            duration_ms=duration_ms,
-            result_preview=resposta_query or "Sem resultado devido ao erro",
-            error_message=error_msg,
-            is_favorite=False,
-            tags="error",
-            app_source=app_source,
-            client_ip=client_ip,
-            executed_by=executed_by,
-            modified_by=modified_by or executed_by,
-            meta_info={
-                "db_type": db_type,
-                "tables_attempted": list(data.updatedRow.keys()),
-                "primary_keys": data.tables_primary_keys_values,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        )
-
-        create_query_history(db=db, data=historico)
-        raise ValueError(error_msg)
-
-

@@ -5,6 +5,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.connection_models import DBConnection
+from app.services.crypto_utils import aes_decrypt
 from app.ultils.conect_database import DatabaseManager
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,6 +16,7 @@ defaults = {
     "mysql": "MySQL",
     "postgresql": "PostgreSQL",
     "sqlite": "SQLite",
+    "SQLite": "SQLite",
     "sqlserver": "SQL Server",
     "oracle": "Oracle",
     "mariadb": "MariaDB"
@@ -28,9 +30,9 @@ def get_session_by_connection_id(connection_id: int, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Conexão não encontrada")
 
     config = {
-        "user": connection.username,
-        "password": connection.password,
-        "host": connection.host,
+        "user": aes_decrypt(connection.username),
+        "password": aes_decrypt(connection.password),
+        "host": aes_decrypt(connection.host),
         "port": connection.port,
         "database": connection.database_name,
         "service": connection.service if hasattr(connection, "service_name") else "xe",
@@ -66,9 +68,9 @@ def get_session_by_connection(connection: DBConnection):
 
     # 1) Montar config (sem logar password)
     config = {
-        "user": connection.username,
-        "password": connection.password,
-        "host": connection.host,
+        "user": aes_decrypt(connection.username),
+        "password": aes_decrypt(connection.password),
+        "host": aes_decrypt(connection.host),
         "port": connection.port,
         "database": connection.database_name,
         "service": connection.service,

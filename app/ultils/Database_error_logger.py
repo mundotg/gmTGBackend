@@ -211,7 +211,7 @@ def _lidar_com_erro_sql(
 
     if return_details:
         return msg, details
-    return msg
+    return msg, {"None": None}
 
 
 class DDLExecutionError(RuntimeError):

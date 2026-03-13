@@ -1,91 +1,126 @@
 import json
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
+# Importações dos teus CRUDS, Database e dependências
 from app.cruds.dbstatistics_crud import create_statistics, get_statistics_by_connection
 from app.cruds.queryhistory_crud import create_query_history
+from app.cruds.geral_crud import get_settings, update_appearance_settings_crud, update_language_settings_crud, update_settings 
 from app.database import get_db
-from app.cruds.geral_crud import create_settings, get_settings
-from app.schemas.dbstatistics_schema import DBStatisticsCreate, DBStatisticsOut
-from app.schemas.geral_schema import Settings, SettingsCreate, OptionTipoModel
-from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryHistoryOut
 from app.services import geral_services
+
+# Importações dos teus Schemas
+from app.schemas.dbstatistics_schema import DBStatisticsCreate, DBStatisticsOut
+from app.schemas.geral_schema import SettingsUpdate, SettingsResponse, OptionTipoModel, UpdateAppearancePayload, UpdateLanguagePayload
+from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryHistoryOut
+
+# Utilitários
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
 router = APIRouter(prefix="/geral", tags=["Geral"])
 
-
 # ==========================================
 # Query History
 # ==========================================
-@router.post("/queries/", response_model=QueryHistoryOut, summary="Salvar histórico de Query")
+@router.post(
+    "/queries/", 
+    response_model=QueryHistoryOut, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Salvar histórico de Query"
+)
 def create_query(
     query_data: QueryHistoryCreate, 
     db: Session = Depends(get_db), 
     user_id: int = Depends(get_current_user_id)
 ):
     try:
-        return create_query_history(db, query_data)
+        return create_query_history(db, user_id,query_data)
+    except SQLAlchemyError as e:
+        log_message(f"❌ Erro de BD ao salvar query (User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Não foi possível guardar o histórico da consulta devido a um erro no servidor."
+        )
     except Exception as e:
-        log_message(f"❌ Erro ao salvar histórico de query (User {user_id}): {e}", level="error")
-        raise HTTPException(status_code=500, detail="Erro interno ao registrar a query.")
+        log_message(f"❌ Erro inesperado ao salvar query (User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Ocorreu um erro inesperado ao processar a requisição."
+        )
 
 
 # ==========================================
 # DB Statistics
 # ==========================================
-@router.post("/statistics/", response_model=DBStatisticsOut, summary="Criar estatísticas de conexão")
+@router.post(
+    "/statistics/", 
+    response_model=DBStatisticsOut, 
+    status_code=status.HTTP_201_CREATED,
+    summary="Criar estatísticas de conexão"
+)
 def create_statistic(
     stat_data: DBStatisticsCreate, 
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    # NOTA DE SEGURANÇA: Certifique-se de que a função create_statistics valide
-    # internamente se o connection_id dentro de 'stat_data' pertence a este 'user_id'.
     try:
+        # Assumindo que a validação de propriedade (se a conexão pertence ao user)
+        # está sendo feita dentro do CRUD `create_statistics`.
         return create_statistics(db, stat_data)
+    except ValueError as ve:
+        # Se o CRUD lançar ValueError (ex: conexão não pertence ao user)
+        log_message(f"⚠️ Tentativa de criar estatística inválida (User {user_id}): {str(ve)}", level="warning")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(ve))
     except Exception as e:
-        log_message(f"❌ Erro ao criar estatística (User {user_id}): {e}", level="error")
-        raise HTTPException(status_code=500, detail="Erro ao processar as estatísticas do banco de dados.")
+        log_message(f"❌ Erro ao criar estatística (User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Não foi possível guardar as estatísticas da base de dados."
+        )
 
-@router.get("/statistics/{connection_id}", response_model=DBStatisticsOut, summary="Obter estatísticas")
+
+@router.get(
+    "/statistics/{connection_id}", 
+    response_model=DBStatisticsOut, 
+    summary="Obter estatísticas de uma conexão"
+)
+
 def get_statistic(
     connection_id: int, 
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
     try:
-        # ATENÇÃO: É vital que sua função de CRUD valide o owner!
-        # stats = get_statistics_by_connection(db, connection_id, user_id) 
         stats = get_statistics_by_connection(db, connection_id)
         if not stats:
-            raise HTTPException(status_code=404, detail="Estatísticas não encontradas para esta conexão.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Nenhuma estatística encontrada para esta conexão."
+            )
+        # TODO: Garantir no CRUD que este user_id tem permissão para ver esta connection_id
         return stats
     except HTTPException:
         raise
     except Exception as e:
-        log_message(f"❌ Erro ao buscar estatísticas da conexão {connection_id}: {e}", level="error")
-        raise HTTPException(status_code=500, detail="Erro interno ao carregar métricas.")
+        log_message(f"❌ Erro ao buscar estatísticas (Conexão {connection_id}, User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Erro interno ao carregar as métricas solicitadas."
+        )
 
 
 # ==========================================
 # User Settings
 # ==========================================
-@router.post("/settings/", response_model=Settings, summary="Atualizar configurações do usuário")
-def create_user_settings(
-    settings_data: SettingsCreate, 
-    db: Session = Depends(get_db), 
-    user_id: int = Depends(get_current_user_id)
-):
-    try:
-        return create_settings(db, user_id, settings_data)
-    except Exception as e:
-        log_message(f"❌ Erro ao salvar configurações (User {user_id}): {e}", level="error")
-        raise HTTPException(status_code=500, detail="Falha ao salvar preferências do usuário.")
+@router.get(
+    "/settings/me", 
+    response_model=SettingsResponse, 
+    summary="Obter preferências do utilizador"
+)
 
-@router.get("/settings/", response_model=Settings, summary="Obter configurações do usuário")
 def get_user_settings(
     db: Session = Depends(get_db), 
     user_id: int = Depends(get_current_user_id)
@@ -93,56 +128,190 @@ def get_user_settings(
     try:
         settings = get_settings(db, user_id)
         if not settings:
-            raise HTTPException(status_code=404, detail="Configurações não encontradas para este usuário.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Não foram encontradas definições para a sua conta."
+            )
         return settings
     except HTTPException:
         raise
     except Exception as e:
-        log_message(f"❌ Erro ao buscar configurações (User {user_id}): {e}", level="error")
-        raise HTTPException(status_code=500, detail="Erro ao carregar preferências.")
+        log_message(f"❌ Erro ao buscar configurações (User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Não foi possível carregar as suas preferências."
+        )
 
+
+@router.patch(
+    "/settings/me", 
+    response_model=SettingsResponse, 
+    summary="Atualizar preferências do utilizador"
+)
+
+def update_user_settings(
+    settings_data: SettingsUpdate, 
+    db: Session = Depends(get_db), 
+    user_id: int = Depends(get_current_user_id)
+):
+    try:
+        updated_settings = update_settings(db, user_id, settings_data)
+        
+        if not updated_settings:
+             raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="As suas configurações não foram encontradas no sistema."
+            )
+        return updated_settings
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_message(f"❌ Erro ao atualizar configurações (User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Falha ao guardar as novas definições. Tente novamente mais tarde."
+        )
+
+# ==========================================
+# User Settings (Configurações do Utilizador)
+# ==========================================
+# Rota específica para alterar APARÊNCIA (Requisitada pelo Frontend)
+@router.put(
+    "/settings/appearance", 
+    response_model=SettingsResponse, 
+    summary="Atualizar preferências de aparência (Tema/Sidebar)"
+)
+
+def update_appearance_settings(
+    payload: UpdateAppearancePayload, 
+    db: Session = Depends(get_db), 
+    user_id: int = Depends(get_current_user_id)
+):
+    try:
+        # Reutilizamos a função update_settings do CRUD porque o Pydantic garante que 
+        # apenas 'theme' ou 'sidebar_collapsed' serão enviados para o update
+        print(f"Payload recebido para update de aparência (User {user_id}): {payload}")
+        updated_settings = update_appearance_settings_crud(db, user_id, payload)
+        
+        if not updated_settings:
+             raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Conta não localizada para aplicar as alterações de visual."
+            )
+        return updated_settings
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_message(f"❌ Erro ao atualizar aparência (User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Ocorreu um erro ao guardar o seu tema visual."
+        )
+
+# Rota específica para alterar IDIOMA (Requisitada pelo Frontend)
+@router.put(
+    "/settings/language", 
+    response_model=SettingsResponse, 
+    summary="Atualizar idioma principal do utilizador"
+)
+def update_language_settings(
+    payload: UpdateLanguagePayload, 
+    db: Session = Depends(get_db), 
+    user_id: int = Depends(get_current_user_id)
+):
+    try:
+        # Mapeamento do payload para o schema geral de Update
+        updated_settings = update_language_settings_crud(db, user_id, payload)
+        
+        if not updated_settings:
+             raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Não foi possível guardar o idioma. Conta não encontrada."
+            )
+        return updated_settings
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_message(f"❌ Erro ao atualizar idioma (User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Não foi possível alterar o idioma neste momento."
+        )
 
 # ==========================================
 # Paginação Global
 # ==========================================
-# Correção: Rota alterada de "/geral/paginate" para "/paginate" para evitar duplicação do prefixo
-@router.get("/paginate", summary="Paginação Universal")
+@router.get(
+    "/paginate", 
+    summary="Listagem paginada e filtrada de entidades"
+)
+
 def listar_elementos(
-    tipo: OptionTipoModel = Query("user", description="Tipo de entidade a ser paginada (ex: user, project, task, sprint)"), # type: ignore
-    search: Optional[str] = Query(None, description="Texto para pesquisa em campos textuais"),
-    filtro: Optional[str] = Query(None, description="Filtros avançados em formato JSON serializado"),
-    page: int = Query(1, ge=1, description="Número da página"),
-    limit: int = Query(10, ge=1, le=100, description="Registros por página (Max: 100)"),
+    tipo: OptionTipoModel = Query(..., description="A entidade a listar (ex: user, project)"),
+    search: Optional[str] = Query(None, min_length=2, max_length=50, description="Pesquisa textual (min: 2 chars)"),
+    filtro: Optional[str] = Query(None, description="Filtros avançados em formato JSON"),
+    page: int = Query(1, ge=1, description="Número da página atual"),
+    limit: int = Query(10, ge=1, le=100, description="Máximo de registos por página (Cap: 100)"),
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id) # Correção: alterado de str para int
+    user_id: int = Depends(get_current_user_id)
 ):
     """
-    Paginação genérica de entidades do sistema.
-    Assegure-se de que o service 'get_paginacao_service' valide se o 'user_id'
-    tem permissão para ver os dados da entidade solicitada.
+    Motor de paginação universal. 
+    Processa pesquisa textual, limites seguros e filtros dinâmicos via JSON.
     """
-    filters = {}
+    filters_dict: Dict[str, Any] = {}
+    
+    # 1. Validação segura do JSON de filtros
     if filtro:
         try:
             parsed_filters = json.loads(filtro)
-            if isinstance(parsed_filters, dict):
-                filters = parsed_filters
-            else:
-                raise ValueError("O JSON não é um dicionário válido.")
-        except (json.JSONDecodeError, ValueError) as e:
-            log_message(f"⚠️ JSON inválido fornecido na paginação por User {user_id}: {filtro}", level="warning")
-            raise HTTPException(status_code=400, detail="Formato de filtro JSON inválido.")
+            if not isinstance(parsed_filters, dict):
+                raise ValueError("O JSON fornecido não é um objeto/dicionário.")
             
+            # Sanitização: Garantir que não há injeção de dicionários aninhados profundos
+            for k, v in parsed_filters.items():
+                if isinstance(v, (dict, list)):
+                    raise ValueError(f"O filtro '{k}' contém tipos de dados complexos não permitidos.")
+                filters_dict[k] = v
+
+        except json.JSONDecodeError:
+            log_message(f"⚠️ JSON malformado na paginação (User {user_id}): {filtro}", level="warning")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="A estrutura do filtro fornecido não é um JSON válido."
+            )
+        except ValueError as ve:
+            log_message(f"⚠️ Erro de segurança/validação no filtro (User {user_id}): {str(ve)}", level="warning")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=str(ve)
+            )
+
+    # 2. Execução da paginação
     try:
-        return geral_services.get_paginacao_service(
+        resultado = geral_services.get_paginacao_service(
             db=db,
             search=search,
             page=page,
             limit=limit,
             options=tipo,
-            filters=filters,
+            filters=filters_dict,
             load_relations=True
         )
+        return resultado
+        
+    except ValueError as ve:
+        # Exemplo: O serviço rejeitou o 'tipo' ou o user_id não tem permissão
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(ve))
+    except SQLAlchemyError as e:
+        log_message(f"❌ Erro de BD na paginação de {tipo} (User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Ocorreu um erro ao processar os dados na base de dados."
+        )
     except Exception as e:
-        log_message(f"❌ Erro na paginação ({tipo}) solicitada pelo User {user_id}: {e}", level="error")
-        raise HTTPException(status_code=500, detail="Erro interno ao processar a listagem de dados.")
+        log_message(f"❌ Erro inesperado na paginação de {tipo} (User {user_id}): {str(e)}", level="error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Erro interno ao tentar listar os registos."
+        )

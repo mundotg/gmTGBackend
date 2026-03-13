@@ -75,7 +75,7 @@ temp/
 tmp/
 cache/
 *.cache
-
+temp_reports/*
 # -------------------------------
 # 8. Arquivos auxiliares e documentação gerada
 # -------------------------------

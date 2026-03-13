@@ -248,7 +248,7 @@ def update_query_history_v2(
 
         # Se houver mudanças, registra a auditoria da modificação
         if has_changes:
-            query_obj.modified_by = f"user_{user_id}"
+            query_obj.modified_by = f"user_{user_id}" # type: ignore
             db.commit()
             db.refresh(query_obj)
             log_message(f"✅ Histórico {query_id} atualizado com sucesso (UserID={user_id})", level="success")

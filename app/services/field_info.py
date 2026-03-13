@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 import traceback
-from typing import Dict, List
+from typing import Dict, List, Optional
 from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 # from app.config.cache_manager import cache_result
+from app.config.cache_manager import cache_result
 from app.cruds.dbstructure_crud import create_db_field, create_db_structure, delete_structure_by_name, get_db_structures_by_conn_id_and_table, get_fields_by_structure
 from app.models.dbstructure_models import   DBField,  DBStructure
 from app.schemas.dbstructure_schema import  CampoDetalhado, DBFieldCreate, MetadataTableResponse
@@ -46,7 +47,7 @@ def sincronizar_metadados_da_tabela(
         )
         
         # 4. Busca ou cria os campos
-        fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine)
+        fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine, str(db_type))
 
         # 5. Busca valores ENUM por coluna
         enum_map: Dict[str, List[str]] = _fetch_enum_values(db,fields_table, engine, structure, db_type)
@@ -98,7 +99,7 @@ def get_fields_of_table(
     )
     
     # 4. Busca ou cria os campos
-    fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine)
+    fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine,str(db_type))
 
     return fields_table
 
@@ -146,7 +147,7 @@ def get_fields_of_tables_bulk(
             fields_table: List[DBField] = buscar_ou_criar_campos_tabela(
                 db=db,
                 structure=structure,
-                engine=engine,
+                engine=engine,db_type=str(db_type)
             )
 
             result[table_name] = fields_table or []
@@ -163,7 +164,7 @@ def get_fields_of_tables_bulk(
 
     
     
-# @cache_result(ttl=150800, user_id="user_{user_id}")    
+@cache_result(ttl=150800, user_id="user_metadados_da_tabela_{user_id}")    
 def sincronizar_metadados_da_tabela_simple(
     db: Session, table_name: str, user_id: int,connection_id:int
 ) -> dict:
@@ -180,11 +181,11 @@ def sincronizar_metadados_da_tabela_simple(
             table_name=table_name,
             db_connection_id=connection.id,
             engine=engine,
-            db_type=db_type
+            db_type=str(db_type)
         )
         
         # 4. Busca ou cria os campos
-        fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine)
+        fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine,str(db_type))
 
         # 5. Busca valores ENUM por coluna
         enum_map: Dict[str, List[str]] = _fetch_enum_values(db,fields_table, engine, structure, db_type)
@@ -335,7 +336,8 @@ def map_column_type(col_type: str, db_type: str) -> str:
 def buscar_ou_criar_campos_tabela(
     db: Session,
     structure: DBStructure,
-    engine: Engine
+    engine: Engine,
+    db_type: Optional[str]
 ) -> List[DBField]:
     """
     Busca os campos de uma tabela no banco. Se não existirem localmente,
@@ -416,7 +418,7 @@ def buscar_ou_criar_campos_tabela(
         # Cria o novo campo
         field_in = DBFieldCreate(
             name=col_name,
-            type=map_column_type(tipo, structure.connection.type),
+            type=map_column_type(tipo, db_type or structure.connection.type),
             is_nullable=column.get("nullable", True),
             default_value=default_value,
             is_primary_key=is_primary_key,

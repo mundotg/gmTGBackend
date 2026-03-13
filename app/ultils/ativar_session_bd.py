@@ -9,6 +9,7 @@ from app.cruds.queryhistory_crud import get_ultima_consulta
 from app.models.connection_models import ActiveConnection, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.users_chemas import DbInfoSchema
+from app.services.crypto_utils import aes_decrypt
 from app.ultils.logger import log_message
 from datetime import datetime
 
@@ -31,6 +32,10 @@ def reativar_connection(id_user: int, db: Session) -> dict:
         conexao, activated_at = get_connection_current(db, id_user)
         if not conexao:
             return {"success": False, "config": None}
+        
+        host = aes_decrypt(conexao.host)
+        username= aes_decrypt(conexao.username)
+        password =aes_decrypt(conexao.password)
 
         stats = get_statistics_by_connection_geral(db, conexao.id)
         num_tabelas = 0
@@ -60,9 +65,9 @@ def reativar_connection(id_user: int, db: Session) -> dict:
         # Se não houver engine ativa, tenta criar
         if not EngineManager.get(id_user):
             # 🔍 Checa antes de criar engine se o host:porta está acessível
-            if not is_port_open(conexao.host, conexao.port):
+            if not is_port_open(host, conexao.port):
                 log_message(
-                    f"❌ Banco {conexao.host}:{conexao.port} inacessível para o usuário {id_user}",
+                    f"❌ Banco {host}:{conexao.port} inacessível para o usuário {id_user}",
                     "error"
                 )
                 desativar_connection(id_user, conexao.id, db)

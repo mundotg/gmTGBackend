@@ -16,12 +16,12 @@ router = APIRouter(prefix="/log", tags=["connections_log"])
 # Funções com Cache
 # -----------------------------
 
-@cache_result(ttl=600, user_id="user_{user_id}")
+@cache_result(ttl=600, user_id="user_logs_{user_id}")
 def get_connection_logs_cached(db: Session, user_id: int):
     """Obtém logs de conexão com cache (10 min)"""
     return get_connection_logs(db, user_id)
 
-@cache_result(ttl=600, user_id="user_{user_id}")
+@cache_result(ttl=600, user_id="user_logs_pagination_{user_id}")
 def get_connection_logs_pagination_cached(
     db: Session, user_id: int, connection_id: Optional[int], page: int, limit: int
 ):

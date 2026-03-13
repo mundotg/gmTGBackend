@@ -37,18 +37,14 @@ if sys.platform == 'win32':
 os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
 # ------------------------------------------------------------
-
 # Configuração principal do aplicativo
-
 # ------------------------------------------------------------
 # 
 
 app = FastAPI(title="API de Autenticação com FastAPI")
 
 # ------------------------------------------------------------
-
 # CORS
-
 # ------------------------------------------------------------
 
 origins = get_env_list_cors("BACKEND_CORS_ORIGINS", ["http://localhost:3000"])

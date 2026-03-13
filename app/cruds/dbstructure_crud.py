@@ -775,7 +775,7 @@ def create_enum_field(db: Session, data: DBEnumField) -> DBEnumField:
     existing = (
         db.query(DBEnumField)
         .options(
-            load_only(DBEnumField.id),  # type: ignore
+            # load_only(DBEnumField.id),  # type: ignore
             noload(DBEnumField.field),
         )
         .filter(
@@ -810,7 +810,7 @@ def get_enum_field(
         db.query(DBEnumField)
         .options(
             load_only(
-                DBEnumField.id,  # type: ignore
+                # DBEnumField.id,  # type: ignore
                 DBEnumField.field_id,  # type: ignore
                 DBEnumField.value,  # type: ignore
                 DBEnumField.status,  # type: ignore
@@ -840,7 +840,6 @@ def list_enum_fields_by_field(
         db.query(DBEnumField)
         .options(
             load_only(
-                DBEnumField.id,  # type: ignore
                 DBEnumField.field_id,  # type: ignore
                 DBEnumField.value,  # type: ignore
                 DBEnumField.status,  # type: ignore

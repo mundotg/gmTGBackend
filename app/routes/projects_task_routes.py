@@ -29,12 +29,12 @@ def handle_service_error(context: str, error: Exception, status_code: int = 500)
     else:
         raise HTTPException(status_code=status_code, detail=f"Erro interno em {context}")
 
-@cache_result(ttl=300, user_id="user_{user_id}")
+@cache_result(ttl=300, user_id="user_projects_{user_id}")
 def list_projects_cached(db: Session, user_id: int = Depends(get_current_user_id)):
     """Lista projetos com cache."""
     return project_service.list_projects_service(db)
 
-@cache_result(ttl=600, user_id="user_{user_id}")
+@cache_result(ttl=600, user_id="user_retrieve_project{user_id}")
 def retrieve_project_cached(db: Session, project_id: str, user_id: int = Depends(get_current_user_id)):
     """Obtém projeto específico com cache."""
     return project_service.retrieve_project_service(db, project_id)

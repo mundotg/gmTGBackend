@@ -22,13 +22,14 @@ from app.schemas.query_select_upAndInsert_schema import (
     UpdateRequest,
 )
 
-from app.services.cloudeAi_execute_query import executar_query_e_salvar_stream
+# from app.services.cloudeAi_execute_query import executar_query_e_salvar_stream
+from app.services.execute_query_select_stream import executar_query_e_salvar_stream
 from app.services.insert_row_service import insert_row_service
 from app.services.insert_service_auto import insert_row_service_auto
 from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.ativar_engine import ConnectionManager
-from app.ultils.build_query import update_row_service
 from app.ultils.logger import log_message
+from app.ultils.update_line_build_exe import update_row_service
 
 class QueryChannelManager:
     """Gerenciador de canais de query com limpeza automática."""
@@ -130,7 +131,7 @@ async def update_row_endpoint(
 
             log_message(f"Atualizando linha para usuário {user_id}", "info")
             result = update_row_service(
-                data, engine, user_id, connection.type, connection.id, db
+                data, engine, user_id, connection.type, connection.id, db # pyright: ignore[reportArgumentType]
             )
 
             log_message("Linha atualizada com sucesso", "success")
@@ -160,7 +161,7 @@ async def insert_row_endpoint(
 
             log_message(f"Inserindo linha para usuário {user_id}", "info")
             result = insert_row_service(
-                data, engine, user_id, connection.type, connection.id, db
+                data, engine, user_id, connection.type, connection.id, db # type: ignore
             )
 
             log_message("Linha inserida com sucesso", "success")

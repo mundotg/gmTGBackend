@@ -8,6 +8,7 @@ class ResponseWrapper(BaseModel, Generic[T]):
     success: bool
     data: Optional[T] = None
     error: Optional[str] = None
+    message: Optional[str] = None
 
 
 class TableRow(RootModel[Dict[str, Any]]):

@@ -13,7 +13,7 @@ from app.models.connection_models import DBConnection
 from app.schemas.query_select_upAndInsert_schema import CondicaoFiltro, QueryPayload
 from app.schemas.queryhistory_schemas import QueryHistoryCreate
 from app.services.cloudeAi_execute_query import QueryFilterBuilder, QuerySecurityValidator
-from app.ultils.build_query import get_count_query, get_filter_condition_with_operation, get_query_string
+from app.ultils.build_query import get_count_query, get_filter_condition_with_operation, get_query_string_advance
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
@@ -65,8 +65,8 @@ def montar_filter_com_parametros(
             db_type=db_type,
             operation=cond.operator,
             param_name=param_prefix,
-            enum_values="",
-            value_otheir_between=cond.value2
+            enum_values={},
+            value_otheir_between=cond.value2 or ""
         )
 
         logic = (cond.logicalOperator or "AND").strip().upper()
@@ -106,13 +106,11 @@ async def executar_query_e_salvar(
         raise ValueError("QueryPayload é obrigatório")
 
     security_validator.ensure_base_table_in_query(queryrequest)
-
-    # Filtros WHERE
+    # Filtros WHERE 
     filters, params = await filter_builder.build_where_clause(
                 queryrequest.where or [], connection.type
             )
     # filters, params = montar_filter_com_parametros(queryrequest.where, connection.type)
-
     # Monta query (count ou select)
     if queryrequest.isCountQuery:
         query_string = get_count_query(
@@ -123,7 +121,20 @@ async def executar_query_e_salvar(
             db_type=connection.type
         )
     else:
-        query_string = get_query_string(
+        query_string = get_query_string_advance(
+                base_table=queryrequest.baseTable,
+                select=queryrequest.select,
+                joins=queryrequest.joins,
+                aliases=queryrequest.aliaisTables,
+                filters=filters,
+                table_list=queryrequest.table_list,
+                order_by=queryrequest.orderBy,
+                max_rows=queryrequest.limit or 1,
+                offset=queryrequest.offset,
+                db_type=connection.type,
+                distinct=queryrequest.distinct,
+            )
+        """ get_query_string(
             base_table=queryrequest.baseTable,
             joins=queryrequest.joins or [],
             select=queryrequest.select,
@@ -134,7 +145,7 @@ async def executar_query_e_salvar(
             offset=queryrequest.offset,
             db_type=connection.type,
             distinct=queryrequest.distinct
-        )
+        ) """
 
     log_message(f"📘 Query montada:\n{query_string}", "debug")
     log_message(f"📦 Parâmetros: {json.dumps(params, indent=2, default=str)}", "debug")
@@ -265,7 +276,7 @@ async def executar_query_e_salvar(
                 "connection_type": connection.type,
             },
         )
-        create_query_history(db=db, data=historico)
+        create_query_history(db=db,user_id=user_id, data=historico)
     except Exception as hist_err:
         log_message(f"⚠️ Falha ao salvar histórico: {hist_err}", "warning")
 

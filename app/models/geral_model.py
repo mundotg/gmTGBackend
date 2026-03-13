@@ -30,6 +30,12 @@ class Settings(Base):
     language = Column(String(10), default="pt", nullable=False)
     sidebar_collapsed = Column(Boolean, default=False, nullable=False)
     preferred_db_type = Column(String(50))
+    # 🔔 Notificações (Falta isto para a aba "Notificações" do frontend)
+    email_notifications = Column(Boolean, default=True, nullable=False)
+    app_notifications = Column(Boolean, default=True, nullable=False)
+
+    # 🌍 Regionalização (Opcional, mas útil para uma plataforma de dados)
+    timezone = Column(String(50), default="UTC", nullable=False)
 
     # 🕒 Auditoria
     created_at = Column(

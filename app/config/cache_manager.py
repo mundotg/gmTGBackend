@@ -35,6 +35,74 @@ CACHE_GZIP_COMPRESSION_LEVEL = get_env_int('CACHE_GZIP_COMPRESSION_LEVEL', 6)
 CACHE_DIR = os.path.join(os.path.dirname(__file__), CACHE_DIR_NAME)
 os.makedirs(CACHE_DIR, exist_ok=True)
 
+
+from datetime import datetime, date
+from decimal import Decimal
+from enum import Enum
+
+def _to_cacheable(value):
+    """
+    Converte valores complexos em tipos seguros para pickle/json/cache.
+    Suporta SQLAlchemy 2.0 (Rows) e ORM Models de forma robusta.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+
+    if isinstance(value, Decimal):
+        return float(value)
+
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+
+    if isinstance(value, Enum):
+        return value.value
+
+    if isinstance(value, dict):
+        return {str(k): _to_cacheable(v) for k, v in value.items()}
+
+    # 1. SQLAlchemy Row (session.execute(...).all())
+    # IMPORTANTE: Tem de vir ANTES da verificação de tuple/list, pois o Row herda de tuple!
+    # Usamos _mapping para extrair como dicionário (nome_da_coluna: valor).
+    if hasattr(value, "_mapping"):
+        return {str(k): _to_cacheable(v) for k, v in value._mapping.items()}
+
+    # 2. Iteráveis comuns (agora é seguro, pois o Row já foi tratado acima)
+    if isinstance(value, (list, tuple, set)):
+        return [_to_cacheable(v) for v in value]
+
+    # 3. Pydantic v2
+    if hasattr(value, "model_dump"):
+        return _to_cacheable(value.model_dump())
+
+    # 4. Pydantic v1
+    if hasattr(value, "dict"):
+        return _to_cacheable(value.dict())
+
+    # 5. SQLAlchemy ORM object (A abordagem mais robusta usando inspect)
+    try:
+        from sqlalchemy.inspection import inspect
+        from sqlalchemy.orm.state import InstanceState
+        
+        # raiseerr=False evita excepções se o objeto não for do SQLAlchemy
+        state = inspect(value, raiseerr=False) 
+        if state is not None and isinstance(state, InstanceState):
+            data = {}
+            # Itera apenas sobre os atributos que são mapeados como colunas
+            for attr in state.mapper.column_attrs:
+                data[attr.key] = _to_cacheable(getattr(value, attr.key))
+            return data
+    except ImportError:
+        pass # Caso o SQLAlchemy não esteja instalado no ambiente (segurança)
+
+    # 6. Fallback original SQLAlchemy (caso o inspect falhe por algum motivo raro)
+    if hasattr(value, "__table__"):
+        data = {}
+        for column in value.__table__.columns:
+            data[column.name] = _to_cacheable(getattr(value, column.name))
+        return data
+
+    # Fallback final
+    return str(value)
 # -------------------------------
 # Cache em memória (camada rápida)
 # -------------------------------
@@ -396,17 +464,16 @@ def cache_result(ttl: Optional[int] = None, max_cache_size_mb: Optional[int] = N
             if CACHE_LOG_MISSES:
                 log_message(f"Cache miss para {func.__name__}", "debug")
             result = func(*args, **kwargs)
-
+            cacheable_result = _to_cacheable(result)
             # 4) grava cache (memória + disco)
             # grava em memória (usa ttl do parâmetro do decorador, se fornecido)
-            MEMORY_CACHE[key] = {"ts": time.time(), "val": result, "ttl": ttl}
+            # 4) grava cache (memória + disco)
+            MEMORY_CACHE[key] = {"ts": time.time(), "val": cacheable_result, "ttl": ttl}
 
-            # grava em disco (no background lógico: grava tentaremos mas não propaga erros)
             try:
-                # determina ttl salvo (None significa nunca expira)
                 entry = {
                     "timestamp": time.time(),
-                    "value": result,
+                    "value": cacheable_result, # <--- CORREÇÃO: Usar o resultado convertido
                     "ttl": ttl,
                     "function": func.__name__,
                     "user_id": actual_user_id
@@ -427,7 +494,7 @@ def cache_result(ttl: Optional[int] = None, max_cache_size_mb: Optional[int] = N
                     log_message(f"Erro ao aplicar limite de cache: {e}", "error")
             # limpeza probabilística de arquivos antigos
             try:
-                if random.random() < CACHE_CLEANUP_PROBABILITY:
+                if random.random() < CACHE_CLEANUP_PROBABILITY: # type: ignore
                     _clean_old_cache_files()
             except Exception as e:
                 log_message(f"Erro em limpeza probabilística do cache: {e}", "error")

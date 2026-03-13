@@ -16,7 +16,7 @@ from sqlalchemy.engine import Engine
 # Funções com Cache
 # -----------------------------
 
-@cache_result(ttl=180, user_id="user_{user_id}")  # 3 minutos de cache para contagens
+@cache_result(ttl=180, user_id="user_table_rowcount{user_id}")  # 3 minutos de cache para contagens
 def get_table_rowcount_cached(
     db: Session,
     engine: Engine,
@@ -31,7 +31,7 @@ def get_table_rowcount_cached(
     """
     return get_table_rowcount(db, engine, table_name, connection_id, db_type, structure_id, schema)
 
-@cache_result(ttl=300, user_id="user_{user_id}")  # 5 minutos de cache para lista de tabelas
+@cache_result(ttl=300, user_id="user_count_all_tupla_{user_id}")  # 5 minutos de cache para lista de tabelas
 def get_cached_table_info(
     db: Session, 
     connection_id: int
@@ -41,7 +41,7 @@ def get_cached_table_info(
     """
     return get_cached_row_count_all_tupla(db, connection_id)
 
-@cache_result(ttl=600, user_id="user_{user_id}")  # 10 minutos de cache para estrutura
+@cache_result(ttl=600, user_id="user_structures_by_conn_id_and_table_{user_id}")  # 10 minutos de cache para estrutura
 def get_db_structure_cached(
     db: Session, 
     connection_id: int, 
@@ -282,11 +282,14 @@ def get_table_count_streams(db: Session, id_user: int) -> StreamingResponse:
     except Exception as e:
         log_message(f"❌ Erro crítico no get_table_count_streams: {e}", "error")
         
-        async def error_generator():
-            error_data = json.dumps({"error": str(e), "source": "initialization"})
-            yield f"event: error\ndata: {error_data}\n\n"
+        mensagem_de_erro = str(e)
+    
+        # 2. Passe a mensagem como parâmetro para o gerador
+        async def error_generator(err_msg: str):
+            error_data = json.dumps({"error": err_msg, "source": "initialization"})
+            yield f"data: {error_data}\n\n"
         
-        return StreamingResponse(error_generator(), media_type="text/event-stream")
+        return StreamingResponse(error_generator(mensagem_de_erro), media_type="text/event-stream")
 
 # -----------------------------
 # Endpoints Adicionais para Cache

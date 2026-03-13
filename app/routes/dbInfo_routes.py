@@ -2,7 +2,7 @@
 
 import json
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
@@ -12,13 +12,14 @@ from app.cruds.dbstatistics_crud import converter_stats, get_statistics_by_conne
 from app.database import get_db
 from app.routes.connection_routes import get_current_user_id
 from app.schemas.dbstructure_schema import MetadataTableResponse
-from app.schemas.query_select_upAndInsert_schema import OrderByOption
+from app.schemas.query_select_upAndInsert_schema import OrderByOption, QueryPayload
 from app.schemas.queryhistory_schemas import DatabaseMetadata, TableInfo
 from app.schemas.responsehttp_schema import ResponseWrapper, TableRow
 from app.services.database_inspector import get_table_names_with_count, sync_connection_statistics
 from app.services.field_info import sincronizar_metadados_da_tabela
 from app.services.pesquizar_index_linha_in_bd import pesquisar_in_db
 from app.cruds.connection_cruds import get_active_connection_by_userid, get_db_connection_by_id
+from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.ativar_session_bd import reativar_connection
 from app.ultils.logger import log_message
 
@@ -61,7 +62,7 @@ def _safe_json_loads(json_str: str, default: Any = None) -> Any:
 # Funções com Cache
 # -------------------------------
 
-@cache_result(ttl=900, user_id="user_{user_id}")  
+@cache_result(ttl=900, user_id="user_metadata_{user_id}")  
 def get_metadata_db_cached(user_id: int, db: Session):
     connection_info = _get_user_connection_info(user_id, db)
     connection = connection_info["connection"]
@@ -215,3 +216,55 @@ def get_row_data_by_index(
     except Exception as e:
         log_message(f"❌ Erro em get_row_data_by_index: {e}", level="error")
         raise HTTPException(status_code=500, detail="Erro ao buscar o registro detalhado no banco de dados.")
+    
+
+@router.post(
+    "/consu/query_line/{index}",
+    response_model=ResponseWrapper[TableRow],
+    summary="Buscar linha completa de uma consulta por index",
+)
+async def get_row_data_query_by_index(
+    index: int = Path(..., ge=0, description="O índice (offset) exato da linha desejada"),
+    payload: QueryPayload = Body(..., description="As configurações da query original"),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    🔍 Busca uma linha completa no banco de dados com base na query original e no índice. 
+    Protegido contra ambiguidades na pesquisa e limites de paginação.
+    """
+    try:
+        # 1. Blindagem no Backend: Forçamos o limit e offset para garantir apenas 1 linha
+        payload.offset = index
+        payload.limit = 1
+        # Desativamos a contagem total, pois só queremos os dados desta linha
+        payload.isCountQuery = False 
+
+        query_service = QueryExecutionService()
+        result = await query_service.execute_query(payload, db, user_id)
+
+        # 2. Valida se retornou dados válidos
+        if not result or not result.get("preview"):
+            raise HTTPException(
+                status_code=404, 
+                detail="O registro solicitado não foi encontrado. Pode ter sido excluído ou a query foi alterada."
+            )
+        
+        # 3. Extrai apenas o objeto (primeira e única linha da lista)
+        row_data = result["preview"][0]
+        # print(row_data)
+        # print(result["columns"])
+
+        return ResponseWrapper(success=True, data=row_data)
+
+    except HTTPException:
+        # Repassa as exceções HTTP que nós mesmos levantamos
+        raise
+    except Exception as e:
+        # 4. Log detalhado para o backend
+        import traceback
+        log_message(f"❌ Erro em get_row_data_query_by_index: {e}\n{traceback.format_exc()}", level="error")
+        raise HTTPException(
+            status_code=500, 
+            detail="Erro interno ao buscar o registro detalhado no banco de dados."
+        )

@@ -1,250 +1,639 @@
 import json
-import re
+from collections import defaultdict
 from datetime import datetime, timezone
-from typing import List, Dict, Any
+from typing import DefaultDict, List, Dict, Any, Optional, Tuple
+
+from sqlalchemy import text, bindparam
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import text
 from sqlalchemy.exc import SQLAlchemyError
+
 from app.schemas.query_delete_schema import PayloadDeleteRow, DeleteResponse
 from app.schemas.query_select_upAndInsert_schema import QueryPayload
 from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryType
 from app.cruds.queryhistory_crud import create_query_history
 from app.services.cloudeAi_execute_query import QueryFilterBuilder
+from app.services.editar_linha import quote_identifier
 from app.services.query_executor import is_safe_identifier
 from app.ultils.ativar_engine import ConnectionManager
+from app.ultils.build_query import get_query_string_advance
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
-from app.ultils.logica_de_join_advance import build_join_clause_for_delete
+
+BOOL_MAP = {
+    "true": True,
+    "1": True,
+    "yes": True,
+    "sim": True,
+    "false": False,
+    "0": False,
+    "no": False,
+    "nao": False,
+    "não": False,
+}
 
 
 class DeleteOperationService:
-    """
-    Serviço responsável por executar operações DELETE seguras e genéricas,
-    com suporte a múltiplos dialetos SQL (PostgreSQL, MySQL, SQL Server, SQLite).
-    """
-
     def __init__(self) -> None:
         self.connection_manager = ConnectionManager()
 
-    def detect_dialect(self, engine) -> str:
-        """Detecta o dialeto ativo."""
-        name = engine.dialect.name.lower()
-        if "postgres" in name:
-            return "postgres"
-        if "mysql" in name:
-            return "mysql"
-        if "mssql" in name or "sqlserver" in name:
-            return "mssql"
-        if "sqlite" in name:
-            return "sqlite"
-        return "generic"
+    def _is_safe_with_dots(self, identifier: str) -> bool:
+        """Permite identificadores como 'public.users' validando cada parte."""
+        if not identifier:
+            return False
+        return all(is_safe_identifier(part) for part in str(identifier).split("."))
 
-    async def execute_delete_all(
+    def _cast_value(self, value: Any, key_type: Optional[str]) -> Any:
+        if value is None:
+            return None
+
+        normalized_type = (key_type or "").strip().lower()
+
+        if normalized_type in ("integer", "int", "bigint", "smallint"):
+            return int(value)
+
+        if normalized_type in ("float", "double", "decimal", "numeric", "real"):
+            return float(value)
+
+        normalized_value = str(value).strip().lower()
+        if normalized_value in BOOL_MAP:
+            return BOOL_MAP[normalized_value]
+
+        return str(value)
+
+    def _read_value(self, obj: Any, field: str, default: Any = None) -> Any:
+        if isinstance(obj, dict):
+            return obj.get(field, default)
+        return getattr(obj, field, default)
+
+    def _normalize_row_delete(self, dados: Any) -> Dict[str, Any]:
+        return {
+            "primaryKey": self._read_value(dados, "primaryKey"),
+            "primaryKeyValue": self._read_value(dados, "primaryKeyValue"),
+            "keyType": self._read_value(dados, "keyType"),
+            "index": self._read_value(dados, "index"),
+            "isPrimarykeyOrUnique": self._read_value(dados, "isPrimarykeyOrUnique"),
+        }
+
+    async def _build_where_clause(
         self,
-        query_payload: QueryPayload,
-        db: Session,
-        current_user_id: int,
-        client_ip: str = None,
-        app_source: str = "API",
-        executed_by: str = "sistema",
-        modified_by: str = None,
-    ) -> DeleteResponse:
-        """
-        Executa um DELETE genérico com suporte a JOINs e múltiplos dialetos SQL.
-        """
-        tabela_base = getattr(query_payload, "baseTable", None)
-        if not tabela_base:
-            raise ValueError("Tabela base não informada no QueryPayload")
-        print("saffsdf: 1")
-        if not is_safe_identifier(tabela_base):
-            raise ValueError(f"Tabela insegura: {tabela_base}")
-        print("saffsdf: 12")
-        engine, connection = self.connection_manager.ensure_connection(db, current_user_id)
-        dialect = self.detect_dialect(engine)
-        params: Dict[str, Any] = {}
-
-        if dialect in ["mysql", "mssql"]:
-            sql_parts = [f"DELETE {tabela_base} FROM {tabela_base}"]
-        else:
-            sql_parts = [f"DELETE FROM {tabela_base}"]
-
-        # 🔗 JOINs e WHERE
-        
-        join_clauses = build_join_clause_for_delete(db_type=connection.type, base_table= tabela_base,joins= query_payload.joins, table_list=query_payload.table_list, is_delete=True)
+        payload: QueryPayload,
+        connection_type: str,
+    ) -> Tuple[str, Dict[str, Any]]:
         filter_builder = QueryFilterBuilder()
         filters, params = await filter_builder.build_where_clause(
-            query_payload.where or [], connection.type
+            payload.where or [],
+            connection_type,
+        )
+        return filters, params
+
+    async def _delete_all_by_payload(
+        self,
+        conn,
+        payload: QueryPayload,
+        connection_type: str,
+    ) -> int:
+        tabela = payload.baseTable
+
+        if not self._is_safe_with_dots(tabela):
+            raise ValueError(f"Tabela base inválida para exclusão total: {tabela}")
+
+        filters, params = await self._build_where_clause(payload, connection_type)
+
+        if not filters:
+            raise ValueError("Exclusão total bloqueada: payload sem filtros.")
+
+        sql = f"""
+            DELETE FROM {quote_identifier(connection_type, tabela)}
+            {filters}
+        """
+
+        log_message(f"DELETE ALL => {sql} | params={params}", "debug")
+        result = conn.execute(text(sql), params)
+        return result.rowcount or 0
+
+    async def _get_pk_by_index(
+        self,
+        conn,
+        payload: QueryPayload,
+        tabela_name: str,
+        pk_coluna: str,
+        index: int,
+        connection_type: str,
+    ) -> Any:
+        filters, params = await self._build_where_clause(payload, connection_type)
+
+        query_select = get_query_string_advance(
+            base_table=payload.baseTable,
+            select=[pk_coluna],
+            joins=payload.joins,
+            aliases=payload.aliaisTables,
+            filters=filters,
+            table_list=payload.table_list,
+            order_by=payload.orderBy,
+            max_rows=1,
+            offset=index,
+            db_type=connection_type,
+            distinct=payload.distinct,
         )
 
-        # ⚠️ Segurança
-        if not query_payload.where or len(filters) == 0:
-            log_message("⚠️ Tentativa de DELETE sem filtro. Operação cancelada.", "warning")
-            raise ValueError("Operação bloqueada: DELETE sem WHERE é perigoso.")
+        log_message(f"SELECT PK BY INDEX => {query_select} | params={params}", "debug")
+        result = conn.execute(text(query_select), params).fetchone()
 
-        if join_clauses:
-            sql_parts.append(join_clauses)
-        if filters:
-            sql_parts.append(f" {filters}")
+        if not result:
+            return None
 
-        sql = " ".join(sql_parts)
-        log_message(f"🧹 DELETE ({dialect}) → {sql}\nParams: {params}", "debug")
+        row_data = result._mapping
+        return row_data.get(pk_coluna) or row_data.get(f"{tabela_name}.{pk_coluna}")
 
-        # 🚀 Execução
-        try:
-            start = datetime.now(timezone.utc)
-            with engine.begin() as conn:
-                result = conn.execute(text(sql), params)
-                afetados = result.rowcount or 0
-            duration_ms = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+    async def _delete_by_index_direct(
+        self,
+        conn,
+        payload: QueryPayload,
+        primaryKey: str,
+        keyType: str,
+        tabela_name: str,
+        index: int,
+        connection_type: str,
+    ) -> int:
+        if not self._is_safe_with_dots(tabela_name):
+            raise ValueError(f"Tabela inválida/insegura: {tabela_name}")
 
-            # 🧾 Histórico completo
-            historico = QueryHistoryCreate(
-                user_id=current_user_id,
-                db_connection_id=connection.id,
-                query=sql,
-                query_type=QueryType.DELETE,
-                executed_at=start,
-                updated_at=datetime.now(timezone.utc),
-                duration_ms=duration_ms,
-                result_preview=json.dumps({"afetados": afetados}, ensure_ascii=False),
-                error_message=None,
-                is_favorite=False,
-                tags=f"delete_generic_{dialect}",
-                app_source=app_source,
-                client_ip=client_ip,
-                executed_by=executed_by,
-                modified_by=modified_by or executed_by,
-                meta_info={
-                    "base_table": tabela_base,
-                    "joins": query_payload.joins,
-                    "filters": query_payload.where,
-                    "dialect": dialect,
-                    "timestamp": start.isoformat()
-                },
+        if not self._is_safe_with_dots(primaryKey):
+            raise ValueError(f"Chave primária inválida/insegura: {primaryKey}")
+
+        filters, params = await self._build_where_clause(payload, connection_type)
+
+        pk_select_options = [
+            primaryKey,
+            f"{tabela_name}.{primaryKey}",
+            f'{tabela_name.split(".")[-1]}.{primaryKey}',
+        ]
+
+        query_select = get_query_string_advance(
+            base_table=payload.baseTable,
+            select=[primaryKey],
+            joins=payload.joins,
+            aliases=payload.aliaisTables,
+            filters=filters,
+            table_list=payload.table_list,
+            order_by=payload.orderBy,
+            max_rows=1,
+            offset=index,
+            db_type=connection_type,
+            distinct=payload.distinct,
+        )
+
+        log_message(
+            f"SELECT PK BY INDEX DIRECT => {query_select} | params={params}", "debug"
+        )
+
+        result = conn.execute(text(query_select), params).fetchone()
+        if not result:
+            return 0
+
+        row_data = result._mapping
+
+        pk_value = None
+        for key in pk_select_options:
+            if key in row_data and row_data[key] is not None:
+                pk_value = row_data[key]
+                break
+
+        if pk_value is None:
+            # fallback extra: tenta achar pela última parte do nome da coluna
+            for col, value in row_data.items():
+                if col.split(".")[-1] == primaryKey and value is not None:
+                    pk_value = value
+                    break
+
+        if pk_value is None:
+            log_message(
+                f"⚠️ Não foi possível obter valor da PK '{primaryKey}' na linha do índice {index}",
+                "warning",
             )
-            create_query_history(db=db, data=historico)
+            return 0
+
+        casted_value = self._cast_value(pk_value, keyType)
+
+        sql = f"""
+            DELETE FROM {quote_identifier(connection_type, tabela_name)}
+            WHERE {quote_identifier(connection_type, primaryKey)} = :pk_value
+        """
+
+        delete_params = {"pk_value": casted_value}
+
+        log_message(
+            f"DELETE DIRECT BY INDEX USING PK => {sql} | params={delete_params}",
+            "debug",
+        )
+
+        result = conn.execute(text(sql), delete_params)
+        return result.rowcount or 0
+
+    async def _execute_bulk_delete_by_pks(
+        self,
+        conn,
+        tabela_name: str,
+        pk_coluna: str,
+        valores: List[Any],
+        connection_type: str,
+    ) -> int:
+        if not valores:
+            return 0
+
+        sql = text(
+            f"DELETE FROM {quote_identifier(connection_type, tabela_name)} "
+            f"WHERE {quote_identifier(connection_type, pk_coluna)} IN :pks"
+        ).bindparams(bindparam("pks", expanding=True))
+
+        log_message(
+            f"DELETE BULK => tabela={tabela_name}, pk={pk_coluna}, total={len(valores)}",
+            "debug",
+        )
+
+        result = conn.execute(sql, {"pks": list(valores)})
+        return result.rowcount or 0
+
+    async def execute_delete(
+        self,
+        registros: List[PayloadDeleteRow],
+        payloadQuery: Optional[QueryPayload],
+        db: Session,
+        current_user_id: int,
+        delete_all: bool = False,
+        app_source: str = "API",
+        executed_by: str = "sistema",
+        modified_by: Optional[str] = None,
+        client_ip: Optional[str] = None,
+    ) -> DeleteResponse:
+        itens_afetados: List[Dict[str, Any]] = []
+        erros: List[str] = []
+
+        engine, connection = self.connection_manager.ensure_connection(
+            db, current_user_id
+        )
+        connection_type = str(connection.type)
+        connection_id = getattr(connection, "id", None)
+
+        start = datetime.now(timezone.utc)
+
+        try:
+            # Se for async engine, o ideal é async with.
+            # Estou assumindo que o teu engine.begin() é compatível com await nas chamadas internas.
+            with engine.begin() as conn:
+                if delete_all:
+                    if not payloadQuery:
+                        raise ValueError(
+                            "Payload da query não informado para exclusão total."
+                        )
+
+                    afetados = await self._delete_all_by_payload(
+                        conn=conn,
+                        payload=payloadQuery,
+                        connection_type=connection_type,
+                    )
+
+                    itens_afetados.append(
+                        {
+                            "tabela": payloadQuery.baseTable,
+                            "chave": "query",
+                            "valor": "delete_all",
+                            "afetados": afetados,
+                        }
+                    )
+
+                else:
+                    grouped_pks, fallbacks, erros_extra = self._prepare_delete_groups(
+                        registros=registros,
+                        payload_query=payloadQuery,
+                    )
+                    erros.extend(erros_extra)
+
+                    # 1) delete em lote por PKs já recebidas diretamente
+                    for tabela_name, colunas in grouped_pks.items():
+                        for pk_coluna, valores in colunas.items():
+                            if not valores:
+                                continue
+
+                            afetados = await self._execute_bulk_delete_by_pks(
+                                conn=conn,
+                                tabela_name=tabela_name,
+                                pk_coluna=pk_coluna,
+                                valores=valores,
+                                connection_type=connection_type,
+                            )
+
+                            itens_afetados.append(
+                                {
+                                    "tabela": tabela_name,
+                                    "chave": pk_coluna,
+                                    "valor": f"{len(valores)} IDs",
+                                    "afetados": afetados,
+                                }
+                            )
+
+                    # 2) resolver fallbacks:
+                    #    primeiro tenta obter PK por index quando possível
+                    fallback_pks: DefaultDict[Tuple[str, str], List[Any]] = defaultdict(
+                        list
+                    )
+                    direct_fallbacks: List[
+                        Tuple[str, Dict[str, Any], QueryPayload, int]
+                    ] = []
+
+                    for tabela_name, dados, payload, index in fallbacks:
+                        pk_coluna = dados.get("primaryKey")
+                        key_type = dados.get("keyType")
+                        is_pk_or_unique = bool(dados.get("isPrimarykeyOrUnique"))
+
+                        # se temos PK válida e a linha pode ser resolvida por index -> buscar valor real da PK
+                        if (
+                            pk_coluna
+                            and is_pk_or_unique
+                            and self._is_safe_with_dots(pk_coluna)
+                        ):
+                            try:
+                                pk_valor = await self._get_pk_by_index(
+                                    conn=conn,
+                                    payload=payload,
+                                    tabela_name=tabela_name,
+                                    pk_coluna=pk_coluna,
+                                    index=index,
+                                    connection_type=connection_type,
+                                )
+                            except Exception as exc:
+                                erros.append(
+                                    f"Erro ao obter PK por índice em {tabela_name}.{pk_coluna} [index={index}]: {exc}"
+                                )
+                                pk_valor = None
+
+                            if pk_valor is not None:
+                                try:
+                                    fallback_pks[(tabela_name, pk_coluna)].append(
+                                        self._cast_value(pk_valor, key_type)
+                                    )
+                                except Exception as exc:
+                                    erros.append(
+                                        f"Erro ao converter PK de fallback em {tabela_name}.{pk_coluna}: {exc}"
+                                    )
+                                continue
+
+                        # se não der para resolver por PK, vai para delete direto por índice
+                        direct_fallbacks.append((tabela_name, dados, payload, index))
+
+                    # 3) delete em lote das PKs resolvidas via fallback
+                    for (tabela_name, pk_coluna), valores in fallback_pks.items():
+                        if not valores:
+                            continue
+
+                        afetados = await self._execute_bulk_delete_by_pks(
+                            conn=conn,
+                            tabela_name=tabela_name,
+                            pk_coluna=pk_coluna,
+                            valores=valores,
+                            connection_type=connection_type,
+                        )
+
+                        itens_afetados.append(
+                            {
+                                "tabela": tabela_name,
+                                "chave": pk_coluna,
+                                "valor": f"{len(valores)} IDs (fallback)",
+                                "afetados": afetados,
+                            }
+                        )
+
+                    # 4) delete direto por índice quando não foi possível resolver PK
+                    for tabela_name, dados, payload, index in direct_fallbacks:
+                        pk_coluna = dados.get("primaryKey")
+                        key_type = dados.get("keyType")
+
+                        if not pk_coluna:
+                            erros.append(
+                                f"Fallback por índice sem primaryKey informado para a tabela {tabela_name}"
+                            )
+                            itens_afetados.append(
+                                {
+                                    "tabela": tabela_name,
+                                    "chave": "index",
+                                    "valor": index,
+                                    "afetados": 0,
+                                }
+                            )
+                            continue
+
+                        if not self._is_safe_with_dots(pk_coluna):
+                            erros.append(
+                                f"PrimaryKey inválida/insegura no fallback: {pk_coluna}"
+                            )
+                            itens_afetados.append(
+                                {
+                                    "tabela": tabela_name,
+                                    "chave": pk_coluna,
+                                    "valor": index,
+                                    "afetados": 0,
+                                }
+                            )
+                            continue
+
+                        afetados = await self._delete_by_index_direct(
+                            conn=conn,
+                            payload=payload,
+                            primaryKey=pk_coluna,
+                            keyType=key_type or "",
+                            tabela_name=tabela_name,
+                            index=index,
+                            connection_type=connection_type,
+                        )
+
+                        itens_afetados.append(
+                            {
+                                "tabela": tabela_name,
+                                "chave": pk_coluna,
+                                "valor": f"fallback_index={index}",
+                                "afetados": afetados,
+                            }
+                        )
+
+            duration_ms = int(
+                (datetime.now(timezone.utc) - start).total_seconds() * 1000
+            )
+            total_deletados = sum(
+                int(item.get("afetados", 0)) for item in itens_afetados
+            )
+            erros_unicos = self._unique_preserve_order(erros)
+
+            if connection_id is not None:
+                historico = QueryHistoryCreate(
+                    user_id=current_user_id,
+                    db_connection_id=connection_id,
+                    query="DELETE simple",
+                    query_type=QueryType.DELETE,
+                    executed_at=start,
+                    updated_at=datetime.now(timezone.utc),
+                    duration_ms=duration_ms,
+                    result_preview=json.dumps(
+                        itens_afetados,
+                        default=str,
+                        ensure_ascii=False,
+                    ),
+                    error_message=(
+                        json.dumps(erros_unicos, ensure_ascii=False)
+                        if erros_unicos
+                        else None
+                    ),
+                    is_favorite=False,
+                    tags="delete_simple",
+                    app_source=app_source,
+                    client_ip=client_ip,
+                    executed_by=executed_by,
+                    modified_by=modified_by or executed_by,
+                    meta_info={
+                        "delete_all": delete_all,
+                        "erros": erros_unicos,
+                        "total_deletados": total_deletados,
+                    },
+                )
+                create_query_history(db=db, user_id=current_user_id, data=historico)
+
+            mensagem = (
+                f"{total_deletados} registro(s) excluído(s) com sucesso."
+                if total_deletados > 0
+                else "Nenhum registro foi excluído."
+            )
+
+            if erros_unicos:
+                mensagem += f" Avisos: {', '.join(erros_unicos)}."
 
             return DeleteResponse(
-                success=True,
-                mensagem=f"{afetados} registro(s) excluído(s) com sucesso.",
-                itens_afetados=[{"tabela": tabela_base, "afetados": afetados}],
-                executado_em=datetime.utcnow(),
+                success=total_deletados > 0,
+                mensagem=mensagem,
+                itens_afetados=itens_afetados,
+                executado_em=datetime.now(timezone.utc),
             )
 
         except SQLAlchemyError as sa_err:
             error_msg = _lidar_com_erro_sql(sa_err)
-            log_message(f"❌ Erro SQL: {error_msg}", "error")
-            raise Exception(f"Erro SQL: {error_msg}")
-        except Exception as e:
-            log_message(f"❌ Erro inesperado no DELETE genérico: {e}", "error")
-            raise Exception(str(e))
+            log_message(f"Erro SQL no delete: {error_msg}", "error")
+            raise RuntimeError(f"Erro SQL: {error_msg}") from sa_err
 
-    async def execute_batch_delete(
+        except Exception as exc:
+            log_message(f"Erro inesperado no delete: {exc}", "error")
+            raise RuntimeError(str(exc)) from exc
+
+    def _prepare_delete_groups(
         self,
         registros: List[PayloadDeleteRow],
-        db: Session,
-        current_user_id: int,
-        client_ip: str = None,
-        app_source: str = "API",
-        executed_by: str = "sistema",
-        modified_by: str = None,
-    ) -> DeleteResponse:
+        payload_query: Optional[QueryPayload],
+    ) -> tuple[
+        DefaultDict[str, DefaultDict[str, List[Any]]],
+        List[Tuple[str, Dict[str, Any], QueryPayload, int]],
+        List[str],
+    ]:
         """
-        Exclui múltiplos registros de forma segura, validando identificadores e registrando histórico completo.
+        Organiza os deletes em:
+        - grouped_pks: deletes em lote por PK
+        - fallbacks: deletes que dependem de index/payload
+        - erros: avisos/erros coletados
         """
-        itens_afetados: List[Dict[str, Any]] = []
+        grouped_pks: DefaultDict[str, DefaultDict[str, List[Any]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        fallbacks: List[Tuple[str, Dict[str, Any], QueryPayload, int]] = []
         erros: List[str] = []
-        engine, connection = self.connection_manager.ensure_connection(db, current_user_id)
 
-        try:
-            start = datetime.now(timezone.utc)
-            with engine.begin() as conn:
-                for registro in registros:
-                    for tabela_name, dados in registro.rowDeletes.items():
-                        pk_coluna = dados.primaryKey
-                        pk_valor = dados.primaryKeyValue
-                        key_type = dados.keyType
+        for registro in registros:
+            payload = payload_query
 
-                        if not tabela_name or not pk_coluna:
-                            msg = f"Tabela ou coluna inválida no payload: {tabela_name or '?'}"
-                            erros.append(msg)
-                            continue
+            row_deletes = self._read_value(registro, "rowDeletes", {}) or {}
+            tables_to_delete = self._read_value(registro, "tableForDelete", []) or []
 
-                        if not pk_valor:
-                            msg = f"Registro ignorado (chave primária vazia) → {tabela_name}.{pk_coluna}"
-                            erros.append(msg)
-                            continue
+            if row_deletes:
+                for tabela_name, dados in row_deletes.items():
+                    row_delete = self._normalize_row_delete(dados)
 
-                        if not is_safe_identifier(tabela_name) or not is_safe_identifier(pk_coluna):
-                            msg = f"Nome inseguro detectado → tabela: {tabela_name}, coluna: {pk_coluna}"
-                            erros.append(msg)
+                    pk_coluna = row_delete["primaryKey"]
+                    pk_valor = row_delete["primaryKeyValue"]
+                    key_type = row_delete["keyType"]
+                    index = row_delete["index"]
+                    is_pk_or_unique = bool(row_delete["isPrimarykeyOrUnique"])
+
+                    if not self._is_safe_with_dots(tabela_name):
+                        erros.append(f"Tabela inválida/insegura: {tabela_name}")
+                        continue
+
+                    if pk_coluna and pk_valor is not None and is_pk_or_unique:
+                        if not self._is_safe_with_dots(pk_coluna):
+                            erros.append(f"PK inválida/insegura: {pk_coluna}")
                             continue
 
                         try:
-                            if key_type in ("integer", "int"):
-                                pk_valor = int(pk_valor)
-                            elif key_type in ("float", "double", "decimal"):
-                                pk_valor = float(pk_valor)
-                            else:
-                                pk_valor = str(pk_valor)
-                        except ValueError:
-                            erros.append(f"Valor inválido: {tabela_name}.{pk_coluna} = {pk_valor}")
-                            continue
+                            grouped_pks[tabela_name][pk_coluna].append(
+                                self._cast_value(pk_valor, key_type)
+                            )
+                        except Exception as exc:
+                            erros.append(
+                                f"Erro ao converter PK em {tabela_name}.{pk_coluna}: {exc}"
+                            )
+                        continue
 
-                        sql = f"DELETE FROM {tabela_name} WHERE {pk_coluna} = :pk_valor"
-                        result = conn.execute(text(sql), {"pk_valor": pk_valor})
-                        afetados = result.rowcount or 0
+                    if pk_coluna and pk_valor is not None and not is_pk_or_unique:
+                        erros.append(
+                            f"Campo {tabela_name}.{pk_coluna} não é PK/Unique. Usando fallback por index."
+                        )
 
-                        itens_afetados.append({
-                            "tabela": tabela_name,
-                            "chave": pk_coluna,
-                            "valor": pk_valor,
-                            "afetados": afetados
-                        })
+                    if payload is None or index is None:
+                        erros.append(
+                            f"Faltando index ou payload para fallback na tabela {tabela_name}"
+                        )
+                        continue
 
-            duration_ms = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+                    fallbacks.append((tabela_name, row_delete, payload, index))
 
-            # Histórico completo
-            historico = QueryHistoryCreate(
-                user_id=current_user_id,
-                db_connection_id=connection.id,
-                query="DELETE (batch)",
-                query_type=QueryType.DELETE,
-                executed_at=start,
-                updated_at=datetime.now(timezone.utc),
-                duration_ms=duration_ms,
-                result_preview=json.dumps(itens_afetados, default=str, ensure_ascii=False),
-                error_message=json.dumps(erros, ensure_ascii=False) if erros else None,
-                is_favorite=False,
-                tags="delete_batch",
-                app_source=app_source,
-                client_ip=client_ip,
-                executed_by=executed_by,
-                modified_by=modified_by or executed_by,
-                meta_info={
-                    "total_itens": len(itens_afetados),
-                    "tabelas_afetadas": [i["tabela"] for i in itens_afetados],
-                    "erros": erros,
-                    "timestamp": start.isoformat()
-                },
-            )
-            create_query_history(db=db, data=historico)
+            else:
+                for tabela_name in tables_to_delete:
+                    if not self._is_safe_with_dots(tabela_name):
+                        erros.append(f"Tabela inválida para deleção: {tabela_name}")
+                        continue
 
-            mensagem_final = f"{len(itens_afetados)} registro(s) excluído(s) com sucesso."
-            if erros:
-                mensagem_final += f" ⚠️ {len(erros)} aviso(s)/erro(s) foram registrados."
+                    if payload is None:
+                        erros.append(
+                            f"Sem payload para consultar na tabela {tabela_name}"
+                        )
+                        continue
 
-            return DeleteResponse(
-                success=True if itens_afetados else False,
-                mensagem=mensagem_final,
-                itens_afetados=itens_afetados,
-                executado_em=datetime.utcnow(),
-            )
+                    fallback_index = self._read_value(registro, "index")
+                    if fallback_index is None:
+                        erros.append(f"Sem index (posição) para a tabela {tabela_name}")
+                        continue
 
-        except SQLAlchemyError as sa_err:
-            error_msg = _lidar_com_erro_sql(sa_err)
-            log_message(f"❌ Erro SQL no DELETE: {error_msg}", "error")
-            raise Exception(f"Erro SQL: {error_msg}")
-        except Exception as e:
-            log_message(f"❌ Erro inesperado no DELETE: {e}", "error")
-            raise Exception(str(e))
+                    fallbacks.append(
+                        (
+                            tabela_name,
+                            {
+                                "primaryKey": None,
+                                "primaryKeyValue": None,
+                                "keyType": None,
+                                "index": fallback_index,
+                                "isPrimarykeyOrUnique": False,
+                            },
+                            payload,
+                            fallback_index,
+                        )
+                    )
+
+        return grouped_pks, fallbacks, erros
+
+    def _unique_preserve_order(self, values: List[str]) -> List[str]:
+        """
+        Remove duplicados preservando a ordem original.
+        """
+        seen = set()
+        result = []
+
+        for value in values:
+            if value not in seen:
+                seen.add(value)
+                result.append(value)
+
+        return result

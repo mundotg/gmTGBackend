@@ -1,32 +1,189 @@
-2026-02-24 19:04:52,184 - ERROR - Unclosed connection
-connection: <aioodbc.connection.Connection object at 0x00000169241AACF0>
-2026-02-24 19:04:52,469 - INFO - \u2705 Engine criada e testada com sucesso (sqlserver)
-2026-02-24 19:04:52,469 - INFO - \U0001f4be Backup iniciado: siga_intellectus_lubango [mssql]
-2026-02-24 19:04:52,477 - INFO - \U0001f4e4 Executando (backup mssql): sqlcmd -S localhost,1433 -U sa -P *** -Q BACKUP DATABASE [siga_intellectus_lubango] TO DISK='C:\Users\IT\Documents\Python\gestorBd backend\backups\siga_intellectus_lubango_backup_20260224_190452.bak' WITH FORMAT
-2026-02-24 19:04:52,571 - ERROR - \u274c Falha ao backup mssql: STDOUT: Msg 3201, Level 16, State 1, Server DESKTOP-4UGL8JL\FRANCEMY, Line 1
-Cannot open backup device 'C:\Users\IT\Documents\Python\gestorBd backend\backups\siga_intellectus_lubango_backup_20260224_190452.bak'. Operating system error 5(Acesso negado.).
-Msg 3013, Level 16, State 1, Server DESKTOP-4UGL8JL\FRANCEMY, Line 1
-BACKUP DATABASE is terminating abnormally.
-STDERR: 
-2026-02-24 19:04:52,572 - ERROR - \U0001f525 Erro no backup: Erro no banco de dados: Msg 3201, Level 16, State 1, Server DESKTOP-4UGL8JL\FRANCEMY, Line 1
-Cannot open backup device 'C:\Users\IT\Documents\Python\gestorBd backend\backups\siga_intellectus_lubango_backup_20260224_190452.bak'. Operating system error 5(Acesso negado.).
-Msg 3013, Level 16, State 1, Server DESKTOP-4UGL8JL\FRANCEMY, Line 1
-BACKUP DATABASE is terminating abnormally. 
+2026-03-12 22:05:47,488 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:05:47,492 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:05:47,527 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2026-03-12 22:05:47,554 - INFO - Reativando conexão para usuário 1
+2026-03-12 22:05:47,585 - INFO - \U0001f50d Buscando conexão com ID 1
+2026-03-12 22:05:47,621 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:05:47,626 - INFO - \U0001f50d Buscando conexão com ID 1
+2026-03-12 22:05:47,818 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:05:47,832 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2026-03-12 22:05:47,834 - INFO - \U0001f50c Criando engine para PostgreSQL em localhost:5432
+2026-03-12 22:05:48,613 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:05:48,656 - INFO - \U0001f504 Estrutura atualizada: sql_parts
+2026-03-12 22:05:48,661 - INFO - \U0001f504 Estrutura atualizada: sql_features
+2026-03-12 22:05:48,666 - INFO - \U0001f504 Estrutura atualizada: sql_implementation_info
+2026-03-12 22:05:48,670 - INFO - \U0001f504 Estrutura atualizada: sql_sizing
+2026-03-12 22:05:48,673 - INFO - \U0001f504 Estrutura atualizada: column_column_usage
+2026-03-12 22:05:48,677 - INFO - \U0001f504 Estrutura atualizada: information_schema_catalog_name
+2026-03-12 22:05:48,681 - INFO - \U0001f504 Estrutura atualizada: check_constraints
+2026-03-12 22:05:48,686 - INFO - \U0001f504 Estrutura atualizada: applicable_roles
+2026-03-12 22:05:48,691 - INFO - \U0001f504 Estrutura atualizada: administrable_role_authorizations
+2026-03-12 22:05:48,696 - INFO - \U0001f504 Estrutura atualizada: attributes
+2026-03-12 22:05:48,701 - INFO - \U0001f504 Estrutura atualizada: collations
+2026-03-12 22:05:48,706 - INFO - \U0001f504 Estrutura atualizada: character_sets
+2026-03-12 22:05:48,711 - INFO - \U0001f504 Estrutura atualizada: check_constraint_routine_usage
+2026-03-12 22:05:48,717 - INFO - \U0001f504 Estrutura atualizada: column_privileges
+2026-03-12 22:05:48,722 - INFO - \U0001f504 Estrutura atualizada: collation_character_set_applicability
+2026-03-12 22:05:48,727 - INFO - \U0001f504 Estrutura atualizada: column_domain_usage
+2026-03-12 22:05:48,732 - INFO - \U0001f504 Estrutura atualizada: column_udt_usage
+2026-03-12 22:05:48,737 - INFO - \U0001f504 Estrutura atualizada: columns
+2026-03-12 22:05:48,747 - INFO - \U0001f504 Estrutura atualizada: constraint_column_usage
+2026-03-12 22:05:48,751 - INFO - \U0001f504 Estrutura atualizada: constraint_table_usage
+2026-03-12 22:05:48,756 - INFO - \U0001f504 Estrutura atualizada: domain_constraints
+2026-03-12 22:05:48,762 - INFO - \U0001f504 Estrutura atualizada: routine_table_usage
+2026-03-12 22:05:48,767 - INFO - \U0001f504 Estrutura atualizada: domain_udt_usage
+2026-03-12 22:05:48,771 - INFO - \U0001f504 Estrutura atualizada: domains
+2026-03-12 22:05:48,776 - INFO - \U0001f504 Estrutura atualizada: enabled_roles
+2026-03-12 22:05:48,782 - INFO - \U0001f504 Estrutura atualizada: routines
+2026-03-12 22:05:48,787 - INFO - \U0001f504 Estrutura atualizada: key_column_usage
+2026-03-12 22:05:48,791 - INFO - \U0001f504 Estrutura atualizada: parameters
+2026-03-12 22:05:48,796 - INFO - \U0001f504 Estrutura atualizada: referential_constraints
+2026-03-12 22:05:48,800 - INFO - \U0001f504 Estrutura atualizada: schemata
+2026-03-12 22:05:48,805 - INFO - \U0001f504 Estrutura atualizada: role_column_grants
+2026-03-12 22:05:48,809 - INFO - \U0001f504 Estrutura atualizada: routine_column_usage
+2026-03-12 22:05:48,815 - INFO - \U0001f504 Estrutura atualizada: routine_privileges
+2026-03-12 22:05:48,819 - INFO - \U0001f504 Estrutura atualizada: sequences
+2026-03-12 22:05:48,824 - INFO - \U0001f504 Estrutura atualizada: role_routine_grants
+2026-03-12 22:05:48,829 - INFO - \U0001f504 Estrutura atualizada: routine_routine_usage
+2026-03-12 22:05:48,833 - INFO - \U0001f504 Estrutura atualizada: routine_sequence_usage
+2026-03-12 22:05:48,838 - INFO - \U0001f504 Estrutura atualizada: role_table_grants
+2026-03-12 22:05:48,843 - INFO - \U0001f504 Estrutura atualizada: table_privileges
+2026-03-12 22:05:48,848 - INFO - \U0001f504 Estrutura atualizada: table_constraints
+2026-03-12 22:05:48,853 - INFO - \U0001f504 Estrutura atualizada: transforms
+2026-03-12 22:05:48,857 - INFO - \U0001f504 Estrutura atualizada: tables
+2026-03-12 22:05:48,862 - INFO - \U0001f504 Estrutura atualizada: triggered_update_columns
+2026-03-12 22:05:48,867 - INFO - \U0001f504 Estrutura atualizada: triggers
+2026-03-12 22:05:48,871 - INFO - \U0001f504 Estrutura atualizada: udt_privileges
+2026-03-12 22:05:48,875 - INFO - \U0001f504 Estrutura atualizada: _pg_foreign_data_wrappers
+2026-03-12 22:05:48,883 - INFO - \U0001f504 Estrutura atualizada: role_udt_grants
+2026-03-12 22:05:48,888 - INFO - \U0001f504 Estrutura atualizada: usage_privileges
+2026-03-12 22:05:48,893 - INFO - \U0001f504 Estrutura atualizada: foreign_tables
+2026-03-12 22:05:48,899 - INFO - \U0001f504 Estrutura atualizada: role_usage_grants
+2026-03-12 22:05:48,903 - INFO - \U0001f504 Estrutura atualizada: foreign_data_wrapper_options
+2026-03-12 22:05:48,908 - INFO - \U0001f504 Estrutura atualizada: user_defined_types
+2026-03-12 22:05:48,913 - INFO - \U0001f504 Estrutura atualizada: view_column_usage
+2026-03-12 22:05:48,917 - INFO - \U0001f504 Estrutura atualizada: view_routine_usage
+2026-03-12 22:05:48,922 - INFO - \U0001f504 Estrutura atualizada: foreign_data_wrappers
+2026-03-12 22:05:48,927 - INFO - \U0001f504 Estrutura atualizada: view_table_usage
+2026-03-12 22:05:48,932 - INFO - \U0001f504 Estrutura atualizada: views
+2026-03-12 22:05:48,936 - INFO - \U0001f504 Estrutura atualizada: _pg_foreign_servers
+2026-03-12 22:05:48,940 - INFO - \U0001f504 Estrutura atualizada: data_type_privileges
+2026-03-12 22:05:48,944 - INFO - \U0001f504 Estrutura atualizada: element_types
+2026-03-12 22:05:48,949 - INFO - \U0001f504 Estrutura atualizada: _pg_foreign_table_columns
+2026-03-12 22:05:48,953 - INFO - \U0001f504 Estrutura atualizada: _pg_user_mappings
+2026-03-12 22:05:48,958 - INFO - \U0001f504 Estrutura atualizada: column_options
+2026-03-12 22:05:48,962 - INFO - \U0001f504 Estrutura atualizada: foreign_server_options
+2026-03-12 22:05:48,967 - INFO - \U0001f504 Estrutura atualizada: foreign_servers
+2026-03-12 22:05:48,971 - INFO - \U0001f504 Estrutura atualizada: _pg_foreign_tables
+2026-03-12 22:05:48,975 - INFO - \U0001f504 Estrutura atualizada: foreign_table_options
+2026-03-12 22:05:48,981 - INFO - \U0001f504 Estrutura atualizada: user_mapping_options
+2026-03-12 22:05:48,986 - INFO - \U0001f504 Estrutura atualizada: user_mappings
+2026-03-12 22:05:48,991 - INFO - \U0001f504 Estrutura atualizada: alembic_version
+2026-03-12 22:05:48,995 - INFO - \U0001f504 Estrutura atualizada: permissions
+2026-03-12 22:05:49,000 - INFO - \U0001f504 Estrutura atualizada: roles_permissions
+2026-03-12 22:05:49,003 - INFO - \U0001f504 Estrutura atualizada: audit_logs
+2026-03-12 22:05:49,007 - INFO - \U0001f504 Estrutura atualizada: roles
+2026-03-12 22:05:49,012 - INFO - \U0001f504 Estrutura atualizada: projects
+2026-03-12 22:05:49,016 - INFO - \U0001f504 Estrutura atualizada: typeprojecto
+2026-03-12 22:05:49,020 - INFO - \U0001f504 Estrutura atualizada: project_team_association
+2026-03-12 22:05:49,025 - INFO - \U0001f504 Estrutura atualizada: sprints
+2026-03-12 22:05:49,030 - INFO - \U0001f504 Estrutura atualizada: task_stats
+2026-03-12 22:05:49,035 - INFO - \U0001f504 Estrutura atualizada: tasks
+2026-03-12 22:05:49,039 - INFO - \U0001f504 Estrutura atualizada: users
+2026-03-12 22:05:49,043 - INFO - \U0001f504 Estrutura atualizada: refresh_tokens
+2026-03-12 22:05:49,048 - INFO - \U0001f504 Estrutura atualizada: settings
+2026-03-12 22:05:49,052 - INFO - \U0001f504 Estrutura atualizada: db_connections
+2026-03-12 22:05:49,056 - INFO - \U0001f504 Estrutura atualizada: active_connection
+2026-03-12 22:05:49,060 - INFO - \U0001f504 Estrutura atualizada: connection_logs
+2026-03-12 22:05:49,064 - INFO - \U0001f504 Estrutura atualizada: db_health_checks
+2026-03-12 22:05:49,067 - INFO - \U0001f504 Estrutura atualizada: db_statistics
+2026-03-12 22:05:49,072 - INFO - \U0001f504 Estrutura atualizada: db_structures
+2026-03-12 22:05:49,076 - INFO - \U0001f504 Estrutura atualizada: table_row_count_cache
+2026-03-12 22:05:49,081 - INFO - \U0001f504 Estrutura atualizada: query_history
+2026-03-12 22:05:49,085 - INFO - \U0001f504 Estrutura atualizada: db_enum_fields
+2026-03-12 22:05:49,089 - INFO - \U0001f504 Estrutura atualizada: cargos
+2026-03-12 22:05:49,093 - INFO - \U0001f504 Estrutura atualizada: db_fields
+2026-03-12 22:05:49,098 - INFO - \U0001f504 Estrutura atualizada: empresas
+2026-03-12 22:05:49,107 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:09:42,420 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:09:42,426 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:09:42,430 - INFO - \U0001f50d Buscando conexão com ID 1
+2026-03-12 22:09:42,734 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:09:42,745 - INFO - \U0001f50d Buscando conexão com ID 1
+2026-03-12 22:09:42,754 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:09:42,890 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:09:42,924 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:14:04,302 - INFO - \u2705 Engine criada e testada com sucesso (postgresql)
+2026-03-12 22:14:13,301 - INFO - \u2705 Engine criada e testada com sucesso (postgresql)
+2026-03-12 22:14:19,584 - INFO - \u2705 Engine criada e testada com sucesso (postgresql)
+2026-03-12 22:14:23,778 - INFO - \u2705 Engine criada e testada com sucesso (postgresql)
+2026-03-12 22:14:49,307 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
+2026-03-12 22:14:49,307 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2026-03-12 22:14:49,406 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
+2026-03-12 22:14:49,528 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:14:49,542 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
+2026-03-12 22:14:49,654 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:14:54,829 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:14:54,850 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-03-12 22:15:32,198 - INFO - query_payload:baseTable='public.query_history' joins={} table_list=['public.query_history'] select=[] aliaisTables={'public.query_history.query': 'public.query_history.query', 'public.query_history.error_message': 'public.query_history.error_message', 'public.query_history.client_ip': 'public.query_history.client_ip', 'public.query_history.updated_at': 'public.query_history.updated_at', 'public.query_history.db_connection_id': 'public.query_history.db_connection_id', 'public.query_history.result_preview': 'public.query_history.result_preview', 'public.query_history.app_source': 'public.query_history.app_source', 'public.query_history.executed_at': 'public.query_history.executed_at', 'public.query_history.id': 'public.query_history.id', 'public.query_history.query_type': 'public.query_history.query_type', 'public.query_history.is_favorite': 'public.query_history.is_favorite', 'public.query_history.executed_by': 'public.query_history.executed_by', 'public.query_history.modified_by': 'public.query_history.modified_by', 'public.query_history.user_id': 'public.query_history.user_id', 'public.query_history.duration_ms': 'public.query_history.duration_ms', 'public.query_history.tags': 'public.query_history.tags', 'public.query_history.meta_info': 'public.query_history.meta_info'} where=[] orderBy=[] limit=100 distinct=DistinctList(useDistinct=False, distinct_columns=[]) offset=None isCountQuery=False 
+2026-03-12 22:15:32,355 - INFO - \u2705 Engine criada e testada com sucesso (postgresql)
+2026-03-12 22:15:32,403 - INFO - \u2705 Consulta criada (ID=594, UserID=1, ConnID=1)
+2026-03-12 22:15:32,404 - INFO - \u2705 Histórico salvo: User=1, Conn=1, Duração=14ms, Tabelas=['public.query_history'], Linhas=100, Status=success
+2026-03-12 22:15:40,851 - INFO - \U0001f4e5 Processando relatório de query (formato: pdf)...
+2026-03-12 22:15:40,852 - INFO - \U0001f4ca Relatório construído com 26 elementos
+2026-03-12 22:15:41,449 - ERROR - \u274c Erro ao gerar relatório: Flowable <Table@0x21EA6DABBB0 20 rows x 11 cols(tallest row 14624)> with cell(0,0) containing
+'<Paragraph at 0x21ea803cfd0>query_history.query (public)'(623.6220472440945 x 28962), tallest cell 14624.0 points,  too large on page 4 in frame 'normal'(469.88976377952764 x 688.1574803149608*) of template 'main'
 Traceback (most recent call last):
-  File "C:\Users\IT\Documents\Python\gestorBd backend\importantConfig\db_backup_restore.py", line 377, in backup_database
-    await _run_command_async(cmd, env, "backup mssql")
-  File "C:\Users\IT\Documents\Python\gestorBd backend\importantConfig\db_backup_restore.py", line 184, in _run_command_async
-    raise RuntimeError(f"Erro no banco de dados: {out} {err}")
-RuntimeError: Erro no banco de dados: Msg 3201, Level 16, State 1, Server DESKTOP-4UGL8JL\FRANCEMY, Line 1
-Cannot open backup device 'C:\Users\IT\Documents\Python\gestorBd backend\backups\siga_intellectus_lubango_backup_20260224_190452.bak'. Operating system error 5(Acesso negado.).
-Msg 3013, Level 16, State 1, Server DESKTOP-4UGL8JL\FRANCEMY, Line 1
-BACKUP DATABASE is terminating abnormally. 
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\gerar_relatorio_routes.py", line 208, in gerar_relatorio_query_com_cache
+    _gerar_query_pdf(query_result, user_id)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\gerar_relatorio_routes.py", line 234, in _gerar_query_pdf
+    generator.generate_report(file_path, estrutura_pdf)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\relatorio\gerarpdf.py", line 392, in generate_report
+    doc.build(self.elements)
+    ~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\reportlab\platypus\doctemplate.py", line 1083, in build
+    self.handle_flowable(flowables)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\reportlab\platypus\doctemplate.py", line 962, in handle_flowable
+    raise LayoutError(ident)
+reportlab.platypus.doctemplate.LayoutError: Flowable <Table@0x21EA6DABBB0 20 rows x 11 cols(tallest row 14624)> with cell(0,0) containing
+'<Paragraph at 0x21ea803cfd0>query_history.query (public)'(623.6220472440945 x 28962), tallest cell 14624.0 points,  too large on page 4 in frame 'normal'(469.88976377952764 x 688.1574803149608*) of template 'main'
 
-2026-02-24 19:04:52,572 - ERROR - [User 1] \u274c Falha crítica no backup: Erro no banco de dados: Msg 3201, Level 16, State 1, Server DESKTOP-4UGL8JL\FRANCEMY, Line 1
-Cannot open backup device 'C:\Users\IT\Documents\Python\gestorBd backend\backups\siga_intellectus_lubango_backup_20260224_190452.bak'. Operating system error 5(Acesso negado.).
-Msg 3013, Level 16, State 1, Server DESKTOP-4UGL8JL\FRANCEMY, Line 1
-BACKUP DATABASE is terminating abnormally. 
-2026-02-24 19:17:57,565 - ERROR - Exception terminating connection <AdaptedConnection <asyncpg.connection.Connection object at 0x000001692418D6D0>>
+2026-03-12 22:15:41,453 - ERROR - \U0001f4a5 Erro inesperado: Falha na geração do relatório: Flowable <Table@0x21EA6DABBB0 20 rows x 11 cols(tallest row 14624)> with cell(0,0) containing
+'<Paragraph at 0x21ea803cfd0>query_history.query (public)'(623.6220472440945 x 28962), tallest cell 14624.0 points,  too large on page 4 in frame 'normal'(469.88976377952764 x 688.1574803149608*) of template 'main'
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\gerar_relatorio_routes.py", line 208, in gerar_relatorio_query_com_cache
+    _gerar_query_pdf(query_result, user_id)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\gerar_relatorio_routes.py", line 234, in _gerar_query_pdf
+    generator.generate_report(file_path, estrutura_pdf)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\relatorio\gerarpdf.py", line 392, in generate_report
+    doc.build(self.elements)
+    ~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\reportlab\platypus\doctemplate.py", line 1083, in build
+    self.handle_flowable(flowables)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\reportlab\platypus\doctemplate.py", line 962, in handle_flowable
+    raise LayoutError(ident)
+reportlab.platypus.doctemplate.LayoutError: Flowable <Table@0x21EA6DABBB0 20 rows x 11 cols(tallest row 14624)> with cell(0,0) containing
+'<Paragraph at 0x21ea803cfd0>query_history.query (public)'(623.6220472440945 x 28962), tallest cell 14624.0 points,  too large on page 4 in frame 'normal'(469.88976377952764 x 688.1574803149608*) of template 'main'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\gerar_relatorio_routes.py", line 327, in _processar_requisicao_relatorio
+    file_path = gerar_relatorio_fn(dados_relatorio, user_id, db, parametros.formato)
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\config\cache_manager.py", line 466, in wrapper
+    result = func(*args, **kwargs)
+  File "C:\Users\IT\Documents\Python\gestorBd backend\app\routes\gerar_relatorio_routes.py", line 214, in gerar_relatorio_query_com_cache
+    raise RuntimeError(f"Falha na geração do relatório: {e}")
+RuntimeError: Falha na geração do relatório: Flowable <Table@0x21EA6DABBB0 20 rows x 11 cols(tallest row 14624)> with cell(0,0) containing
+'<Paragraph at 0x21ea803cfd0>query_history.query (public)'(623.6220472440945 x 28962), tallest cell 14624.0 points,  too large on page 4 in frame 'normal'(469.88976377952764 x 688.1574803149608*) of template 'main'
+
+2026-03-12 22:21:19,204 - ERROR - Exception terminating connection <AdaptedConnection <asyncpg.connection.Connection object at 0x0000021EA6ED4140>>
 Traceback (most recent call last):
   File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 374, in _close_connection
     self._dialect.do_terminate(connection)
@@ -56,98 +213,68 @@ Traceback (most recent call last):
   File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 556, in _check_closed
     raise RuntimeError('Event loop is closed')
 RuntimeError: Event loop is closed
-2026-02-24 19:17:57,577 - ERROR - The garbage collector is trying to clean up non-checked-in connection <AdaptedConnection <asyncpg.connection.Connection object at 0x000001692418D6D0>>, which will be terminated.  Please ensure that SQLAlchemy pooled connections are returned to the pool explicitly, either by calling ``close()`` or by using appropriate context managers to manage their lifecycle.
-2026-02-24 19:17:57,578 - ERROR - Exception terminating connection <AdaptedConnection <asyncpg.connection.Connection object at 0x0000016924FF0B90>>
-Traceback (most recent call last):
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 374, in _close_connection
-    self._dialect.do_terminate(connection)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 1130, in do_terminate
-    dbapi_connection.terminate()
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 922, in terminate
-    self._connection.terminate()
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\asyncpg\connection.py", line 1515, in terminate
-    self._abort()
-    ~~~~~~~~~~~^^
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\asyncpg\connection.py", line 1567, in _abort
-    self._protocol.abort()
-    ~~~~~~~~~~~~~~~~~~~~^^
-  File "asyncpg\\protocol\\protocol.pyx", line 608, in asyncpg.protocol.protocol.BaseProtocol.abort
-  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\selector_events.py", line 830, in abort
-    self._force_close(None)
-    ~~~~~~~~~~~~~~~~~^^^^^^
-  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\selector_events.py", line 902, in _force_close
-    self._loop.call_soon(self._call_connection_lost, exc)
-    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 833, in call_soon
-    self._check_closed()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 556, in _check_closed
-    raise RuntimeError('Event loop is closed')
-RuntimeError: Event loop is closed
-2026-02-24 19:17:57,580 - ERROR - The garbage collector is trying to clean up non-checked-in connection <AdaptedConnection <asyncpg.connection.Connection object at 0x0000016924FF0B90>>, which will be terminated.  Please ensure that SQLAlchemy pooled connections are returned to the pool explicitly, either by calling ``close()`` or by using appropriate context managers to manage their lifecycle.
-2026-02-24 19:17:57,582 - ERROR - Unclosed connection
-connection: <aioodbc.connection.Connection object at 0x0000016924743110>
-2026-02-24 19:17:59,164 - INFO - Sistema de cache inicializado: C:\Users\IT\Documents\Python\gestorBd backend\app\config\cache
-2026-02-24 19:17:59,164 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\IT\\Documents\\Python\\gestorBd backend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-02-24 19:17:59,642 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-02-24 19:18:13,092 - INFO - [LOG PATH] Sistema: windows, Ambiente: Azure App Service, Hostname: DESKTOP-4UGL8JL, IP: 172.16.66.89, Caminho: C:\logs\logs.txt
-2026-02-24 19:18:13,092 - INFO - \U0001f4c4 Log file: C:\logs\logs.txt
-2026-02-24 19:18:13,092 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
-2026-02-24 19:18:13,092 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-02-24 19:18:13,235 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-02-24 19:18:13,242 - INFO - \U0001f4bc Cargos sincronizados
-2026-02-24 19:18:13,312 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-02-24 19:18:13,542 - INFO - \U0001f464 Usuário admin já existente
-2026-02-24 19:18:13,556 - INFO - \U0001f331 Seed executado com sucesso!
-2026-02-24 19:18:13,557 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-02-24 19:18:13,557 - INFO - Nenhum cache expirado encontrado.
-2026-02-24 19:18:13,557 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-02-24 19:18:13,557 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-02-24 19:18:13.557921
-2026-02-24 19:18:24,581 - INFO - \U0001f513 Permissões Windows ajustadas para: C:\Users\IT\Documents\Python\gestorBd backend\backups
-2026-02-24 19:18:25,225 - INFO - \u2705 Engine criada e testada com sucesso (sqlserver)
-2026-02-24 19:18:25,225 - INFO - \U0001f4be Backup iniciado: siga_intellectus_lubango [mssql]
-2026-02-24 19:18:25,232 - INFO - \U0001f4e4 Executando (backup mssql): sqlcmd -S localhost,1433 -U sa -P *** -Q BACKUP DATABASE [siga_intellectus_lubango] TO DISK='C:\Users\IT\Documents\Python\gestorBd backend\backups\siga_intellectus_lubango_backup_20260224_191825.bak' WITH FORMAT
-2026-02-24 19:18:31,894 - INFO - \u2705 Backup mssql concluído em 6.66s
-2026-02-24 19:19:24,503 - INFO - \U0001f4e6 Comprimido: siga_intellectus_lubango_backup_20260224_191825.bak.gz
-2026-02-24 19:39:51,585 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
-2026-02-24 19:39:51,606 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
-2026-02-24 19:39:51,650 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
-2026-02-24 19:39:51,796 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-02-24 19:39:51,908 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
-2026-02-24 19:39:51,966 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-02-24 19:43:12,754 - ERROR - Exception terminating connection <AdaptedConnection <asyncpg.connection.Connection object at 0x00000251BAC8D9A0>>
-Traceback (most recent call last):
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 374, in _close_connection
-    self._dialect.do_terminate(connection)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 1130, in do_terminate
-    dbapi_connection.terminate()
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 922, in terminate
-    self._connection.terminate()
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\asyncpg\connection.py", line 1515, in terminate
-    self._abort()
-    ~~~~~~~~~~~^^
-  File "C:\Users\IT\Documents\Python\gestorBd backend\venv\Lib\site-packages\asyncpg\connection.py", line 1567, in _abort
-    self._protocol.abort()
-    ~~~~~~~~~~~~~~~~~~~~^^
-  File "asyncpg\\protocol\\protocol.pyx", line 608, in asyncpg.protocol.protocol.BaseProtocol.abort
-  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\selector_events.py", line 830, in abort
-    self._force_close(None)
-    ~~~~~~~~~~~~~~~~~^^^^^^
-  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\selector_events.py", line 902, in _force_close
-    self._loop.call_soon(self._call_connection_lost, exc)
-    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 833, in call_soon
-    self._check_closed()
-    ~~~~~~~~~~~~~~~~~~^^
-  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\asyncio\base_events.py", line 556, in _check_closed
-    raise RuntimeError('Event loop is closed')
-RuntimeError: Event loop is closed
-2026-02-24 19:43:12,766 - ERROR - The garbage collector is trying to clean up non-checked-in connection <AdaptedConnection <asyncpg.connection.Connection object at 0x00000251BAC8D9A0>>, which will be terminated.  Please ensure that SQLAlchemy pooled connections are returned to the pool explicitly, either by calling ``close()`` or by using appropriate context managers to manage their lifecycle.
-2026-02-24 19:43:12,775 - ERROR - Unclosed connection
-connection: <aioodbc.connection.Connection object at 0x00000251BACAABA0>
+2026-03-12 22:21:19,233 - ERROR - The garbage collector is trying to clean up non-checked-in connection <AdaptedConnection <asyncpg.connection.Connection object at 0x0000021EA6ED4140>>, which will be terminated.  Please ensure that SQLAlchemy pooled connections are returned to the pool explicitly, either by calling ``close()`` or by using appropriate context managers to manage their lifecycle.
+2026-03-12 22:21:21,654 - INFO - Sistema de cache inicializado: C:\Users\IT\Documents\Python\gestorBd backend\app\config\cache
+2026-03-12 22:21:21,654 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\IT\\Documents\\Python\\gestorBd backend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-03-12 22:21:22,520 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-03-12 22:21:37,773 - INFO - [LOG PATH] Sistema: windows, Ambiente: Azure App Service, Hostname: DESKTOP-4UGL8JL, IP: 10.43.127.68, Caminho: C:\logs\logs.txt
+2026-03-12 22:21:37,773 - INFO - \U0001f4c4 Log file: C:\logs\logs.txt
+2026-03-12 22:21:37,773 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2026-03-12 22:21:37,774 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-03-12 22:21:38,200 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-03-12 22:21:38,212 - INFO - \U0001f4bc Cargos sincronizados
+2026-03-12 22:21:38,314 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-03-12 22:21:38,653 - INFO - \U0001f464 Usuário admin já existente
+2026-03-12 22:21:38,683 - INFO - \U0001f331 Seed executado com sucesso!
+2026-03-12 22:21:38,685 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2026-03-12 22:21:38,701 - INFO - \U0001f9f9 Cache expirado removido: 52d9f14feeef1b39c6c384c13bcd5781d5947cda19fe296ac12fa2b841799564.pkl.gz
+2026-03-12 22:21:38,702 - INFO - \U0001f9f9 Cache expirado removido: 74d54f0816bcc44713aa2fe8bbe0e0abea03a77202aa72ecde93d0d4e7c94f1a.pkl.gz
+2026-03-12 22:21:38,705 - INFO - \U0001f9f9 Cache expirado removido: 76fbaeab060ecd1d24f2402992804a1d7c8f764450152b354157ee46e3de708d.pkl.gz
+2026-03-12 22:21:38,707 - INFO - \U0001f9f9 Cache expirado removido: 79f4b3dfaface89f28e27ec3487af90ff70606d8db68751882e00b45bf79c0fb.pkl.gz
+2026-03-12 22:21:38,709 - INFO - \U0001f9f9 Cache expirado removido: 88de810699919ad22cf7d10258116beb68dfbf835fbd385d2e43d2858f8de707.pkl.gz
+2026-03-12 22:21:38,711 - INFO - \U0001f9f9 Cache expirado removido: cb82cbdf6ace4574283b78845af08bb56ea49d749b731ad8983fe334580e5949.pkl.gz
+2026-03-12 22:21:38,712 - INFO - \U0001f9f9 Cache expirado removido: dc8a2ad86cda0978b8fff17d9bdf7e1fbdb9fea0cf2aea5f306780d954c368c0.pkl.gz
+2026-03-12 22:21:38,714 - INFO - \U0001f9f9 Cache expirado removido: e37ec6269bb0e09cc8076cf9f212313aeaa80b5f1193a82d9c9a7da4a8d57ebd.pkl.gz
+2026-03-12 22:21:38,714 - INFO - \U0001f9fe Total de 8/11 caches expirados removidos.
+2026-03-12 22:21:38,715 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
+2026-03-12 22:21:38,715 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-03-12 22:21:38.715316
+2026-03-13 10:03:48,698 - INFO - Sistema de cache inicializado: C:\Users\IT\Documents\Python\gestorBd backend\app\config\cache
+2026-03-13 10:03:48,699 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\IT\\Documents\\Python\\gestorBd backend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-03-13 10:03:52,079 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-03-13 10:04:49,368 - INFO - [LOG PATH] Sistema: windows, Ambiente: Azure App Service, Hostname: DESKTOP-4UGL8JL, IP: 172.16.66.89, Caminho: C:\logs\logs.txt
+2026-03-13 10:04:49,368 - INFO - \U0001f4c4 Log file: C:\logs\logs.txt
+2026-03-13 10:04:49,369 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2026-03-13 10:04:49,369 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-03-13 10:04:50,056 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-03-13 10:04:50,070 - INFO - \U0001f4bc Cargos sincronizados
+2026-03-13 10:04:50,220 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-03-13 10:04:50,503 - INFO - \U0001f464 Usuário admin já existente
+2026-03-13 10:04:50,560 - INFO - \U0001f331 Seed executado com sucesso!
+2026-03-13 10:04:50,561 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2026-03-13 10:04:50,565 - INFO - \U0001f9f9 Cache expirado removido: 1f0ba3f903ca8100392920bd0a59120e14f63da24026eaaac75d2ad2bfda25c8.pkl.gz
+2026-03-13 10:04:50,570 - INFO - \U0001f9f9 Cache expirado removido: 9e39193619605090f11d8e7f71c675a714aa4b7e076800d4bc00ce9518ff57e8.pkl.gz
+2026-03-13 10:04:50,572 - INFO - \U0001f9f9 Cache expirado removido: e7b99007b67022a5a58f352778ac1323f1d317e5136822684c63df40f2593ed8.pkl.gz
+2026-03-13 10:04:50,572 - INFO - \U0001f9fe Total de 3/3 caches expirados removidos.
+2026-03-13 10:04:50,572 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
+2026-03-13 10:04:50,572 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-03-13 10:04:50.572512
+2026-03-13 10:05:45,763 - ERROR - Nenhum engine ativo para o usuário ID 1 em EngineManager dependecia
+2026-03-13 10:05:45,768 - INFO - \U0001f50c Criando engine para PostgreSQL em localhost:5432
+2026-03-13 11:33:15,405 - INFO - Sistema de cache inicializado: C:\Users\IT\Documents\Python\gestorBd backend\app\config\cache
+2026-03-13 11:33:15,406 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\IT\\Documents\\Python\\gestorBd backend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-03-13 11:33:16,296 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-03-13 11:33:29,280 - INFO - [LOG PATH] Sistema: windows, Ambiente: Azure App Service, Hostname: DESKTOP-4UGL8JL, IP: 172.16.66.89, Caminho: C:\logs\logs.txt
+2026-03-13 11:33:29,280 - INFO - \U0001f4c4 Log file: C:\logs\logs.txt
+2026-03-13 11:33:29,280 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2026-03-13 11:33:29,280 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-03-13 11:33:29,649 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-03-13 11:33:29,671 - INFO - \U0001f4bc Cargos sincronizados
+2026-03-13 11:33:29,828 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-03-13 11:33:30,056 - INFO - \U0001f464 Usuário admin já existente
+2026-03-13 11:33:30,084 - INFO - \U0001f331 Seed executado com sucesso!
+2026-03-13 11:33:30,085 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2026-03-13 11:33:30,085 - INFO - Nenhum cache expirado encontrado.
+2026-03-13 11:33:30,085 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
+2026-03-13 11:33:30,085 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-03-13 11:33:30.085936
+2026-03-13 12:33:30,090 - INFO - Nenhum cache expirado encontrado.
+2026-03-13 12:33:30,092 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
+2026-03-13 12:33:30,092 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-03-13 12:33:30.092891

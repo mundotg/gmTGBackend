@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import traceback
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, cast
 
 from sqlalchemy import Engine, inspect, text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-
-from app.config.dependencies import EngineManager, get_session_by_connection_id
-from app.cruds.dbstatistics_crud import (
-    create_statistics,
-    get_cached_row_count_all,
-    get_statistics_by_connection,
-    update_statistics,
+from sqlalchemy.exc import (
+    SQLAlchemyError
 )
+
+from app.config.dependencies import get_session_by_connection_id
+from app.config.engine_manager_cache import EngineManager
+from app.cruds.dbstatistics_crud import create_statistics, get_cached_row_count_all, get_statistics_by_connection, update_statistics
 from app.cruds.dbstructure_crud import (
     create_db_structure,
     get_db_structures,
@@ -21,15 +19,11 @@ from app.cruds.dbstructure_crud import (
     update_db_structure,
 )
 from app.models.dbstructure_models import DBField
-from app.schemas.dbstructure_schema import DBStructureOut
 from app.schemas.dbstatistics_schema import DBStatisticsDict
-from app.services.field_info import (
-    get_fields_of_table,
-    get_fields_of_tables_bulk,
-    sincronizar_metadados_da_tabela_simple,
-)
+from app.schemas.dbstructure_schema import DBStructureOut
+from app.services.field_info import get_fields_of_table, get_fields_of_tables_bulk, sincronizar_metadados_da_tabela_simple
+from app.ultils.Database_error_logger import _lidar_com_erro_sql
 from app.ultils.ativar_engine import ConnectionManager
-from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
 
@@ -38,45 +32,56 @@ from app.ultils.logger import log_message
 # ============================================================
 
 def _get_engine(connection_id: int, user_id: int, db: Session) -> Engine:
-    engine = EngineManager.get(user_id)
-    if engine:
+    """
+    Obtém o engine ativo ou recria a sessão a partir da conexão.
+    """
+    engine: Optional[Engine] = EngineManager.get(user_id)
+
+    if engine is not None:
         return engine
+
     return get_session_by_connection_id(connection_id, db)
 
 
 def _get_default_schema(engine: Engine, inspector: Any) -> Optional[str]:
-    dialect_name = engine.dialect.name.lower()
+    dialect = engine.dialect.name.lower()
 
-    if dialect_name == "postgresql":
+    if dialect == "postgresql":
         return "public"
-    if dialect_name in ("mssql", "sqlserver"):
+
+    if dialect in ("mssql", "sqlserver"):
         return "dbo"
-    if dialect_name in ("mysql", "mariadb"):
+
+    if dialect in ("mysql", "mariadb"):
         return engine.url.database
-    if dialect_name == "oracle":
+
+    if dialect == "oracle":
         return engine.url.username.upper() if engine.url.username else None
-    if dialect_name == "sqlite":
+
+    if dialect == "sqlite":
         return None
 
     return getattr(inspector, "default_schema_name", None)
 
 
 def _get_schemas(engine: Engine, inspector: Any) -> list[Optional[str]]:
-    dialect_name = engine.dialect.name.lower()
+    dialect = engine.dialect.name.lower()
 
-    if dialect_name == "sqlite":
+    if dialect == "sqlite":
         return [None]
 
     try:
-        schemas = inspector.get_schema_names()
+        schemas: list[str] = inspector.get_schema_names()
+
         if not schemas:
-            raise ValueError("O banco não retornou schemas.")
-        return schemas
+            raise ValueError("O banco não retornou schemas")
+
+        return cast(list[Optional[str]], schemas)
+
     except Exception as e:
         default_schema = _get_default_schema(engine, inspector)
         log_message(
-            f"⚠️ Erro ao obter schemas: {e}. "
-            f"Aplicando schema padrão '{default_schema}' para o dialeto '{dialect_name}'.",
+            f"Erro ao obter schemas: {e}. Usando schema padrão '{default_schema}' para '{dialect}'",
             "warning",
         )
         return [default_schema]
@@ -86,55 +91,61 @@ def _list_tables_and_views(
     engine: Engine,
     inspector: Any,
 ) -> list[tuple[str, Optional[str], str]]:
-    """
-    Retorna lista no formato:
-    [
-        (nome_objeto, schema, "table"),
-        (nome_objeto, schema, "view"),
-    ]
-    """
+
     results: list[tuple[str, Optional[str], str]] = []
     seen: set[tuple[str, Optional[str], str]] = set()
+
+    dialect = engine.dialect.name.lower()
+
+    def _add_items(names: list[str], schema: Optional[str], kind: str):
+
+        for name in names:
+
+            item = (name, schema, kind)
+
+            if item not in seen:
+                seen.add(item)
+                results.append(item)
+
+    if dialect == "sqlite":
+
+        try:
+            _add_items(inspector.get_table_names(), None, "table")
+
+        except Exception as e:
+            log_message(f"Erro ao obter tabelas SQLite: {e}", "warning")
+
+        try:
+            _add_items(inspector.get_view_names(), None, "view")
+
+        except Exception as e:
+            log_message(f"Erro ao obter views SQLite: {e}", "warning")
+
+        return results
 
     schemas = _get_schemas(engine, inspector)
 
     for schema in schemas:
-        try:
-            tables = inspector.get_table_names(schema=schema)
-        except Exception as e:
-            log_message(
-                f"⚠️ Erro ao obter tabelas do schema '{schema}': {e}",
-                "warning",
-            )
-            tables = []
-
-        for table in tables:
-            item = (table, schema, "table")
-            if item not in seen:
-                seen.add(item)
-                results.append(item)
 
         try:
-            views = inspector.get_view_names(schema=schema)
+            _add_items(inspector.get_table_names(schema=schema), schema, "table")
+
         except Exception as e:
             log_message(
-                f"⚠️ Erro ao obter views do schema '{schema}': {e}",
+                f"Erro ao obter tabelas schema '{schema}': {e}",
                 "warning",
             )
-            views = []
 
-        for view in views:
-            item = (view, schema, "view")
-            if item not in seen:
-                seen.add(item)
-                results.append(item)
+        try:
+            _add_items(inspector.get_view_names(schema=schema), schema, "view")
+
+        except Exception as e:
+            log_message(
+                f"Erro ao obter views schema '{schema}': {e}",
+                "warning",
+            )
 
     return results
-
-
-# ============================================================
-# Estruturas
-# ============================================================
 
 def verificar_ou_atualizar_estrutura(
     db: Session,
@@ -142,85 +153,117 @@ def verificar_ou_atualizar_estrutura(
     table_name: str,
     schema_name: Optional[str] = None,
 ) -> Optional[DBStructureOut]:
-    """
-    Verifica se a estrutura da tabela já existe:
-    - se não existir, cria
-    - se existir, atualiza campos básicos se necessário
-    """
+
     try:
-        existing_structure = get_structure_by_id_and_name(db, connection_id, table_name)
+        if connection_id <= 0:
+            raise ValueError("connection_id inválido")
 
-        if not existing_structure:
-            new_structure = create_db_structure(
-                db=db,
-                db_connection_id=connection_id,
-                table_name=table_name,
-                schema_name=schema_name,
-                description="",
-            )
-            log_message(f"🆕 Estrutura registrada: {table_name}", "info")
-            return DBStructureOut.model_validate(new_structure)
+        if not table_name.strip():
+            raise ValueError("table_name inválido")
 
-        update_needed = False
-
-        if existing_structure.schema_name != schema_name:
-            existing_structure.schema_name = schema_name
-            update_needed = True
-
-        if not existing_structure.description:
-            existing_structure.description = ""
-            update_needed = True
-
-        if update_needed:
-            updated_structure = update_db_structure(db, existing_structure)
-            log_message(f"🔄 Estrutura atualizada: {table_name}", "info")
-            return DBStructureOut.model_validate(updated_structure)
-
-        return DBStructureOut.model_validate(existing_structure)
-
-    except Exception as e:
+        structure = create_db_structure(
+            db=db,
+            db_connection_id=connection_id,
+            table_name=table_name,
+            schema_name=schema_name,
+            description="",
+        )
         log_message(
-            f"⚠️ Erro ao gerenciar estrutura da tabela '{table_name}': {e}",
+            f"Estrutura registrada | connection_id={connection_id} | table={table_name} | schema={schema_name}",
+            "info",
+        )
+        return DBStructureOut.model_validate(structure)
+
+    except ValueError as e:
+        log_message(
+            f"Erro validação estrutura | connection_id={connection_id} | table={table_name} | erro={e}",
             "warning",
         )
         return None
+    except Exception as e:
+        log_message(
+            f"Erro estrutura | connection_id={connection_id} | table={table_name} | erro={e} | trace={traceback.format_exc()}",
+            "warning",
+        )
+        return None
+# ============================================================
+# Tabelas
+# ============================================================
 
-
-def get_table_names(connection_id: int, id_user: int, db: Session) -> list[str]:
-    """
-    Retorna todos os nomes de tabelas e views da conexão.
-    Atualiza estruturas no banco local quando necessário.
-    """
-    structures = None  # get_db_structures(db, connection_id)
-    if structures:
-        return sorted([s.table_name for s in structures], key=str.lower)
+def get_table_names(
+    connection_id: int,
+    id_user: int,
+    db: Session,
+) -> list[str]:
 
     try:
+
+        if connection_id <= 0:
+            raise ValueError("connection_id inválido")
+
+        if id_user <= 0:
+            raise ValueError("id_user inválido")
+
         engine = _get_engine(connection_id, id_user, db)
-        inspector = inspect(engine)
+
+        inspector: Any = inspect(engine)
 
         items = _list_tables_and_views(engine, inspector)
 
-        all_names: list[str] = []
-        seen_names: set[str] = set()
+        seen: set[str] = set()
+        names: list[str] = []
+        # print("line: 244")
+        for name, schema, obj_type in items:
+            # print("\nname:",name,"\nschema:",schema,"\nobj_type:",obj_type)
 
-        for name, schema, _obj_type in items:
-            try:
-                verificar_ou_atualizar_estrutura(db, connection_id, name, schema)
-            except Exception as e:
+            if not name:
+
                 log_message(
-                    f"⚠️ Erro ao atualizar estrutura da tabela/view '{name}' no schema '{schema}': {e}",
+                    f"Nome inválido ignorado | connection_id={connection_id} | schema={schema} | type={obj_type}",
                     "warning",
                 )
 
-            if name not in seen_names:
-                seen_names.add(name)
-                all_names.append(name)
+                continue
 
-        return sorted(all_names, key=str.lower)
+            try:
+
+                st=verificar_ou_atualizar_estrutura(
+                    db,
+                    connection_id,
+                    name,
+                    schema,
+                )
+                # print(st)
+
+            except Exception as e:
+
+                log_message(
+                    f"Erro atualizar estrutura | table={name} | erro={e}",
+                    "warning",
+                )
+
+            if name not in seen:
+                seen.add(name)
+                names.append(name)
+
+        return sorted(names, key=str.lower)
+
+    except ValueError as e:
+
+        log_message(
+            f"Erro validação get_table_names | connection_id={connection_id} | user={id_user} | erro={e}",
+            "warning",
+        )
+
+        return []
 
     except Exception as e:
-        log_message(f"❌ Erro ao obter tabelas/views: {e}\n{traceback.format_exc()}", "error")
+
+        log_message(
+            f"Erro get_table_names | connection_id={connection_id} | user={id_user} | erro={e} | trace={traceback.format_exc()}",
+            "error",
+        )
+
         return []
 
 
@@ -229,7 +272,7 @@ def get_table_names_with_count(connection_id: int, id_user: int, db: Session) ->
     Retorna nomes das tabelas com rowcount.
     Usa cache se disponível.
     """
-    table_info = get_cached_row_count_all(db, connection_id)
+    table_info = get_cached_row_count_all( connection_id)
     if table_info:
         log_message(
             f"🔍 Usando cache para {len(table_info)} tabelas na conexão {connection_id}",
@@ -319,6 +362,7 @@ def get_strutures_names_only(
     """
     structures = get_db_structures(db, connection_id)
     if structures:
+        print(f"structures: {structures}")
         return [DBStructureOut.model_validate(s) for s in structures]
 
     try:
@@ -332,7 +376,7 @@ def get_strutures_names_only(
             structure = verificar_ou_atualizar_estrutura(db, connection_id, name, schema)
             if structure:
                 all_structures.append(structure)
-
+        # print("all_structures",all_structures)
         return all_structures
 
     except Exception as e:
@@ -564,7 +608,7 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
     """
     from app.schemas.dbstatistics_schema import DBStatisticsCreate, DBStatisticsUpdate
 
-    existing = get_statistics_by_connection(db, connection_id)
+    existing = get_statistics_by_connection( connection_id)
 
     if not existing:
         data_create = DBStatisticsCreate(
@@ -576,7 +620,7 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
             },
         )
         log_message(f"🆕 Criando estatísticas para a conexão {connection_id}.", "info")
-        return create_statistics(db, data_create) or "created"
+        return create_statistics(data_create) or "created"
 
     watched_fields = [
         "table_count",
@@ -594,7 +638,7 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
         data_update = DBStatisticsUpdate(
             **{k: stats[k] for k in DBStatisticsUpdate.__annotations__ if k in stats}
         )
-        update_statistics(db, connection_id, data_update)
+        update_statistics( connection_id, data_update)
         return "updated"
 
     log_message(
@@ -602,7 +646,6 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
         "info",
     )
     return "unchanged"
-
 
 def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
     """
@@ -612,12 +655,23 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
 
     try:
         engine, connection = ConnectionManager.ensure_connection(db, id_user)
+        
+        # Verificação de segurança
+        if not connection or not hasattr(connection, 'id'):
+            log_message(f"❌ Conexão inválida para usuário ID={id_user}", "error")
+            return None
+            
+        id_conn = cast(int, connection.id)
 
-        existing = get_statistics_by_connection(db, connection.id)
+        existing = get_statistics_by_connection( id_conn)
         if existing:
+            # Se for objeto SQLAlchemy, converter para dict
+            if hasattr(existing, '__dict__'):
+                return {k: v for k, v in existing.__dict__.items() 
+                       if not k.startswith('_')}
             return existing
 
-        stats = collect_statistics(engine, connection.type)
+        stats = collect_statistics(engine, str(id_conn))
         if not stats:
             log_message(
                 f"⚠️ Nenhuma estatística coletada para a conexão {connection.id}.",
@@ -626,16 +680,18 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
             return None
 
         log_message(f"📊 Estatísticas coletadas: {stats}", "info")
-        action = save_or_update_statistics(connection.id, stats, db)
+        action = save_or_update_statistics(id_conn, dict(stats), db)
 
         log_message(
             f"✅ Estatísticas '{action}' registradas para conexão ID={connection.id}.",
             "success",
         )
 
-        stats["connection_name"] = connection.name
-        stats["db_connection_id"] = connection.id
-        return stats
+        # Adicionar metadados sem modificar stats original
+        result = dict(stats)
+        result["connection_name"] = connection.name
+        result["db_connection_id"] = connection.id
+        return result
 
     except Exception as e:
         connection_id = getattr(connection, "id", "?")

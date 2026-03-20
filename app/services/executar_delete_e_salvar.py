@@ -109,6 +109,7 @@ class DeleteOperationService:
 
         log_message(f"DELETE ALL => {sql} | params={params}", "debug")
         result = conn.execute(text(sql), params)
+        conn.commit()
         return result.rowcount or 0
 
     async def _get_pk_by_index(
@@ -150,6 +151,7 @@ class DeleteOperationService:
         conn,
         payload: QueryPayload,
         primaryKey: str,
+        is_pk_or_unique: bool,
         keyType: str,
         tabela_name: str,
         index: int,
@@ -163,6 +165,31 @@ class DeleteOperationService:
 
         filters, params = await self._build_where_clause(payload, connection_type)
 
+        # Se for PK ou UNIQUE, usa o método otimizado
+        if is_pk_or_unique:
+            return await self._delete_by_pk_or_unique(
+                conn, payload, primaryKey, keyType, tabela_name, index, 
+                connection_type, filters, params
+            )
+        else:
+            # Se não for PK/UNIQUE, usa método baseado em rowid ou todas as colunas
+            return await self._delete_by_rowid_or_columns(
+                conn, payload, tabela_name, index, connection_type, filters, params
+            )
+
+    async def _delete_by_pk_or_unique(
+        self,
+        conn,
+        payload: QueryPayload,
+        primaryKey: str,
+        keyType: str,
+        tabela_name: str,
+        index: int,
+        connection_type: str,
+        filters: str,
+        params: dict,
+    ) -> int:
+        """Deleção otimizada usando PK ou Unique Key"""
         pk_select_options = [
             primaryKey,
             f"{tabela_name}.{primaryKey}",
@@ -229,6 +256,118 @@ class DeleteOperationService:
 
         result = conn.execute(text(sql), delete_params)
         return result.rowcount or 0
+
+    async def _delete_by_rowid_or_columns(
+        self,
+        conn,
+        payload: QueryPayload,
+        tabela_name: str,
+        index: int,
+        connection_type: str,
+        filters: str,
+        params: dict,
+    ) -> int:
+        """Deleção baseada em rowid (SQLite/PostgreSQL) ou todas as colunas"""
+        
+        # Primeiro, busca todas as colunas da linha específica
+        query_select_all = get_query_string_advance(
+            base_table=payload.baseTable,
+            select=[],  # Seleciona todas as colunas
+            joins=payload.joins,
+            aliases=payload.aliaisTables,
+            filters=filters,
+            table_list=payload.table_list,
+            order_by=payload.orderBy,
+            max_rows=1,
+            offset=index,
+            db_type=connection_type,
+            distinct=payload.distinct,
+        )
+
+        log_message(
+            f"SELECT ALL COLUMNS BY INDEX => {query_select_all} | params={params}", 
+            "debug"
+        )
+
+        result = conn.execute(text(query_select_all), params).fetchone()
+        if not result:
+            return 0
+
+        row_data = result._mapping
+        
+        # Tenta usar rowid se disponível (SQLite/PostgreSQL)
+        if connection_type.lower() in ['sqlite', 'postgresql']:
+            # Para SQLite, tenta rowid
+            if connection_type.lower() == 'sqlite':
+                # Busca o rowid da linha
+                query_rowid = f"""
+                    SELECT rowid FROM {quote_identifier(connection_type, tabela_name)}
+                    WHERE rowid IN (
+                        SELECT rowid FROM {quote_identifier(connection_type, tabela_name)}
+                        {filters}
+                        ORDER BY {payload.orderBy or '1'}
+                        LIMIT 1 OFFSET {index}
+                    )
+                """
+                
+                rowid_result = conn.execute(text(query_rowid), params).fetchone()
+                if rowid_result and rowid_result[0] is not None:
+                    # Deleta por rowid
+                    sql = f"""
+                        DELETE FROM {quote_identifier(connection_type, tabela_name)}
+                        WHERE rowid = :rowid_value
+                    """
+                    delete_params = {"rowid_value": rowid_result[0]}
+                    
+                    log_message(
+                        f"DELETE BY ROWID => {sql} | params={delete_params}",
+                        "debug",
+                    )
+                    
+                    result = conn.execute(text(sql), delete_params)
+                    return result.rowcount or 0
+        
+        # Se não conseguir usar rowid, constrói WHERE clause com todas as colunas
+        where_conditions = []
+        delete_params = {}
+        
+        for i, (col, value) in enumerate(row_data.items()):
+            # Ignora colunas com alias (que tenham ponto)
+            if '.' in col:
+                col_name = col.split('.')[-1]
+            else:
+                col_name = col
+                
+            # Para valores None, usa IS NULL
+            if value is None:
+                where_conditions.append(
+                    f"{quote_identifier(connection_type, col_name)} IS NULL"
+                )
+            else:
+                param_name = f"p_{i}"
+                where_conditions.append(
+                    f"{quote_identifier(connection_type, col_name)} = :{param_name}"
+                )
+                delete_params[param_name] = value
+        
+        if not where_conditions:
+            log_message("⚠️ Nenhuma condição WHERE gerada para deleção", "warning")
+            return 0
+        
+        sql = f"""
+            DELETE FROM {quote_identifier(connection_type, tabela_name)}
+            WHERE {' AND '.join(where_conditions)}
+        """
+        
+        log_message(
+            f"DELETE BY ALL COLUMNS => {sql} | params={delete_params}",
+            "debug",
+        )
+        
+        result = conn.execute(text(sql), delete_params)
+        return result.rowcount or 0
+
+   
 
     async def _execute_bulk_delete_by_pks(
         self,
@@ -441,6 +580,7 @@ class DeleteOperationService:
                             payload=payload,
                             primaryKey=pk_coluna,
                             keyType=key_type or "",
+                            is_pk_or_unique=False,
                             tabela_name=tabela_name,
                             index=index,
                             connection_type=connection_type,

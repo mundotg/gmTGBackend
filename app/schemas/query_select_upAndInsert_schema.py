@@ -122,7 +122,7 @@ class QueryResultType(BaseModel):
     columns: List[str]
     tabela_coluna: Optional[Dict[str, List[CampoDetalhado]]] = None
     preview: List[Dict[str, Any]]
-    QueryPayload: Optional[QueryPayload] = None
+    QueryPayload: Optional["QueryPayload"] = None
     
 class ParametrosRelatorioSchema(BaseModel):
     formato: str = Field(..., description="Formato de saída do relatório (ex: pdf, csv, excel)")

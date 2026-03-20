@@ -94,7 +94,7 @@ def get_statistic(
     user_id: int = Depends(get_current_user_id)
 ):
     try:
-        stats = get_statistics_by_connection(db, connection_id)
+        stats = get_statistics_by_connection(connection_id)
         if not stats:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, 

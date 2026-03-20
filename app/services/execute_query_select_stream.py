@@ -38,23 +38,6 @@ def _sse_event(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {_json(data)}\n\n"
 
 
-async def _execute_query(
-    db: AsyncSession,
-    user_id: int,
-    connection: DBConnection,
-    engine: AsyncEngine,
-    query_payload: QueryPayload,
-    use_cache: bool,
-):
-    return await query_service.execute_query_with_cache(
-        db=db,
-        user_id=user_id,
-        connection=connection,
-        engine=engine,
-        query_payload=query_payload,
-        use_cache=use_cache,
-    )
-
 
 async def _run_select_without_chunking(
     db: AsyncSession,
@@ -65,13 +48,12 @@ async def _run_select_without_chunking(
 ) -> AsyncGenerator[str, None]:
     select_body = _clone_payload(body)
 
-    result = await _execute_query(
+    result = await query_service.execute_query_with_cache(
         db=db,
         user_id=user_id,
         connection=connection,
         engine=engine,
         query_payload=select_body,
-        use_cache=False,
     )
 
     if not result.success:
@@ -125,14 +107,14 @@ async def _run_select_with_chunking(
             {"info": f"Executando chunk {chunk_index + 1}/{total_chunks}"},
         )
 
-        result = await _execute_query(
-            db=db,
-            user_id=user_id,
-            connection=connection,
-            engine=engine,
-            query_payload=chunk_body,
-            use_cache=False,
-        )
+        result = await query_service.execute_query_with_cache(
+        db=db,
+        user_id=user_id,
+        connection=connection,
+        engine=engine,
+        query_payload=chunk_body,
+        use_cache=False
+    )
 
         if not result.success:
             yield _sse_event("error", {"error": result.error_message})
@@ -194,13 +176,13 @@ async def _run_count(
     count_body = _clone_payload(body)
     count_body.isCountQuery = True
 
-    result = await _execute_query(
+    result = await query_service.execute_query_with_cache(
         db=db,
         user_id=user_id,
         connection=connection,
         engine=engine,
         query_payload=count_body,
-        use_cache=True,
+        use_cache=True
     )
 
     if not result.success:
@@ -274,10 +256,10 @@ async def executar_query_e_salvar_stream(
                 "error",
             )
             yield _sse_event("error", {"error": str(exc)})
+        except asyncio.CancelledError:
+            log_message("SSE stream cancelado pelo cliente", "warning")
 
         finally:
-            # Só usar dispose aqui se esse engine for criado especificamente para esta request.
-            # Se for compartilhado/global, não faça dispose por request.
             pass
 
     return StreamingResponse(

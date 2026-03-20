@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
 from app.config.cache_manager import cache_result # <- Assumindo que você crie isso
-from app.config.dependencies import EngineManager
+from app.config.engine_manager_cache import EngineManager
 from app.cruds.dbstatistics_crud import converter_stats, get_statistics_by_connection_geral
 from app.database import get_db
 from app.routes.connection_routes import get_current_user_id
@@ -67,7 +67,7 @@ def get_metadata_db_cached(user_id: int, db: Session):
     connection_info = _get_user_connection_info(user_id, db)
     connection = connection_info["connection"]
     
-    stats = converter_stats(get_statistics_by_connection_geral(db, connection_info["active"].connection_id))
+    stats = converter_stats(get_statistics_by_connection_geral(connection_info["active"].connection_id))
     if not stats:
         stats = sync_connection_statistics(user_id, db)
         if not stats:

@@ -32,9 +32,7 @@ try:
 except Exception:
     DDLExecutionError = None
 
-
 router = APIRouter(prefix="/database", tags=["Database Schema (DDL)"])
-
 
 # ============================================================
 # 🔧 HELPERS
@@ -42,10 +40,8 @@ router = APIRouter(prefix="/database", tags=["Database Schema (DDL)"])
 
 IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-
 def _http_error(status: int, detail: str) -> HTTPException:
     return HTTPException(status_code=status, detail=detail)
-
 
 def _validate_identifier(value: str, label: str) -> str:
     v = (value or "").strip()
@@ -57,7 +53,6 @@ def _validate_identifier(value: str, label: str) -> str:
         raise ValueError(f"{label} inválido: '{v}'. Use letras/números/_ e não comece com número.")
     return v
 
-
 def _build_full_table_name(schema: Optional[str], table: str) -> str:
     table = _validate_identifier(table, "table_name")
     if schema and schema.strip():
@@ -65,13 +60,10 @@ def _build_full_table_name(schema: Optional[str], table: str) -> str:
         return f"{schema}.{table}"
     return table
 
-
 def _map_ddl_error_to_http(e: Exception) -> HTTPException:
-    # validação do teu lado
     if isinstance(e, ValueError):
         return _http_error(400, str(e))
 
-    # erro DDL padronizado (com mensagem amigável)
     if DDLExecutionError and isinstance(e, DDLExecutionError):
         msg = str(e)
         op = getattr(e, "operation", None)
@@ -93,9 +85,7 @@ def _map_ddl_error_to_http(e: Exception) -> HTTPException:
             return _http_error(404, msg)
         return _http_error(400, msg)
 
-    # fallback
     return _http_error(500, "Erro interno ao modificar a estrutura do banco de dados.")
-
 
 async def _get_engine(db: Session, user_id: int):
     engine, connectionModel = await asyncio.to_thread(ConnectionManager.ensure_connection, db, user_id)
@@ -103,17 +93,14 @@ async def _get_engine(db: Session, user_id: int):
         raise _http_error(503, "Não foi possível conectar ao motor do banco de dados.")
     return engine, connectionModel
 
-
 async def _run_sync(func: Callable[..., Any], *args, **kwargs):
     return await asyncio.to_thread(func, *args, **kwargs)
-
 
 def _ensure_connection_id(connectionModel: Any, connection_id: Optional[int]) -> None:
     if connection_id is None:
         return
     if getattr(connectionModel, "id", None) != connection_id:
         raise _http_error(403, "Permissão negada ou incompatibilidade de conexão.")
-
 
 def _build_audit_context(request: Request, user_id: int) -> AuditContext:
     return AuditContext(
@@ -123,24 +110,17 @@ def _build_audit_context(request: Request, user_id: int) -> AuditContext:
         executed_by=f"user_id:{user_id}",
     )
 
-
 async def _handle_endpoint(
     *,
     action_name: str,
     db: Session,
     user_id: int,
     connectionModel_ref_getter: Callable[[], Optional[DBConnection]],
+    engine_ref_getter: Callable[[], Any] = lambda: None,  # ✅ Referência para fechar a engine
     success_message: str,
     runner: Callable[[], Any],
     log_context: str,
 ):
-    """
-    Unifica:
-    - rollback em caso de erro
-    - log com traceback
-    - mapeamento de erro para HTTP
-    - response wrapper
-    """
     try:
         await runner()
         cm = connectionModel_ref_getter()
@@ -157,7 +137,19 @@ async def _handle_endpoint(
             level="error",
         )
         raise _map_ddl_error_to_http(e)
-
+    finally:
+        # ✅ FORÇA O ENCERRAMENTO DAS CONEXÕES PENDENTES NO FINAL DA ROTA
+        engine = engine_ref_getter()
+        if engine:
+            try:
+                if hasattr(engine, "dispose"):
+                    # Verifica se é uma AsyncEngine (SQLAlchemy 2.0+)
+                    if asyncio.iscoroutinefunction(engine.dispose) or type(engine).__name__ == "AsyncEngine":
+                        await engine.dispose()
+                    else:
+                        await asyncio.to_thread(engine.dispose)
+            except Exception as ex:
+                log_message(f"⚠️ Erro ao fazer dispose da engine: {ex}", "warning")
 
 # ============================================================
 # ➕ FIELD: CREATE
@@ -179,11 +171,13 @@ async def create_field(
     safe_payload.name = field_name
 
     connectionModel_ref: Optional[DBConnection] = None
+    engine_ref: Any = None  # ✅ Referência capturada
 
     async def runner():
-        nonlocal connectionModel_ref
+        nonlocal connectionModel_ref, engine_ref
         engine, connectionModel = await _get_engine(db, user_id)
         connectionModel_ref = connectionModel
+        engine_ref = engine  # ✅ Guarda a engine
         _ensure_connection_id(connectionModel, connection_id)
 
         safe_payload.table_id = await _run_sync(
@@ -208,11 +202,11 @@ async def create_field(
         db=db,
         user_id=user_id,
         connectionModel_ref_getter=lambda: connectionModel_ref,
+        engine_ref_getter=lambda: engine_ref,  # ✅ Passa a engine
         success_message=f"A coluna '{field_name}' foi adicionada com sucesso na tabela '{payload.table_name}'.",
         runner=runner,
         log_context=f"col='{field_name}' table='{full_table_name}'",
     )
-
 
 # ============================================================
 # ✏️ FIELD: UPDATE
@@ -237,11 +231,13 @@ async def update_field(
     safe_payload.name = new_field_name
 
     connectionModel_ref: Optional[DBConnection] = None
+    engine_ref: Any = None
 
     async def runner():
-        nonlocal connectionModel_ref
+        nonlocal connectionModel_ref, engine_ref
         engine, connectionModel = await _get_engine(db, user_id)
         connectionModel_ref = connectionModel
+        engine_ref = engine
         _ensure_connection_id(connectionModel, connection_id)
 
         safe_payload.table_id = await _run_sync(
@@ -268,11 +264,11 @@ async def update_field(
         db=db,
         user_id=user_id,
         connectionModel_ref_getter=lambda: connectionModel_ref,
+        engine_ref_getter=lambda: engine_ref,
         success_message=f"As propriedades da coluna '{new_field_name}' foram atualizadas com sucesso.",
         runner=runner,
         log_context=f"orig='{original_column_name_safe}' new='{new_field_name}' action={action} table='{full_table_name}'",
     )
-
 
 # ============================================================
 # 🗑️ FIELD: DELETE
@@ -293,11 +289,13 @@ async def delete_field(
     audit_ctx = _build_audit_context(request, user_id)
 
     connectionModel_ref: Optional[DBConnection] = None
+    engine_ref: Any = None
 
     async def runner():
-        nonlocal connectionModel_ref
+        nonlocal connectionModel_ref, engine_ref
         engine, connectionModel = await _get_engine(db, user_id)
         connectionModel_ref = connectionModel
+        engine_ref = engine
         _ensure_connection_id(connectionModel, connection_id)
 
         table_id = await _run_sync(
@@ -324,14 +322,14 @@ async def delete_field(
         db=db,
         user_id=user_id,
         connectionModel_ref_getter=lambda: connectionModel_ref,
+        engine_ref_getter=lambda: engine_ref,
         success_message=f"A coluna '{column_name_safe}' foi removida permanentemente da tabela '{table_name}'.",
         runner=runner,
         log_context=f"col='{column_name_safe}' table='{full_table_name}'",
     )
 
-
 # ============================================================
-# 🧨 TABLE: BULK DROP (coloque ANTES de /table/{table_name})
+# 🧨 TABLE: BULK DROP
 # ============================================================
 
 @router.delete("/table/bulk", response_model=ResponseWrapper, summary="Excluir várias Tabelas (Bulk DROP)")
@@ -356,13 +354,15 @@ async def delete_tables_bulk(
         tables_safe.append(_build_full_table_name(schema_name, _validate_identifier(t, "table_name")))
 
     connectionModel_ref: Optional[DBConnection] = None
+    engine_ref: Any = None
 
     async def runner():
-        nonlocal connectionModel_ref
+        nonlocal connectionModel_ref, engine_ref
         engine, connectionModel = await _get_engine(db, user_id)
         connectionModel_ref = connectionModel
+        engine_ref = engine
         _ensure_connection_id(connectionModel, connection_id)
-        print("🚀 Conexão garantida, iniciando drops em massa...", connectionModel_ref.database_name  )
+        print("🚀 Conexão garantida, iniciando drops em massa...", connectionModel_ref.database_name)
         for full_table_name in tables_safe:
             await _run_sync(
                 execute_drop_table,
@@ -380,11 +380,11 @@ async def delete_tables_bulk(
         db=db,
         user_id=user_id,
         connectionModel_ref_getter=lambda: connectionModel_ref,
+        engine_ref_getter=lambda: engine_ref,
         success_message=f"{len(tables_safe)} tabela(s) removida(s) com sucesso.",
         runner=runner,
         log_context=f"tables={tables_safe}",
     )
-
 
 # ============================================================
 # ➕ TABLE: CREATE
@@ -411,11 +411,13 @@ async def create_table(
         safe_payload.table_name = table_name
 
     connectionModel_ref: Optional[DBConnection] = None
+    engine_ref: Any = None
 
     async def runner():
-        nonlocal connectionModel_ref
+        nonlocal connectionModel_ref, engine_ref
         engine, connectionModel = await _get_engine(db, user_id)
         connectionModel_ref = connectionModel
+        engine_ref = engine
         _ensure_connection_id(connectionModel, connection_id)
 
         await _run_sync(
@@ -433,11 +435,11 @@ async def create_table(
         db=db,
         user_id=user_id,
         connectionModel_ref_getter=lambda: connectionModel_ref,
+        engine_ref_getter=lambda: engine_ref,
         success_message=f"A tabela '{full_table_name}' foi criada com sucesso.",
         runner=runner,
         log_context=f"table='{full_table_name}'",
     )
-
 
 # ============================================================
 # ✏️ TABLE: UPDATE / RENAME
@@ -474,11 +476,13 @@ async def update_table(
         safe_payload.table_name = new_name_safe
 
     connectionModel_ref: Optional[DBConnection] = None
+    engine_ref: Any = None
 
     async def runner():
-        nonlocal connectionModel_ref
+        nonlocal connectionModel_ref, engine_ref
         engine, connectionModel = await _get_engine(db, user_id)
         connectionModel_ref = connectionModel
+        engine_ref = engine
         _ensure_connection_id(connectionModel, connection_id)
 
         await _run_sync(
@@ -499,11 +503,11 @@ async def update_table(
         db=db,
         user_id=user_id,
         connectionModel_ref_getter=lambda: connectionModel_ref,
+        engine_ref_getter=lambda: engine_ref,
         success_message=f"A tabela '{old_full}' foi {action} com sucesso.",
         runner=runner,
         log_context=f"old='{old_full}' new='{new_full}' action={action}",
     )
-
 
 # ============================================================
 # 🗑️ TABLE: DELETE
@@ -525,11 +529,13 @@ async def delete_table(
     audit_ctx = _build_audit_context(request, user_id)
 
     connectionModel_ref: Optional[DBConnection] = None
+    engine_ref: Any = None
 
     async def runner():
-        nonlocal connectionModel_ref
+        nonlocal connectionModel_ref, engine_ref
         engine, connectionModel = await _get_engine(db, user_id)
         connectionModel_ref = connectionModel
+        engine_ref = engine
         _ensure_connection_id(connectionModel, connection_id)
 
         await _run_sync(
@@ -548,6 +554,7 @@ async def delete_table(
         db=db,
         user_id=user_id,
         connectionModel_ref_getter=lambda: connectionModel_ref,
+        engine_ref_getter=lambda: engine_ref,
         success_message=f"A tabela '{full_table_name}' foi removida permanentemente.",
         runner=runner,
         log_context=f"table='{full_table_name}'",

@@ -150,25 +150,76 @@ def _convert_column_type_for_string_one_V1(value, col_type):
     except Exception as e:
         log_message(f"Erro ao converter valor '{value}' para {col_type}: {e}", "error")
         return None
+    
+RESERVED_KEYWORDS = {
+    'default', 'select', 'insert', 'update', 'delete', 'from', 'where',
+    'order', 'group', 'by', 'having', 'join', 'inner', 'left', 'right',
+    'outer', 'on', 'as', 'and', 'or', 'not', 'null', 'is', 'true', 'false',
+    'primary', 'key', 'foreign', 'references', 'table', 'column', 'index',
+    'create', 'alter', 'drop', 'truncate', 'grant', 'revoke', 'commit',
+    'rollback', 'savepoint', 'begin', 'transaction', 'lock', 'unlock',
+    'user', 'role', 'database', 'schema', 'view', 'function', 'procedure',
+    'trigger', 'event', 'type', 'domain', 'constraint', 'check', 'unique',
+    'current', 'time', 'date', 'timestamp', 'interval', 'year',
+    'month', 'day', 'hour', 'minute', 'second', 'zone', 'value', 'values'
+}
+
+
+def needs_quoting(identifier_part: str, db_type: str) -> bool:
+    if not identifier_part:
+        return False
+
+    db_type = db_type.lower()
+
+    # 🔥 POSTGRESQL / SQLITE → case-sensitive se usar maiúsculas
+    if db_type in ["postgresql", "postgres", "sqlite"]:
+        if identifier_part != identifier_part.lower():
+            return True
+
+    # 🔥 MYSQL → normalmente não precisa por causa do case-insensitive
+    # (mas ainda precisa para keywords e caracteres inválidos)
+
+    # palavra reservada
+    if identifier_part.lower() in RESERVED_KEYWORDS:
+        return True
+
+    # caracteres inválidos
+    if not identifier_part.replace('_', '').isalnum():
+        return True
+
+    # começa com número
+    if identifier_part[0].isdigit():
+        return True
+
+    return False
+
+
+def quote_char(db_type: str) -> str:
+    db_type = db_type.lower()
+
+    if db_type in ["postgresql", "postgres", "sqlite"]:
+        return '"'
+    elif db_type in ["mysql", "mariadb"]:
+        return '`'
+    else:
+        return '"'  # fallback seguro
+
 
 def quote_identifier(db_type: str, identifier: str) -> str:
     """
-    Escapa um identificador SQL conforme o tipo de banco.
-    Suporta identificadores compostos como 'tabela.coluna'.
-
-    Ex:
-    - PostgreSQL: "tabela"."coluna"
-    - MySQL: `tabela`.`coluna`
-    - MSSQL: [tabela].[coluna]
+    Escapa identificadores SQL corretamente por banco.
+    Suporta: schema.tabela.coluna
     """
     db_type = db_type.lower()
     parts = identifier.split(".")
-    
-    if db_type in ['postgresql', 'postgres', 'oracle']:
-        return ".".join(f'"{part}"' for part in parts)
-    elif db_type in ['mssql', 'sql server', 'sqlserver']:
-        return ".".join(f'[{part}]' for part in parts)
-    elif db_type in ['mysql']:
-        return ".".join(f'`{part}`' for part in parts)
-    else:
-        return identifier
+    qchar = quote_char(db_type)
+
+    quoted_parts = []
+
+    for part in parts:
+        if needs_quoting(part, db_type):
+            quoted_parts.append(f"{qchar}{part}{qchar}")
+        else:
+            quoted_parts.append(part)
+
+    return ".".join(quoted_parts)

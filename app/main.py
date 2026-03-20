@@ -32,6 +32,12 @@ from app.routes import (
 import os
 
 from app.seed_new import seed_data
+import faulthandler
+import signal
+import sys
+
+faulthandler.enable()
+
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"

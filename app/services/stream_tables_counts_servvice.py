@@ -1,5 +1,7 @@
 import asyncio
+import time
 import json
+from app.database import SessionLocal
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 from fastapi.responses import StreamingResponse
@@ -7,11 +9,11 @@ from typing import List, Tuple, Optional
 from app.config.cache_manager import cache_result
 from app.cruds.dbstatistics_crud import get_cached_row_count_all_tupla, update_or_create_cache
 from app.cruds.dbstructure_crud import get_db_structures_by_conn_id_and_table, get_fields_by_structure_pk
+from app.services.database_inspector import verificar_ou_atualizar_estrutura
 from app.services.editar_linha import quote_identifier
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
 from sqlalchemy.engine import Engine
-
 # -----------------------------
 # Funções com Cache
 # -----------------------------
@@ -25,7 +27,7 @@ def get_table_rowcount_cached(
     db_type: str,
     structure_id: Optional[int] = None,
     schema: Optional[str] = None
-) -> dict:
+) -> dict | None:
     """
     Retorna a contagem de registros (real ou estimada) de uma tabela com cache.
     """
@@ -39,18 +41,45 @@ def get_cached_table_info(
     """
     Obtém informações de tabelas em cache.
     """
-    return get_cached_row_count_all_tupla(db, connection_id)
+    return get_cached_row_count_all_tupla( connection_id)
 
-@cache_result(ttl=600, user_id="user_structures_by_conn_id_and_table_{user_id}")  # 10 minutos de cache para estrutura
+
+@cache_result(ttl=600, user_id="user_structures_by_conn_id_and_table_{user_id}") 
 def get_db_structure_cached(
-    db: Session, 
-    connection_id: int, 
+    db: Session,
+    connection_id: int,
     table_name: str
 ):
     """
     Obtém estrutura da tabela com cache.
     """
-    return get_db_structures_by_conn_id_and_table(db, connection_id, table_name)
+
+    try:
+        if connection_id <= 0:
+            raise ValueError("connection_id inválido")
+
+        if not table_name or not table_name.strip():
+            raise ValueError("table_name inválido")
+
+        return get_db_structures_by_conn_id_and_table(
+            db,
+            connection_id,
+            table_name
+        )
+
+    except ValueError as e:
+        log_message(
+            message=f"Erro de validação em get_db_structure_cached | conn_id={connection_id} | table={table_name} | erro={str(e)}",
+            level="warning",
+        )
+        raise
+
+    except Exception as e:
+        log_message(
+            message=f"Erro ao obter estrutura em cache | conn_id={connection_id} | table={table_name} | erro={str(e)}",
+            level="error",
+        )
+        raise
 
 # -----------------------------
 # Utilitários
@@ -109,7 +138,7 @@ def get_table_rowcount(
     db_type: str,
     structure_id: Optional[int] = None,
     schema: Optional[str] = None
-) -> dict:
+) -> dict | None:
     """
     Retorna a contagem de registros (real ou estimada) de uma tabela.
     Usa estatísticas específicas por SGBD quando disponível.
@@ -148,200 +177,216 @@ def get_table_rowcount(
 
         return { "name": table_name, "rowcount": count }
 
+
 def get_table_count_streams(db: Session, id_user: int) -> StreamingResponse:
-    """
-    Stream em tempo real das contagens de tabelas com cache inteligente.
-    """
+
+    def sse_data(payload: dict) -> str:
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    def sse_event(event_name: str, payload: dict) -> str:
+        return f"event: {event_name}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
     try:
+        if id_user <= 0:
+            raise ValueError("id_user inválido")
+
+        # 🔥 pega conexão UMA VEZ só
         engine, connection = ConnectionManager.ensure_connection(db, id_user)
+
         if not engine or not connection:
             raise ValueError("Não foi possível estabelecer conexão com o banco")
 
-        # Obtém informações em cache
-        table_info = get_cached_table_info(db, connection.id)
-        
+        connection_id = connection.id
+        connection_type = (connection.type or "").lower()
+
+        if not connection_type:
+            raise ValueError("Tipo de conexão inválido")
+
+        table_info = get_cached_table_info(db, connection_id)
+
+        # =========================================================
+        # 🔵 CACHE STREAM
+        # =========================================================
         if table_info:
-            # Se tem cache, usa dados cacheados com validação
+
             async def cached_event_generator():
+                db_local = SessionLocal()
                 processed_tables = set()
+                loop = asyncio.get_event_loop()
+
                 try:
-                    # Primeiro envia dados do cache
-                    for table, count in table_info:
-                        if table in processed_tables:
-                            continue
-                            
-                        processed_tables.add(table)
-                        
-                        # Se count é inválido, busca atualização
-                        if count in (-1, '-1', None):
-                            structure = get_db_structure_cached(db, connection.id, table)
-                            count = get_table_rowcount_cached(
-                                db, engine, table, connection.id, 
-                                connection.type.lower(), structure.id, structure.schema_name
-                            )
-                        
-                        data = json.dumps({
-                            "table": table, 
-                            "count": count,
-                            "cached": True,
-                            "timestamp": asyncio.get_event_loop().time()
-                        })
-                        yield f"data: {data}\n\n"
-                        await asyncio.sleep(0.03)  # Delay menor para cache
-                    
-                    yield "event: end\ndata: {\"status\": \"completed\", \"source\": \"cache\"}\n\n"
-                    
-                except Exception as e:
-                    error_data = json.dumps({"error": str(e), "source": "cache"})
-                    yield f"event: error\ndata: {error_data}\n\n"
+                    for item in table_info:
+                        table = None
 
-            return StreamingResponse(cached_event_generator(), media_type="text/event-stream")
+                        try:
+                            if not item or len(item) < 2:
+                                continue
 
-        # Sem cache, faz busca completa
+                            table, count = item
+
+                            if not table or table in processed_tables:
+                                continue
+
+                            processed_tables.add(table)
+
+                            if count in (-1, "-1", None):
+                                structure = get_db_structure_cached(
+                                    db_local, connection_id, table
+                                )
+
+                                if not structure:
+                                    raise ValueError(f"Sem estrutura: {table}")
+
+                                count = await loop.run_in_executor(
+                                    None,
+                                    lambda: get_table_rowcount_cached(
+                                        db=db_local,
+                                        engine=engine,
+                                        table_name=table,
+                                        connection_id=connection_id,
+                                        db_type=connection_type,
+                                        structure_id=structure.id,
+                                        schema=structure.schema_name,
+                                    ),
+                                )
+
+                            yield sse_data({
+                                "table": table,
+                                "count": count,
+                                "cached": True,
+                                "ts": time.time(),
+                            })
+
+                            if connection_type != "sqlite":
+                                await asyncio.sleep(0.03)
+
+                        except Exception as err:
+                            log_message(f"[CACHE] {table} -> {err}", "error")
+
+                            yield sse_data({
+                                "table": table,
+                                "count": -1,
+                                "error": str(err),
+                                "cached": True,
+                            })
+
+                    yield sse_event("end", {"source": "cache"})
+
+                finally:
+                    db_local.close()
+
+            return StreamingResponse(
+                cached_event_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
+            )
+
+        # =========================================================
+        # 🔴 LIVE STREAM
+        # =========================================================
+
         async def live_event_generator():
+            db_local = SessionLocal()
             processed_tables = set()
+            loop = asyncio.get_event_loop()
+
             try:
                 inspector = inspect(engine)
                 default_schema = inspector.default_schema_name
-                tables = inspector.get_table_names(schema=default_schema)
-                
-                total_tables = len(tables)
-                completed_tables = 0
-                
-                # Envia progresso inicial
-                progress_data = json.dumps({
-                    "type": "progress",
-                    "total": total_tables,
-                    "completed": 0,
-                    "message": f"Iniciando contagem de {total_tables} tabelas"
-                })
-                yield f"data: {progress_data}\n\n"
-                
+
+                tables = await loop.run_in_executor(
+                    None,
+                    lambda: inspector.get_table_names(schema=default_schema),
+                )
+
+                total = len(tables)
+                done = 0
+
+                yield sse_data({"type": "progress", "total": total, "done": 0})
+
                 for table in tables:
-                    if table in processed_tables:
+                    if not table or table in processed_tables:
                         continue
-                        
+
                     processed_tables.add(table)
-                    
+
                     try:
-                        structure = get_db_structure_cached(db, connection.id, table)
-                        count = get_table_rowcount_cached(
-                            db, engine, table, connection.id, 
-                            connection.type.lower(), structure.id, structure.schema_name
+                        structure = verificar_ou_atualizar_estrutura(
+                            db_local, connection_id, table, default_schema
                         )
-                        
-                        completed_tables += 1
-                        
-                        # Envia dados da tabela
-                        table_data = json.dumps({
-                            "table": table, 
+
+                        if not structure:
+                            continue
+
+                        count = await loop.run_in_executor(
+                            None,
+                            lambda: get_table_rowcount_cached(
+                                db=db_local,
+                                engine=engine,
+                                table_name=table,
+                                connection_id=connection_id,
+                                db_type=connection_type,
+                                structure_id=structure.id,
+                                schema=structure.schema_name,
+                            ),
+                        )
+
+                        done += 1
+
+                        yield sse_data({
+                            "table": table,
                             "count": count,
                             "cached": False,
-                            "timestamp": asyncio.get_event_loop().time()
+                            "ts": time.time(),
                         })
-                        yield f"data: {table_data}\n\n"
-                        
-                        # Envia progresso a cada 5 tabelas
-                        if completed_tables % 5 == 0:
-                            progress_data = json.dumps({
-                                "type": "progress", 
-                                "total": total_tables,
-                                "completed": completed_tables,
-                                "message": f"Processadas {completed_tables}/{total_tables} tabelas"
+
+                        if done % 5 == 0:
+                            yield sse_data({
+                                "type": "progress",
+                                "total": total,
+                                "done": done,
                             })
-                            yield f"data: {progress_data}\n\n"
-                        
-                        await asyncio.sleep(0.1)  # Delay para não sobrecarregar
-                        
-                    except Exception as table_error:
-                        log_message(f"❌ Erro na tabela '{table}': {table_error}", "error")
-                        error_data = json.dumps({
+
+                        if connection_type != "sqlite":
+                            await asyncio.sleep(0.1)
+
+                    except Exception as err:
+                        log_message(f"[LIVE] {table} -> {err}", "error")
+
+                        yield sse_data({
                             "table": table,
-                            "error": str(table_error),
-                            "count": -1
+                            "count": -1,
+                            "error": str(err),
+                            "cached": False,
                         })
-                        yield f"data: {error_data}\n\n"
-                
-                # Finalização
-                completion_data = json.dumps({
-                    "type": "completion",
-                    "total_tables": total_tables,
-                    "processed_tables": completed_tables,
-                    "message": "Contagem concluída"
-                })
-                yield f"data: {completion_data}\n\n"
-                yield "event: end\ndata: {\"status\": \"completed\", \"source\": \"live\"}\n\n"
 
-            except Exception as e:
-                log_message(f"❌ Erro no stream: {e}", "error")
-                error_data = json.dumps({"error": str(e), "source": "live"})
-                yield f"event: error\ndata: {error_data}\n\n"
+                yield sse_event("end", {"source": "live"})
 
-        return StreamingResponse(live_event_generator(), media_type="text/event-stream")
+            finally:
+                db_local.close()
+
+        return StreamingResponse(
+            live_event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     except Exception as e:
-        log_message(f"❌ Erro crítico no get_table_count_streams: {e}", "error")
-        
-        mensagem_de_erro = str(e)
-    
-        # 2. Passe a mensagem como parâmetro para o gerador
-        async def error_generator(err_msg: str):
-            error_data = json.dumps({"error": err_msg, "source": "initialization"})
-            yield f"data: {error_data}\n\n"
-        
-        return StreamingResponse(error_generator(mensagem_de_erro), media_type="text/event-stream")
+        error_msg = str(e)
+        log_message(f"[INIT ERROR] {str(e)}", "error")
 
-# -----------------------------
-# Endpoints Adicionais para Cache
-# -----------------------------
+        async def error_generator():
+            yield sse_event("error", {"error": error_msg})
 
-def clear_table_cache_endpoint(db: Session, id_user: int) -> dict:
-    """
-    Limpa o cache de contagens de tabelas.
-    """
-    try:
-        connection = ConnectionManager.get_connection(db, id_user)
-        connection_id = connection.id if connection else None
-        
-        # _clear_table_cache(id_user, connection_id)
-        
-        return {
-            "success": True,
-            "message": "Cache de tabelas limpo com sucesso",
-            "user_id": id_user,
-            "connection_id": connection_id
-        }
-    except Exception as e:
-        log_message(f"❌ Erro ao limpar cache de tabelas: {e}", "error")
-        return {
-            "success": False,
-            "error": str(e),
-            "user_id": id_user
-        }
-
-def get_cache_stats(db: Session, id_user: int) -> dict:
-    """
-    Retorna estatísticas do cache de tabelas.
-    """
-    try:
-        connection = ConnectionManager.get_connection(db, id_user)
-        if not connection:
-            return {"error": "Nenhuma conexão ativa"}
-            
-        table_info = get_cached_table_info(db, connection.id)
-        cached_tables = len(table_info) if table_info else 0
-        
-        inspector = inspect(ConnectionManager.get_engine(id_user))
-        total_tables = len(inspector.get_table_names())
-        
-        return {
-            "user_id": id_user,
-            "connection_id": connection.id,
-            "cached_tables": cached_tables,
-            "total_tables": total_tables,
-            "cache_coverage": f"{(cached_tables / total_tables * 100) if total_tables > 0 else 0:.1f}%",
-            "cache_enabled": True
-        }
-    except Exception as e:
-        log_message(f"❌ Erro ao obter estatísticas do cache: {e}", "error")
-        return {"error": str(e)}
+        return StreamingResponse(
+            error_generator(),
+            media_type="text/event-stream",
+        )

@@ -1,13 +1,13 @@
+
 import traceback
 from aiosqlite import OperationalError
 from fastapi import Depends, HTTPException
-from sqlalchemy import Engine, text
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.connection_models import DBConnection
 from app.services.crypto_utils import aes_decrypt
 from app.ultils.conect_database import DatabaseManager
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.ultils.logger import log_message
@@ -25,6 +25,7 @@ defaults = {
 
 def get_session_by_connection_id(connection_id: int, db: Session = Depends(get_db)):
     # Buscar a conexão salva
+    # print(f"connection_id: {connection_id}")
     connection = db.query(DBConnection).filter(DBConnection.id == connection_id).first()
     if not connection:
         raise HTTPException(status_code=404, detail="Conexão não encontrada")
@@ -41,6 +42,35 @@ def get_session_by_connection_id(connection_id: int, db: Session = Depends(get_d
     }
 
     try:
+        db_type = (connection.type or "").lower()
+        # print(f"db_type: {db_type}")
+        if db_type == "sqlite":
+            db_path = aes_decrypt(connection.host)
+
+            if not db_path:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Caminho do ficheiro SQLite não encontrado."
+                )
+
+            engine = create_engine(f"sqlite:///{db_path}")
+            rs= ""
+            with engine.connect() as conn:
+                rs=conn.execute(text("SELECT 1"))
+                
+            # info = _verify_sqlite_connection(engine,connection.database_name)
+            # print(rs)
+            # print("dialect:", info["dialect"])
+            # print("engine_url:", info["engine_url"])
+            # print("db_file_exists:", info["db_file_exists"])
+            # print("db_file_size:", info["db_file_size"])
+            # print("database_list:", info["database_list"])
+            # print("tables:", info["tables"])
+            # print("views:", info["views"])
+            # print("expected_table:", info["expected_table"])
+            # print("expected_table_exists:", info["expected_table_exists"])
+
+            return engine
         # Obter o engine com base nas configs
         engine = DatabaseManager.get_engine(defaults[connection.type], config)
 
@@ -51,53 +81,59 @@ def get_session_by_connection_id(connection_id: int, db: Session = Depends(get_d
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro inesperado: {str(e)}{traceback.format_exc()}")
+    
+from sqlalchemy import create_engine, text
+from fastapi import HTTPException
 
 def get_session_by_connection(connection: DBConnection):
-    """
-    Cria e testa uma conexão com o banco de dados com base nas configurações fornecidas.
-
-    Retorna:
-        sqlalchemy.engine.Engine
-
-    Lança:
-        HTTPException (400/503/500) com motivo real.
-    """
-
     if not connection:
         raise HTTPException(status_code=404, detail="Conexão não encontrada")
 
-    # 1) Montar config (sem logar password)
-    config = {
-        "user": aes_decrypt(connection.username),
-        "password": aes_decrypt(connection.password),
-        "host": aes_decrypt(connection.host),
-        "port": connection.port,
-        "database": connection.database_name,
-        "service": connection.service,
-        "sslmode": connection.sslmode,
-        "trustServerCertificate": connection.trustServerCertificate,
-    }
-
-    # 2) Tipo suportado?
-    db_config = defaults.get(connection.type)
-    if not db_config:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Tipo de banco de dados '{connection.type}' não é suportado."
-        )
-
     try:
-        # 3) Criar engine
+        db_type = (connection.type or "").lower()
+
+        if db_type == "sqlite":
+            db_path = aes_decrypt(connection.host)
+
+            if not db_path:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Caminho do ficheiro SQLite não encontrado."
+                )
+
+            engine = create_engine(f"sqlite:///{db_path}")
+
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+
+            return engine
+
+        config = {
+            "user": aes_decrypt(connection.username) if connection.username else "",
+            "password": aes_decrypt(connection.password) if connection.password else "",
+            "host": aes_decrypt(connection.host),
+            "port": connection.port,
+            "database": connection.database_name,
+            "service": connection.service,
+            "sslmode": connection.sslmode,
+            "trustServerCertificate": connection.trustServerCertificate,
+        }
+
+        db_config = defaults.get(connection.type)
+        if not db_config:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Tipo de banco de dados '{connection.type}' não é suportado."
+            )
+
         engine = DatabaseManager.get_engine(db_config, config)
 
-        # 4) Teste leve: connect() em vez de Session ORM
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
 
         return engine
 
     except OperationalError as e:
-        # ✅ normalmente pega timeouts/host/porta/instância/firewall
         log_message("❌ Falha de conexão (OperationalError) ao conectar ao banco", level="error")
         log_message(str(e), level="error")
         raise HTTPException(
@@ -134,24 +170,3 @@ def get_test_by_connection(conn_data: DBConnection, db: Session):
     }
     session, engine = DatabaseManager.connect(conn_data.type, config)
     session.close()
-
-class EngineManager:
-    __engines: dict[int, Engine] = {}
-
-    @classmethod
-    def set(cls, engine: Engine, id_user: int):
-        cls.__engines[id_user] = engine
-
-    @classmethod
-    def get(cls, id_user: int) -> Engine:
-        engine = cls.__engines.get(id_user)
-        if not engine:
-            log_message(f"Nenhum engine ativo para o usuário ID {id_user} em EngineManager dependecia","error")
-        return engine
-    @classmethod
-    def remove(cls, id_user:int):
-        engine = cls.__engines.pop(id_user, None)
-        if engine:
-            log_message(f"Engine removido para o usuário {id_user}  em EngineManager dependecia")
-        else:
-            log_message(f"Nenhum engine encontrado para remover do usuário {id_user}  em EngineManager dependecia")

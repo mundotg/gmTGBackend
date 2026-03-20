@@ -5,17 +5,28 @@ executa secury
 import re
 from typing import Any
 
-from app.schemas.query_select_upAndInsert_schema import  QueryPayload
+from app.schemas.query_select_upAndInsert_schema import QueryPayload
+
 
 class QuerySecurityValidator:
     """Validador de segurança para queries SQL."""
-    
+
     # Palavras reservadas perigosas
     FORBIDDEN_KEYWORDS = {
-        "drop", "delete", "update", "insert", "alter", "truncate", 
-        "create", "grant", "revoke", "execute", "exec", "xp_"
+        "drop",
+        "delete",
+        "update",
+        "insert",
+        "alter",
+        "truncate",
+        "create",
+        "grant",
+        "revoke",
+        "execute",
+        "exec",
+        "xp_",
     }
-    
+
     # Padrão para identificadores válidos
     IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
@@ -33,7 +44,9 @@ class QuerySecurityValidator:
             # Suporta listas de inteiros em string separada por vírgula
             if isinstance(value, str) and "," in value:
                 try:
-                    return all(int(v.strip()) or v.strip() == "0" for v in value.split(","))
+                    return all(
+                        int(v.strip()) or v.strip() == "0" for v in value.split(",")
+                    )
                 except Exception:
                     return False
             try:
@@ -54,7 +67,16 @@ class QuerySecurityValidator:
             except Exception:
                 return False
         if column_type in ("bool", "boolean"):
-            return isinstance(value, bool) or value in (0, 1, "0", "1", "true", "false", "True", "False")
+            return isinstance(value, bool) or value in (
+                0,
+                1,
+                "0",
+                "1",
+                "true",
+                "false",
+                "True",
+                "False",
+            )
         # Para strings, limita tamanho e caracteres perigosos
         if column_type in ("str", "string", "varchar", "text", "char"):
             if not isinstance(value, str):
@@ -75,14 +97,14 @@ class QuerySecurityValidator:
         """Valida se um identificador SQL é seguro."""
         if not identifier or not isinstance(identifier, str):
             return False
-            
+
         # Verifica padrão de identificador válido
         if not cls.IDENTIFIER_PATTERN.match(identifier):
             return False
-            
+
         # Verifica palavras reservadas perigosas
         return identifier.lower() not in cls.FORBIDDEN_KEYWORDS
-    
+
     @classmethod
     def is_safe_qualified_identifier(cls, identifier: str, max_parts: int = 3) -> bool:
         """
@@ -104,7 +126,7 @@ class QuerySecurityValidator:
                 return False
 
         return True
-    
+
     @classmethod
     def ensure_base_table_in_query(cls, payload: QueryPayload) -> QueryPayload:
         """
@@ -124,7 +146,7 @@ class QuerySecurityValidator:
                 return None
 
             parts = [p for p in token.split(".") if p]
-            
+
             # Se tem mais de 2 partes, assumimos que a última é a coluna.
             # Caso contrário, assumimos que é "schema.tabela" ou "tabela" e retornamos intacto.
             if len(parts) > 2:
@@ -133,74 +155,100 @@ class QuerySecurityValidator:
 
         def extract_table_from_alias_key(alias_key: str) -> str | None:
             """
-            Chave de aliaisTables costuma vir como:
-            - "table.column" -> "table"
-            - "schema.table.column" -> "schema.table"
-            Pegamos tudo, exceto a última parte (que é a coluna).
+            Extrai a tabela de chaves como "schema.table.column" -> "schema.table"
+            ou "table.column" -> "table".
             """
             parts = [p for p in (alias_key or "").split(".") if p]
             if len(parts) >= 2:
-                return ".".join(parts[:-1])  # Junta tudo de novo, removendo a coluna
-            if len(parts) == 1:
-                return parts[0]
+                return ".".join(parts[:-1])
             return None
 
-        base = payload.baseTable
+        def is_same_table(ref1: str | None, ref2: str | None) -> bool:
+            """
+            Compara duas tabelas ignorando o schema e aspas.
+            Exemplo: 'public.usuarios' e 'usuarios' retornam True.
+            """
+            if not ref1 or not ref2:
+                return False
+            # Pega apenas a última parte (nome da tabela real) e ignora aspas/brackets
+            name1 = ref1.strip('"`[]').split(".")[-1].lower()
+            name2 = ref2.strip('"`[]').split(".")[-1].lower()
+            return name1 == name2
 
-        # ---------- check SELECT ----------
-        base_table_in_select = False
+        base = payload.baseTable
+        base_table_in_use = False
+
+        # ---------- check SELECT (aliases) ----------
         if payload.aliaisTables:
             for alias_key in payload.aliaisTables.keys():
                 t = extract_table_from_alias_key(alias_key)
-                if t == base:
-                    base_table_in_select = True
+                if is_same_table(t, base):
+                    base_table_in_use = True
+                    break
+
+        # ---------- check SELECT (lista simples) ----------
+        if not base_table_in_use and getattr(payload, "select", None):
+            for col in payload.select:
+                t = extract_table_from_alias_key(col)
+                if is_same_table(t, base):
+                    base_table_in_use = True
                     break
 
         # ---------- check WHERE ----------
-        base_table_in_where = False
-        if payload.where:
+        if not base_table_in_use and payload.where:
             for condition in payload.where:
-                if condition.table_name_fil == base:
-                    base_table_in_where = True
+                if is_same_table(condition.table_name_fil, base):
+                    base_table_in_use = True
+                    break
+
+        # ---------- check TABLE LIST direta ----------
+        if not base_table_in_use and payload.table_list:
+            for tb in payload.table_list:
+                if is_same_table(tb, base):
+                    base_table_in_use = True
                     break
 
         # ---------- if missing -> pick another ----------
-        if not base_table_in_select and not base_table_in_where:
+        if not base_table_in_use:
             available_tables: list[str] = []
 
-            # SELECT aliaisTables
+            def add_available(t_name: str | None):
+                # Só adiciona se não for a tabela base e se já não existir na lista
+                if t_name and not is_same_table(t_name, base):
+                    if not any(
+                        is_same_table(t_name, exist_t) for exist_t in available_tables
+                    ):
+                        available_tables.append(t_name)
+
+            # Coleta de todas as fontes possíveis
             if payload.aliaisTables:
                 for alias_key in payload.aliaisTables.keys():
-                    t = extract_table_from_alias_key(alias_key)
-                    if t and t != base and t not in available_tables:
-                        available_tables.append(t)
+                    add_available(extract_table_from_alias_key(alias_key))
 
-            # WHERE tables
+            if getattr(payload, "select", None):
+                for col in payload.select:
+                    add_available(extract_table_from_alias_key(col))
+
             if payload.where:
                 for condition in payload.where:
-                    t = condition.table_name_fil
-                    if t and t != base and t not in available_tables:
-                        available_tables.append(t)
+                    add_available(condition.table_name_fil)
 
-            # JOINs
             if payload.joins:
                 for join_table in payload.joins.keys():
-                    t = extract_table_ref(join_table)
-                    if t and t != base and t not in available_tables:
-                        available_tables.append(t)
+                    # Assegure-se de que extract_table_ref está definida no seu código
+                    add_available(extract_table_ref(join_table))
 
-            # table_list
             if payload.table_list:
                 for table in payload.table_list:
-                    t = extract_table_ref(table)
-                    if t and t != base and t not in available_tables:
-                        available_tables.append(t)
+                    add_available(extract_table_ref(table))
 
             if available_tables:
+                # Opcional: Se quiser garantir que a nova baseTable também mantém
+                # o schema se estiver disponível na table_list original, pode fazer aqui.
                 payload.baseTable = available_tables[0]
 
         return payload
-    
+
     @classmethod
     def validate_query_payload(cls, payload) -> None:
         """Valida apenas os campos críticos do payload para segurança."""
@@ -218,39 +266,61 @@ class QuerySecurityValidator:
             if payload.joins:
                 for table_name, join_option in payload.joins.items():
                     if not cls.is_safe_qualified_identifier(table_name, max_parts=2):
-                        raise ValueError(f"Nome da tabela de join inválido: {table_name}")
+                        raise ValueError(
+                            f"Nome da tabela de join inválido: {table_name}"
+                        )
 
                     for condition in join_option.conditions:
                         # leftColumn (table.column OU schema.table.column)
                         if condition.leftColumn:
-                            if not cls.is_safe_qualified_identifier(condition.leftColumn, max_parts=3):
-                                raise ValueError(f"Coluna inválida em leftColumn: {condition.leftColumn}")
+                            if not cls.is_safe_qualified_identifier(
+                                condition.leftColumn, max_parts=3
+                            ):
+                                raise ValueError(
+                                    f"Coluna inválida em leftColumn: {condition.leftColumn}"
+                                )
 
                         # rightColumn (quando não usa value)
                         if not condition.useValue and condition.rightColumn:
-                            if not cls.is_safe_qualified_identifier(condition.rightColumn, max_parts=3):
-                                raise ValueError(f"Coluna inválida em rightColumn: {condition.rightColumn}")
+                            if not cls.is_safe_qualified_identifier(
+                                condition.rightColumn, max_parts=3
+                            ):
+                                raise ValueError(
+                                    f"Coluna inválida em rightColumn: {condition.rightColumn}"
+                                )
 
             # 3) WHERE
             if payload.where:
                 for condition in payload.where:
                     # table_name_fil pode vir schema.table
-                    if not cls.is_safe_qualified_identifier(condition.table_name_fil, max_parts=2):
-                        raise ValueError(f"Nome da tabela no filtro inválido: {condition.table_name_fil}")
+                    if not cls.is_safe_qualified_identifier(
+                        condition.table_name_fil, max_parts=2
+                    ):
+                        raise ValueError(
+                            f"Nome da tabela no filtro inválido: {condition.table_name_fil}"
+                        )
 
                     # column normalmente é só "nome", "email"... (1 parte)
                     # mas se em algum cenário vier qualificado, aceitamos 1..3 pra compatibilidade
-                    if not cls.is_safe_qualified_identifier(condition.column, max_parts=3):
-                        raise ValueError(f"Nome da coluna no filtro inválido: {condition.column}")
+                    if not cls.is_safe_qualified_identifier(
+                        condition.column, max_parts=3
+                    ):
+                        raise ValueError(
+                            f"Nome da coluna no filtro inválido: {condition.column}"
+                        )
 
                     # valores em operadores de risco
                     if condition.operator in ["IN", "NOT IN"] and condition.value:
                         if isinstance(condition.value, list):
                             for val in condition.value:
                                 if not cls.is_safe_value(val, condition.column_type):
-                                    raise ValueError(f"Valor inválido na condição IN: {val}")
+                                    raise ValueError(
+                                        f"Valor inválido na condição IN: {val}"
+                                    )
                         else:
-                            if not cls.is_safe_value(condition.value, condition.column_type):
+                            if not cls.is_safe_value(
+                                condition.value, condition.column_type
+                            ):
                                 raise ValueError(f"Valor inválido: {condition.value}")
 
             # 4) Aliases/colunas no SELECT (aliaisTables)
@@ -263,10 +333,11 @@ class QuerySecurityValidator:
                     # opcional: validar também o "original" se tu realmente usas isso no SQL
                     if original and isinstance(original, str):
                         if not cls.is_safe_qualified_identifier(original, max_parts=3):
-                            raise ValueError(f"Original inválido em aliaisTables: {original}")
+                            raise ValueError(
+                                f"Original inválido em aliaisTables: {original}"
+                            )
 
         except ValueError:
             raise
         except Exception as e:
             raise ValueError(f"Erro na validação do payload: {e}")
-

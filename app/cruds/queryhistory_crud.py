@@ -43,28 +43,32 @@ async def create_query_history_async(
     Cria um novo registro de histórico de consulta (async).
     """
     try:
-        query_data = data.model_dump(exclude_unset=True)
-        new_query = QueryHistory(**query_data)
+        try:
+            query_data = data.model_dump(exclude_unset=True)
+            new_query = QueryHistory(**query_data)
 
-        db.add(new_query)
-        await db.commit()
-        await db.refresh(new_query)
+            db.add(new_query)
+            await db.commit()
+            await db.refresh(new_query)
 
-        log_message(
-            f"✅ Consulta criada (ID={new_query.id}, UserID={new_query.user_id}, ConnID={new_query.db_connection_id})",
-            "success",
-        )
-        return new_query
+            log_message(
+                f"✅ Consulta criada (ID={new_query.id}, UserID={new_query.user_id}, ConnID={new_query.db_connection_id})",
+                "success",
+            )
+            return new_query
 
-    except SQLAlchemyError as e:
-        await db.rollback()
-        log_message(f"❌ Erro SQL ao criar histórico async: {str(e)}", "error")
-        raise
+        except SQLAlchemyError as e:
+            await db.rollback()
+            log_message(f"❌ Erro SQL ao criar histórico async: {str(e)}", "error")
+            raise
 
-    except Exception as e:
-        await db.rollback()
-        log_message(f"❌ Erro inesperado ao criar histórico async: {str(e)}\n{traceback.format_exc()}", "error")
-        raise
+        except Exception as e:
+            await db.rollback()
+            log_message(f"❌ Erro inesperado ao criar histórico async: {str(e)}\n{traceback.format_exc()}", "error")
+            raise
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 async def get_query_history_async(
@@ -73,25 +77,29 @@ async def get_query_history_async(
 ) -> Optional[QueryHistory]:
     """Obtém um histórico por ID (async)."""
     try:
-        stmt = (
-            select(QueryHistory)
-            .where(QueryHistory.id == query_id)
-            # Carrega relações SOMENTE quando você precisa.
-            # Se isso for usado em listagem leve, considere remover.
-            .options(selectinload(QueryHistory.user))
-            .options(selectinload(QueryHistory.connection))
-        )
+        try:
+            stmt = (
+                select(QueryHistory)
+                .where(QueryHistory.id == query_id)
+                # Carrega relações SOMENTE quando você precisa.
+                # Se isso for usado em listagem leve, considere remover.
+                .options(selectinload(QueryHistory.user))
+                .options(selectinload(QueryHistory.connection))
+            )
 
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
+            result = await db.execute(stmt)
+            return result.scalar_one_or_none()
 
-    except SQLAlchemyError as e:
-        log_message(f"❌ Erro SQL ao buscar histórico {query_id}: {str(e)}", "error")
-        return None
+        except SQLAlchemyError as e:
+            log_message(f"❌ Erro SQL ao buscar histórico {query_id}: {str(e)}", "error")
+            return None
 
-    except Exception as e:
-        log_message(f"❌ Erro inesperado ao buscar histórico {query_id}: {str(e)}", "error")
-        return None
+        except Exception as e:
+            log_message(f"❌ Erro inesperado ao buscar histórico {query_id}: {str(e)}", "error")
+            return None
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 async def update_query_history_async(
@@ -101,37 +109,41 @@ async def update_query_history_async(
 ) -> Optional[QueryHistory]:
     """Atualiza um histórico existente (async)."""
     try:
-        stmt = select(QueryHistory).where(QueryHistory.id == query_id)
-        result = await db.execute(stmt)
-        query_history = result.scalar_one_or_none()
+        try:
+            stmt = select(QueryHistory).where(QueryHistory.id == query_id)
+            result = await db.execute(stmt)
+            query_history = result.scalar_one_or_none()
 
-        if not query_history:
-            return None
+            if not query_history:
+                return None
 
-        update_data = data.model_dump(exclude_unset=True)
+            update_data = data.model_dump(exclude_unset=True)
 
-        changed = False
-        for field, value in update_data.items():
-            if hasattr(query_history, field) and getattr(query_history, field) != value:
-                setattr(query_history, field, value)
-                changed = True
+            changed = False
+            for field, value in update_data.items():
+                if hasattr(query_history, field) and getattr(query_history, field) != value:
+                    setattr(query_history, field, value)
+                    changed = True
 
-        if changed:
-            await db.commit()
-            await db.refresh(query_history)
+            if changed:
+                await db.commit()
+                await db.refresh(query_history)
 
-        log_message(f"ℹ️ Histórico {query_id} atualizado", "info")
-        return query_history
+            log_message(f"ℹ️ Histórico {query_id} atualizado", "info")
+            return query_history
 
-    except SQLAlchemyError as e:
-        await db.rollback()
-        log_message(f"❌ Erro SQL ao atualizar histórico {query_id}: {str(e)}", "error")
-        raise
+        except SQLAlchemyError as e:
+            await db.rollback()
+            log_message(f"❌ Erro SQL ao atualizar histórico {query_id}: {str(e)}", "error")
+            raise
 
-    except Exception:
-        await db.rollback()
-        log_message(f"❌ Erro inesperado ao atualizar histórico {query_id}:\n{traceback.format_exc()}", "error")
-        raise
+        except Exception:
+            await db.rollback()
+            log_message(f"❌ Erro inesperado ao atualizar histórico {query_id}:\n{traceback.format_exc()}", "error")
+            raise
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 async def delete_query_history_async(
@@ -140,26 +152,30 @@ async def delete_query_history_async(
 ) -> bool:
     """Deleta um histórico (async)."""
     try:
-        stmt = select(QueryHistory).where(QueryHistory.id == query_id)
-        result = await db.execute(stmt)
-        query_history = result.scalar_one_or_none()
+        try:
+            stmt = select(QueryHistory).where(QueryHistory.id == query_id)
+            result = await db.execute(stmt)
+            query_history = result.scalar_one_or_none()
 
-        if not query_history:
-            return False
+            if not query_history:
+                return False
 
-        await db.delete(query_history)
-        await db.commit()
-        return True
+            await db.delete(query_history)
+            await db.commit()
+            return True
 
-    except SQLAlchemyError as e:
-        await db.rollback()
-        log_message(f"❌ Erro SQL ao deletar histórico {query_id}: {str(e)}", "error")
-        raise
+        except SQLAlchemyError as e:
+            await db.rollback()
+            log_message(f"❌ Erro SQL ao deletar histórico {query_id}: {str(e)}", "error")
+            raise
 
-    except Exception:
-        await db.rollback()
-        log_message(f"❌ Erro inesperado ao deletar histórico {query_id}:\n{traceback.format_exc()}", "error")
-        raise
+        except Exception:
+            await db.rollback()
+            log_message(f"❌ Erro inesperado ao deletar histórico {query_id}:\n{traceback.format_exc()}", "error")
+            raise
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 # ============================================================
@@ -183,30 +199,34 @@ def create_query_history(db: Session, user_id: int, data: QueryHistoryCreate) ->
     Força o user_id recebido pelo token para evitar spoofing (falsidade ideológica).
     """
     try:
-        # Extrai os dados e injeta o dono real (proteção contra manipulação de payload)
-        dump_data = data.model_dump(exclude_unset=True)
-        dump_data["user_id"] = user_id
-        dump_data["executed_by"] = f"user_{user_id}"
+        try:
+            # Extrai os dados e injeta o dono real (proteção contra manipulação de payload)
+            dump_data = data.model_dump(exclude_unset=True)
+            dump_data["user_id"] = user_id
+            dump_data["executed_by"] = f"user_{user_id}"
 
-        new_query = QueryHistory(**dump_data)
-        db.add(new_query)
-        db.commit()
-        db.refresh(new_query)
+            new_query = QueryHistory(**dump_data)
+            db.add(new_query)
+            db.commit()
+            db.refresh(new_query)
 
-        log_message(
-            f"✅ Histórico registrado (ID={new_query.id}, UserID={user_id}, ConnID={new_query.db_connection_id}, Type={new_query.query_type})",
-            level="success",
-        )
-        return new_query
+            log_message(
+                f"✅ Histórico registrado (ID={new_query.id}, UserID={user_id}, ConnID={new_query.db_connection_id}, Type={new_query.query_type})",
+                level="success",
+            )
+            return new_query
 
-    except SQLAlchemyError as e:
-        db.rollback()
-        log_message(f"❌ Falha no banco ao criar histórico de consulta (User {user_id}): {str(e)}", level="error")
-        raise
-    except Exception as e:
-        db.rollback()
-        log_message(f"❌ Erro inesperado ao criar histórico de consulta: {str(e)}", level="error")
-        raise
+        except SQLAlchemyError as e:
+            db.rollback()
+            log_message(f"❌ Falha no banco ao criar histórico de consulta (User {user_id}): {str(e)}", level="error")
+            raise
+        except Exception as e:
+            db.rollback()
+            log_message(f"❌ Erro inesperado ao criar histórico de consulta: {str(e)}", level="error")
+            raise
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 # ============================================================
@@ -224,45 +244,49 @@ def update_query_history_v2(
     Bloqueia a edição da string da query ou tempo de execução por motivos de auditoria.
     """
     try:
-        # 1. Busca garantindo que o registro pertence ao usuário que solicitou
-        query_obj = db.query(QueryHistory).filter(
-            QueryHistory.id == query_id,
-            QueryHistory.user_id == user_id
-        ).first()
+        try:
+            # 1. Busca garantindo que o registro pertence ao usuário que solicitou
+            query_obj = db.query(QueryHistory).filter(
+                QueryHistory.id == query_id,
+                QueryHistory.user_id == user_id
+            ).first()
 
-        if not query_obj:
-            log_message(f"⚠️ Tentativa de edição negada ou histórico não encontrado (ID={query_id}, UserID={user_id})", level="warning")
-            return None
+            if not query_obj:
+                log_message(f"⚠️ Tentativa de edição negada ou histórico não encontrado (ID={query_id}, UserID={user_id})", level="warning")
+                return None
 
-        # 2. Atualiza apenas os campos permitidos
-        update_data = data.model_dump(exclude_unset=True)
-        
-        # Blindagem: Apenas estes campos podem ser editados pelo usuário no histórico
-        allowed_updates = {"is_favorite", "tags", "meta_info"}
+            # 2. Atualiza apenas os campos permitidos
+            update_data = data.model_dump(exclude_unset=True)
+            
+            # Blindagem: Apenas estes campos podem ser editados pelo usuário no histórico
+            allowed_updates = {"is_favorite", "tags", "meta_info"}
 
-        has_changes = False
-        for key, value in update_data.items():
-            if key in allowed_updates:
-                setattr(query_obj, key, value)
-                has_changes = True
+            has_changes = False
+            for key, value in update_data.items():
+                if key in allowed_updates:
+                    setattr(query_obj, key, value)
+                    has_changes = True
 
-        # Se houver mudanças, registra a auditoria da modificação
-        if has_changes:
-            query_obj.modified_by = f"user_{user_id}" # type: ignore
-            db.commit()
-            db.refresh(query_obj)
-            log_message(f"✅ Histórico {query_id} atualizado com sucesso (UserID={user_id})", level="success")
-        
-        return query_obj
+            # Se houver mudanças, registra a auditoria da modificação
+            if has_changes:
+                query_obj.modified_by = f"user_{user_id}" # type: ignore
+                db.commit()
+                db.refresh(query_obj)
+                log_message(f"✅ Histórico {query_id} atualizado com sucesso (UserID={user_id})", level="success")
+            
+            return query_obj
 
-    except SQLAlchemyError as e:
-        db.rollback()
-        log_message(f"❌ Falha no banco ao atualizar histórico {query_id}: {str(e)}", level="error")
-        raise
-    except Exception as e:
-        db.rollback()
-        log_message(f"❌ Erro inesperado ao atualizar histórico {query_id}: {str(e)}", level="error")
-        raise
+        except SQLAlchemyError as e:
+            db.rollback()
+            log_message(f"❌ Falha no banco ao atualizar histórico {query_id}: {str(e)}", level="error")
+            raise
+        except Exception as e:
+            db.rollback()
+            log_message(f"❌ Erro inesperado ao atualizar histórico {query_id}: {str(e)}", level="error")
+            raise
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 def get_query_history_by_user_and_query(
@@ -271,16 +295,20 @@ def get_query_history_by_user_and_query(
     connection_id: int,
     query_string: str
 ) -> QueryHistory | None:
-    return (
-        db.query(QueryHistory)
-        .filter(
-            QueryHistory.user_id == user_id,
-            QueryHistory.db_connection_id == connection_id,
-            QueryHistory.query == query_string,
+    try:
+        return (
+            db.query(QueryHistory)
+            .filter(
+                QueryHistory.user_id == user_id,
+                QueryHistory.db_connection_id == connection_id,
+                QueryHistory.query == query_string,
+            )
+            .order_by(QueryHistory.executed_at.desc(), QueryHistory.id.desc())
+            .first()
         )
-        .order_by(QueryHistory.executed_at.desc(), QueryHistory.id.desc())
-        .first()
-    )
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 async def get_query_history_by_user_and_query_async(
@@ -294,115 +322,154 @@ async def get_query_history_by_user_and_query_async(
     Retorna o registro mais recente em caso de duplicatas.
     """
     try:
-        stmt = (
-            select(QueryHistory)
-            .where(
-                QueryHistory.user_id == user_id,
-                QueryHistory.db_connection_id == connection_id,
-                QueryHistory.query == query_string,
-                QueryHistory.error_message.is_(None),
+        try:
+            stmt = (
+                select(QueryHistory)
+                .where(
+                    QueryHistory.user_id == user_id,
+                    QueryHistory.db_connection_id == connection_id,
+                    QueryHistory.query == query_string,
+                    QueryHistory.error_message.is_(None),
+                )
             )
-        )
-        stmt = _apply_common_order(stmt)
+            stmt = _apply_common_order(stmt)
 
-        result = await db.execute(stmt)
-        return result.scalars().first()
+            result = await db.execute(stmt)
+            return result.scalars().first()
 
-    except SQLAlchemyError as e:
-        log_message(f"❌ Erro SQL ao buscar histórico de query: {str(e)}", "error")
-        return None
+        except SQLAlchemyError as e:
+            log_message(f"❌ Erro SQL ao buscar histórico de query: {str(e)}", "error")
+            return None
 
-    except Exception as e:
-        log_message(f"❌ Erro inesperado ao buscar histórico de query: {str(e)}", "error")
-        return None
+        except Exception as e:
+            log_message(f"❌ Erro inesperado ao buscar histórico de query: {str(e)}", "error")
+            return None
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 # ─────────────── Obter por ID ───────────────
 def get_query_history(db: Session, query_id: int) -> Optional[QueryHistory]:
     """Retorna um registro de consulta específico pelo ID."""
-    return (
-        db.query(QueryHistory)
-        .filter(QueryHistory.id == query_id)
-        .first()
-    )
+    try:
+        return (
+            db.query(QueryHistory)
+            .filter(QueryHistory.id == query_id)
+            .first()
+        )
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 # ─────────────── Listar por Usuário ───────────────
 def get_all_queries_by_user(db: Session, user_id: int, limit: int = 50) -> List[QueryHistory]:
     """Lista as últimas consultas realizadas por um usuário."""
-    limit = _sanitize_limit(limit)
-    return (
-        db.query(QueryHistory)
-        .filter(QueryHistory.user_id == user_id)
-        .order_by(desc(QueryHistory.executed_at), desc(QueryHistory.id))
-        .limit(limit)
-        .all()
-    )
+    try:
+        limit = _sanitize_limit(limit)
+        return (
+            db.query(QueryHistory)
+            .filter(QueryHistory.user_id == user_id)
+            .order_by(desc(QueryHistory.executed_at), desc(QueryHistory.id))
+            .limit(limit)
+            .all()
+        )
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 # ─────────────── Listar por Conexão ───────────────
 def get_queries_by_connection(db: Session, connection_id: int, limit: int = 50) -> List[QueryHistory]:
     """Lista as últimas consultas feitas em uma conexão de banco de dados específica."""
-    limit = _sanitize_limit(limit)
-    return (
-        db.query(QueryHistory)
-        .filter(QueryHistory.db_connection_id == connection_id)
-        .order_by(desc(QueryHistory.executed_at), desc(QueryHistory.id))
-        .limit(limit)
-        .all()
-    )
+    try:
+        limit = _sanitize_limit(limit)
+        return (
+            db.query(QueryHistory)
+            .filter(QueryHistory.db_connection_id == connection_id)
+            .order_by(desc(QueryHistory.executed_at), desc(QueryHistory.id))
+            .limit(limit)
+            .all()
+        )
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 # ─────────────── Última Consulta ───────────────
 def get_ultima_consulta(db: Session, connection_id: int, user_id: int) -> Optional[QueryHistory]:
     """Retorna a última consulta executada por um usuário em uma conexão específica."""
-    return (
-        db.query(QueryHistory)
-        .filter(
-            QueryHistory.user_id == user_id,
-            QueryHistory.db_connection_id == connection_id,
+    try:
+        return (
+            db.query(QueryHistory)
+            .filter(
+                QueryHistory.user_id == user_id,
+                QueryHistory.db_connection_id == connection_id,
+            )
+            .order_by(QueryHistory.executed_at.desc(), QueryHistory.id.desc())
+            .first()
         )
-        .order_by(QueryHistory.executed_at.desc(), QueryHistory.id.desc())
-        .first()
-    )
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 # ─────────────── Atualizar ───────────────
 def update_query_history(db: Session, query_id: int, data: QueryHistoryUpdate) -> Optional[QueryHistory]:
     """Atualiza os campos de um registro de consulta específico."""
-    query = db.query(QueryHistory).filter(QueryHistory.id == query_id).first()
-    if not query:
-        log_message(f"⚠️ Tentativa de atualizar consulta inexistente (ID={query_id})", level="warning")
-        return None
+    try:
+        try:
+            query = db.query(QueryHistory).filter(QueryHistory.id == query_id).first()
+            if not query:
+                log_message(f"⚠️ Tentativa de atualizar consulta inexistente (ID={query_id})", level="warning")
+                return None
 
-    update_data = data.model_dump(exclude_unset=True)
+            update_data = data.model_dump(exclude_unset=True)
 
-    changed = False
-    for field, value in update_data.items():
-        if hasattr(query, field) and getattr(query, field) != value:
-            setattr(query, field, value)
-            changed = True
+            changed = False
+            for field, value in update_data.items():
+                if hasattr(query, field) and getattr(query, field) != value:
+                    setattr(query, field, value)
+                    changed = True
 
-    if changed:
-        db.commit()
-        db.refresh(query)
+            if changed:
+                db.commit()
+                db.refresh(query)
 
-    log_message(f"ℹ️ Consulta atualizada (ID={query_id})", level="info")
-    return query
+            log_message(f"ℹ️ Consulta atualizada (ID={query_id})", level="info")
+            return query
+
+        except Exception as e:
+            log_message(f"❌ Erro ao atualizar consulta {query_id}: {str(e)}", level="error")
+            raise
+    finally:
+        # A sessão será fechada pelo caller
+        pass
 
 
 # ─────────────── Deletar ───────────────
 def delete_query_history(db: Session, query_id: int) -> bool:
     """Remove um registro de histórico de consulta pelo ID."""
-    deleted = (
-        db.query(QueryHistory)
-        .filter(QueryHistory.id == query_id)
-        .delete(synchronize_session=False)
-    )
-    if not deleted:
-        log_message(f"⚠️ Tentativa de deletar consulta inexistente (ID={query_id})", level="warning")
-        return False
+    try:
+        try:
+            deleted = (
+                db.query(QueryHistory)
+                .filter(QueryHistory.id == query_id)
+                .delete(synchronize_session=False)
+            )
+            if not deleted:
+                log_message(f"⚠️ Tentativa de deletar consulta inexistente (ID={query_id})", level="warning")
+                return False
 
-    db.commit()
-    log_message(f"🗑️ Consulta deletada (ID={query_id})", level="warning")
-    return True
+            db.commit()
+            log_message(f"🗑️ Consulta deletada (ID={query_id})", level="warning")
+            return True
+
+        except Exception as e:
+            db.rollback()
+            log_message(f"❌ Erro ao deletar consulta {query_id}: {str(e)}", level="error")
+            raise
+    finally:
+        # A sessão será fechada pelo caller
+        pass

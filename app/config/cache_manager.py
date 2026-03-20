@@ -1,3 +1,4 @@
+import asyncio
 import gzip
 import json
 import os
@@ -386,9 +387,10 @@ def _make_key(func_name: str, user_id: Optional[str] = None, *args, **kwargs) ->
         except Exception:
             return hashlib.sha256(func_name.encode()).hexdigest()
 
-# -------------------------------
+
+# ============================================================
 # Decorador principal
-# -------------------------------
+# ============================================================
 def cache_result(ttl: Optional[int] = None, max_cache_size_mb: Optional[int] = None, user_id: Optional[str] = None):
     """
     Decorador de cache com:
@@ -396,118 +398,210 @@ def cache_result(ttl: Optional[int] = None, max_cache_size_mb: Optional[int] = N
       - fallback em disco (gzip opcional)
       - limitação de espaço (remoção dos mais antigos)
       - serialização segura para gerar chaves
-    Args:
-      ttl: tempo em segundos (None = infinito)
-      max_cache_size_mb: limite (None = usar CACHE_MAX_SIZE_MB)
-      user_id: forçar user_id fixo (opcional)
+      - SUPORTE A FUNÇÕES SYNC E ASYNC
     """
     def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            # Se cache globalmente desabilitado -> executa direto
-            if not CACHE_ENABLED or CACHE_DISABLE_FLAG:
-                return func(*args, **kwargs)
+        
+        # ---------------------------------------------------------
+        # 1. CAMINHO ASSÍNCRONO (Para rotas com 'async def')
+        # ---------------------------------------------------------
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                if not CACHE_ENABLED or CACHE_DISABLE_FLAG:
+                    return await func(*args, **kwargs)
 
-            # Determina o user_id real (param do decorador tem prioridade)
-            actual_user_id = user_id if user_id is not None else kwargs.get("user_id")
-            # if user_id:
-            #     kwargs["user_id"] = user_id
+                actual_user_id = user_id if user_id is not None else kwargs.get("user_id")
+                key = _make_key(func.__name__, *args, **kwargs)
 
-            # Gera chave limpa (não altera kwargs originais)
-            key = _make_key(func.__name__, *args, **kwargs)
-
-            # 1) verifica em memória
-            mem = MEMORY_CACHE.get(key)
-            if mem is not None:
-                mem_ttl = mem.get("ttl")
-                if mem_ttl is None:
-                    # sem ttl em memória -> usa MEMORY_CACHE_TTL para expiração local
-                    if time.time() - mem["ts"] < MEMORY_CACHE_TTL:
-                        if CACHE_LOG_HITS:
-                            log_message(f"Cache RAM hit para {func.__name__}", "debug")
-                        return mem["val"]
+                # 1) verifica em memória
+                mem = MEMORY_CACHE.get(key)
+                if mem is not None:
+                    mem_ttl = mem.get("ttl")
+                    if mem_ttl is None:
+                        if time.time() - mem["ts"] < MEMORY_CACHE_TTL:
+                            if CACHE_LOG_HITS:
+                                log_message(f"Cache RAM hit para {func.__name__}", "debug")
+                            return mem["val"]
+                        else:
+                            MEMORY_CACHE.pop(key, None)
                     else:
-                        MEMORY_CACHE.pop(key, None)
-                else:
-                    # se houve ttl específico guardado
-                    if mem_ttl is None or (time.time() - mem["ts"] < mem_ttl):
-                        if CACHE_LOG_HITS:
-                            log_message(f"Cache RAM hit para {func.__name__}", "debug")
-                        return mem["val"]
-                    else:
-                        MEMORY_CACHE.pop(key, None)
+                        if mem_ttl is None or (time.time() - mem["ts"] < mem_ttl):
+                            if CACHE_LOG_HITS:
+                                log_message(f"Cache RAM hit para {func.__name__}", "debug")
+                            return mem["val"]
+                        else:
+                            MEMORY_CACHE.pop(key, None)
 
-            # 2) verifica em disco
-            path = _get_cache_path(key)
-            if os.path.exists(path):
-                data = _read_cache(path)
-                if data is not None:
-                    entry_ttl = data.get("ttl", CACHE_TTL_DEFAULT)
-                    timestamp = data.get("timestamp", 0)
-                    # ttl None = nunca expira
-                    if entry_ttl is None or (time.time() - timestamp < (entry_ttl if entry_ttl is not None else float("inf"))):
-                        if CACHE_LOG_HITS:
-                            log_message(f"Cache disco hit para {func.__name__}", "debug")
-                        # coloca em memória para acessos futuros
-                        MEMORY_CACHE[key] = {"ts": time.time(), "val": data.get("value"), "ttl": entry_ttl}
-                        return data.get("value")
-                    else:
-                        # expirado -> remove
-                        try:
-                            os.remove(path)
-                            if CACHE_LOG_MISSES:
-                                log_message(f"Cache expirado removido para {func.__name__}", "debug")
-                        except Exception:
-                            pass
+                # 2) verifica em disco
+                path = _get_cache_path(key)
+                if os.path.exists(path):
+                    data = _read_cache(path)
+                    if data is not None:
+                        entry_ttl = data.get("ttl", CACHE_TTL_DEFAULT)
+                        timestamp = data.get("timestamp", 0)
+                        if entry_ttl is None or (time.time() - timestamp < (entry_ttl if entry_ttl is not None else float("inf"))):
+                            if CACHE_LOG_HITS:
+                                log_message(f"Cache disco hit para {func.__name__}", "debug")
+                            MEMORY_CACHE[key] = {"ts": time.time(), "val": data.get("value"), "ttl": entry_ttl}
+                            return data.get("value")
+                        else:
+                            try:
+                                os.remove(path)
+                                if CACHE_LOG_MISSES:
+                                    log_message(f"Cache expirado removido para {func.__name__}", "debug")
+                            except Exception:
+                                pass
 
-            # 3) cache miss -> executa função
-            if CACHE_LOG_MISSES:
-                log_message(f"Cache miss para {func.__name__}", "debug")
-            result = func(*args, **kwargs)
-            cacheable_result = _to_cacheable(result)
-            # 4) grava cache (memória + disco)
-            # grava em memória (usa ttl do parâmetro do decorador, se fornecido)
-            # 4) grava cache (memória + disco)
-            MEMORY_CACHE[key] = {"ts": time.time(), "val": cacheable_result, "ttl": ttl}
+                # 3) cache miss -> executa função
+                if CACHE_LOG_MISSES:
+                    log_message(f"Cache miss para {func.__name__}", "debug")
+                
+                # 🚀 MÁGICA AQUI: O await garante que a execução termine antes do cache
+                result = await func(*args, **kwargs)
+                
+                cacheable_result = _to_cacheable(result)
 
-            try:
-                entry = {
-                    "timestamp": time.time(),
-                    "value": cacheable_result, # <--- CORREÇÃO: Usar o resultado convertido
-                    "ttl": ttl,
-                    "function": func.__name__,
-                    "user_id": actual_user_id
-                }
-                _write_cache(path, entry)
-            except Exception as e:
-                # já foi logado em _write_cache, mas registra aqui para contexto
-                log_message(f"Falha ao gravar cache para {func.__name__}: {e}", "error")
+                # 4) grava cache (memória + disco)
+                MEMORY_CACHE[key] = {"ts": time.time(), "val": cacheable_result, "ttl": ttl}
 
-            # 5) verifica e aplica política de tamanho (probabilisticamente leve)
-            max_size = max_cache_size_mb if max_cache_size_mb is not None else CACHE_MAX_SIZE_MB
-            if max_size:
-                # faz enforcement se ultrapassar
                 try:
-                    if _get_cache_size() > (max_size * 1024 * 1024):
-                        _enforce_cache_size(max_size)
+                    entry = {
+                        "timestamp": time.time(),
+                        "value": cacheable_result,
+                        "ttl": ttl,
+                        "function": func.__name__,
+                        "user_id": actual_user_id
+                    }
+                    _write_cache(path, entry)
                 except Exception as e:
-                    log_message(f"Erro ao aplicar limite de cache: {e}", "error")
-            # limpeza probabilística de arquivos antigos
-            try:
-                if random.random() < CACHE_CLEANUP_PROBABILITY: # type: ignore
-                    _clean_old_cache_files()
-            except Exception as e:
-                log_message(f"Erro em limpeza probabilística do cache: {e}", "error")
+                    log_message(f"Falha ao gravar cache para {func.__name__}: {e}", "error")
 
-            return result
-        # adiciona utilitários à função decorada (opcional)
-        def clear_cache_for_this_function():
-            clear_cache_for_function(func.__name__)
-        def get_cache_info_for_this_function():
-            return get_function_cache_info(func.__name__)
-        wrapper.clear_cache = clear_cache_for_this_function  # type: ignore
-        wrapper.get_cache_info = get_cache_info_for_this_function  # type: ignore
-        return wrapper
+                # 5) políticas de tamanho e limpeza
+                max_size = max_cache_size_mb if max_cache_size_mb is not None else CACHE_MAX_SIZE_MB
+                if max_size:
+                    try:
+                        if _get_cache_size() > (max_size * 1024 * 1024):
+                            _enforce_cache_size(max_size)
+                    except Exception as e:
+                        log_message(f"Erro ao aplicar limite de cache: {e}", "error")
+                try:
+                    if random.random() < CACHE_CLEANUP_PROBABILITY: # type: ignore
+                        _clean_old_cache_files()
+                except Exception as e:
+                    log_message(f"Erro em limpeza probabilística do cache: {e}", "error")
+
+                return result
+
+            def clear_cache_for_this_function():
+                clear_cache_for_function(func.__name__)
+            def get_cache_info_for_this_function():
+                return get_function_cache_info(func.__name__)
+            async_wrapper.clear_cache = clear_cache_for_this_function # type: ignore
+            async_wrapper.get_cache_info = get_cache_info_for_this_function # type: ignore
+            
+            return async_wrapper
+
+        # ---------------------------------------------------------
+        # 2. CAMINHO SÍNCRONO (Para rotas com 'def' normal)
+        # ---------------------------------------------------------
+        else:
+            @functools.wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                if not CACHE_ENABLED or CACHE_DISABLE_FLAG:
+                    return func(*args, **kwargs)
+
+                actual_user_id = user_id if user_id is not None else kwargs.get("user_id")
+                key = _make_key(func.__name__, *args, **kwargs)
+
+                # 1) verifica em memória
+                mem = MEMORY_CACHE.get(key)
+                if mem is not None:
+                    mem_ttl = mem.get("ttl")
+                    if mem_ttl is None:
+                        if time.time() - mem["ts"] < MEMORY_CACHE_TTL:
+                            if CACHE_LOG_HITS:
+                                log_message(f"Cache RAM hit para {func.__name__}", "debug")
+                            return mem["val"]
+                        else:
+                            MEMORY_CACHE.pop(key, None)
+                    else:
+                        if mem_ttl is None or (time.time() - mem["ts"] < mem_ttl):
+                            if CACHE_LOG_HITS:
+                                log_message(f"Cache RAM hit para {func.__name__}", "debug")
+                            return mem["val"]
+                        else:
+                            MEMORY_CACHE.pop(key, None)
+
+                # 2) verifica em disco
+                path = _get_cache_path(key)
+                if os.path.exists(path):
+                    data = _read_cache(path)
+                    if data is not None:
+                        entry_ttl = data.get("ttl", CACHE_TTL_DEFAULT)
+                        timestamp = data.get("timestamp", 0)
+                        if entry_ttl is None or (time.time() - timestamp < (entry_ttl if entry_ttl is not None else float("inf"))):
+                            if CACHE_LOG_HITS:
+                                log_message(f"Cache disco hit para {func.__name__}", "debug")
+                            MEMORY_CACHE[key] = {"ts": time.time(), "val": data.get("value"), "ttl": entry_ttl}
+                            return data.get("value")
+                        else:
+                            try:
+                                os.remove(path)
+                                if CACHE_LOG_MISSES:
+                                    log_message(f"Cache expirado removido para {func.__name__}", "debug")
+                            except Exception:
+                                pass
+
+                # 3) cache miss -> executa função
+                if CACHE_LOG_MISSES:
+                    log_message(f"Cache miss para {func.__name__}", "debug")
+                
+                # 🚀 Execução síncrona normal
+                result = func(*args, **kwargs)
+                
+                cacheable_result = _to_cacheable(result)
+
+                # 4) grava cache (memória + disco)
+                MEMORY_CACHE[key] = {"ts": time.time(), "val": cacheable_result, "ttl": ttl}
+
+                try:
+                    entry = {
+                        "timestamp": time.time(),
+                        "value": cacheable_result,
+                        "ttl": ttl,
+                        "function": func.__name__,
+                        "user_id": actual_user_id
+                    }
+                    _write_cache(path, entry)
+                except Exception as e:
+                    log_message(f"Falha ao gravar cache para {func.__name__}: {e}", "error")
+
+                # 5) políticas de tamanho e limpeza
+                max_size = max_cache_size_mb if max_cache_size_mb is not None else CACHE_MAX_SIZE_MB
+                if max_size:
+                    try:
+                        if _get_cache_size() > (max_size * 1024 * 1024):
+                            _enforce_cache_size(max_size)
+                    except Exception as e:
+                        log_message(f"Erro ao aplicar limite de cache: {e}", "error")
+                try:
+                    if random.random() < CACHE_CLEANUP_PROBABILITY: # type: ignore
+                        _clean_old_cache_files()
+                except Exception as e:
+                    log_message(f"Erro em limpeza probabilística do cache: {e}", "error")
+
+                return result
+
+            def clear_cache_for_this_function():
+                clear_cache_for_function(func.__name__)
+            def get_cache_info_for_this_function():
+                return get_function_cache_info(func.__name__)
+            sync_wrapper.clear_cache = clear_cache_for_this_function # type: ignore
+            sync_wrapper.get_cache_info = get_cache_info_for_this_function # type: ignore
+            
+            return sync_wrapper
+
     return decorator
 
 # -------------------------------

@@ -1,20 +1,17 @@
-import asyncio
+
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, AsyncGenerator, List
+from typing import Any, Dict, List, Optional, AsyncGenerator
 from contextlib import asynccontextmanager
 
-from pydantic import BaseModel, Field
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
     Body
 )
-from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.database import get_db_async
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 

@@ -28,24 +28,28 @@ class GeradorDadosInteligente:
         self.locale = gen_config['default_locale']
         self.max_retries = gen_config['max_retries']
         self.null_probability = gen_config['null_probability']
-        
+        self.faker = Faker(gen_config['default_locale'])
         # Configura Faker com seed se especificado
-        if faker_config['seed'] is not None:
-            self.faker.seed(faker_config['seed'])
-        self._cache_lock = Lock()
-        self._cache = {}
-        self._relational_cache = {}
-        self._consistent_data = {}
-        self._unique_values_cache = {}
-        
         try:
-            self.faker = Faker( gen_config['default_locale'])
+            self.faker = Faker(gen_config['default_locale'])
+            # Configura Faker com seed se especificado
+            if faker_config['seed'] is not None:
+                self.faker.seed(faker_config['seed'])
+            
             self._build_patterns()
             self._build_relational_data()
         except Exception as e:
             logger.error(f"Erro ao inicializar gerador com locale {locale}: {e}")
             # Fallback para locale padrão
             self.faker = Faker("pt_PT")
+            self._build_patterns()
+            self._build_relational_data()
+        
+        self._cache_lock = Lock()
+        self._cache = {}
+        self._relational_cache = {}
+        self._consistent_data = {}
+        self._unique_values_cache = {}
 
     def _build_patterns(self):
         """Constrói padrões regex para identificação inteligente de campos"""
@@ -614,7 +618,7 @@ class GeradorDadosInteligente:
         # Fallback final
         return faker_strategy(lambda: f"auto_{self.faker.word()}")
 
-
+gerador = GeradorDadosInteligente()
 # Função principal para manter compatibilidade com código existente
 def gerar_valor_pelo_tipo_de_dados_na_bd(
     coluna: CampoDetalhado, como_strategy: bool = False, tabela_name: str = ""
@@ -622,5 +626,5 @@ def gerar_valor_pelo_tipo_de_dados_na_bd(
     """
     Versão melhorada da função original com geração inteligente de dados
     """
-    gerador = GeradorDadosInteligente()
+    
     return gerador.gerar_valor_inteligente(coluna, como_strategy, tabela_name)

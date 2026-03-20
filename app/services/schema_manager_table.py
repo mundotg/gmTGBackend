@@ -142,7 +142,7 @@ def _audit_write(
     historico = QueryHistoryCreate(
         user_id=ctx.user_id,
         db_connection_id=connection_id,
-        query=_shorten_sql(sql) if sql else None,
+        query=_shorten_sql(sql) if sql else "Create table",
         query_type=query_type,
         executed_at=started_at,
         duration_ms=duration_ms,

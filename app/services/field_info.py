@@ -6,7 +6,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 # from app.config.cache_manager import cache_result
 from app.config.cache_manager import cache_result
-from app.cruds.dbstructure_crud import create_db_field, create_db_structure, delete_structure_by_name, get_db_structures_by_conn_id_and_table, get_fields_by_structure
+from app.cruds.dbstructure_crud import create_db_field, create_db_structure, delete_structure_by_name, get_db_structures_by_conn_id_and_table,  get_fields_by_structure
 from app.models.dbstructure_models import   DBField,  DBStructure
 from app.schemas.dbstructure_schema import  CampoDetalhado, DBFieldCreate, MetadataTableResponse
 from app.services.fields_estruture import  _is_system_field_from_column, obter_schema_do_engine
@@ -46,6 +46,7 @@ def sincronizar_metadados_da_tabela(
             db_type=db_type
         )
         
+        print("structure:",structure)
         # 4. Busca ou cria os campos
         fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine, str(db_type))
 
@@ -291,11 +292,11 @@ def buscar_estrutura_tabela(
     """
     Busca ou cria a estrutura da tabela na base local.
     """
-    structure = get_db_structures_by_conn_id_and_table(db, db_connection_id, table_name)
+    structure =get_db_structures_by_conn_id_and_table(db, db_connection_id, table_name)
     
     if not structure:
         # Usa o schema da conexão, se possível
-        schema_name = obter_schema_do_engine(engine, db_type)
+        schema_name = obter_schema_do_engine(engine, db_type.lower())
         
         # Opcional: Se 'create_db_structure' já lida com reativação de deletados, 
         # essa linha abaixo pode ser redundante, mas mantive conforme seu código original.
@@ -410,7 +411,7 @@ def buscar_ou_criar_campos_tabela(
         scale = getattr(column_type, "scale", None)
         is_primary_key = col_name in primary_keys
         is_unique = col_name in unique_columns
-        relation = relations_map.get(col_name)
+        relation = relations_map.get(col_name) or {}
         is_foreign_key = True if relation else False
         tipo = column_type.compile(dialect=engine.dialect)
         default_value =column.get("default")

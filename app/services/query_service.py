@@ -143,6 +143,7 @@ class QueryService:
         """
         Constrói a cláusula WHERE e os parâmetros associados.
         """
+        
         filters, params = await self.filter_builder.build_where_clause(
             payload.where or [],
             db_type,

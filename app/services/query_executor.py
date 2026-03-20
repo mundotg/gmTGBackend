@@ -18,7 +18,7 @@ from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
 # Limite de linhas a manter no preview (evita OOM)
-MAX_PREVIEW_ROWS = 500
+MAX_PREVIEW_ROWS = 50000
 # Tamanho do lote para fetchmany
 FETCH_BATCH_SIZE = 100
 
@@ -105,17 +105,18 @@ async def executar_query_e_salvar(
     if not queryrequest:
         raise ValueError("QueryPayload é obrigatório")
 
-    security_validator.ensure_base_table_in_query(queryrequest)
+    newQueryValidado=security_validator.ensure_base_table_in_query(queryrequest)
+    
     # Filtros WHERE 
     filters, params = await filter_builder.build_where_clause(
-                queryrequest.where or [], connection.type
+                newQueryValidado.where or [], connection.type
             )
     # filters, params = montar_filter_com_parametros(queryrequest.where, connection.type)
     # Monta query (count ou select)
     if queryrequest.isCountQuery:
         query_string = get_count_query(
-            base_table=queryrequest.baseTable,
-            joins=queryrequest.joins or [],
+            base_table=newQueryValidado.baseTable,
+            joins=queryrequest.joins or {},
             filters=filters,
             distinct=queryrequest.distinct,
             db_type=connection.type
@@ -129,7 +130,7 @@ async def executar_query_e_salvar(
                 filters=filters,
                 table_list=queryrequest.table_list,
                 order_by=queryrequest.orderBy,
-                max_rows=queryrequest.limit or 1,
+                max_rows=queryrequest.limit ,
                 offset=queryrequest.offset,
                 db_type=connection.type,
                 distinct=queryrequest.distinct,
@@ -234,6 +235,7 @@ async def executar_query_e_salvar(
                 log_message(f"✅ Preview gerado com {fetched} linhas (cap {MAX_PREVIEW_ROWS}).", "debug")
 
         log_message("✅ Query executada com sucesso.", "success")
+        print(len(result_preview))
 
     except SQLAlchemyError as sa_err:
         # trata erros SQL de forma específica

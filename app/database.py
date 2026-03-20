@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -90,14 +92,14 @@ Base = declarative_base()
 # ============================================================
 # 🔁 DEPENDÊNCIAS DE SESSÃO
 # ============================================================
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
+        
 async def get_db_async():
     async with AsyncSessionLocal() as session:
         yield session

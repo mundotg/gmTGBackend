@@ -120,75 +120,10 @@ class QuerySecurityValidator:
     @classmethod
     def ensure_base_table_in_query(cls, payload: QueryPayload) -> QueryPayload:
         """Verifica se a tabela base está no SELECT ou WHERE, caso não esteja, substitui pela primeira tabela disponível."""
-        
-        if not payload.baseTable:
-            return payload
-
-        # 1. Extrai o nome puro da tabela base (remove o schema para comparações seguras)
-        # Ex: "public.db_fields" vira "db_fields"
-        raw_base_table = payload.baseTable.split('.')[-1]
-        
-        # Verifica se a tabela base está presente no SELECT
-        base_table_in_select = False
-        if payload.aliaisTables:
-            for alias in payload.aliaisTables.keys():
-                parts = alias.split('.')
-                # Se for schema.tabela.coluna ou tabela.coluna, o penúltimo é SEMPRE a tabela
-                if len(parts) >= 2:
-                    alias_table = parts[-2]
-                    if alias_table == raw_base_table:
-                        base_table_in_select = True
-                        break
-                # Se por acaso for só a coluna (len == 1), não dá pra inferir a tabela
-        
-        # Verifica se a tabela base está presente no WHERE
-        base_table_in_where = False
-        if payload.where:
-            for condition in payload.where:
-                # Compara ignorando schema (ex: "db_fields" == "db_fields")
-                if condition.table_name_fil.split('.')[-1] == raw_base_table:
-                    base_table_in_where = True
-                    break
-        
-        # Se a tabela base não está em nenhum lugar, faz a substituição
-        if not base_table_in_select and not base_table_in_where:
-            available_tables = []
-            
-            # Procura na table_list primeiro (É a melhor fonte, pois o frontend já manda com schema: "public.users")
-            if payload.table_list:
-                for table in payload.table_list:
-                    if table.split('.')[-1] != raw_base_table and table not in available_tables:
-                        available_tables.append(table)
-                        
-            # Procura tabelas nos joins
-            if payload.joins:
-                for join_table in payload.joins.keys():
-                    if join_table.split('.')[-1] != raw_base_table and join_table not in available_tables:
-                        available_tables.append(join_table)
-
-            # Procura tabelas no SELECT (aliaisTables) reconstruindo o nome com schema
-            if payload.aliaisTables:
-                for alias in payload.aliaisTables.keys():
-                    parts = alias.split('.')
-                    if len(parts) >= 2:
-                        # Ex: "public.db_structures.id" -> junta "public.db_structures"
-                        table_with_schema = ".".join(parts[:-1])
-                        if parts[-2] != raw_base_table and table_with_schema not in available_tables:
-                            available_tables.append(table_with_schema)
-            
-            # Procura tabelas no WHERE
-            if payload.where:
-                for condition in payload.where:
-                    if condition.table_name_fil.split('.')[-1] != raw_base_table and condition.table_name_fil not in available_tables:
-                        available_tables.append(condition.table_name_fil)
-            
-            # Substitui pela primeira tabela disponível
-            if available_tables:
-                new_base_table = available_tables[0]
-                # print(f"⚠️  Tabela base '{payload.baseTable}' não encontrada no SELECT ou WHERE. Substituindo por '{new_base_table}'")
-                payload.baseTable = new_base_table
-        
-        return payload
+        from app.services.query_security_validator import QuerySecurityValidator as sv
+        security_validator = sv()
+        security_validator.validate_query_payload(payload)
+        return security_validator.ensure_base_table_in_query(payload)
     
     @classmethod
     def validate_query_payload(cls, payload: QueryPayload) -> None:

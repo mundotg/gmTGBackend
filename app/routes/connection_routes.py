@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import os
 import traceback
-from typing import Any, Optional
-
+from typing import Any, Optional, cast
+import pandas as pd
 from fastapi import (
     APIRouter,
     Body,
@@ -19,7 +19,8 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from app.config.cache_manager import cache_result
-from app.config.dependencies import EngineManager, get_session_by_connection
+from app.config.dependencies import get_session_by_connection
+from app.config.engine_manager_cache import EngineManager
 from app.cruds.connection_cruds import (
     create_connection_log,
     create_db_connection,
@@ -188,7 +189,7 @@ def save_connection(
 
         create_connection_log(
             db,
-            connection_id=saved_conn.id,
+            connection_id=cast(int,saved_conn.id) or 0,
             action="Conexão salva",
             status="success",
             details={
@@ -244,11 +245,11 @@ def test_and_connect(
             raise ValueError("Tipo de operação inválido. Use 'con' ou 'upsert'.")
 
         desactivate_all_connections(db, user_id)
-        set_active_connection(db, user_id, db_conn.id)
+        set_active_connection(db, user_id, cast(int, db_conn.id))
 
         create_connection_log(
             db,
-            connection_id=db_conn.id,
+            connection_id=cast(int, db_conn.id),
             action="Conexão testada e ativada",
             status="success",
             details={
@@ -260,7 +261,7 @@ def test_and_connect(
         )
 
         return _build_connection_output(
-            connection_id=db_conn.id,
+            connection_id=cast(int, db_conn.id),
             message="✅ Conexão testada, salva e ativada com sucesso.",
             connected=True,
         )
@@ -272,7 +273,7 @@ def test_and_connect(
             action="Tentativa de conexão falhou",
             message="Falha ao conectar ou salvar a conexão. Verifique os dados e tente novamente.",
             status_code=status.HTTP_400_BAD_REQUEST,
-            connection_id=db_conn.id if db_conn else None,
+            connection_id=cast(int, db_conn.id) if db_conn else None,
             details={"error": str(e), "trace": traceback.format_exc()},
         )
 
@@ -289,15 +290,16 @@ def connect_or_disconnect(
     try:
         active_conn = get_active_connection_by_connid(db, conn_id)
 
-        if active_conn and active_conn.status:
+        if active_conn and active_conn["status"]:
             _cleanup_engine(user_id)
-            disconnect_active_connection(db, active_conn.connection_id)
+            disconnect_active_connection(db, active_conn["connection_id"])
 
             conn_data = _validate_connection_owner(
-                get_db_connection_by_id(db, active_conn.connection_id),
-                active_conn.connection_id,
+                get_db_connection_by_id(db, active_conn["connection_id"]),
+                active_conn["connection_id"],
             )
 
+            # CORRIGIDO: acessando como atributo, não como dicionário
             create_connection_log(
                 db,
                 connection_id=conn_data.id,
@@ -317,8 +319,6 @@ def connect_or_disconnect(
             )
 
         conn_data = _validate_connection_owner(get_db_connection_by_id(db, conn_id), conn_id)
-        
-        print(conn_data)
 
         desactivate_all_connections(db, user_id)
 
@@ -327,8 +327,10 @@ def connect_or_disconnect(
             raise ValueError("Engine não foi criada corretamente.")
 
         EngineManager.set(engine, user_id)
+        # CORRIGIDO: acessando como atributo, não como dicionário
         set_active_connection(db, user_id, conn_data.id)
 
+        # CORRIGIDO: acessando como atributo, não como dicionário
         create_connection_log(
             db,
             connection_id=conn_data.id,
@@ -374,7 +376,7 @@ def list_connections_paginated(
     try:
         connections = get_db_connections_pagination_cached(db, user_id, page, limit)
         active_conn = get_active_connection_by_userid(db, user_id)
-        active_conn_id = active_conn.connection_id if active_conn else None
+        active_conn_id = cast(int,active_conn.connection_id )if active_conn else None
 
         return ConnectionPaginationOutput(
             page=connections["page"],
@@ -401,7 +403,7 @@ def list_connections_paginated(
             db=db,
             user_id=user_id,
             action="Erro ao listar conexões",
-            message="Erro interno ao listar conexões.",
+            message=f"Erro interno ao listar conexões. {str(e)}{traceback.print_exc()}",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             details={"error": str(e)},
         )
@@ -418,18 +420,19 @@ def delete_connection_save(
     """
     try:
         conn = delete_connection(db, conn_id)
-
-        create_connection_log(
-            db,
-            connection_id=conn_id,
-            action=f"Conexão deletada: {conn.name}",
-            status="success",
-            details={
-                "database": conn.database_name,
-                "type": conn.type,
-            },
-            user_id=user_id,
-        )
+        if conn:
+            # CORRIGIDO: aspas simples para evitar problemas com string interpolation
+            create_connection_log(
+                db,
+                connection_id=conn_id,
+                action=f"Conexão deletada: {conn.name}",
+                status="success",
+                details={
+                    "database": conn.database_name,
+                    "type": conn.type,
+                },
+                user_id=user_id,
+            )
 
         _cleanup_engine(user_id)
 
@@ -464,6 +467,7 @@ def get_credenciais(
         conn = get_db_connection_by_id_cached(db, conn_id)
         conn = _validate_connection_owner(conn, conn_id)
 
+        # CORRIGIDO: acessando como atributo, não como dicionário
         return ConnectionPassUserOut(
             password=conn.password,
             username=conn.username,
@@ -575,7 +579,6 @@ def listar_elementos_connections(
 # =========================================================
 # Endpoint de dataset
 # =========================================================
-
 @router.post("/dataset/open")
 async def open_dataset(
     file: Optional[UploadFile] = File(None, description="Arquivo para upload"),
@@ -584,36 +587,65 @@ async def open_dataset(
     user_id: int = Depends(get_current_user_id),
 ):
     """
-    Abre um dataset por upload ou URL pública,
-    converte para SQLite e registra como conexão do usuário.
+    Abre um dataset (que pode conter múltiplas tabelas) por upload ou URL pública,
+    converte para um único ficheiro SQLite e regista como conexão do utilizador.
     """
     conn = None
     db_path: Optional[str] = None
-    filename = "dataset.csv"
+    filename = "dataset"
 
     try:
+        # 1. Lê os bytes do ficheiro/url
         contents, filename, source_type = await read_dataset_source(file=file, url=url)
-        df = read_dataframe(contents, filename)
 
-        table_name = build_safe_table_name(filename)
-        db_path = save_dataframe_to_sqlite(df, user_id=user_id, table_name=table_name)
+        # 2. Transforma num dicionário de DataFrames (suporta múltiplas abas/tabelas)
+        dict_dfs = read_dataframe(contents, filename)
+
+        # 3. Guarda tudo no SQLite e obtém o caminho e as tabelas criadas
+        db_path, tabelas_criadas = save_dataframe_to_sqlite(
+            dict_dfs=dict_dfs,
+            user_id=user_id,
+            original_filename=filename,
+        )
+
+        # 4. Registar a conexão na base de dados principal (o MustaInf)
+        # Usamos o nome da primeira tabela como database_name principal para referência, 
+        # mas o SQLite tem todas lá dentro.
+        main_table_name = tabelas_criadas[0] if tabelas_criadas else "main_table"
 
         conn_data = DBConnectionBase(
             name=f"Dataset: {filename}",
             type="SQLite",
-            host=aes_encrypt(db_path),
+            host=aes_encrypt(db_path),   # caminho absoluto do ficheiro SQLite
             port=0,
             username="",
             password="",
-            database_name=table_name,
+            database_name=main_table_name,
             status="available",
         )
 
         conn = create_db_connection(db, user_id, conn_data)
 
+        # 5. Prepara os metadados de resposta para todas as tabelas
+        # Calcula o total de linhas somando todas as tabelas
+        total_rows_all_tables = sum(len(df) for df in dict_dfs.values())
+        
+        # Cria um resumo com as informações de cada tabela extraída
+        tabelas_info = []
+        for tab_name in tabelas_criadas:
+            df = dict_dfs[tab_name]
+            tabelas_info.append({
+                "table_name": tab_name,
+                "rows": int(len(df)),
+                "columns": int(len(df.columns)),
+                "column_names": list(df.columns),
+                # Preview apenas das primeiras 3 linhas de cada tabela para não sobrecarregar o JSON
+                "preview": df.head(3).where(pd.notna(df.head(3)), None).to_dict(orient="records")
+            })
+
         log_message(
             f"📄 Dataset '{filename}' importado pelo usuário {user_id}. "
-            f"Fonte: {source_type}. Linhas: {len(df)}. Colunas: {len(df.columns)}",
+            f"Fonte: {source_type}. Tabelas: {len(tabelas_criadas)}. Linhas Totais: {total_rows_all_tables}.",
             level="info",
         )
 
@@ -625,9 +657,8 @@ async def open_dataset(
             details={
                 "source": source_type,
                 "host": db_path,
-                "table": table_name,
-                "rows": int(len(df)),
-                "columns": list(df.columns),
+                "tables_created": tabelas_criadas,
+                "total_rows_processed": total_rows_all_tables,
             },
             user_id=user_id,
         )
@@ -637,12 +668,9 @@ async def open_dataset(
             "source": source_type,
             "filename": filename,
             "connection_id": conn.id,
-            "table_name": table_name,
-            "total_rows": int(len(df)),
-            "total_columns": int(len(df.columns)),
-            "columns": list(df.columns),
-            "preview": {}, # preview_df.to_dict(orient="records"),
-            "message": "Dataset carregado e transformado em banco SQLite com sucesso.",
+            "tables": tabelas_info, # Array com info detalhada de cada tabela importada
+            "total_tables_extracted": len(tabelas_criadas),
+            "message": f"Dataset carregado com sucesso. {len(tabelas_criadas)} tabela(s) criada(s).",
         }
 
     except HTTPException as e:
@@ -657,7 +685,10 @@ async def open_dataset(
                 connection_id=conn.id,
                 action="Falha ao importar dataset",
                 status="error",
-                details={"error": e.detail, "filename": filename},
+                details={
+                    "error": e.detail,
+                    "filename": filename,
+                },
                 user_id=user_id,
             )
 
@@ -679,10 +710,13 @@ async def open_dataset(
         if conn:
             create_connection_log(
                 db,
-                connection_id=conn.id,
+                connection_id=cast(int,conn.id),
                 action="Erro crítico no processamento do dataset",
                 status="error",
-                details={"error": str(e), "filename": filename},
+                details={
+                    "error": str(e),
+                    "filename": filename,
+                },
                 user_id=user_id,
             )
 

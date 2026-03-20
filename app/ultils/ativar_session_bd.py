@@ -2,7 +2,8 @@ import traceback
 from typing import Optional, Tuple
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.config.dependencies import EngineManager, get_session_by_connection
+from app.config.dependencies import  get_session_by_connection
+from app.config.engine_manager_cache import EngineManager
 from app.cruds.connection_cruds import create_db_connection, disconnect_active_connection, get_db_connection_by_id
 from app.cruds.dbstatistics_crud import get_statistics_by_connection_geral
 from app.cruds.queryhistory_crud import get_ultima_consulta
@@ -33,11 +34,12 @@ def reativar_connection(id_user: int, db: Session) -> dict:
         if not conexao:
             return {"success": False, "config": None}
         
-        host = aes_decrypt(conexao.host)
-        username= aes_decrypt(conexao.username)
-        password =aes_decrypt(conexao.password)
+        host = aes_decrypt(str(conexao.host))
+        # username= aes_decrypt(str(conexao.username))
+        # password =aes_decrypt(str(conexao.password))
+        type_db = str(conexao.type)
 
-        stats = get_statistics_by_connection_geral(db, conexao.id)
+        stats = get_statistics_by_connection_geral(conexao.id)
         num_tabelas = 0
         consultas_hoje = 0
         registros = 0
@@ -54,7 +56,7 @@ def reativar_connection(id_user: int, db: Session) -> dict:
             id_connection=conexao.id,
             name_db=conexao.database_name,
             data=activated_at,
-            type=conexao.type,
+            type=type_db,
             num_table=num_tabelas,
             num_consultas=consultas_hoje,
             ultima_execucao_ms=duracao_ultima,
@@ -65,13 +67,14 @@ def reativar_connection(id_user: int, db: Session) -> dict:
         # Se não houver engine ativa, tenta criar
         if not EngineManager.get(id_user):
             # 🔍 Checa antes de criar engine se o host:porta está acessível
-            if not is_port_open(host, conexao.port):
-                log_message(
-                    f"❌ Banco {host}:{conexao.port} inacessível para o usuário {id_user}",
-                    "error"
-                )
-                desativar_connection(id_user, conexao.id, db)
-                return {"success": False, "config": db_on}
+            if type_db.lower() != "sqlite":
+                if not is_port_open(host, conexao.port):
+                    log_message(
+                        f"❌ Banco {host}:{conexao.port} inacessível para o usuário {id_user}",
+                        "error"
+                    )
+                    desativar_connection(id_user, conexao.id, db)
+                    return {"success": False, "config": db_on}
 
             engine = get_session_by_connection(conexao)
             if engine:

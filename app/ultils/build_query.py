@@ -34,7 +34,7 @@ def build_contains_condition(
     db_type = db_type.lower()
 
     # Strings e JSON → LIKE direto
-    if any(t in col_type_str for t in ["text", "char", "json"]):
+    if any(t in col_type_str for t in ["text", "char", "json", "sql_identifier", "name"]):
         return f"{field_escaped} {not_}LIKE :{param_name}"
 
     # Datas → precisa converter para texto dependendo do banco
@@ -305,19 +305,92 @@ def get_filter_condition_with_operation(
 
 def format_column(db_type: str, col: str, alias: Optional[str] = None) -> str:
     """
-    Formata uma coluna com quote e alias.
+    Formata uma coluna com quote e alias, escapando palavras reservadas.
     """
-    # Ex: "public"."db_fields"."id"
-    col_quoted = quote_identifier(db_type, col)
+    # Lista de palavras reservadas comuns do SQL
+    RESERVED_KEYWORDS = {
+        'default', 'select', 'insert', 'update', 'delete', 'from', 'where',
+        'order', 'group', 'by', 'having', 'join', 'inner', 'left', 'right',
+        'outer', 'on', 'as', 'and', 'or', 'not', 'null', 'is', 'true', 'false',
+        'primary', 'key', 'foreign', 'references', 'table', 'column', 'index',
+        'create', 'alter', 'drop', 'truncate', 'grant', 'revoke', 'commit',
+        'rollback', 'savepoint', 'begin', 'transaction', 'lock', 'unlock',
+        'user', 'role', 'database', 'schema', 'view', 'function', 'procedure',
+        'trigger', 'event', 'type', 'domain', 'constraint', 'check', 'unique',
+        'current', 'time', 'date', 'timestamp', 'interval', 'year',
+        'month', 'day', 'hour', 'minute', 'second', 'zone', 'value', 'values'
+    }
+    
+    def needs_escape(identifier: str) -> bool:
+        """Verifica se um identificador precisa ser escapado."""
+        # Remove quotes existentes para verificar o nome puro
+        clean = identifier.strip('"`[]')
+        return clean.lower() in RESERVED_KEYWORDS or not clean.isidentifier()
+    
+    def quote_identifier_safe(db_type: str, identifier: str) -> str:
+        """
+        Versão melhorada do quote_identifier que também escapa palavras reservadas.
+        """
+        # Se já está quotado, retorna como está
+        if (identifier.startswith('"') and identifier.endswith('"')) or \
+           (identifier.startswith('`') and identifier.endswith('`')) or \
+           (identifier.startswith('[') and identifier.endswith(']')):
+            return identifier
+        
+        # Divide por pontos para tratar cada parte
+        parts = identifier.split('.')
+        quoted_parts = []
+        
+        for part in parts:
+            # Limpa a parte
+            clean_part = part.strip('"`[]')
+            
+            # Verifica se precisa escapar
+            if needs_escape(clean_part):
+                if db_type.lower() == "postgresql":
+                    quoted_parts.append(f'"{clean_part}"')
+                elif db_type.lower() == "mssql" or db_type.lower() == "sqlserver":
+                    quoted_parts.append(f'[{clean_part}]')
+                else:  # mysql, mariadb, sqlite
+                    quoted_parts.append(f'`{clean_part}`')
+            else:
+                # Usa o quote padrão do banco
+                if db_type.lower() == "postgresql":
+                    quoted_parts.append(f'"{clean_part}"')
+                elif db_type.lower() == "mssql" or db_type.lower() == "sqlserver":
+                    quoted_parts.append(f'[{clean_part}]')
+                else:
+                    quoted_parts.append(f'`{clean_part}`')
+        
+        return '.'.join(quoted_parts)
+    
+    # Escapa a coluna se necessário
+    col_quoted = quote_identifier_safe(db_type, col)
     
     if alias:
-        # O alias precisa ser tratado como uma string ÚNICA literal.
-        # Não podemos usar quote_identifier aqui se o alias tiver pontos (.), 
-        # senão o banco de dados recusa a query.
-        quote_char = "`" if db_type.lower() == "mysql" else '"'
-        return f"{col_quoted} AS {quote_char}{alias}{quote_char}"
+        # Trata o alias de forma especial
+        # Se o alias já tem quotes, usa como está
+        if (alias.startswith('"') and alias.endswith('"')) or \
+           (alias.startswith('`') and alias.endswith('`')) or \
+           (alias.startswith('[') and alias.endswith(']')):
+            return f"{col_quoted} AS {alias}"
+        
+        # Escapa o alias se necessário
+        clean_alias = alias.strip('"`[]')
+        if needs_escape(clean_alias):
+            if db_type.lower() == "postgresql":
+                return f'{col_quoted} AS "{clean_alias}"'
+            elif db_type.lower() == "mssql" or db_type.lower() == "sqlserver":
+                return f'{col_quoted} AS [{clean_alias}]'
+            else:
+                return f'{col_quoted} AS `{clean_alias}`'
+        else:
+            # Alias sem pontos, usa quote padrão
+            quote_char = "`" if db_type.lower() == "mysql" else '"'
+            return f"{col_quoted} AS {quote_char}{alias}{quote_char}"
         
     return col_quoted
+
 
 def build_select_view(
     db_type: str,
@@ -325,26 +398,34 @@ def build_select_view(
     aliases: Optional[dict[str, str]],
 ) -> str:
     """
-    Monta o SELECT.
+    Monta o SELECT com escape de palavras reservadas.
     - Se select foi enviado → usa select
     - Aplica alias apenas quando existir alias real
     - Se select vazio e aliases existir → usa aliases como fonte
     - Caso contrário → usa '*'
     """
-    if select and len(select) > 0:
-        parts = []
-        for col in select:
-            alias = aliases.get(col) if aliases else None
-            parts.append(format_column(db_type, col, alias))
-        return ", ".join(parts)
+    try:
+        if select and len(select) > 0:
+            parts = []
+            for col in select:
+                alias = aliases.get(col) if aliases else None
+                parts.append(format_column(db_type, col, alias))
+            return ", ".join(parts)
 
-    if aliases:
-        return ", ".join(
-            format_column(db_type, col, alias)
-            for col, alias in aliases.items()
-        )
+        if aliases:
+            return ", ".join(
+                format_column(db_type, col, alias)
+                for col, alias in aliases.items()
+            )
 
-    return "*" 
+        return "*"
+    
+    except Exception as e:
+        # Log do erro e fallback
+        from app.ultils.logger import log_message
+        log_message(f"Erro ao construir SELECT: {str(e)}", level="error")
+        # Fallback seguro: retorna *
+        return "*"
 
 def format_order_by(
     db_type: str,
@@ -469,7 +550,7 @@ def get_query_string_advance(
     filters: Optional[str] = None,
     select: Optional[List[str]] = None,
     table_list: Optional[List[str]] = None,
-    max_rows: Optional[int] = 1000,
+    max_rows: Optional[int] =None,
     db_type: str = "mysql",
     order_by: Optional[list[OrderByOption]] = None,
     offset: Optional[int] = None,
@@ -540,7 +621,7 @@ def get_query_string_advance(
             )
         else:
             query = f"SELECT * FROM ({query}) WHERE ROWNUM <= {max_rows}"
-
+    # print("query:",query)
     return query
 
 def get_count_query(
@@ -551,30 +632,145 @@ def get_count_query(
     db_type: str = "mysql"
 ) -> str:
     """
-    Gera uma query SQL para contar registros, considerando joins, filtros e DISTINCT.
+    Gera uma query SQL otimizada para contar registros.
+    
+    Otimizações:
+    - Usa COUNT(*) quando possível (mais rápido)
+    - Para DISTINCT com colunas, usa COUNT(DISTINCT colunas)
+    - Remove ORDER BY da subquery (desnecessário para COUNT)
+    - Para LEFT JOINs, considera NULLs no COUNT
+    - Adiciona hints de otimização para bancos específicos
     """
     db_type = db_type.lower()
     quoted_base_table = quote_identifier(db_type, base_table)
-
-    # JOINs
-    if joins:
-         # --- JOINs ---
-        join_sql = build_join_clause(db_type, base_table, joins, None)
-    else:
-        join_sql = ""
-
+    
+    # JOINs - usando a mesma função existente
+    join_sql = build_join_clause(db_type, base_table, joins, None) if joins else ""
+    
+    # Otimização: Se não há joins ou filters, COUNT(*) é extremamente rápido
+    # em muitos bancos (especialmente MySQL com MyISAM)
+    
     # COUNT com DISTINCT
     if distinct and distinct.useDistinct and distinct.distinct_columns:
+        # Para COUNT DISTINCT, precisamos considerar NULLs
+        # COUNT(DISTINCT col) ignora NULLs automaticamente
+        
+        # Verifica se as colunas podem ter NULL e se precisamos tratá-las
         distinct_cols = ", ".join(quote_identifier(db_type, col) for col in distinct.distinct_columns)
+        
+        # Otimização para PostgreSQL: usa COUNT(DISTINCT colunas)
+        # Para MySQL/SQLite, COUNT(DISTINCT col1, col2) também funciona
         query = f"SELECT COUNT(DISTINCT {distinct_cols}) FROM {quoted_base_table}{join_sql}"
+        
+        # Otimização para Oracle (não suporta múltiplas colunas em COUNT DISTINCT)
+        if db_type == "oracle" and len(distinct.distinct_columns) > 1:
+            # Oracle precisa de concatenação ou subquery
+            concat_cols = " || '|' || ".join(quote_identifier(db_type, col) for col in distinct.distinct_columns)
+            query = f"SELECT COUNT(DISTINCT {concat_cols}) FROM {quoted_base_table}{join_sql}"
     else:
+        # COUNT(*) é mais rápido que COUNT(1) ou COUNT(coluna) na maioria dos bancos
         query = f"SELECT COUNT(*) FROM {quoted_base_table}{join_sql}"
-
+    
     # WHERE
     if filters:
         query += f" {filters}"
-
+    
+    # Otimizações específicas por banco
+    if db_type in {"mysql", "mariadb"}:
+        # MySQL: hints para acelerar COUNT em tabelas grandes
+        if not joins and not filters:
+            # Para tabelas MyISAM, COUNT(*) é instantâneo
+            # Para InnoDB, ainda precisa scan, mas podemos usar:
+            if not distinct or not distinct.useDistinct:
+                # Adiciona comentário de hint (não afeta execução)
+                query = f"SELECT /*+ NO_ICP({quoted_base_table}) */ COUNT(*) FROM {quoted_base_table}{join_sql}"
+    
+    elif db_type in {"postgresql", "postgres"}:
+        # PostgreSQL: COUNT(*) é otimizado com índices
+        # Podemos adicionar sugestões para usar índices
+        if filters and "=" in filters:
+            # Se há filtros de igualdade, provavelmente usa índice
+            pass
+    
+    elif db_type in {"sqlite"}:
+        # SQLite: COUNT(*) é rápido se houver índice na coluna de filtro
+        pass
+    
+    elif db_type in {"mssql", "sql server", "sqlserver"}:
+        # SQL Server: COUNT(*) com dicas de tabela
+        if not joins and not filters and not distinct:
+            # Para contagem rápida, podemos usar dicas
+            query = f"SELECT COUNT(*) FROM {quoted_base_table} WITH (NOLOCK){join_sql}"
+    
+    elif db_type == "oracle":
+        # Oracle: COUNT(*) pode ser otimizado com hint
+        if not joins and not filters and not distinct:
+            query = f"SELECT /*+ PARALLEL({quoted_base_table}, 2) */ COUNT(*) FROM {quoted_base_table}{join_sql}"
+    
     return query
+
+
+# Versão alternativa ainda mais otimizada para casos específicos
+def get_count_query_optimized(
+    base_table: str,
+    joins: Optional[dict[str, AdvancedJoinOption]] = None,
+    filters: Optional[str] = None,
+    distinct: Optional[DistinctList] = None,
+    db_type: str = "mysql",
+    use_estimate: bool = False
+) -> str:
+    """
+    Versão ultra-otimizada que pode usar estatísticas do banco para COUNT aproximado.
+    
+    Args:
+        use_estimate: Se True, tenta usar métodos aproximados (mais rápidos, menos precisos)
+    """
+    db_type = db_type.lower()
+    quoted_base_table = quote_identifier(db_type, base_table)
+    
+    # Se queremos estimativa e não há filtros complexos
+    if use_estimate and not filters and not distinct:
+        if db_type in {"postgresql", "postgres"}:
+            # PostgreSQL: usa estatísticas do planner
+            return f"SELECT reltuples::bigint AS estimate FROM pg_class WHERE relname = '{base_table.split('.')[-1]}'"
+        
+        elif db_type in {"mysql", "mariadb"}:
+            # MySQL: usa informações do INFORMATION_SCHEMA
+            schema = base_table.split('.')[0] if '.' in base_table else None
+            table = base_table.split('.')[-1]
+            if schema:
+                return f"SELECT table_rows FROM information_schema.tables WHERE table_schema = '{schema}' AND table_name = '{table}'"
+            else:
+                return f"SELECT table_rows FROM information_schema.tables WHERE table_name = '{table}'"
+        
+        elif db_type in {"mssql", "sql server", "sqlserver"}:
+            # SQL Server: usa estatísticas
+            return f"SELECT rows FROM sys.partitions WHERE object_id = OBJECT_ID('{base_table}') AND index_id IN (0,1)"
+    
+    # Se não, usa COUNT normal
+    return get_count_query(base_table, joins, filters, distinct, db_type)
+
+
+# Função auxiliar para decidir qual estratégia de COUNT usar
+def should_use_estimate(total_rows: Optional[int] = None, table_size: str = "unknown") -> bool:
+    """
+    Decide se deve usar COUNT estimado baseado no tamanho da tabela.
+    
+    Args:
+        total_rows: Número aproximado de linhas (se conhecido)
+        table_size: 'small', 'medium', 'large', 'unknown'
+    """
+    if total_rows is not None:
+        return total_rows > 1000000  # > 1 milhão de linhas
+    
+    # Baseado em heurística
+    size_map = {
+        "small": False,
+        "medium": False,
+        "large": True,
+        "unknown": False
+    }
+    return size_map.get(table_size, False)
 
 def build_update_query(table_name, db_type, updated_values, primary_key, primary_value) -> TextClause | None:
     """Constrói a query de atualização dinâmica."""

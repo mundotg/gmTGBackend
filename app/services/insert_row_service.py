@@ -19,22 +19,33 @@ def build_insert_query(table_name, db_type, insert_values):
     if not insert_values:
         return None
 
+    # print(f"DEBUG: db_type in build_insert_query = '{db_type}'")  # DEBUG
+    
     columns = []
     values = []
 
     for col, info in insert_values.items():
         value = info.get("value")
         col_type = info.get("type_column", "text")  # default string
-        columns.append(quote_identifier(db_type, col))
-        # IDEAL: Aqui deveríamos usar parâmetros nomeados (:p1, :p2) em vez de inserir o valor direto na string.
-        # Vamos manter sua função original, mas fica o aviso para o futuro!
+        
+        # Quote the column name
+        quoted_col = quote_identifier(db_type, col)
+        # print(f"DEBUG: Column '{col}' -> quoted as '{quoted_col}'")  # DEBUG
+        
+        columns.append(quoted_col)
         values.append(_convert_column_type_for_string_one(value, col_type))
 
+    # Quote the table name
+    quoted_table = quote_identifier(db_type, table_name)
+    # print(f"DEBUG: Table '{table_name}' -> quoted as '{quoted_table}'")  # DEBUG
+
     query = text(f"""
-        INSERT INTO {quote_identifier(db_type, table_name)}
+        INSERT INTO {quoted_table}
         ({', '.join(columns)})
         VALUES ({', '.join(values)});
     """)
+    
+    # print(f"DEBUG: Final query: {query}")  # DEBUG
     return query
 
 def insert_row_service(

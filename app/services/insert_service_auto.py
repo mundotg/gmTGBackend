@@ -21,6 +21,7 @@ from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.generate_value import gerar_valor_pelo_tipo_de_dados_na_bd
 from app.ultils.logger import log_message
 from collections import defaultdict
+
 def insert_row_service_auto( 
     data: AutoCreateRequest,
     engine: Engine,
@@ -69,7 +70,7 @@ def insert_row_service_auto(
                                 conn.execute(q)
                             conn.commit()
                             tabela_stats[config.tabela]["sucesso"] += len(buffer_queries)
-                            exemplo = buffer_queries[0][:90]
+                            exemplo = str(buffer_queries[0])[:90]
                             log_message(f"Buffer atual contém {len(buffer_queries)} queries. Exemplo: {exemplo}", "info")
                             buffer_queries.clear()
 
@@ -88,7 +89,7 @@ def insert_row_service_auto(
                 for q in buffer_queries:
                     conn.execute(q)
                 conn.commit()
-                exemplo = buffer_queries[0][:90]
+                exemplo = str(buffer_queries[0])[:90]
                 log_message(f"Buffer atual contém {len(buffer_queries)} queries. Exemplo: {exemplo}", "info")
             log_message(f"Finalizado {config.quantidade} inserções em {config.tabela}", "success")
 
@@ -137,8 +138,6 @@ def insert_row_service_auto(
     }
 
 
-
-
 def gerar_dict_para_insercao(config : ConfiguracaoTabela, engine: Engine, db :Session, connection : DBConnection, user_id: int) -> Dict:
     """
     Gera o dicionário de valores para uma linha de INSERT,
@@ -173,7 +172,6 @@ def gerar_dict_para_insercao(config : ConfiguracaoTabela, engine: Engine, db :Se
 
     return insert_dict
 
-
     
 def create_strutura_tabela(tabela_name:str , engine: Engine, db: Session, db_type: str, db_connection_id:int)->List[CampoDetalhado] :
     structure = buscar_estrutura_tabela(
@@ -183,7 +181,7 @@ def create_strutura_tabela(tabela_name:str , engine: Engine, db: Session, db_typ
             engine=engine,
             db_type=db_type
         )
-    fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine)
+    fields_table: List[DBField] = buscar_ou_criar_campos_tabela(db, structure, engine,db_type)
     enum_map: Dict[str, List[str]] = _fetch_enum_values(db,fields_table, engine, structure, db_type)
     
     return processar_enum_fields(

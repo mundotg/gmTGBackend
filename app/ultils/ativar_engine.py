@@ -1,6 +1,15 @@
+import ssl  # 👈 ADICIONADO: Necessário para o ssl_context
+import traceback
+from typing import Tuple
+
 from fastapi import HTTPException
-from typing import Any, Dict, Tuple
-from app.config.dependencies import EngineManager, defaults, get_session_by_connection
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.orm import Session
+
+from app.config.dependencies import defaults, get_session_by_connection
+from app.config.engine_manager_cache import EngineManager
 from app.models.connection_models import DBConnection
 from app.services.crypto_utils import aes_decrypt
 from app.ultils.ativar_session_bd import (
@@ -9,10 +18,6 @@ from app.ultils.ativar_session_bd import (
 )
 from app.ultils.conect_database import DatabaseManager
 from app.ultils.logger import log_message
-from sqlalchemy.orm import Session
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngine
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 
 
 async def test_session_connection(async_session: AsyncSession):
@@ -30,27 +35,67 @@ class ConnectionManager:
 
     @staticmethod
     def ensure_connection(db: Session, user_id: int):
-        """Garante que existe uma conexão válida para o usuário."""
-        engine = EngineManager.get(user_id)
+        """
+        Garante que existe uma conexão ativa para o usuário.
+        Retorna: (engine, connection)
+        """
+        try:
+            if user_id <= 0:
+                raise HTTPException(status_code=400, detail="user_id inválido")
 
-        if not engine:
-            log_message(f"Reativando conexão para usuário {user_id}", "info")
-            result = reativar_connection(db=db, id_user=user_id)
-            if not result["success"]:
-                raise HTTPException(status_code=400, detail="Conexão do banco de dados não encontrada")
             engine = EngineManager.get(user_id)
 
-        connection, _ = get_connection_current(db, user_id)
-        if connection is None:
-            raise HTTPException(status_code=400, detail="ID da conexão não está disponível")
+            # Se não existir engine ativa tenta reativar
+            if not engine:
+                log_message(f"Tentando reativar conexão | user_id={user_id}", "info")
+                result = reativar_connection(db=db, id_user=user_id)
 
-        return engine, connection
+                if not result or not result.get("success"):
+                    log_message(f"Falha ao reativar conexão | user_id={user_id}", "warning")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Conexão do banco de dados não encontrada",
+                    )
+
+                engine = EngineManager.get(user_id)
+
+                if not engine:
+                    log_message(f"Engine não criada após reativação | user_id={user_id}", "error")
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Falha ao inicializar engine da conexão",
+                    )
+
+            connection, _ = get_connection_current(db, user_id)
+
+            if connection is None:
+                log_message(f"Conexão atual não encontrada | user_id={user_id}", "warning")
+                raise HTTPException(
+                    status_code=400,
+                    detail="ID da conexão não está disponível",
+                )
+
+            return engine, connection
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            log_message(
+                f"Erro inesperado em ensure_connection | user_id={user_id} | "
+                f"erro={str(e)} | trace={traceback.format_exc()}",
+                "error",
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Erro interno ao verificar conexão",
+            )
 
     @staticmethod
     def ensure_idConn_connection(db: Session, user_id: int, id_connection: int):
         """Garante que existe uma conexão válida por ID."""
         connection = get_connection_by_id(db, user_id, id_connection)
         engine = get_session_by_connection(connection)
+        
         if not engine:
             log_message(f"Reativando conexão para usuário {user_id}", "error")
             raise HTTPException(status_code=400, detail="Conexão do banco de dados não encontrada")
@@ -58,121 +103,121 @@ class ConnectionManager:
         return engine, connection
 
     # =====================================================
-    # 🔄 MÉTODO ASSÍNCRONO PADRÃO
-    # =====================================================
-    @staticmethod
-    async def get_engine_async(db: AsyncSession, user_id: int) -> Tuple[AsyncEngine, DBConnection]:
-        engineManager = DatabaseManager()
-        connection, _ = await get_connection_current_async(db, user_id)
-        if connection is None:
-            raise HTTPException(status_code=400, detail="ID da conexão não está disponível")
-
-        return await ConnectionManager._create_async_engine(connection, engineManager)
-
-    # =====================================================
     # 🔄 MÉTODO ASSÍNCRONO POR ID
     # =====================================================
     @staticmethod
     async def get_engine_idconn_async(db: AsyncSession, user_id: int, id_connection: int) -> Tuple[AsyncEngine, DBConnection]:
-        engineManager = DatabaseManager()
+        
         connection = await get_connection_id_async(db, user_id, id_connection)
 
         if not connection:
             raise HTTPException(status_code=400, detail="Conexão não encontrada")
+        
+        engine = EngineManager.async_get(user_id)
+        if engine:
+            return engine, connection
 
-        return await ConnectionManager._create_async_engine(connection, engineManager)
+        engine = await ConnectionManager._create_async_engine(connection)
+        # 👈 AJUSTE: Opcionalmente, podes querer guardar na cache aqui também.
+        # EngineManager.async_set(user_id, engine) 
+        
+        return engine, connection
 
     # =====================================================
     # 🧩 MÉTODO INTERNO DE CRIAÇÃO DE ENGINE
     # =====================================================
     @staticmethod
-    async def _create_async_engine(connection: DBConnection, engineManager: DatabaseManager):
-        """Cria e testa uma engine assíncrona segura."""
-        config = {
-            "user": aes_decrypt(connection.username),
-            "password": aes_decrypt(connection.password),
-            "host": aes_decrypt(connection.host),
-            "port": connection.port,
-            "database": connection.database_name,
-            "service": connection.service or "",
-            "sslmode": connection.sslmode or "disable",
-            "trustServerCertificate": connection.trustServerCertificate or "yes",
-        }
+    async def get_engine_async(
+        db: AsyncSession,
+        user_id: int
+    ) -> Tuple[AsyncEngine, DBConnection]:
 
-        uri_template = engineManager.DB_URIS_ASYNC.get(defaults.get(connection.type))
-        if not uri_template:
-            raise ValueError(f"Tipo de banco de dados não suportado: {connection.type}")
+        connection, _ = await get_connection_current_async(db, user_id)
 
-        try:
-            if connection.type.lower() in ["postgresql", "pg"]:
-                uri = uri_template.format(
-                    user=config["user"],
-                    password=config["password"],
-                    host=config["host"],
-                    port=config["port"],
-                    database=config["database"]
-                )
+        if connection is None:
+            raise HTTPException(status_code=400, detail="Conexão não encontrada")
 
-                # Configura SSL apenas se for remoto
-                if config["host"] in ["localhost", "127.0.0.1"]:
-                    connect_args = { "ssl": False,}  # ❌ não incluir "ssl" de forma alguma
-                else:
-                    import ssl
-                    ssl_context = None
-                    if config["sslmode"].lower() != "disable":
-                        ssl_context = ssl.create_default_context()
-                        if config["sslmode"].lower() == "require":
-                            ssl_context.check_hostname = False
-                            ssl_context.verify_mode = ssl.CERT_NONE
-                    connect_args = {"ssl": ssl_context} if ssl_context else {}
-
-            elif connection.type.lower() in ["mssql", "sqlserver"]:
-                uri = uri_template.format(
-                    user=config["user"],
-                    password=config["password"],
-                    host=config["host"],
-                    port=config["port"],
-                    database=config["database"],
-                    trustServerCertificate=config["trustServerCertificate"]
-                )
-                connect_args = {}
-
-            else:
-                uri = uri_template.format(
-                    user=config["user"],
-                    password=config["password"],
-                    host=config["host"],
-                    port=config["port"],
-                    database=config["database"],
-                    service=config["service"]
-                )
-                connect_args = {}
-
-            # Argumentos extras
-            extra_args: Dict[str, Any] = {
-                "echo": False,
-                "pool_pre_ping": True,
-                "connect_args": connect_args if connect_args else {} 
-            }
-
-            if connection.type.lower() != "sqlite":
-                extra_args.update({
-                    "pool_size": 5,
-                    "max_overflow": 10,
-                    "pool_timeout": 30,
-                    "pool_recycle": 1800,
-                })
-
-            # Criação da engine
-            engine = create_async_engine(uri, **extra_args)
-
-            # Teste da conexão
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-
-            log_message(f"✅ Engine criada e testada com sucesso ({connection.type})", "info")
+        # 🔎 verifica se engine já existe na cache
+        engine = EngineManager.async_get(user_id)
+        if engine:
             return engine, connection
 
+        # cria engine nova
+        engine = await ConnectionManager._create_async_engine(connection)
+
+        # 👈 CORREÇÃO: Guardar a engine na cache (antes estava '(user_id, engine)')
+        EngineManager.async_set(user_id, engine)
+
+        return engine, connection
+
+    @staticmethod
+    async def _create_async_engine(connection: DBConnection) -> AsyncEngine:
+        db_type = (connection.type or "").lower()
+        engineManager = DatabaseManager()
+
+        try:
+            if db_type == "sqlite":
+                db_path = aes_decrypt(connection.host)
+                uri = f"sqlite+aiosqlite:///{db_path}"
+                engine = create_async_engine(uri, echo=False, pool_pre_ping=True)
+            else:
+                config = {
+                    "user": aes_decrypt(connection.username) if connection.username else "",
+                    "password": aes_decrypt(connection.password) if connection.password else "",
+                    "host": aes_decrypt(connection.host),
+                    "port": connection.port,
+                    "database": connection.database_name,
+                    "service": connection.service or "",
+                    "sslmode": connection.sslmode or "disable",
+                    "trustServerCertificate": connection.trustServerCertificate or "yes",
+                }
+
+                uri_template = engineManager.DB_URIS_ASYNC.get(defaults.get(connection.type))
+
+                if not uri_template:
+                    raise ValueError(f"Banco não suportado: {connection.type}")
+
+                # PostgreSQL
+                if db_type in ["postgresql", "pg"]:
+                    uri = uri_template.format(**config)
+                    
+                    if config["host"] in ["localhost", "127.0.0.1"]:
+                        connect_args = {"ssl": False}
+                    else:
+                        ssl_context = None
+                        if config["sslmode"].lower() != "disable":
+                            ssl_context = ssl.create_default_context()
+                        connect_args = {"ssl": ssl_context} if ssl_context else {}
+
+                # SQL Server
+                elif db_type in ["mssql", "sqlserver"]:
+                    uri = uri_template.format(**config)
+                    connect_args = {}
+
+                # Outros (ex: MySQL, Oracle)
+                else:
+                    uri = uri_template.format(**config)
+                    connect_args = {}
+
+                engine = create_async_engine(
+                    uri,
+                    echo=False,
+                    pool_pre_ping=True,
+                    pool_size=3,
+                    max_overflow=5,
+                    pool_timeout=30,
+                    pool_recycle=1800,
+                    connect_args=connect_args
+                )
+
+            # 🔎 teste de conexão (com tratamento para garantir que a ligação devolve à pool)
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+                await conn.commit() # Assegura a libertação limpa
+
+            log_message(f"✅ Engine criada ({connection.type})", "info")
+            return engine
+
         except SQLAlchemyError as e:
-            log_message(f"❌ Erro ao criar ou testar engine: {e}", "error")
-            raise HTTPException(status_code=500, detail=f"Erro ao criar engine ({connection.type})")
+            log_message(f"❌ erro criando engine: {e}\n{traceback.format_exc()}", "error")
+            raise HTTPException(status_code=500, detail="Erro ao conectar ao banco")

@@ -80,7 +80,7 @@ def get_tables_with_count_cached(
     return get_table_names_with_count(connection_id, user_id, db)
 
 
-@cache_result(ttl=600, user_id="tables_names_{user_id}")
+# @cache_result(ttl=600, user_id="tables_names_{user_id}")
 def get_tables_names_cached(
     connection_id: int,
     user_id: int,

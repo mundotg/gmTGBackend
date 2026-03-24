@@ -47,105 +47,136 @@ ROLES_PERMISSIONS = {
         "description": "Acesso total ao sistema",
         "permissions": [
             # AUTH & USERS
-            "auth:login", "auth:logout", "auth:refresh",
-            "user:create", "user:read", "user:update", "user:delete",
-            "user:invite", "user:deactivate", "user:manage",
-
+            "auth:login",
+            "auth:logout",
+            "auth:refresh",
+            "user:manage" "user:create",
+            "user:read",
+            "user:update",
+            "user:delete",
+            "user:invite",
+            "user:deactivate",
+            "user:manage",
             # ROLES & PERMISSIONS
-            "role:create", "role:read", "role:update", "role:delete", "role:manage",
-            "permission:create", "permission:read", "permission:update",
-            "permission:delete", "permission:manage",
-
+            "role:create",
+            "role:read",
+            "role:update",
+            "role:delete",
+            "role:manage",
+            "permission:create",
+            "permission:read",
+            "permission:update",
+            "permission:delete",
+            "permission:manage",
             # COMPANY
-            "company:read", "company:update", "company:settings",
-            "company:billing", "company:members",
-            "company:invite", "company:remove_member",
-
+            "company:read",
+            "company:update",
+            "company:settings",
+            "company:billing",
+            "company:members",
+            "company:invite",
+            "company:remove_member",
             # DB CONNECTIONS
-            "db_connection:create", "db_connection:read_own",
-            "db_connection:read_company", "db_connection:read_all",
-            "db_connection:update", "db_connection:delete", "db_connection:test",
-
+            "db_connection:create",
+            "db_connection:read_own",
+            "db_connection:read_company",
+            "db_connection:read_all",
+            "db_connection:update",
+            "db_connection:delete",
+            "db_connection:test",
             # QUERY / SQL
-            "query:execute", "query:read_history",
-            "query:delete_history", "query:export",
-
+            "query:execute",
+            "query:read_history",
+            "query:delete_history",
+            "query:export",
             # TABLES
-            "table:read", "table:describe", "table:stats", "table:export",
-
+            "table:read",
+            "table:describe",
+            "table:stats",
+            "table:export",
             # PROJECTS
-            "project:create", "project:read", "project:view",
-            "project:update", "project:delete", "project:manage",
-            "project:assign_user", "project:remove_user",
-
+            "project:create",
+            "project:read",
+            "project:view",
+            "project:update",
+            "project:delete",
+            "project:manage",
+            "project:assign_user",
+            "project:remove_user",
             # TEAM
-            "team:read", "team:update", "team:manage",
-
+            "team:read",
+            "team:update",
+            "team:manage",
             # INTEGRATIONS
-            "integration:read", "integration:create",
-            "integration:update", "integration:delete",
+            "integration:read",
+            "integration:create",
+            "integration:update",
+            "integration:delete",
             "integration:webhook",
-
             # SETTINGS
-            "settings:user", "settings:company",
-            "settings:projects", "settings:team",
-            "settings:integrations", "settings:system",
-
+            "settings:user",
+            "settings:company",
+            "settings:projects",
+            "settings:team",
+            "settings:integrations",
+            "settings:system",
             # SYSTEM
-            "audit:read", "audit:export",
-            "logs:read", "logs:export",
-            "backup:read", "backup:configure",
-            "backup:execute", "backup:restore",        
-            #analytics
-            "analytics:db:view","audit:read", "analytics:project:view", "analytics:db:export","analytics:project:export","admin:*",
-            
-            #logs
-            "logs:view"
+            "audit:read",
+            "audit:export",
+            "logs:read",
+            "logs:export",
+            "backup:read",
+            "backup:configure",
+            "backup:execute",
+            "backup:restore",
+            # analytics
+            "analytics:db:view",
+            "audit:read",
+            "analytics:project:view",
+            "analytics:db:export",
+            "analytics:project:export",
+            "admin:*",
+            # logs
+            "logs:view",
         ],
     },
-
     "manager": {
         "description": "Gestão de equipe e projetos",
         "permissions": [
-            "user:read", "user:invite",
+            "user:read",
+            "user:invite",
             "team:read",
-
             "company:read",
-
             "db_connection:read_company",
-            "query:execute", "query:read_history",
-
-            "project:create", "project:read",
-            "project:update", "project:assign_user",
-
-            "settings:projects", "settings:team",
+            "query:execute",
+            "query:read_history",
+            "project:create",
+            "project:read",
+            "project:update",
+            "project:assign_user",
+            "settings:projects",
+            "settings:team",
         ],
     },
-
     "developer": {
         "description": "Desenvolvedor técnico",
         "permissions": [
             "db_connection:create",
             "db_connection:read_own",
-
-            "query:execute", "query:read_history",
-
-            "table:read", "table:describe",
-
+            "query:execute",
+            "query:read_history",
+            "table:read",
+            "table:describe",
             "project:view",
-
             "settings:user",
         ],
     },
-
     "user": {
         "description": "Usuário básico",
         "permissions": [
             "db_connection:read_own",
             "query:execute",
-
             "project:view",
-
             "settings:user",
         ],
     },
@@ -161,6 +192,7 @@ PROJECT_TYPES = [
 # ==========================================================
 # 🧠 HELPER GENÉRICO
 # ==========================================================
+
 
 def get_or_create(
     db: Session,
@@ -183,6 +215,7 @@ def get_or_create(
 # 🏢 EMPRESA
 # ==========================================================
 
+
 def seed_empresa(db: Session) -> Empresa:
     empresa, created = get_or_create(
         db,
@@ -201,6 +234,7 @@ def seed_empresa(db: Session) -> Empresa:
 # 💼 CARGOS
 # ==========================================================
 
+
 def seed_cargos(db: Session) -> None:
     for nome, descricao, nivel in CARGOS_DATA:
         get_or_create(
@@ -216,14 +250,13 @@ def seed_cargos(db: Session) -> None:
 # 🔐 RBAC (Roles + Permissões)
 # ==========================================================
 
+
 def seed_rbac(db: Session) -> None:
     # Criar permissões únicas
     permission_map: Dict[str, Permission] = {}
 
     all_permissions = {
-        perm
-        for role in ROLES_PERMISSIONS.values()
-        for perm in role["permissions"]
+        perm for role in ROLES_PERMISSIONS.values() for perm in role["permissions"]
     }
 
     for perm_name in all_permissions:
@@ -245,9 +278,7 @@ def seed_rbac(db: Session) -> None:
         )
 
         # Sincronização forte (modelo Google/AWS)
-        role.permissions = [
-            permission_map[p] for p in data["permissions"]
-        ]
+        role.permissions = [permission_map[p] for p in data["permissions"]]
 
     log_message("🎭 RBAC sincronizado (roles + permissões)", "success")
 
@@ -255,6 +286,7 @@ def seed_rbac(db: Session) -> None:
 # ==========================================================
 # 👤 USUÁRIO ADMIN
 # ==========================================================
+
 
 def seed_admin_user(db: Session, empresa: Empresa) -> User:
     cargo_admin = db.query(Cargo).filter_by(nome="Admin").first()
@@ -287,6 +319,7 @@ def seed_admin_user(db: Session, empresa: Empresa) -> User:
 # ==========================================================
 # 🌱 SEED PRINCIPAL
 # ==========================================================
+
 
 def seed_data(db: Session) -> None:
     log_message("🚀 Iniciando seed do sistema...", "info")

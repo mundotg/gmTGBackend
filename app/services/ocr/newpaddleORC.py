@@ -1,8 +1,20 @@
 import traceback
 from paddleocr import PaddleOCR
 import cv2
-from matplotlib import pyplot as plt
 import numpy as np
+
+# test_ocr.py
+import os
+os.environ['FLAGS_use_mkldnn'] = '0'
+os.environ['FLAGS_use_onednn'] = '0'
+
+from paddleocr import PaddleOCR
+
+# Teste simples
+
+# Teste com uma imagem (substitua pelo caminho da sua imagem)
+# result = ocr.ocr('caminho/para/sua/imagem.jpg')
+# print("OCR executado com sucesso!")
 
 # from app.services.analyzer import save_report
 
@@ -53,6 +65,7 @@ def group_text_by_lines(texts, boxes, y_threshold=15):
     return final_lines
 def analyze_image(image_bytes):
     try:
+        
         ocr = PaddleOCR(
             lang="pt",
             use_angle_cls=True

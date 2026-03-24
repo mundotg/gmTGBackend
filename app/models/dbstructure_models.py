@@ -1,25 +1,41 @@
 from sqlalchemy import (
-    Column, Enum, Index, Integer, String, Boolean, ForeignKey, DateTime, Text,
-    UniqueConstraint, func
+    Column,
+    Enum,
+    Index,
+    Integer,
+    String,
+    Boolean,
+    ForeignKey,
+    DateTime,
+    Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import relationship, validates
 from app.database import Base
+
 STATUS_ACTIVE = "active"
 STATUS_INACTIVE = "inactive"
 STATUS_DELETED = "deleted"
 STATUS_ERROR = "error"
 _STATUS_CHOICES = {STATUS_ACTIVE, STATUS_INACTIVE, STATUS_DELETED, STATUS_ERROR}
 
+
 class DBStructure(Base):
     __tablename__ = "db_structures"
     __table_args__ = (
-        UniqueConstraint("db_connection_id", "table_name", "schema_name", name="uq_structure_connection_table"),
+        UniqueConstraint(
+            "db_connection_id",
+            "table_name",
+            "schema_name",
+            name="uq_structure_connection_table",
+        ),
         Index("ix_db_structures_connection", "db_connection_id"),
     )
     _STATUS_CHOICES = {STATUS_ACTIVE, STATUS_INACTIVE, STATUS_DELETED, STATUS_ERROR}
     # O asterisco (*) desempacota a lista/tupla _STATUS_CHOICES
     status = Column(String(20), default=STATUS_ACTIVE, nullable=False)
-    
+
     @validates("status")
     def validate_status(self, key, value):
         if not value or not value.strip():
@@ -28,8 +44,11 @@ class DBStructure(Base):
         if v not in self._STATUS_CHOICES:
             raise ValueError(f"Status inválido: {value}")
         return v
+
     id = Column(Integer, primary_key=True, index=True)
-    db_connection_id = Column(Integer, ForeignKey("db_connections.id", ondelete="CASCADE"), nullable=False)
+    db_connection_id = Column(
+        Integer, ForeignKey("db_connections.id", ondelete="CASCADE"), nullable=False
+    )
     table_name = Column(String, nullable=False)
     schema_name = Column(String, nullable=True)
     description = Column(Text, nullable=True)
@@ -37,19 +56,23 @@ class DBStructure(Base):
     Charset = Column(String(50), nullable=True)
     Collation = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False
+    )
     is_deleted = Column(Boolean, default=False)
 
     # Relações
     fields = relationship(
-        "DBField",back_populates="structure",
-        cascade="all, delete-orphan", lazy="selectin"
+        "DBField",
+        back_populates="structure",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
     connection = relationship("DBConnection", back_populates="structures")
 
     @property
     def full_table_name(self) -> str:
-        return f"{self.schema_name}.{self.table_name}" if self.schema_name else self.table_name # type: ignore
+        return f"{self.schema_name}.{self.table_name}" if self.schema_name else self.table_name  # type: ignore
 
     @validates("table_name")
     def validate_table_name(self, key, value):
@@ -61,12 +84,12 @@ class DBStructure(Base):
         return f"<DBStructure(id={self.id}, table='{self.table_name}', schema='{self.schema_name}')>"
 
 
-
 class DBField(Base):
     """
     Representa uma coluna (campo) pertencente a uma tabela de banco de dados.
     Contém metadados como tipo, restrições e relacionamentos (FK, PK, UNIQUE).
     """
+
     __tablename__ = "db_fields"
     __table_args__ = (
         UniqueConstraint("structure_id", "name", name="uq_field_structure_name"),
@@ -79,9 +102,9 @@ class DBField(Base):
         Integer,
         ForeignKey("db_structures.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
-        index=True
+        index=True,
     )
-
+    is_unsigned = Column(Boolean, default=False)
     name = Column(String(255), nullable=False)
     type = Column(String(100), nullable=False)
     is_nullable = Column(Boolean, default=True)
@@ -90,17 +113,21 @@ class DBField(Base):
     is_auto_increment = Column(Boolean, default=False)
 
     # Informações de FK (referência a outra tabela/field)is_foreign_key
-    
+
     is_foreign_key = Column(Boolean, default=False)
-    referenced_table = Column(String(255), nullable=True)   # Nome da tabela referenciada
-    referenced_field = Column(String(255), nullable=True)   # Nome do campo referenciado (por texto)
+    referenced_table = Column(String(255), nullable=True)  # Nome da tabela referenciada
+    referenced_field = Column(
+        String(255), nullable=True
+    )  # Nome do campo referenciado (por texto)
     referenced_field_id = Column(
         Integer,
         ForeignKey("db_fields.id", ondelete="SET NULL", onupdate="CASCADE"),
         nullable=True,
-        index=True
+        index=True,
     )
-    fk_on_delete = Column(String, nullable=True, default="NO ACTION")  # CASCADE, SET NULL, RESTRICT, NO ACTION...
+    fk_on_delete = Column(
+        String, nullable=True, default="NO ACTION"
+    )  # CASCADE, SET NULL, RESTRICT, NO ACTION...
     fk_on_update = Column(String, nullable=True, default="NO ACTION")
 
     default_value = Column(String(255), nullable=True)
@@ -109,15 +136,19 @@ class DBField(Base):
     precision = Column(Integer, nullable=True)
     scale = Column(Integer, nullable=True)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
     # Relação com a estrutura (tabela)
     structure = relationship(
-        "DBStructure",
-        back_populates="fields",
-        passive_deletes=True,
-        lazy="selectin"
+        "DBStructure", back_populates="fields", passive_deletes=True, lazy="selectin"
     )
 
     # Relação auto-referenciada: este campo referencia outro DBField (referenced_field_id)
@@ -128,7 +159,7 @@ class DBField(Base):
         uselist=False,
         foreign_keys=[referenced_field_id],
         passive_deletes=True,
-        lazy="selectin"
+        lazy="selectin",
     )
 
     # Lista de campos que referenciam este field
@@ -136,7 +167,7 @@ class DBField(Base):
         "DBField",
         back_populates="referenced_field_obj",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="selectin",
     )
 
     # Valores ENUM associados (se houver)
@@ -144,7 +175,7 @@ class DBField(Base):
         "DBEnumField",
         back_populates="field",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="selectin",
     )
 
     @validates("name")
@@ -165,21 +196,22 @@ class DBEnumField(Base):
     Representa os valores possíveis de um campo ENUM.
     Cada valor é associado a um campo (coluna) de uma tabela específica.
     """
+
     __tablename__ = "db_enum_fields"
-    __table_args__ = (
-        Index("ix_enum_field_field_id", "field_id"),
-    )
+    __table_args__ = (Index("ix_enum_field_field_id", "field_id"),)
 
     field_id = Column(
         Integer,
         ForeignKey("db_fields.id", ondelete="CASCADE", onupdate="CASCADE"),
         primary_key=True,
         nullable=False,
-        index=True
+        index=True,
     )
     value = Column(String(255), primary_key=True, nullable=False)
     status = Column(String(20), default=STATUS_ACTIVE, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Relacionamento inverso com DBField

@@ -28,8 +28,7 @@ class QueryFilterBuilder:
 
     @staticmethod
     async def build_where_clause(
-        conditions: List[CondicaoFiltro],
-        db_type: str = "postgres"
+        conditions: List[CondicaoFiltro], db_type: str = "postgres"
     ) -> Tuple[str, Dict[str, Any]]:
         if not conditions:
             return "", {}
@@ -39,8 +38,7 @@ class QueryFilterBuilder:
 
         for i, condition in enumerate(conditions):
             field = QueryFilterBuilder._normalize_column_ref(
-                condition.table_name_fil,
-                condition.column
+                condition.table_name_fil, condition.column
             )
 
             param_prefix = f"param_{i}"
@@ -54,7 +52,10 @@ class QueryFilterBuilder:
                 operation=condition.operator,
                 param_name=param_prefix,
                 enum_values={},
-                value_otheir_between=str(condition.value2) if condition.value2 is not None else "",
+                value_otheir_between=(
+                    str(condition.value2) if condition.value2 is not None else ""
+                ),
+                pattern=condition.pattern,
             )
 
             # 👈 Correção: Só adiciona se o construtor retornou uma parte SQL válida
@@ -69,7 +70,7 @@ class QueryFilterBuilder:
         # 👈 Correção: Montagem segura da string WHERE
         # O primeiro elemento não leva o operador lógico (AND/OR) antes dele.
         where_sql = where_clauses[0][1]
-        
+
         # Concatena o resto com os respetivos operadores lógicos
         for logic, clause in where_clauses[1:]:
             where_sql += f" {logic} {clause}"
@@ -79,7 +80,7 @@ class QueryFilterBuilder:
 
 class QueryExecutor:
     """Executor de queries SQL."""
-    
+
     def __init__(self, engine: AsyncEngine, db_type: str):
         self.engine = engine
         self.db_type = db_type
@@ -87,13 +88,13 @@ class QueryExecutor:
         self.MAX_PREVIEW_ROWS = 500
         # Tamanho do lote para fetchmany
         self.FETCH_BATCH_SIZE = 100
-    
+
     async def execute_query(
         self,
         query_string: str,
         params: Optional[Dict[str, Any]] = None,
         is_count_query: bool = False,
-        select_tables: Optional[List[str]] = None
+        select_tables: Optional[List[str]] = None,
     ):
         select_tables = select_tables or []
         colunas: List[str] = []
@@ -103,10 +104,7 @@ class QueryExecutor:
                 result: Optional[Result] = None
 
                 try:
-                    result = await conn.execute(
-                        text(query_string),
-                        params or {}
-                    )
+                    result = await conn.execute(text(query_string), params or {})
 
                     if is_count_query:
                         count_result = result.scalar_one_or_none()

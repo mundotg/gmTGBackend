@@ -499,6 +499,33 @@ def cache_result(ttl: Optional[int] = None, max_cache_size_mb: Optional[int] = N
                 return get_function_cache_info(func.__name__)
             async_wrapper.clear_cache = clear_cache_for_this_function # type: ignore
             async_wrapper.get_cache_info = get_cache_info_for_this_function # type: ignore
+            def set_cache(value, *args, **kwargs):
+                try:
+                    key = _make_key(func.__name__, *args, **kwargs)
+                    cacheable_value = _to_cacheable(value)
+
+                    # memória
+                    MEMORY_CACHE[key] = {
+                        "ts": time.time(),
+                        "val": cacheable_value,
+                        "ttl": ttl
+                    }
+
+                    # disco
+                    path = _get_cache_path(key)
+                    entry = {
+                        "timestamp": time.time(),
+                        "value": cacheable_value,
+                        "ttl": ttl,
+                        "function": func.__name__,
+                        "user_id": kwargs.get("user_id")
+                    }
+                    _write_cache(path, entry)
+
+                except Exception as e:
+                    log_message(f"[CACHE_SET_ERROR][ASYNC] {str(e)}", "error")
+
+            setattr(async_wrapper, "set", set_cache)  # 🔥 AQUI
             
             return async_wrapper
 

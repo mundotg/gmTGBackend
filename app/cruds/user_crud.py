@@ -138,50 +138,67 @@ def get_or_create_cargo(db: Session, cargo_data: users_chemas.CargoSchema):
 # -----------------------------
 # 🧑 Criar novo usuário
 # -----------------------------
-def create_user(db: Session, user: users_chemas.UserCreate):
-    try:
-        email_norm = (user.email or "").strip().lower()
-        log_message(f"🧑 Criando novo usuário: {email_norm}", "info")
+def create_user(db: Session, user: users_chemas.UserCreate) -> user_model.User:
+    email_norm = (user.email or "").strip().lower()
 
-        # ✅ Evita criar duplicado antes de gastar hash (hash é “caro”)
-        if get_user_by_email(db, email_norm):
-            log_message(f"⚠️ Já existe usuário com email: {email_norm}", "warning")
+    try:
+        log_message(f"🧑 Criando usuário: {email_norm}", "info")
+
+        # 🚫 validação básica
+        if not email_norm:
+            raise ValueError("Email é obrigatório")
+
+        if not user.senha:
+            raise ValueError("Senha é obrigatória")
+
+        # ⚡ evita query pesada desnecessária (opcional)
+        existing_user = db.query(user_model.User.id).filter(
+            user_model.User.email == email_norm
+        ).first()
+
+        if existing_user:
             raise ValueError("E-mail já está em uso.")
 
-        # 🔐 Hash da senha
+        # 🔐 hash da senha (só depois da validação)
         hashed_pw = auth.hash_password(user.senha)
 
-        # 🏢 Empresa / 💼 Cargo (podem ser None)
+        # 🏢 relações (lazy creation)
         empresa = get_or_create_empresa(db, user.empresa)
         cargo = get_or_create_cargo(db, user.cargo)
 
+        # 🎯 criar user
         db_user = user_model.User(
-            nome=user.nome,
-            apelido=user.apelido,
-            email=email_norm,                 # salva normalizado
-            telefone=user.telefone,
+            nome=user.nome.strip(),
+            apelido=(user.apelido or "").strip(),
+            email=email_norm,
+            telefone=(user.telefone or "").strip(),
             empresa_id=empresa.id if empresa else None,
             cargo_id=cargo.id if cargo else None,
             hashed_password=hashed_pw,
-            concorda_termos=user.concorda_termos,
+            concorda_termos=bool(user.concorda_termos),
         )
 
         db.add(db_user)
+
+        # ⚡ flush antes do commit → pega ID sem fechar transação
+        db.flush()
+
+        log_message(f"📌 ID gerado: {db_user.id}", "debug")
+
         db.commit()
         db.refresh(db_user)
 
-        log_message(f"✅ Usuário {email_norm} criado com sucesso (ID: {db_user.id})", "success")
+        log_message(f"✅ Usuário criado: {email_norm}", "success")
         return db_user
 
-    except IntegrityError as e:
-        # Caso exista UNIQUE(email) no banco, isso te salva de corrida
+    except IntegrityError:
         db.rollback()
-        log_message(f"❌ E-mail duplicado ao criar usuário {user.email}: {e}", "error")
-        raise
+        log_message(f"❌ Duplicate email: {email_norm}", "error")
+        raise ValueError("E-mail já está em uso.")
 
-    except SQLAlchemyError as e:
+    except Exception as e:
         db.rollback()
-        log_message(f"❌ Erro ao criar usuário: {e}", "error")
+        log_message(f"🔥 Erro inesperado: {str(e)}", "error")
         raise
 
 

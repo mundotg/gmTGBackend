@@ -4,10 +4,8 @@ OrionForgeNexus (oFn)
 
 Gera relatórios PDF baseados em resultados de consultas SQL executadas no sistema.
 """
-
-import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 from app.schemas.query_select_upAndInsert_schema import QueryResultType
 from app.ultils.logger import log_message

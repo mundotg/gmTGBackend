@@ -38,7 +38,6 @@ def _sse_event(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {_json(data)}\n\n"
 
 
-
 async def _run_select_without_chunking(
     db: AsyncSession,
     user_id: int,
@@ -54,6 +53,7 @@ async def _run_select_without_chunking(
         connection=connection,
         engine=engine,
         query_payload=select_body,
+        use_cache=False,
     )
 
     if not result.success:
@@ -108,13 +108,13 @@ async def _run_select_with_chunking(
         )
 
         result = await query_service.execute_query_with_cache(
-        db=db,
-        user_id=user_id,
-        connection=connection,
-        engine=engine,
-        query_payload=chunk_body,
-        use_cache=False
-    )
+            db=db,
+            user_id=user_id,
+            connection=connection,
+            engine=engine,
+            query_payload=chunk_body,
+            use_cache=False,
+        )
 
         if not result.success:
             yield _sse_event("error", {"error": result.error_message})
@@ -182,7 +182,7 @@ async def _run_count(
         connection=connection,
         engine=engine,
         query_payload=count_body,
-        use_cache=True
+        use_cache=True,
     )
 
     if not result.success:

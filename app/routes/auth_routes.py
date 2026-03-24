@@ -120,6 +120,36 @@ def assert_access_token_binding(request: Request, access_token: str) -> dict:
     return payload
 
 
+@router.post(
+    "/register",
+    response_model=users_chemas.UserOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def register_user(
+    user: users_chemas.UserCreate,
+    db: Session = Depends(database.get_db),
+):
+    try:
+        db_user = user_crud.create_user(db, user)
+
+        return {
+            **db_user.__dict__,
+            "id": str(db_user.id),  # 🔥 aqui resolve
+            "permissions": list(db_user.permissions),
+            "role": db_user.role,
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno ao criar usuário: {str(e)}"
+        )
+
+
+
 @router.post("/login", response_model=users_chemas.LoginResponse)
 def login_user(
     credentials: users_chemas.UserLogin,

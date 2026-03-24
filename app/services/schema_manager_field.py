@@ -30,6 +30,7 @@ from app.ultils.logger import log_message
 # ✅ CORE HELPERS (poucos métodos)
 # ============================================================
 
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -55,6 +56,7 @@ def _audit_tag(operation: str, status: str) -> str:
 # ============================================================
 # 🧾 AUDITORIA + EXECUÇÃO (poucos métodos)
 # ============================================================
+
 
 @dataclass(frozen=True)
 class AuditContext:
@@ -112,7 +114,8 @@ def _audit_write(
         tags=_audit_tag(operation, status),
         app_source=ctx.app_source,
         client_ip=ctx.client_ip,
-        executed_by=ctx.executed_by or (f"user_{ctx.user_id}" if ctx.user_id is not None else None),
+        executed_by=ctx.executed_by
+        or (f"user_{ctx.user_id}" if ctx.user_id is not None else None),
         modified_by=ctx.modified_by,
         meta_info=meta_info,
     )
@@ -141,7 +144,9 @@ def _run_ddl(
     t0 = perf_counter()
 
     compiled_sql = (
-        sql_or_queries if isinstance(sql_or_queries, str) else " ; ".join(sql_or_queries)
+        sql_or_queries
+        if isinstance(sql_or_queries, str)
+        else " ; ".join(sql_or_queries)
     )
 
     _audit_write(
@@ -230,7 +235,14 @@ def _run_ddl(
 
 FK_ACTIONS = {"NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT"}
 _NUM_RE = re.compile(r"^-?\d+(\.\d+)?$")
-_SQL_KEYWORDS_DEFAULT = {"CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME", "NOW()", "GETDATE()", "SYSDATE"}
+_SQL_KEYWORDS_DEFAULT = {
+    "CURRENT_TIMESTAMP",
+    "CURRENT_DATE",
+    "CURRENT_TIME",
+    "NOW()",
+    "GETDATE()",
+    "SYSDATE",
+}
 
 
 def _normalize_fk_action(v: Optional[str]) -> str:
@@ -242,9 +254,20 @@ def _normalize_fk_action(v: Optional[str]) -> str:
 
 def _validate_dialect(db_type: str) -> str:
     db_type = (db_type or "").lower().strip()
-    allowed = {"postgresql", "postgres", "mysql", "mariadb", "oracle", "mssql", "sqlserver", "sqlite"}
+    allowed = {
+        "postgresql",
+        "postgres",
+        "mysql",
+        "mariadb",
+        "oracle",
+        "mssql",
+        "sqlserver",
+        "sqlite",
+    }
     if db_type not in allowed:
-        raise ValueError(f"Dialeto '{db_type}' não suportado para manipulação estrutural.")
+        raise ValueError(
+            f"Dialeto '{db_type}' não suportado para manipulação estrutural."
+        )
     return db_type
 
 
@@ -274,26 +297,49 @@ def _validate_field_for_add(field: FieldDDLRequest) -> Tuple[str, str]:
     if not (field.type and str(field.type).strip()):
         raise ValueError("Tipo do campo é obrigatório.")
     if (field.scale is not None) and (field.precision is None):
-        raise ValueError("A precisão (precision) é obrigatória quando a escala (scale) é informada.")
+        raise ValueError(
+            "A precisão (precision) é obrigatória quando a escala (scale) é informada."
+        )
 
     fk_on_delete = _normalize_fk_action(getattr(field, "fk_on_delete", None))
     fk_on_update = _normalize_fk_action(getattr(field, "fk_on_update", None))
 
     if getattr(field, "is_foreign_key", False):
-        if not getattr(field, "referenced_table", None) or not getattr(field, "referenced_field", None):
-            raise ValueError("Tabela e campo referenciados são obrigatórios quando is_foreign_key=True.")
+        if not getattr(field, "referenced_table", None) or not getattr(
+            field, "referenced_field", None
+        ):
+            raise ValueError(
+                "Tabela e campo referenciados são obrigatórios quando is_foreign_key=True."
+            )
 
     return fk_on_delete, fk_on_update
 
 
-def build_type_string(field: FieldDDLRequest) -> str:
+def build_type_string(field: FieldDDLRequest, db_type: str) -> str:
     type_str = str(field.type).upper().strip()
-    if field.precision is not None:
+
+    # 🔥 1. TRATAMENTO DE ENUM
+    if type_str == "ENUM" and getattr(field, "enum_values", None):
+        # Escapa aspas simples e formata: ENUM('valor1', 'valor2')
+        vals = ", ".join(
+            f"'{v.replace(chr(39), chr(39) + chr(39))}'" for v in field.enum_values
+        )
+        type_str = f"ENUM({vals})"
+
+    # TRATAMENTO DE PRECISÃO E TAMANHO
+    elif field.precision is not None:
         if field.scale is not None:
-            return f"{type_str}({field.precision},{field.scale})"
-        return f"{type_str}({field.precision})"
-    if field.length is not None:
-        return f"{type_str}({field.length})"
+            type_str = f"{type_str}({field.precision},{field.scale})"
+        else:
+            type_str = f"{type_str}({field.precision})"
+    elif field.length is not None:
+        type_str = f"{type_str}({field.length})"
+
+    # 🔥 2. TRATAMENTO DE UNSIGNED (Apenas MySQL/MariaDB suportam isto nativamente em tipos numéricos)
+    if getattr(field, "is_unsigned", False) and db_type in ["mysql", "mariadb"]:
+        if "INT" in type_str or type_str in ["FLOAT", "DOUBLE", "DECIMAL", "NUMERIC"]:
+            type_str += " UNSIGNED"
+
     return type_str
 
 
@@ -305,7 +351,9 @@ def _sql_default(field: FieldDDLRequest) -> str:
         return ""
     upper = raw.upper()
 
-    if (raw.startswith("'") and raw.endswith("'")) or (raw.startswith('"') and raw.endswith('"')):
+    if (raw.startswith("'") and raw.endswith("'")) or (
+        raw.startswith('"') and raw.endswith('"')
+    ):
         return f"DEFAULT {raw}"
     if upper in {"NULL", "TRUE", "FALSE"}:
         return f"DEFAULT {upper}"
@@ -319,6 +367,7 @@ def _sql_default(field: FieldDDLRequest) -> str:
 # ============================================================
 # ⚙️ OPERAÇÕES DDL PRINCIPAIS (3 funções)
 # ============================================================
+
 
 def execute_add_column(
     db: Session,
@@ -336,7 +385,8 @@ def execute_add_column(
     safe_table = _q_table(db_type, schema, table)
     safe_col = quote_identifier(db_type, field.name)
 
-    type_str = build_type_string(field)
+    # 🔥 MELHORIA: Agora passamos o db_type para o formatador do tipo
+    type_str = build_type_string(field, db_type)
     null_str = "NULL" if field.is_nullable else "NOT NULL"
     default_str = _sql_default(field)
     unique_str = "UNIQUE" if field.is_unique else ""
@@ -354,7 +404,9 @@ def execute_add_column(
         sql = f"ALTER TABLE {safe_table} ADD {safe_col} {type_str} {null_str} {default_str} {unique_str};"
     elif db_type == "sqlite":
         if (not field.is_nullable) and not field.default_value:
-            raise ValueError("SQLite exige default_value para colunas NOT NULL ao usar ADD COLUMN.")
+            raise ValueError(
+                "SQLite exige default_value para colunas NOT NULL ao usar ADD COLUMN."
+            )
         sql = f"ALTER TABLE {safe_table} ADD COLUMN {safe_col} {type_str} {default_str} {null_str};"
     else:
         raise ValueError(f"Dialeto '{db_type}' não suportado.")
@@ -365,20 +417,32 @@ def execute_add_column(
         engine=engine,
         connection_id=connection_model.id,
         operation=operation,
-        query_type=QueryType.ADDCOLUMN,
+        query_type=QueryType.ADD_COLUMN,
         dialect=db_type,
         table=table_name,
         column=field.name,
         sql_or_queries=sql,
-        extra={"payload": getattr(field, "model_dump", lambda **_: field.__dict__)(exclude_none=True)},
+        extra={
+            "payload": getattr(field, "model_dump", lambda **_: field.__dict__)(
+                exclude_none=True
+            )
+        },
     )
 
     # FK opcional (exceto sqlite)
-    if db_type != "sqlite" and getattr(field, "is_foreign_key", False) and getattr(field, "referenced_table", None):
+    if (
+        db_type != "sqlite"
+        and getattr(field, "is_foreign_key", False)
+        and getattr(field, "referenced_table", None)
+    ):
         ref_schema, ref_table_name = _split_schema_table(str(field.referenced_table))
         ref_table = _q_table(db_type, ref_schema, ref_table_name)
-        ref_col = quote_identifier(db_type, str(getattr(field, "referenced_field", "id")))
-        fk_name = quote_identifier(db_type, _sanitize_name(f"fk_{table}_{field.name}_{ref_table_name}"))
+        ref_col = quote_identifier(
+            db_type, str(getattr(field, "referenced_field", "id"))
+        )
+        fk_name = quote_identifier(
+            db_type, _sanitize_name(f"fk_{table}_{field.name}_{ref_table_name}")
+        )
 
         fk_sql = (
             f"ALTER TABLE {safe_table} "
@@ -395,18 +459,25 @@ def execute_add_column(
             engine=engine,
             connection_id=connection_model.id,
             operation="ADD FK",
-            query_type=QueryType.ADDCOLUMN,
+            query_type=QueryType.ADD_COLUMN,
             dialect=db_type,
             table=table_name,
             column=field.name,
             sql_or_queries=fk_sql,
-            extra={"fk": {"referenced_table": str(field.referenced_table), "referenced_field": str(field.referenced_field)}},
+            extra={
+                "fk": {
+                    "referenced_table": str(field.referenced_table),
+                    "referenced_field": str(field.referenced_field),
+                }
+            },
         )
 
     # Persistência de Metadados
     structure_id = getattr(field, "table_id", None)
     if not structure_id:
-        raise ValueError("table_id não informado no FieldDDLRequest (necessário para salvar metadata).")
+        raise ValueError(
+            "table_id não informado no FieldDDLRequest (necessário para salvar metadata)."
+        )
 
     field_in = DBFieldCreate(
         name=field.name,
@@ -426,6 +497,7 @@ def execute_add_column(
         length=field.length,
         precision=field.precision,
         scale=field.scale,
+        is_unsigned=field.is_unsigned,  # 🔥 ADICIONADO AQUI NA CRIAÇÃO
     )
 
     try:
@@ -444,7 +516,7 @@ def execute_add_column(
             ctx=audit_ctx,
             connection_id=connection_model.id,
             operation="METADATA::CREATE_FIELD",
-            query_type=QueryType.ADDCOLUMN,
+            query_type=QueryType.ADD_COLUMN,
             dialect=db_type,
             table=table_name,
             column=field.name,
@@ -474,36 +546,61 @@ def execute_alter_column(
     original_col = quote_identifier(db_type, original_name)
     new_col = quote_identifier(db_type, field.name)
 
-    type_str = build_type_string(field)
+    # 🔥 MELHORIA: Agora passamos o db_type para o formatador do tipo
+    type_str = build_type_string(field, db_type)
     null_str = "NULL" if field.is_nullable else "NOT NULL"
 
     queries: List[str] = []
 
     if field.original_name and field.original_name != field.name:
         if db_type in ["postgresql", "postgres", "oracle", "sqlite"]:
-            queries.append(f"ALTER TABLE {safe_table} RENAME COLUMN {original_col} TO {new_col};")
+            queries.append(
+                f"ALTER TABLE {safe_table} RENAME COLUMN {original_col} TO {new_col};"
+            )
         elif db_type in ["mssql", "sqlserver"]:
-            queries.append(f"EXEC sp_rename '{table_name}.{field.original_name}', '{field.name}', 'COLUMN';")
+            queries.append(
+                f"EXEC sp_rename '{table_name}.{field.original_name}', '{field.name}', 'COLUMN';"
+            )
         elif db_type in ["mysql", "mariadb"]:
-            queries.append(f"ALTER TABLE {safe_table} CHANGE COLUMN {original_col} {new_col} {type_str} {null_str};")
+            queries.append(
+                f"ALTER TABLE {safe_table} CHANGE COLUMN {original_col} {new_col} {type_str} {null_str};"
+            )
         else:
             raise ValueError(f"Dialeto '{db_type}' não suportado para rename.")
 
     if not (db_type in ["mysql", "mariadb"] and queries):
         if db_type in ["postgresql", "postgres"]:
-            queries.append(f"ALTER TABLE {safe_table} ALTER COLUMN {new_col} TYPE {type_str};")
+            queries.append(
+                f"ALTER TABLE {safe_table} ALTER COLUMN {new_col} TYPE {type_str};"
+            )
             queries.append(
                 f"ALTER TABLE {safe_table} ALTER COLUMN {new_col} {'DROP' if field.is_nullable else 'SET'} NOT NULL;"
             )
         elif db_type == "oracle":
-            queries.append(f"ALTER TABLE {safe_table} MODIFY ({new_col} {type_str} {null_str});")
+            queries.append(
+                f"ALTER TABLE {safe_table} MODIFY ({new_col} {type_str} {null_str});"
+            )
         elif db_type in ["mssql", "sqlserver"]:
-            queries.append(f"ALTER TABLE {safe_table} ALTER COLUMN {new_col} {type_str} {null_str};")
+            queries.append(
+                f"ALTER TABLE {safe_table} ALTER COLUMN {new_col} {type_str} {null_str};"
+            )
         elif db_type in ["mysql", "mariadb"]:
-            queries.append(f"ALTER TABLE {safe_table} MODIFY COLUMN {new_col} {type_str} {null_str};")
+            queries.append(
+                f"ALTER TABLE {safe_table} MODIFY COLUMN {new_col} {type_str} {null_str};"
+            )
         elif db_type == "sqlite":
-            if any([field.type, field.length, field.precision, field.scale, field.is_nullable is not None]):
-                raise ValueError("SQLite não suporta alterar tipo/nulidade sem recriar a tabela inteira.")
+            if any(
+                [
+                    field.type,
+                    field.length,
+                    field.precision,
+                    field.scale,
+                    field.is_nullable is not None,
+                ]
+            ):
+                raise ValueError(
+                    "SQLite não suporta alterar tipo/nulidade sem recriar a tabela inteira."
+                )
 
     if queries:
         _run_ddl(
@@ -519,7 +616,9 @@ def execute_alter_column(
             sql_or_queries=queries,
             extra={
                 "original_name": original_name,
-                "payload": getattr(field, "model_dump", lambda **_: field.__dict__)(exclude_none=True),
+                "payload": getattr(field, "model_dump", lambda **_: field.__dict__)(
+                    exclude_none=True
+                ),
             },
         )
 
@@ -543,6 +642,7 @@ def execute_alter_column(
         length=field.length,
         precision=field.precision,
         scale=field.scale,
+        is_unsigned=field.is_unsigned,  # 🔥 ADICIONADO AQUI NA ALTERAÇÃO
     )
 
     try:
@@ -574,7 +674,11 @@ def execute_alter_column(
             status="error",
             started_at=_utcnow(),
             error_message=friendly_msg,
-            extra={"structure_id": structure_id, "original_name": original_name, "error": details},
+            extra={
+                "structure_id": structure_id,
+                "original_name": original_name,
+                "error": details,
+            },
         )
         raise
 
@@ -604,7 +708,7 @@ def execute_drop_column(
         engine=engine,
         connection_id=connection_id,
         operation="DROP COLUMN",
-        query_type=QueryType.REMOVECOLUMN,
+        query_type=QueryType.REMOVE_COLUMN,
         dialect=db_type,
         table=structure_name,
         column=column_name,
@@ -628,7 +732,7 @@ def execute_drop_column(
             ctx=audit_ctx,
             connection_id=connection_id,
             operation="METADATA::SOFT_DELETE_FIELD",
-            query_type=QueryType.REMOVECOLUMN,
+            query_type=QueryType.REMOVE_COLUMN,
             dialect=db_type,
             table=structure_name,
             column=column_name,

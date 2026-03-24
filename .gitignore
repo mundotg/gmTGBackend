@@ -41,7 +41,8 @@ __pycache__/
 *.bin
 *.pid
 database_connector.log
-
+ocr_cache_data/
+temp_reports/
 # -------------------------------
 # 4. Dados de build e pacotes
 # -------------------------------

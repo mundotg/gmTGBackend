@@ -5,23 +5,25 @@ from typing import Dict, List, Optional, Any, cast
 
 from sqlalchemy import Engine, inspect, text
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import (
-    SQLAlchemyError
-)
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.config.dependencies import get_session_by_connection_id
 from app.config.engine_manager_cache import EngineManager
-from app.cruds.dbstatistics_crud import create_statistics, get_cached_row_count_all, get_statistics_by_connection, update_statistics
-from app.cruds.dbstructure_crud import (
-    create_db_structure,
-    get_db_structures,
-    get_structure_by_id_and_name,
-    update_db_structure,
+from app.cruds.dbstatistics_crud import (
+    create_statistics,
+    get_cached_row_count_all,
+    get_statistics_by_connection,
+    update_statistics,
 )
+from app.cruds.dbstructure_crud import create_db_structure, get_db_structures
 from app.models.dbstructure_models import DBField
 from app.schemas.dbstatistics_schema import DBStatisticsDict
 from app.schemas.dbstructure_schema import DBStructureOut
-from app.services.field_info import get_fields_of_table, get_fields_of_tables_bulk, sincronizar_metadados_da_tabela_simple
+from app.services.field_info import (
+    get_fields_of_table,
+    get_fields_of_tables_bulk,
+    sincronizar_metadados_da_tabela_simple,
+)
 from app.ultils.Database_error_logger import _lidar_com_erro_sql
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
@@ -30,6 +32,7 @@ from app.ultils.logger import log_message
 # ============================================================
 # Helpers
 # ============================================================
+
 
 def _get_engine(connection_id: int, user_id: int, db: Session) -> Engine:
     """
@@ -147,11 +150,13 @@ def _list_tables_and_views(
 
     return results
 
+
 def verificar_ou_atualizar_estrutura(
     db: Session,
     connection_id: int,
     table_name: str,
     schema_name: Optional[str] = None,
+    description: Optional[str] = "",
 ) -> Optional[DBStructureOut]:
 
     try:
@@ -166,7 +171,7 @@ def verificar_ou_atualizar_estrutura(
             db_connection_id=connection_id,
             table_name=table_name,
             schema_name=schema_name,
-            description="",
+            description=description,
         )
         log_message(
             f"Estrutura registrada | connection_id={connection_id} | table={table_name} | schema={schema_name}",
@@ -186,15 +191,26 @@ def verificar_ou_atualizar_estrutura(
             "warning",
         )
         return None
+
+
 # ============================================================
 # Tabelas
 # ============================================================
+
 
 def get_table_names(
     connection_id: int,
     id_user: int,
     db: Session,
 ) -> list[str]:
+
+    table_cache = get_db_structures(db, connection_id)
+    if table_cache:
+        log_message(
+            f"Usando cache para tabelas | connection_id={connection_id} | user={id_user} | tables={len(table_cache)}",
+            "info",
+        )
+        return [str(s.table_name) for s in table_cache if s.table_name is not None]
 
     try:
 
@@ -214,7 +230,6 @@ def get_table_names(
         names: list[str] = []
         # print("line: 244")
         for name, schema, obj_type in items:
-            # print("\nname:",name,"\nschema:",schema,"\nobj_type:",obj_type)
 
             if not name:
 
@@ -227,7 +242,7 @@ def get_table_names(
 
             try:
 
-                st=verificar_ou_atualizar_estrutura(
+                st = verificar_ou_atualizar_estrutura(
                     db,
                     connection_id,
                     name,
@@ -267,12 +282,14 @@ def get_table_names(
         return []
 
 
-def get_table_names_with_count(connection_id: int, id_user: int, db: Session) -> list[dict]:
+def get_table_names_with_count(
+    connection_id: int, id_user: int, db: Session
+) -> list[dict]:
     """
     Retorna nomes das tabelas com rowcount.
     Usa cache se disponível.
     """
-    table_info = get_cached_row_count_all( connection_id)
+    table_info = get_cached_row_count_all(connection_id)
     if table_info:
         log_message(
             f"🔍 Usando cache para {len(table_info)} tabelas na conexão {connection_id}",
@@ -323,7 +340,9 @@ def get_strutures_names(
         all_structures: list[DBStructureOut] = []
 
         for name, schema, _obj_type in items:
-            structure = verificar_ou_atualizar_estrutura(db, connection_id, name, schema)
+            structure = verificar_ou_atualizar_estrutura(
+                db, connection_id, name, schema
+            )
             if not structure:
                 continue
 
@@ -373,7 +392,9 @@ def get_strutures_names_only(
         all_structures: list[DBStructureOut] = []
 
         for name, schema, _obj_type in items:
-            structure = verificar_ou_atualizar_estrutura(db, connection_id, name, schema)
+            structure = verificar_ou_atualizar_estrutura(
+                db, connection_id, name, schema
+            )
             if structure:
                 all_structures.append(structure)
         # print("all_structures",all_structures)
@@ -390,6 +411,7 @@ def get_strutures_names_only(
 # ============================================================
 # Campos
 # ============================================================
+
 
 def get_fields_info_cached(
     connection_id: int,
@@ -417,7 +439,7 @@ def get_fields_info_bulk_cached(
     table_names: list[str],
     user_id: int,
     db: Session,
-)-> Dict[str, List[DBField]]:
+) -> Dict[str, List[DBField]]:
     try:
         return get_fields_of_tables_bulk(
             db=db,
@@ -436,6 +458,7 @@ def get_fields_info_bulk_cached(
 # ============================================================
 # Contagem
 # ============================================================
+
 
 def get_table_count(
     connection_id: int,
@@ -461,7 +484,14 @@ def get_table_count(
             pass
 
         default_schema = getattr(inspector, "default_schema_name", None)
-        if (table_name, default_schema) in view_names or any(name == table_name for name, _schema in [(n, s) for n, s, t in _list_tables_and_views(engine, inspector) if t == "view"]):
+        if (table_name, default_schema) in view_names or any(
+            name == table_name
+            for name, _schema in [
+                (n, s)
+                for n, s, t in _list_tables_and_views(engine, inspector)
+                if t == "view"
+            ]
+        ):
             log_message(f"ℹ️ '{table_name}' é uma VIEW, retornando 0.", "info")
             return 0
 
@@ -487,6 +517,7 @@ def get_table_count(
 # ============================================================
 # Estatísticas
 # ============================================================
+
 
 def collect_statistics(engine: Engine, db_type: str) -> DBStatisticsDict:
     """
@@ -533,71 +564,125 @@ def collect_statistics(engine: Engine, db_type: str) -> DBStatisticsDict:
 
         try:
             if dialect == "postgresql":
-                stats["procedure_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'p'")
-                ).scalar() or 0
-                stats["function_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'f'")
-                ).scalar() or 0
-                stats["trigger_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM pg_trigger WHERE NOT tgisinternal")
-                ).scalar() or 0
-                stats["index_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM pg_indexes")
-                ).scalar() or 0
+                stats["procedure_count"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'p'")
+                    ).scalar()
+                    or 0
+                )
+                stats["function_count"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'f'")
+                    ).scalar()
+                    or 0
+                )
+                stats["trigger_count"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM pg_trigger WHERE NOT tgisinternal")
+                    ).scalar()
+                    or 0
+                )
+                stats["index_count"] = (
+                    conn.execute(text("SELECT COUNT(*) FROM pg_indexes")).scalar() or 0
+                )
 
             elif dialect == "mysql":
-                stats["procedure_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='PROCEDURE'")
-                ).scalar() or 0
-                stats["function_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='FUNCTION'")
-                ).scalar() or 0
-                stats["trigger_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM information_schema.TRIGGERS")
-                ).scalar() or 0
-                stats["index_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM information_schema.STATISTICS")
-                ).scalar() or 0
+                stats["procedure_count"] = (
+                    conn.execute(
+                        text(
+                            "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='PROCEDURE'"
+                        )
+                    ).scalar()
+                    or 0
+                )
+                stats["function_count"] = (
+                    conn.execute(
+                        text(
+                            "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='FUNCTION'"
+                        )
+                    ).scalar()
+                    or 0
+                )
+                stats["trigger_count"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM information_schema.TRIGGERS")
+                    ).scalar()
+                    or 0
+                )
+                stats["index_count"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM information_schema.STATISTICS")
+                    ).scalar()
+                    or 0
+                )
 
             elif dialect == "sqlite":
-                stats["trigger_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger'")
-                ).scalar() or 0
-                stats["index_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM sqlite_master WHERE type='index'")
-                ).scalar() or 0
+                stats["trigger_count"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger'")
+                    ).scalar()
+                    or 0
+                )
+                stats["index_count"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM sqlite_master WHERE type='index'")
+                    ).scalar()
+                    or 0
+                )
 
             elif dialect in ("mssql", "sql server", "sqlserver"):
-                stats["procedure_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM sys.procedures")
-                ).scalar() or 0
-                stats["function_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM sys.objects WHERE type IN ('FN', 'TF', 'IF')")
-                ).scalar() or 0
-                stats["trigger_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM sys.triggers")
-                ).scalar() or 0
-                stats["index_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM sys.indexes WHERE name IS NOT NULL")
-                ).scalar() or 0
+                stats["procedure_count"] = (
+                    conn.execute(text("SELECT COUNT(*) FROM sys.procedures")).scalar()
+                    or 0
+                )
+                stats["function_count"] = (
+                    conn.execute(
+                        text(
+                            "SELECT COUNT(*) FROM sys.objects WHERE type IN ('FN', 'TF', 'IF')"
+                        )
+                    ).scalar()
+                    or 0
+                )
+                stats["trigger_count"] = (
+                    conn.execute(text("SELECT COUNT(*) FROM sys.triggers")).scalar()
+                    or 0
+                )
+                stats["index_count"] = (
+                    conn.execute(
+                        text("SELECT COUNT(*) FROM sys.indexes WHERE name IS NOT NULL")
+                    ).scalar()
+                    or 0
+                )
 
             elif dialect == "oracle":
-                stats["procedure_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'PROCEDURE'")
-                ).scalar() or 0
-                stats["function_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'FUNCTION'")
-                ).scalar() or 0
-                stats["trigger_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM ALL_TRIGGERS")
-                ).scalar() or 0
-                stats["index_count"] = conn.execute(
-                    text("SELECT COUNT(*) FROM ALL_INDEXES")
-                ).scalar() or 0
+                stats["procedure_count"] = (
+                    conn.execute(
+                        text(
+                            "SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'PROCEDURE'"
+                        )
+                    ).scalar()
+                    or 0
+                )
+                stats["function_count"] = (
+                    conn.execute(
+                        text(
+                            "SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'FUNCTION'"
+                        )
+                    ).scalar()
+                    or 0
+                )
+                stats["trigger_count"] = (
+                    conn.execute(text("SELECT COUNT(*) FROM ALL_TRIGGERS")).scalar()
+                    or 0
+                )
+                stats["index_count"] = (
+                    conn.execute(text("SELECT COUNT(*) FROM ALL_INDEXES")).scalar() or 0
+                )
 
         except Exception as e:
-            log_message(f"⚠️ Erro ao coletar estatísticas específicas do banco: {e}", "warning")
+            log_message(
+                f"⚠️ Erro ao coletar estatísticas específicas do banco: {e}", "warning"
+            )
 
     return stats
 
@@ -608,7 +693,7 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
     """
     from app.schemas.dbstatistics_schema import DBStatisticsCreate, DBStatisticsUpdate
 
-    existing = get_statistics_by_connection( connection_id)
+    existing = get_statistics_by_connection(connection_id)
 
     if not existing:
         data_create = DBStatisticsCreate(
@@ -632,13 +717,15 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
         "tables_connected",
     ]
 
-    changed = any(getattr(existing, key, None) != stats.get(key) for key in watched_fields)
+    changed = any(
+        getattr(existing, key, None) != stats.get(key) for key in watched_fields
+    )
 
     if changed:
         data_update = DBStatisticsUpdate(
             **{k: stats[k] for k in DBStatisticsUpdate.__annotations__ if k in stats}
         )
-        update_statistics( connection_id, data_update)
+        update_statistics(connection_id, data_update)
         return "updated"
 
     log_message(
@@ -646,6 +733,7 @@ def save_or_update_statistics(connection_id: int, stats: dict, db: Session):
         "info",
     )
     return "unchanged"
+
 
 def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
     """
@@ -655,20 +743,21 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
 
     try:
         engine, connection = ConnectionManager.ensure_connection(db, id_user)
-        
+
         # Verificação de segurança
-        if not connection or not hasattr(connection, 'id'):
+        if not connection or not hasattr(connection, "id"):
             log_message(f"❌ Conexão inválida para usuário ID={id_user}", "error")
             return None
-            
+
         id_conn = cast(int, connection.id)
 
-        existing = get_statistics_by_connection( id_conn)
+        existing = get_statistics_by_connection(id_conn)
         if existing:
             # Se for objeto SQLAlchemy, converter para dict
-            if hasattr(existing, '__dict__'):
-                return {k: v for k, v in existing.__dict__.items() 
-                       if not k.startswith('_')}
+            if hasattr(existing, "__dict__"):
+                return {
+                    k: v for k, v in existing.__dict__.items() if not k.startswith("_")
+                }
             return existing
 
         stats = collect_statistics(engine, str(id_conn))

@@ -7,6 +7,7 @@ from pydantic import (
     Field,
     StringConstraints,
     field_validator,
+    model_validator,
 )
 from typing_extensions import Annotated
 
@@ -86,10 +87,12 @@ class UserCreate(BaseModel):
     confirmar_senha: Annotated[str, StringConstraints(min_length=8)] = Field(
         ..., alias="confirmPassword"
     )
+
     concorda_termos: bool = Field(..., alias="terms")
 
     model_config = ConfigDict(
         populate_by_name=True,
+        str_strip_whitespace=True,  # 🔥 remove espaços automaticamente
         json_schema_extra={
             "example": {
                 "firstName": "João",
@@ -111,24 +114,40 @@ class UserCreate(BaseModel):
         },
     )
 
+    # -------------------------
+    # 📧 Email
+    # -------------------------
     @field_validator("email")
     @classmethod
     def normalize_email(cls, v: str):
-        return v.strip().lower()
+        return v.lower()
 
+    # -------------------------
+    # 👤 Nome
+    # -------------------------
     @field_validator("nome", "apelido")
     @classmethod
     def normalize_name(cls, v: str):
-        return " ".join(v.strip().title().split())
+        return " ".join(v.title().split())
 
-    @field_validator("confirmar_senha")
-    @classmethod
-    def passwords_match(cls, v, info):
-        senha = info.data.get("senha")
-        if senha and v != senha:
+    # -------------------------
+    # 🔐 Senhas (melhor abordagem)
+    # -------------------------
+    @model_validator(mode="after")
+    def validate_passwords(self):
+        if self.senha != self.confirmar_senha:
             raise ValueError("Passwords do not match.")
-        return v
+        return self
 
+    # -------------------------
+    # 📜 Termos obrigatórios
+    # -------------------------
+    @field_validator("concorda_termos")
+    @classmethod
+    def validate_terms(cls, v: bool):
+        if not v:
+            raise ValueError("Aceitação dos termos é obrigatória.")
+        return v
 
 # =============================
 # 💾 DB Info Schema

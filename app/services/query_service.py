@@ -64,11 +64,12 @@ class QueryService:
                 db_type=str(connection.type),
             )
 
+            # print("Query construída:", "\n\ncom parâmetros:", params)
             if use_cache:
                 cached_result = await self.cache_manager.get_cached_result(
                     db=db,
                     user_id=user_id,
-                    connection_id=connection.id, # type: ignore
+                    connection_id=connection.id,  # type: ignore
                     query_string=query_string,
                     is_count_query=query_payload.isCountQuery,
                 )
@@ -97,7 +98,7 @@ class QueryService:
             await self._save_success_history(
                 db=db,
                 user_id=user_id,
-                connection_id=connection.id, # type: ignore
+                connection_id=connection.id,  # type: ignore
                 query=query_string,
                 duration_ms=duration_ms,
                 query_payload=sanitized_payload,
@@ -114,7 +115,7 @@ class QueryService:
             await self._save_error_history(
                 db=db,
                 user_id=user_id,
-                connection_id=connection.id, # type: ignore
+                connection_id=connection.id,  # type: ignore
                 query=query_string,
                 duration_ms=duration_ms,
                 query_payload=query_payload,
@@ -143,7 +144,7 @@ class QueryService:
         """
         Constrói a cláusula WHERE e os parâmetros associados.
         """
-        
+
         filters, params = await self.filter_builder.build_where_clause(
             payload.where or [],
             db_type,
@@ -224,9 +225,7 @@ class QueryService:
             )
 
         resolved_columns = (
-            list(payload.aliaisTables.keys())
-            if payload.aliaisTables
-            else columns
+            list(payload.aliaisTables.keys()) if payload.aliaisTables else columns
         )
 
         return QueryExecutionResult(
@@ -437,7 +436,7 @@ class QueryService:
         """
         Monta o contexto detalhado do histórico.
         """
-        query_payload = query_payload or QueryPayload() # type: ignore
+        query_payload = query_payload or QueryPayload()  # type: ignore
 
         where_items = getattr(query_payload, "where", None) or []
         joins = getattr(query_payload, "joins", None) or {}
@@ -470,7 +469,9 @@ class QueryService:
             "modified_by": modified_by,
         }
 
-    def _truncate_preview(self, result_preview: Optional[str], max_size: int = 15000) -> Optional[str]:
+    def _truncate_preview(
+        self, result_preview: Optional[str], max_size: int = 15000
+    ) -> Optional[str]:
         """
         Evita salvar preview muito grande no histórico.
         """

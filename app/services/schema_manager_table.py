@@ -31,6 +31,7 @@ from app.ultils.Database_error_logger import DDLExecutionError, _lidar_com_erro_
 # ✅ CORE HELPERS (poucos métodos)
 # ============================================================
 
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -57,11 +58,23 @@ def _audit_tag(operation: str, status: str) -> str:
 # 🛡️ HELPERS
 # ============================================================
 
+
 def _validate_dialect(db_type: str) -> str:
     db_type = (db_type or "").lower().strip()
-    allowed = {"postgresql", "postgres", "mysql", "mariadb", "oracle", "mssql", "sqlserver", "sqlite"}
+    allowed = {
+        "postgresql",
+        "postgres",
+        "mysql",
+        "mariadb",
+        "oracle",
+        "mssql",
+        "sqlserver",
+        "sqlite",
+    }
     if db_type not in allowed:
-        raise ValueError(f"Dialeto '{db_type}' não suportado para manipulação estrutural.")
+        raise ValueError(
+            f"Dialeto '{db_type}' não suportado para manipulação estrutural."
+        )
     return db_type
 
 
@@ -97,6 +110,7 @@ def _normalize_description(payload: Any) -> Optional[str]:
 # ============================================================
 # 🧾 AUDITORIA + EXECUÇÃO (poucos métodos)
 # ============================================================
+
 
 @dataclass(frozen=True)
 class AuditContext:
@@ -146,13 +160,16 @@ def _audit_write(
         query_type=query_type,
         executed_at=started_at,
         duration_ms=duration_ms,
-        result_preview=_safe_json({"status": status, "table": table, "dialect": dialect}),
+        result_preview=_safe_json(
+            {"status": status, "table": table, "dialect": dialect}
+        ),
         error_message=error_message,
         is_favorite=False,
         tags=_audit_tag(operation, status),
         app_source=ctx.app_source,
         client_ip=ctx.client_ip,
-        executed_by=ctx.executed_by or (f"user_{ctx.user_id}" if ctx.user_id is not None else None),
+        executed_by=ctx.executed_by
+        or (f"user_{ctx.user_id}" if ctx.user_id is not None else None),
         modified_by=ctx.modified_by,
         meta_info=meta_info,
     )
@@ -181,7 +198,9 @@ def _run_ddl(
     t0 = perf_counter()
 
     compiled_sql = (
-        sql_or_queries if isinstance(sql_or_queries, str) else " ; ".join(sql_or_queries)
+        sql_or_queries
+        if isinstance(sql_or_queries, str)
+        else " ; ".join(sql_or_queries)
     )
 
     _audit_write(
@@ -266,6 +285,7 @@ def _run_ddl(
 # 📝 DESCRIÇÃO helper (por dialeto) + auditoria
 # ============================================================
 
+
 def _apply_table_description(
     db: Session,
     *,
@@ -293,7 +313,7 @@ def _apply_table_description(
             engine=engine,
             connection_id=connection_id,
             operation="TABLE DESCRIPTION",
-            query_type=QueryType.ALTERTABLE,
+            query_type=QueryType.ALTER_TABLE,
             dialect=db_type,
             table=full_table_name,
             column=None,
@@ -310,7 +330,7 @@ def _apply_table_description(
             engine=engine,
             connection_id=connection_id,
             operation="TABLE DESCRIPTION",
-            query_type=QueryType.ALTERTABLE,
+            query_type=QueryType.ALTER_TABLE,
             dialect=db_type,
             table=full_table_name,
             column=None,
@@ -356,7 +376,7 @@ def _apply_table_description(
             engine=engine,
             connection_id=connection_id,
             operation="TABLE DESCRIPTION",
-            query_type=QueryType.ALTERTABLE,
+            query_type=QueryType.ALTER_TABLE,
             dialect=db_type,
             table=full_table_name,
             column=None,
@@ -371,20 +391,25 @@ def _apply_table_description(
         ctx=ctx,
         connection_id=connection_id,
         operation="TABLE DESCRIPTION",
-        query_type=QueryType.ALTERTABLE,
+        query_type=QueryType.ALTER_TABLE,
         dialect=db_type,
         table=full_table_name,
         column=None,
         sql=None,
         status="success",
         started_at=_utcnow(),
-        extra={"skipped": True, "reason": "dialect_no_native_comment", "description": description},
+        extra={
+            "skipped": True,
+            "reason": "dialect_no_native_comment",
+            "description": description,
+        },
     )
 
 
 # ============================================================
 # ⚙️ DDL PRINCIPAIS (TABELA) + METADATA
 # ============================================================
+
 
 def execute_create_table(
     db: Session,
@@ -405,9 +430,19 @@ def execute_create_table(
         sql = f"CREATE {temp}TABLE {ine}{safe_table} (id INTEGER);"
     elif db_type in ["mysql", "mariadb"]:
         ine = "IF NOT EXISTS " if getattr(payload, "if_not_exists", True) else ""
-        engine_sql = f" ENGINE={payload.engine}" if getattr(payload, "engine", None) else ""
-        charset_sql = f" DEFAULT CHARSET={payload.charset}" if getattr(payload, "charset", None) else ""
-        coll_sql = f" COLLATE={payload.collation}" if getattr(payload, "collation", None) else ""
+        engine_sql = (
+            f" ENGINE={payload.engine}" if getattr(payload, "engine", None) else ""
+        )
+        charset_sql = (
+            f" DEFAULT CHARSET={payload.charset}"
+            if getattr(payload, "charset", None)
+            else ""
+        )
+        coll_sql = (
+            f" COLLATE={payload.collation}"
+            if getattr(payload, "collation", None)
+            else ""
+        )
         temp = "TEMPORARY " if getattr(payload, "temporary", False) else ""
         sql = f"CREATE {temp}TABLE {ine}{safe_table} (id INT){engine_sql}{charset_sql}{coll_sql};"
     elif db_type in ["mssql", "sqlserver"]:
@@ -433,12 +468,16 @@ def execute_create_table(
         engine=engine,
         connection_id=connection_model.id,
         operation="CREATE TABLE",
-        query_type=QueryType.CREATETABLE,
+        query_type=QueryType.CREATE_TABLE,
         dialect=db_type,
         table=full_table_name,
         column=None,
         sql_or_queries=sql,
-        extra={"payload": getattr(payload, "model_dump", lambda **_: payload.__dict__)(exclude_none=True)},
+        extra={
+            "payload": getattr(payload, "model_dump", lambda **_: payload.__dict__)(
+                exclude_none=True
+            )
+        },
     )
 
     description = _normalize_description(payload)
@@ -481,7 +520,7 @@ def execute_create_table(
             ctx=audit_ctx,
             connection_id=connection_model.id,
             operation="METADATA::CREATE_TABLE",
-            query_type=QueryType.CREATETABLE,
+            query_type=QueryType.CREATE_TABLE,
             dialect=db_type,
             table=full_table_name,
             column=None,
@@ -541,7 +580,9 @@ def execute_alter_table(
                 queries.append(f"EXEC sp_rename '{obj}', '{new_table}';")
         elif db_type == "oracle":
             if old_schema and new_schema and old_schema != new_schema:
-                raise ValueError("Oracle: mover schema não suportado via ALTER simples.")
+                raise ValueError(
+                    "Oracle: mover schema não suportado via ALTER simples."
+                )
             if old_table != new_table:
                 queries.append(
                     f"RENAME {quote_identifier(db_type, old_table)} "
@@ -556,7 +597,9 @@ def execute_alter_table(
                     f"RENAME TO {quote_identifier(db_type, new_table)};"
                 )
         else:
-            raise ValueError(f"Dialeto '{db_type}' não suportado para rename/move table.")
+            raise ValueError(
+                f"Dialeto '{db_type}' não suportado para rename/move table."
+            )
 
     if queries:
         _run_ddl(
@@ -565,7 +608,7 @@ def execute_alter_table(
             engine=engine,
             connection_id=connection_model.id,
             operation="ALTER TABLE",
-            query_type=QueryType.ALTERTABLE,
+            query_type=QueryType.ALTER_TABLE,
             dialect=db_type,
             table=old_full_table_name,
             column=None,
@@ -573,7 +616,9 @@ def execute_alter_table(
             extra={
                 "old_full": old_full_table_name,
                 "new_full": new_full_table_name,
-                "payload": getattr(payload, "model_dump", lambda **_: payload.__dict__)(exclude_none=True),
+                "payload": getattr(payload, "model_dump", lambda **_: payload.__dict__)(
+                    exclude_none=True
+                ),
             },
         )
 
@@ -620,7 +665,7 @@ def execute_alter_table(
             ctx=audit_ctx,
             connection_id=connection_model.id,
             operation="METADATA::UPDATE_TABLE",
-            query_type=QueryType.ALTERTABLE,
+            query_type=QueryType.ALTER_TABLE,
             dialect=db_type,
             table=new_full_table_name,
             column=None,
@@ -628,7 +673,11 @@ def execute_alter_table(
             status="error",
             started_at=_utcnow(),
             error_message=friendly_msg,
-            extra={"old_full": old_full_table_name, "new_full": new_full_table_name, "error": details},
+            extra={
+                "old_full": old_full_table_name,
+                "new_full": new_full_table_name,
+                "error": details,
+            },
         )
         raise
 
@@ -674,7 +723,7 @@ def execute_drop_table(
         engine=engine,
         connection_id=connection_model.id,
         operation="DROP TABLE",
-        query_type=QueryType.DROPTABLE,
+        query_type=QueryType.DROP_TABLE,
         dialect=db_type,
         table=full_table_name,
         column=None,
@@ -704,7 +753,7 @@ def execute_drop_table(
             ctx=audit_ctx,
             connection_id=connection_model.id,
             operation="METADATA::SOFT_DELETE_TABLE",
-            query_type=QueryType.DROPTABLE,
+            query_type=QueryType.DROP_TABLE,
             dialect=db_type,
             table=full_table_name,
             column=None,

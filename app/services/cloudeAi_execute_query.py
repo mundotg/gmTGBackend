@@ -261,7 +261,7 @@ class QueryFilterBuilder:
         for i, condition in enumerate(conditions):
             # Validação de segurança já feita pelo SecurityValidator
             field = f"{condition.table_name_fil}.{condition.column}"
-            # print(f"🔍 DEBUG: Processando condição {condition}")
+            # print(f" DEBUG: Processando condição {condition}")
             # Gera nome único do parâmetro
             param_prefix = f"param_{i}"
 

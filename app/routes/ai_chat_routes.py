@@ -48,7 +48,7 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 # 🧠 CRIAR SESSÃO
 # ============================================================
 @router.post("/session", response_model=ChatSessionResponse)
-def create_chat_session(
+async def create_chat_session(
     data: ChatSessionCreate,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -69,7 +69,7 @@ def create_chat_session(
 # 📋 LISTAR SESSÕES
 # ============================================================
 @router.get("/sessions", response_model=list[ChatSessionResponse])
-def list_sessions(
+async def list_sessions(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -111,7 +111,7 @@ def get_session_details(
 # 💬 LISTAR MENSAGENS (Apenas as mensagens)
 # ============================================================
 @router.get("/messages/{session_id}", response_model=list[MessageResponse])
-def list_messages(
+async def list_messages(
     session_id: int,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -141,7 +141,7 @@ def list_messages(
 # ✉️ ENVIAR MENSAGEM + IA
 # ============================================================
 @router.post("/send/{session_id}")
-def send_message(
+async def send_message(
     session_id: int,
     data: MessageCreate,
     db: Session = Depends(get_db),
@@ -222,7 +222,7 @@ def send_message(
 # ⭐ ADICIONAR FEEDBACK / REAÇÃO (NOVO)
 # ============================================================
 @router.post("/message/{message_id}/feedback")
-def rate_ai_message(
+async def rate_ai_message(
     message_id: int,
     data: FeedbackCreate,
     db: Session = Depends(get_db),
@@ -249,7 +249,7 @@ def rate_ai_message(
 # ❌ DELETAR SESSÃO
 # ============================================================
 @router.delete("/session/{session_id}")
-def remove_session(
+async def remove_session(
     session_id: int,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -287,7 +287,7 @@ def remove_session(
 
 
 @router.post("/send-stream/{session_id}")
-def send_message_stream(
+async def send_message_stream(
     session_id: int,
     data: MessageCreate,
     db: Session = Depends(get_db),

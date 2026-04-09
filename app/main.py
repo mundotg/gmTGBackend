@@ -1,4 +1,5 @@
 import asyncio
+import io
 import sys
 import os
 import faulthandler
@@ -43,7 +44,6 @@ from app.routes import (
 # 🔧 Correção de PATH (importante pro PyInstaller)
 # ------------------------------------------------------------
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 # ------------------------------------------------------------
 # Debug e compatibilidade
 # ------------------------------------------------------------
@@ -61,7 +61,7 @@ os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 🔥 2. Tudo que vem ANTES do yield é o "Startup"
-    print("🚀 Inicializando aplicação...")
+    print(" Inicializando aplicação...")
     init_on_startup()
 
     db = SessionLocal()
@@ -134,7 +134,10 @@ if __name__ == "__main__":
     host = get_env("HOST", "0.0.0.0") or "127.0.0.1"
     port = int(get_env("PORT") or "8000")
 
-    print(f"📡 Servidor rodando em: http://{host}:{port}")
+    print(f" Servidor rodando em: http://{host}:{port}")
 
     # ✅ NÃO usar string nem reload
-    uvicorn.run(app, host=host, port=port)
+    try:
+        uvicorn.run(app, host=host, port=port)
+    except KeyboardInterrupt:
+        print("Sinal de paragem recebido. A encerrar o servidor graciosamente...")

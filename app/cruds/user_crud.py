@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from app import auth
 from app.models import user_model
-from app.schemas import users_chemas
+from app.schemas import users_schemas
 from app.ultils.logger import log_message
 
 
@@ -21,7 +21,9 @@ def get_user_by_email(db: Session, email: str):
     # Mantive a lógica, mas deixei o código mais enxuto.
     return (
         db.query(user_model.User)
-        .options(load_only(user_model.User.id, user_model.User.email, user_model.User.nome))
+        .options(
+            load_only(user_model.User.id, user_model.User.email, user_model.User.nome)
+        )
         .filter(func.lower(user_model.User.email) == normalized_email)
         .first()
     )
@@ -30,7 +32,7 @@ def get_user_by_email(db: Session, email: str):
 # -----------------------------
 # 🧩 Criar (ou obter) empresa
 # -----------------------------
-def get_or_create_empresa(db: Session, empresa_data: users_chemas.EmpresaSchema):
+def get_or_create_empresa(db: Session, empresa_data: users_schemas.EmpresaSchema):
     """Busca ou cria uma empresa caso ainda não exista."""
     if not empresa_data or not (empresa_data.nome or "").strip():
         return None
@@ -73,7 +75,10 @@ def get_or_create_empresa(db: Session, empresa_data: users_chemas.EmpresaSchema)
             .first()
         )
         if empresa:
-            log_message(f"🏢 Empresa criada por outra transação, usando existente: {empresa.nome}", "info")
+            log_message(
+                f"🏢 Empresa criada por outra transação, usando existente: {empresa.nome}",
+                "info",
+            )
             return empresa
         raise
 
@@ -86,7 +91,7 @@ def get_or_create_empresa(db: Session, empresa_data: users_chemas.EmpresaSchema)
 # -----------------------------
 # 🧩 Criar (ou obter) cargo
 # -----------------------------
-def get_or_create_cargo(db: Session, cargo_data: users_chemas.CargoSchema):
+def get_or_create_cargo(db: Session, cargo_data: users_schemas.CargoSchema):
     """Busca ou cria um cargo caso ainda não exista."""
     if not cargo_data or not (cargo_data.nome or "").strip():
         return None
@@ -125,7 +130,10 @@ def get_or_create_cargo(db: Session, cargo_data: users_chemas.CargoSchema):
             .first()
         )
         if cargo:
-            log_message(f"💼 Cargo criado por outra transação, usando existente: {cargo.nome}", "info")
+            log_message(
+                f"💼 Cargo criado por outra transação, usando existente: {cargo.nome}",
+                "info",
+            )
             return cargo
         raise
 
@@ -138,7 +146,7 @@ def get_or_create_cargo(db: Session, cargo_data: users_chemas.CargoSchema):
 # -----------------------------
 # 🧑 Criar novo usuário
 # -----------------------------
-def create_user(db: Session, user: users_chemas.UserCreate) -> user_model.User:
+def create_user(db: Session, user: users_schemas.UserCreate) -> user_model.User:
     email_norm = (user.email or "").strip().lower()
 
     try:
@@ -152,9 +160,11 @@ def create_user(db: Session, user: users_chemas.UserCreate) -> user_model.User:
             raise ValueError("Senha é obrigatória")
 
         # ⚡ evita query pesada desnecessária (opcional)
-        existing_user = db.query(user_model.User.id).filter(
-            user_model.User.email == email_norm
-        ).first()
+        existing_user = (
+            db.query(user_model.User.id)
+            .filter(user_model.User.email == email_norm)
+            .first()
+        )
 
         if existing_user:
             raise ValueError("E-mail já está em uso.")
@@ -235,7 +245,9 @@ def get_users(db: Session):
     # Performance: se for listagem, normalmente não precisa de todos campos / relações
     return (
         db.query(user_model.User)
-        .options(load_only(user_model.User.id, user_model.User.nome, user_model.User.email))
+        .options(
+            load_only(user_model.User.id, user_model.User.nome, user_model.User.email)
+        )
         .order_by(user_model.User.id.desc())
         .all()
     )

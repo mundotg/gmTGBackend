@@ -10,14 +10,20 @@ from sqlalchemy.sql.sqltypes import String, Text
 
 from app.cruds.project_cruds import get_project
 from app.models.connection_models import DBConnection
-from app.models.task_models import Project, Sprint, Task as TaskORM, TaskStats, TypeProjecto
+from app.models.task_models import (
+    Project,
+    Sprint,
+    Task as TaskORM,
+    TaskStats,
+    TypeProjecto,
+)
 from app.models.user_model import Role, User
 from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.project_schemas import ProjectResponseSchema, TypeProjectoSchema
 from app.schemas.sprint_schemas import SprintSchema
 from app.schemas.task_schema import TaskSchema, TaskStatsSchema
 from app.schemas.userTask_schemas import RoleSchema
-from app.schemas.users_chemas import UserOut
+from app.schemas.users_schemas import UserOut
 from app.ultils.logger import log_message
 
 T = TypeVar("T")
@@ -32,7 +38,9 @@ def add_task(db: Session, project_id: str, task_data: TaskSchema) -> Optional[Ta
         # PERFORMANCE: se você só quer saber se existe, use exists()
         # Mantive get_project, mas dá para trocar se quiser.
         if not get_project(db, project_id):
-            log_message(f"Projeto {project_id} não encontrado ao adicionar tarefa", "warning")
+            log_message(
+                f"Projeto {project_id} não encontrado ao adicionar tarefa", "warning"
+            )
             return None
 
         task_dict = task_data.model_dump(by_alias=False, exclude_unset=True)
@@ -49,7 +57,9 @@ def add_task(db: Session, project_id: str, task_data: TaskSchema) -> Optional[Ta
 
     except SQLAlchemyError as e:
         db.rollback()
-        log_message(f"Erro SQL ao adicionar tarefa no projeto {project_id}: {e}", "error")
+        log_message(
+            f"Erro SQL ao adicionar tarefa no projeto {project_id}: {e}", "error"
+        )
         return None
 
 
@@ -62,7 +72,11 @@ def get_tasks(db: Session, project_id: str) -> List[TaskORM]:
         return (
             db.query(TaskORM)
             .filter(TaskORM.project_id == project_id)
-            .order_by(TaskORM.created_at.desc() if hasattr(TaskORM, "created_at") else TaskORM.id.desc())
+            .order_by(
+                TaskORM.created_at.desc()
+                if hasattr(TaskORM, "created_at")
+                else TaskORM.id.desc()
+            )
             .all()
         )
     except SQLAlchemyError as e:
@@ -85,7 +99,9 @@ def get_task_by_id(db: Session, task_id: str) -> Optional[TaskORM]:
 # -----------------------------------------------------
 # 🔄 ATUALIZAR TAREFA
 # -----------------------------------------------------
-def update_task(db: Session, project_id: str, task_id: str, task_data: TaskSchema) -> Optional[TaskORM]:
+def update_task(
+    db: Session, project_id: str, task_id: str, task_data: TaskSchema
+) -> Optional[TaskORM]:
     """Atualiza uma tarefa existente com base nos dados do schema."""
     task = get_task_by_id(db, task_id)
     if not task:
@@ -114,7 +130,10 @@ def update_task(db: Session, project_id: str, task_id: str, task_data: TaskSchem
 
     except Exception:
         db.rollback()
-        log_message(f"Erro inesperado ao atualizar tarefa {task_id}: {traceback.format_exc()}", "error")
+        log_message(
+            f"Erro inesperado ao atualizar tarefa {task_id}: {traceback.format_exc()}",
+            "error",
+        )
         return None
 
 
@@ -168,10 +187,7 @@ def delegate_task(db: Session, task_id: str, new_user_id: str) -> Optional[TaskO
 # ✅ VALIDAR TAREFA
 # -----------------------------------------------------
 def validate_task(
-    db: Session,
-    task_id: str,
-    aprovado: bool = True,
-    validator_id: Optional[str] = None
+    db: Session, task_id: str, aprovado: bool = True, validator_id: Optional[str] = None
 ) -> Optional[TaskORM]:
     """Marca uma tarefa como validada e concluída."""
     try:
@@ -245,7 +261,10 @@ def get_paginated_query(
                 if hasattr(model, relation):
                     query = query.options(selectinload(getattr(model, relation)))
                 else:
-                    log_message(f"Relação '{relation}' não encontrada no modelo {model.__name__}", "warning")
+                    log_message(
+                        f"Relação '{relation}' não encontrada no modelo {model.__name__}",
+                        "warning",
+                    )
 
         # 🔍 Busca textual (somente String/Text)
         if search:
@@ -269,7 +288,10 @@ def get_paginated_query(
                 query = query.filter(getattr(model, key) == value)
 
         # ✅ total count eficiente
-        total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
+        total = (
+            db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
+            or 0
+        )
 
         # Itens
         items = db.scalars(query.offset(offset).limit(limit)).all()
@@ -310,5 +332,7 @@ def get_paginated_query(
         return {"items": [], "total": 0, "page": page, "limit": limit, "pages": 0}
 
     except Exception:
-        log_message(f"Erro inesperado na consulta paginada: {traceback.format_exc()}", "error")
+        log_message(
+            f"Erro inesperado na consulta paginada: {traceback.format_exc()}", "error"
+        )
         return {"items": [], "total": 0, "page": page, "limit": limit, "pages": 0}

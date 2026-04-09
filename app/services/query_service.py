@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from time import time
 from typing import Any, Optional
 
+from fastapi import params
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -104,6 +105,11 @@ class QueryService:
                 query_payload=sanitized_payload,
                 result_data=result_data,
                 params=params,
+            )
+
+            log_message(f"📘 Query montada:\n{query_string}", "debug")
+            log_message(
+                f"📦 Parâmetros: {json.dumps(params, indent=2, default=str)}", "debug"
             )
 
             return execution_result

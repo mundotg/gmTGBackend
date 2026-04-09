@@ -12,7 +12,10 @@ from app.services.editar_linha import (
     _convert_column_type_for_string_one,
     quote_identifier,
 )
-from app.ultils.logica_de_join_advance import build_join_clause
+from app.ultils.logica_de_join_advance import (
+    build_contains_condition,
+    build_join_clause,
+)
 
 
 def is_valid_uuid(value: str) -> bool:

@@ -10,7 +10,7 @@ from sqlalchemy.orm import load_only, noload
 from app.models.user_model import User
 from app.models.connection_models import ActiveConnection, ConnectionLog, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
-from app.schemas.users_chemas import PaginationOutput
+from app.schemas.users_schemas import PaginationOutput
 from app.ultils.logger import log_message
 
 
@@ -49,7 +49,9 @@ def get_active_connection_by_userid(db: Session, user_id: int):
     )
 
 
-def get_active_connection_by_connid(db: Session, conn_id: int):
+def get_active_connection_by_connid(
+    db: Session, conn_id: int
+) -> Optional[ActiveConnection]:
     """
     Busca conexão ativa por connection_id SEM relações.
     """
@@ -161,12 +163,10 @@ def set_active_connection(db: Session, user_id: int, id_conn: int):
     log_message(f"✅ Conexão ativa definida: user={user_id}, conn={id_conn}", "success")
     return active
 
+
 def desactivate_all_connections(db: Session, user_id: int):
     # subquery: pega ids de conexões do usuário
-    conn_ids_subq = (
-        select(DBConnection.id)
-        .where(DBConnection.user_id == user_id)
-    )
+    conn_ids_subq = select(DBConnection.id).where(DBConnection.user_id == user_id)
 
     stmt = (
         update(ActiveConnection)

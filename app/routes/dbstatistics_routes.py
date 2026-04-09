@@ -39,6 +39,7 @@ router = APIRouter(prefix="/consu", tags=["Consulta de Banco de Dados"])
 # Helpers
 # --------------------------------------------------
 
+
 def _get_active_connection_or_400(db: Session, user_id: int):
     active = get_active_connection_by_userid(db, user_id)
     if not active:
@@ -70,6 +71,7 @@ def _log_and_raise_500(message: str, error: Exception, detail: str):
 # --------------------------------------------------
 # Cache wrappers
 # --------------------------------------------------
+
 
 @cache_result(ttl=300, user_id="tables_with_count_{user_id}")
 def get_tables_with_count_cached(
@@ -159,8 +161,9 @@ def sync_connection_stats_cached(user_id: int, db: Session) -> Any:
 # Endpoints
 # --------------------------------------------------
 
+
 @router.get("/tables-with-count", response_model=ResponseWrapper[List[TableInfo]])
-def get_tables_with_count_endpoint(
+async def get_tables_with_count_endpoint(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -183,7 +186,7 @@ def get_tables_with_count_endpoint(
 
 
 @router.get("/tables", response_model=ResponseWrapper[List[str]])
-def get_tables_endpoint(
+async def get_tables_endpoint(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -202,7 +205,7 @@ def get_tables_endpoint(
 
 
 @router.get("/structures", response_model=ResponseWrapper[List[DBStructureOut]])
-def get_structures_endpoint(
+async def get_structures_endpoint(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -228,7 +231,7 @@ def get_structures_endpoint(
     "/all/structures/{connection_id}",
     response_model=ResponseWrapper[List[DBStructureOut]],
 )
-def get_structures_by_connection_id_endpoint(
+async def get_structures_by_connection_id_endpoint(
     connection_id: int = Path(..., description="ID da conexão"),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -251,7 +254,7 @@ def get_structures_by_connection_id_endpoint(
     "/field/{connection_id}/{table_name}",
     response_model=ResponseWrapper[List[DBFieldOut]],
 )
-def get_fields_by_connection_id_endpoint(
+async def get_fields_by_connection_id_endpoint(
     connection_id: int = Path(..., description="ID da conexão"),
     table_name: str = Path(..., description="Nome da tabela"),
     db: Session = Depends(get_db),
@@ -282,7 +285,7 @@ def get_fields_by_connection_id_endpoint(
     "/fields/{connection_id}",
     response_model=ResponseWrapper[Dict[str, List[DBFieldOut]]],
 )
-def get_fields_by_connection_id_and_table_names_endpoint(
+async def get_fields_by_connection_id_and_table_names_endpoint(
     payload: FieldsBulkRequest,
     connection_id: int = Path(..., description="ID da conexão"),
     db: Session = Depends(get_db),
@@ -291,7 +294,9 @@ def get_fields_by_connection_id_and_table_names_endpoint(
     try:
         _validate_connection_access_or_404(db, connection_id)
 
-        table_names = [t.strip() for t in (payload.table_names or []) if t and t.strip()]
+        table_names = [
+            t.strip() for t in (payload.table_names or []) if t and t.strip()
+        ]
         if not table_names:
             return ResponseWrapper(success=True, data={})
 
@@ -315,7 +320,7 @@ def get_fields_by_connection_id_and_table_names_endpoint(
 
 
 @router.get("/table/{table_name}/count", response_model=ResponseWrapper[int])
-def get_table_count_endpoint(
+async def get_table_count_endpoint(
     table_name: str,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -338,7 +343,7 @@ def get_table_count_endpoint(
 
 
 @router.get("/sync", response_model=ResponseWrapper[Any])
-def sync_connection_stats_endpoint(
+async def sync_connection_stats_endpoint(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -376,8 +381,9 @@ async def stream_table_counts_endpoint(
 # Cache management
 # --------------------------------------------------
 
+
 @router.post("/cache/clear")
-def clear_cache_endpoint(
+async def clear_cache_endpoint(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -419,7 +425,7 @@ def clear_cache_endpoint(
 
 
 @router.get("/cache/info")
-def get_cache_info_endpoint(
+async def get_cache_info_endpoint(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -462,8 +468,9 @@ def get_cache_info_endpoint(
 # Health
 # --------------------------------------------------
 
+
 @router.get("/health")
-def health_check_endpoint(
+async def health_check_endpoint(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):

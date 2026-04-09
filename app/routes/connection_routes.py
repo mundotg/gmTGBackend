@@ -4,6 +4,7 @@ import json
 import os
 import traceback
 from typing import Any, Optional, cast
+from fastapi.concurrency import run_in_threadpool
 import pandas as pd
 from fastapi import (
     APIRouter,
@@ -51,7 +52,6 @@ from app.schemas.connetion_schema import (
 )
 from app.services.crypto_utils import aes_encrypt
 from app.services.dataset_service import (
-    build_safe_table_name,
     read_dataframe,
     read_dataset_source,
     save_dataframe_to_sqlite,
@@ -66,13 +66,16 @@ router = APIRouter(prefix="/conn", tags=["connections"])
 # Cache
 # =========================================================
 
+
 @cache_result(ttl=300, user_id="user_{user_id}")
 def get_db_connections_cached(db: Session, user_id: int):
     return get_db_connections(db, user_id)
 
 
 @cache_result(ttl=300, user_id="user_{user_id}")
-def get_db_connections_pagination_cached(db: Session, user_id: int, page: int, limit: int):
+def get_db_connections_pagination_cached(
+    db: Session, user_id: int, page: int, limit: int
+):
     return get_db_connections_pagination_v1(db, user_id, page, limit)
 
 
@@ -101,6 +104,7 @@ def get_db_connection_by_id_cached(db: Session, conn_id: int) -> DBConnection | 
 # Helpers
 # =========================================================
 
+
 def _log_and_raise(
     *,
     db: Session,
@@ -115,7 +119,7 @@ def _log_and_raise(
     """
     Padroniza log técnico + log de conexão + exceção HTTP.
     """
-    log_message(f'{message} : {details}', level=level)
+    log_message(f"{message} : {details}", level=level)
 
     try:
         create_connection_log(
@@ -144,14 +148,20 @@ def _cleanup_engine(user_id: int) -> None:
         if current_engine:
             current_engine.dispose()
             EngineManager.remove(user_id)
-            log_message(f"🔁 Engine do usuário {user_id} descartado com sucesso.", level="info")
+            log_message(
+                f"🔁 Engine do usuário {user_id} descartado com sucesso.", level="info"
+            )
     except ValueError:
         log_message(f"ℹ️ Nenhum engine ativo para o usuário {user_id}.", level="info")
     except Exception as e:
-        log_message(f"⚠️ Erro ao limpar engine do usuário {user_id}: {str(e)}", level="warning")
+        log_message(
+            f"⚠️ Erro ao limpar engine do usuário {user_id}: {str(e)}", level="warning"
+        )
 
 
-def _validate_connection_owner(conn: Optional[DBConnection], conn_id: int) -> DBConnection:
+def _validate_connection_owner(
+    conn: Optional[DBConnection], conn_id: int
+) -> DBConnection:
     """
     Garante que a conexão existe.
     """
@@ -163,7 +173,9 @@ def _validate_connection_owner(conn: Optional[DBConnection], conn_id: int) -> DB
     return conn
 
 
-def _build_connection_output(connection_id: int, message: str, connected: bool) -> DbConnectionOutput:
+def _build_connection_output(
+    connection_id: int, message: str, connected: bool
+) -> DbConnectionOutput:
     return DbConnectionOutput(
         connection_id=connection_id,
         message=message,
@@ -175,8 +187,9 @@ def _build_connection_output(connection_id: int, message: str, connected: bool) 
 # Endpoints de conexão
 # =========================================================
 
+
 @router.post("/salvarconnections/", response_model=SavedConnectionBase)
-def save_connection(
+async def save_connection(
     conn_data: DBConnectionBase,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -189,7 +202,7 @@ def save_connection(
 
         create_connection_log(
             db,
-            connection_id=cast(int,saved_conn.id) or 0,
+            connection_id=cast(int, saved_conn.id) or 0,
             action="Conexão salva",
             status="success",
             details={
@@ -214,13 +227,13 @@ def save_connection(
 
 
 @router.post("/connect/", response_model=DbConnectionOutput)
-def test_and_connect(
+async def test_and_connect(
     request: ConnectionRequest,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     """
-    Testa a conexão, salva ou atualiza e define como ativa.
+    Testa a conexão de forma assíncrona, salva ou atualiza e define como ativa.
     """
     db_conn = None
 
@@ -228,87 +241,102 @@ def test_and_connect(
         conn_data = request.conn_data
         action_type = request.tipo
 
+        # 1. Limpeza prévia da engine antiga no EngineManager
         _cleanup_engine(user_id)
 
-        engine = get_session_by_connection(conn_data)
+        # 2. TESTE DE CONEXÃO (Ponto crítico de bloqueio)
+        # Executamos em threadpool para que o teste do driver (ex: pyodbc) não trave o backend
+        engine = await run_in_threadpool(get_session_by_connection, conn_data)
+
         if not engine:
-            raise ValueError("Engine não foi criado corretamente.")
+            raise ValueError("Não foi possível criar a Engine de conexão.")
 
-        EngineManager.set(engine, user_id)
-        conn_data.status = "connected"
-
+        # 3. Persistência e Lógica de Negócio
+        # Usamos blocos separados para garantir que a engine só vá para o cache se o DB local salvar
         if action_type == "con":
             db_conn = create_db_connection(db, user_id, conn_data)
         elif action_type == "upsert":
             db_conn = upsert_db_connection(db, user_id, conn_data)
         else:
-            raise ValueError("Tipo de operação inválido. Use 'con' ou 'upsert'.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tipo de operação inválido. Use 'con' ou 'upsert'.",
+            )
 
+        if not db_conn or not db_conn.id:
+            raise ValueError("Falha ao persistir dados da conexão no banco local.")
+
+        # 4. Ativação da Conexão
+        # Definimos no Cache de memória (EngineManager) e no Banco de Dados
+        EngineManager.set(engine, user_id)
         desactivate_all_connections(db, user_id)
-        set_active_connection(db, user_id, cast(int, db_conn.id))
+        set_active_connection(db, user_id, db_conn.id)
 
+        # 5. Log de Auditoria
         create_connection_log(
             db,
-            connection_id=cast(int, db_conn.id),
+            connection_id=db_conn.id,
             action="Conexão testada e ativada",
             status="success",
             details={
-                "host": conn_data.host,
                 "database": conn_data.database_name,
                 "type": conn_data.type,
+                "host": conn_data.host,
             },
             user_id=user_id,
         )
 
         return _build_connection_output(
-            connection_id=cast(int, db_conn.id),
-            message="✅ Conexão testada, salva e ativada com sucesso.",
+            connection_id=db_conn.id,
+            message=f"✅ Conexão com {conn_data.database_name} estabelecida e salva.",
             connected=True,
         )
 
     except Exception as e:
+        # Se algo falhou, garantimos que a engine não fique órfã no cache
+        _cleanup_engine(user_id)
+
         _log_and_raise(
             db=db,
             user_id=user_id,
             action="Tentativa de conexão falhou",
-            message="Falha ao conectar ou salvar a conexão. Verifique os dados e tente novamente.",
+            message="Falha ao conectar. Verifique as credenciais e o acesso à rede.",
             status_code=status.HTTP_400_BAD_REQUEST,
-            connection_id=cast(int, db_conn.id) if db_conn else None,
+            connection_id=db_conn.id if db_conn else None,
             details={"error": str(e), "trace": traceback.format_exc()},
         )
 
 
 @router.put("/connect-toggle/", response_model=DbConnectionOutput)
-def connect_or_disconnect(
+async def connect_or_disconnect(
     conn_id: int = Body(..., embed=True),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     """
-    Alterna entre conectar e desconectar uma conexão salva.
+    Alterna entre conectar e desconectar uma conexão salva sem travar o asyncio.
     """
     try:
         active_conn = get_active_connection_by_connid(db, conn_id)
 
-        if active_conn and active_conn["status"]:
+        # 1. LÓGICA DE DESCONEXÃO
+        if active_conn and active_conn.status:
             _cleanup_engine(user_id)
-            disconnect_active_connection(db, active_conn["connection_id"])
+
+            # CORRIGIDO: Acesso via ponto (objeto) em vez de colchetes
+            disconnect_active_connection(db, active_conn.connection_id)
 
             conn_data = _validate_connection_owner(
-                get_db_connection_by_id(db, active_conn["connection_id"]),
-                active_conn["connection_id"],
+                get_db_connection_by_id(db, active_conn.connection_id),
+                active_conn.connection_id,
             )
 
-            # CORRIGIDO: acessando como atributo, não como dicionário
             create_connection_log(
                 db,
                 connection_id=conn_data.id,
                 action="Desconexão manual",
                 status="disconnected",
-                details={
-                    "database": conn_data.database_name,
-                    "type": conn_data.type,
-                },
+                details={"database": conn_data.database_name, "type": conn_data.type},
                 user_id=user_id,
             )
 
@@ -318,28 +346,30 @@ def connect_or_disconnect(
                 connected=False,
             )
 
-        conn_data = _validate_connection_owner(get_db_connection_by_id(db, conn_id), conn_id)
+        # 2. LÓGICA DE CONEXÃO (ATIVAÇÃO)
+        conn_data = _validate_connection_owner(
+            get_db_connection_by_id(db, conn_id), conn_id
+        )
 
         desactivate_all_connections(db, user_id)
 
-        engine = get_session_by_connection(conn_data)
+        # MELHORIA: Rodar em threadpool para não travar o loop se a rede demorar
+        from fastapi.concurrency import run_in_threadpool
+
+        engine = await run_in_threadpool(get_session_by_connection, conn_data)
+
         if not engine:
             raise ValueError("Engine não foi criada corretamente.")
 
         EngineManager.set(engine, user_id)
-        # CORRIGIDO: acessando como atributo, não como dicionário
         set_active_connection(db, user_id, conn_data.id)
 
-        # CORRIGIDO: acessando como atributo, não como dicionário
         create_connection_log(
             db,
             connection_id=conn_data.id,
             action="Conexão ativada",
             status="success",
-            details={
-                "database": conn_data.database_name,
-                "type": conn_data.type,
-            },
+            details={"database": conn_data.database_name, "type": conn_data.type},
             user_id=user_id,
         )
 
@@ -352,19 +382,21 @@ def connect_or_disconnect(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+
         _log_and_raise(
             db=db,
             user_id=user_id,
             action="Erro ao alternar conexão",
             message="Erro ao conectar ou desconectar a conexão.",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             connection_id=conn_id,
             details={"error": str(e), "trace": traceback.format_exc()},
         )
 
 
 @router.get("/connections/", response_model=ConnectionPaginationOutput)
-def list_connections_paginated(
+async def list_connections_paginated(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
     page: int = Query(1, ge=1),
@@ -376,7 +408,7 @@ def list_connections_paginated(
     try:
         connections = get_db_connections_pagination_cached(db, user_id, page, limit)
         active_conn = get_active_connection_by_userid(db, user_id)
-        active_conn_id = cast(int,active_conn.connection_id )if active_conn else None
+        active_conn_id = cast(int, active_conn.connection_id) if active_conn else None
 
         return ConnectionPaginationOutput(
             page=connections["page"],
@@ -410,7 +442,7 @@ def list_connections_paginated(
 
 
 @router.delete("/delete_connection/{conn_id}", response_model=DbConnectionOutput)
-def delete_connection_save(
+async def delete_connection_save(
     conn_id: int,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -455,7 +487,7 @@ def delete_connection_save(
 
 
 @router.get("/get_credencial_db/{conn_id}", response_model=ConnectionPassUserOut)
-def get_credenciais(
+async def get_credenciais(
     conn_id: int,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -491,7 +523,7 @@ def get_credenciais(
 
 
 @router.post("/testconnections/", response_model=DbConnectionOutput)
-def test_connection(
+async def test_connection(
     conn_data: DBConnectionBase,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -544,7 +576,7 @@ def test_connection(
 
 
 @router.get("/paginate")
-def listar_elementos_connections(
+async def listar_elementos_connections(
     search: str | None = Query(None, description="Texto para pesquisa"),
     filtro: str | None = Query(None, description="Filtro opcional em formato JSON"),
     page: int = Query(1, ge=1),
@@ -609,14 +641,14 @@ async def open_dataset(
         )
 
         # 4. Registar a conexão na base de dados principal (o MustaInf)
-        # Usamos o nome da primeira tabela como database_name principal para referência, 
+        # Usamos o nome da primeira tabela como database_name principal para referência,
         # mas o SQLite tem todas lá dentro.
         main_table_name = tabelas_criadas[0] if tabelas_criadas else "main_table"
 
         conn_data = DBConnectionBase(
             name=f"Dataset: {filename}",
             type="SQLite",
-            host=aes_encrypt(db_path),   # caminho absoluto do ficheiro SQLite
+            host=aes_encrypt(db_path),  # caminho absoluto do ficheiro SQLite
             port=0,
             username="",
             password="",
@@ -629,19 +661,23 @@ async def open_dataset(
         # 5. Prepara os metadados de resposta para todas as tabelas
         # Calcula o total de linhas somando todas as tabelas
         total_rows_all_tables = sum(len(df) for df in dict_dfs.values())
-        
+
         # Cria um resumo com as informações de cada tabela extraída
         tabelas_info = []
         for tab_name in tabelas_criadas:
             df = dict_dfs[tab_name]
-            tabelas_info.append({
-                "table_name": tab_name,
-                "rows": int(len(df)),
-                "columns": int(len(df.columns)),
-                "column_names": list(df.columns),
-                # Preview apenas das primeiras 3 linhas de cada tabela para não sobrecarregar o JSON
-                "preview": df.head(3).where(pd.notna(df.head(3)), None).to_dict(orient="records")
-            })
+            tabelas_info.append(
+                {
+                    "table_name": tab_name,
+                    "rows": int(len(df)),
+                    "columns": int(len(df.columns)),
+                    "column_names": list(df.columns),
+                    # Preview apenas das primeiras 3 linhas de cada tabela para não sobrecarregar o JSON
+                    "preview": df.head(3)
+                    .where(pd.notna(df.head(3)), None)
+                    .to_dict(orient="records"),
+                }
+            )
 
         log_message(
             f"📄 Dataset '{filename}' importado pelo usuário {user_id}. "
@@ -668,7 +704,7 @@ async def open_dataset(
             "source": source_type,
             "filename": filename,
             "connection_id": conn.id,
-            "tables": tabelas_info, # Array com info detalhada de cada tabela importada
+            "tables": tabelas_info,  # Array com info detalhada de cada tabela importada
             "total_tables_extracted": len(tabelas_criadas),
             "message": f"Dataset carregado com sucesso. {len(tabelas_criadas)} tabela(s) criada(s).",
         }
@@ -710,7 +746,7 @@ async def open_dataset(
         if conn:
             create_connection_log(
                 db,
-                connection_id=cast(int,conn.id),
+                connection_id=cast(int, conn.id),
                 action="Erro crítico no processamento do dataset",
                 status="error",
                 details={

@@ -25,19 +25,21 @@ def convert_to_asyncpg_url(url: str) -> str:
     # Para asyncpg, é melhor usar parâmetros de conexão via connect_args
     # do que via query string. Vamos remover a query string completamente.
     parsed = urlparse(url)
-    
+
     # Constrói a URL sem query parameters
-    clean_url = urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path,
-        parsed.params,
-        "",  # query string vazia
-        parsed.fragment
-    ))
-    
+    clean_url = urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            "",  # query string vazia
+            parsed.fragment,
+        )
+    )
+
     log_message(f"🔧 URL convertida para asyncpg (sem query parameters)")
-    
+
     # troca o driver psycopg2 → asyncpg
     return clean_url.replace("postgresql://", "postgresql+asyncpg://")
 
@@ -61,16 +63,24 @@ else:
     raise ValueError("❌ Driver não suportado para ASYNC.")
 
 # Configuração do engine async
-async_engine_kwargs = {
-    "echo": False,
-    "future": True,
-    "connect_args": {
-        "ssl": False,  # 👈 Desativa SSL (resolve o erro)
-        "server_settings": {
-            "jit": "off"
-        }
+# ============================================================
+# ⚡ CONFIGURAÇÃO ASYNC
+# ============================================================
+if DATABASE_URL.startswith("sqlite"):
+    async_engine_kwargs = {
+        "echo": False,
+        "future": True,
+        "connect_args": {"check_same_thread": False},  # ✅ apenas para sqlite
     }
-}
+else:
+    async_engine_kwargs = {
+        "echo": False,
+        "future": True,
+        "connect_args": {
+            "ssl": False,  # ou um contexto SSL válido se precisar
+            "server_settings": {"jit": "off"},
+        },
+    }
 
 
 async_engine = create_async_engine(ASYNC_DATABASE_URL, **async_engine_kwargs)
@@ -93,13 +103,15 @@ Base = declarative_base()
 # 🔁 DEPENDÊNCIAS DE SESSÃO
 # ============================================================
 
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-        
+
+
 async def get_db_async():
     async with AsyncSessionLocal() as session:
         yield session

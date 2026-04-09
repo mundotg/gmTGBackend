@@ -177,10 +177,6 @@ async def executar_query_e_salvar(
                 db, user_id, connection.id, query_string
             )
             if consulta_existente:
-                log_message(
-                    "⚠️ Consulta já registrada no histórico. Retornando resultado salvo.",
-                    "warning",
-                )
                 # se existiu erro operacional, repassa
                 if consulta_existente.error_message:
                     # se for erro operacional genérico, levanta para re-executar

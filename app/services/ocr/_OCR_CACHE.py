@@ -141,7 +141,6 @@ def get_cached_result(file_bytes: bytes, filename: str):
 
     # 1. Buscar na RAM
     if key in MEMORY_CACHE:
-        print(f"⚡ [CACHE RAM HIT] Chave: {key}")
         _mark_as_recently_used(key)  # Marca como recém-usado
         return MEMORY_CACHE[key]["val"]
 
@@ -150,7 +149,6 @@ def get_cached_result(file_bytes: bytes, filename: str):
     disk_data = _read_cache(cache_path)
 
     if disk_data is not None:
-        print(f"💾 [CACHE DISK HIT] Chave: {key} carregada do disco para a RAM.")
 
         # Serializamos para saber o tamanho exato dos bytes que vai ocupar
         data_bytes = _serialize_to_bytes(disk_data)
@@ -202,8 +200,6 @@ def set_cached_result(file_bytes: bytes, filename: str, result: dict):
 
         MEMORY_CACHE[key] = {"val": payload_formatado, "size": item_size}
         current_ram_usage += item_size
-
-        print(f"✅ [CACHE SAVED] Estrutura guardada. Chave: {key}")
 
     except Exception as e:
         log_message(

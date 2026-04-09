@@ -8,7 +8,7 @@ from app import database, auth
 from app.cruds import user_crud
 from app.models import user_model
 from app.request_fingerprint import build_fingerprint
-from app.schemas import users_chemas
+from app.schemas import users_schemas
 from app.services.crypto_utils import aes_decrypt
 from app.token_storage import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -18,7 +18,7 @@ from app.token_storage import (
     is_refresh_token_valid,
     revoke_token,
     update_refresh_token,
-    assert_refresh_token_binding,   # ✅ IMPORTANTE
+    assert_refresh_token_binding,  # ✅ IMPORTANTE
 )
 from app.config.dotenv import get_env
 from app.ultils.ativar_session_bd import reativar_connection
@@ -73,16 +73,26 @@ def internal_error(e: Exception):
     raise HTTPException(status_code=500, detail="Erro interno no servidor.")
 
 
-def build_user_out(user: user_model.User, info_extra=None) -> users_chemas.UserOut:
-    return users_chemas.UserOut(
+def build_user_out(user: user_model.User, info_extra=None) -> users_schemas.UserOut:
+    return users_schemas.UserOut(
         id=str(user.id),
         nome=user.nome,
         apelido=user.apelido,
         email=user.email,
         telefone=user.telefone,
-        empresa=users_chemas.EmpresaSchema.model_validate(user.empresa) if user.empresa else None,
-        cargo=users_chemas.CargoSchema.model_validate(user.cargo) if user.cargo else None,
-        roles=users_chemas.RoleSimpleSchema.model_validate(user.role) if user.role else None,
+        empresa=(
+            users_schemas.EmpresaSchema.model_validate(user.empresa)
+            if user.empresa
+            else None
+        ),
+        cargo=(
+            users_schemas.CargoSchema.model_validate(user.cargo) if user.cargo else None
+        ),
+        roles=(
+            users_schemas.RoleSimpleSchema.model_validate(user.role)
+            if user.role
+            else None
+        ),
         permissions=list(user.permissions),
         info_extra=info_extra,
     )
@@ -95,8 +105,6 @@ def get_payload_from_token_or_401(token: str) -> dict:
     return payload
 
 
-
-
 def assert_access_token_binding(request: Request, access_token: str) -> dict:
     """
     Valida binding do access token com o fingerprint atual.
@@ -107,7 +115,9 @@ def assert_access_token_binding(request: Request, access_token: str) -> dict:
 
     # Comparações severas (se quiseres tolerância, mexe aqui)
     if payload.get("fp") != fp_now.get("fp"):
-        raise HTTPException(status_code=401, detail="Sessão inválida: fingerprint divergente")
+        raise HTTPException(
+            status_code=401, detail="Sessão inválida: fingerprint divergente"
+        )
 
     if payload.get("ip") != fp_now.get("user_ip_prefix"):
         raise HTTPException(status_code=401, detail="Sessão inválida: IP divergente")
@@ -115,18 +125,20 @@ def assert_access_token_binding(request: Request, access_token: str) -> dict:
     # Obs: user_agent no token pode estar normalizado/hashiado dependendo da tua implementação.
     # Aqui assumo que estás guardando o ua bruto no token como você fez.
     if payload.get("ua") != fp_now.get("user_agent"):
-        raise HTTPException(status_code=401, detail="Sessão inválida: User-Agent divergente")
+        raise HTTPException(
+            status_code=401, detail="Sessão inválida: User-Agent divergente"
+        )
 
     return payload
 
 
 @router.post(
     "/register",
-    response_model=users_chemas.UserOut,
+    response_model=users_schemas.UserOut,
     status_code=status.HTTP_201_CREATED,
 )
-def register_user(
-    user: users_chemas.UserCreate,
+async def register_user(
+    user: users_schemas.UserCreate,
     db: Session = Depends(database.get_db),
 ):
     try:
@@ -144,15 +156,13 @@ def register_user(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Erro interno ao criar usuário: {str(e)}"
+            status_code=500, detail=f"Erro interno ao criar usuário: {str(e)}"
         )
 
 
-
-@router.post("/login", response_model=users_chemas.LoginResponse)
-def login_user(
-    credentials: users_chemas.UserLogin,
+@router.post("/login", response_model=users_schemas.LoginResponse)
+async def login_user(
+    credentials: users_schemas.UserLogin,
     request: Request,
     response: Response,
     db: Session = Depends(database.get_db),
@@ -162,24 +172,30 @@ def login_user(
         if not user:
             raise HTTPException(status_code=401, detail="E-mail não encontrado")
 
-        if not auth.verify_password(aes_decrypt(credentials.senha), user.hashed_password):
+        if not auth.verify_password(
+            aes_decrypt(credentials.senha), user.hashed_password
+        ):
             raise HTTPException(status_code=401, detail="Senha incorreta")
 
         fp = build_fingerprint(request, FINGERPRINT_SALT)
 
-        access_token = auth.create_access_token({
-            "sub": str(user.id),
-            "fp": fp["fp"],
-            "ua": fp["user_agent"],
-            "ip": fp["user_ip_prefix"],
-        })
+        access_token = auth.create_access_token(
+            {
+                "sub": str(user.id),
+                "fp": fp["fp"],
+                "ua": fp["user_agent"],
+                "ip": fp["user_ip_prefix"],
+            }
+        )
 
-        refresh_token = auth.create_refresh_token({
-            "sub": str(user.id),
-            "fp": fp["fp"],
-            "ua": fp["user_agent"],
-            "ip": fp["user_ip_prefix"],
-        })
+        refresh_token = auth.create_refresh_token(
+            {
+                "sub": str(user.id),
+                "fp": fp["fp"],
+                "ua": fp["user_agent"],
+                "ip": fp["user_ip_prefix"],
+            }
+        )
 
         # ✅ CRÍTICO: guardar refresh token com fingerprint
         store_refresh_token(db, refresh_token, user.id, REFRESH_TOKEN_EXPIRE_DAYS, fp)
@@ -190,7 +206,9 @@ def login_user(
         rep = reativar_connection(user.id, db)
         info_extra = rep.get("config") if rep.get("success") else None
 
-        return users_chemas.LoginResponse(user=build_user_out(user, info_extra=info_extra))
+        return users_schemas.LoginResponse(
+            user=build_user_out(user, info_extra=info_extra)
+        )
 
     except HTTPException:
         raise
@@ -198,8 +216,8 @@ def login_user(
         internal_error(e)
 
 
-@router.post("/refresh", response_model=users_chemas.AccessTokenOut)
-def refresh_access_token(
+@router.post("/refresh", response_model=users_schemas.AccessTokenOut)
+async def refresh_access_token(
     request: Request,
     response: Response,
     refresh_token: str | None = Cookie(None, alias="refresh_token"),
@@ -207,7 +225,9 @@ def refresh_access_token(
 ):
     try:
         if not refresh_token or not is_refresh_token_valid(db, refresh_token):
-            raise HTTPException(status_code=422, detail="Refresh token inválido ou expirado")
+            raise HTTPException(
+                status_code=422, detail="Refresh token inválido ou expirado"
+            )
 
         fp = build_fingerprint(request, FINGERPRINT_SALT)
 
@@ -223,24 +243,30 @@ def refresh_access_token(
         payload = get_payload_from_token_or_401(refresh_token)
         user_id = payload.get("sub")
         if not user_id:
-            raise HTTPException(status_code=401, detail="Refresh token inválido: sub ausente")
+            raise HTTPException(
+                status_code=401, detail="Refresh token inválido: sub ausente"
+            )
 
         # Access token novo carrega o binding atual
-        access_token = auth.create_access_token({
-            "sub": str(user_id),
-            "fp": fp["fp"],
-            "ua": fp["user_agent"],
-            "ip": fp["user_ip_prefix"],
-        })
-
-        _, is_expiring = refresh_token_time_left(db, refresh_token)
-        if is_expiring:
-            new_refresh = auth.create_refresh_token({
+        access_token = auth.create_access_token(
+            {
                 "sub": str(user_id),
                 "fp": fp["fp"],
                 "ua": fp["user_agent"],
                 "ip": fp["user_ip_prefix"],
-            })
+            }
+        )
+
+        _, is_expiring = refresh_token_time_left(db, refresh_token)
+        if is_expiring:
+            new_refresh = auth.create_refresh_token(
+                {
+                    "sub": str(user_id),
+                    "fp": fp["fp"],
+                    "ua": fp["user_agent"],
+                    "ip": fp["user_ip_prefix"],
+                }
+            )
 
             update_refresh_token(db, refresh_token, new_refresh)
             refresh_token = new_refresh
@@ -254,17 +280,17 @@ def refresh_access_token(
         set_cookie(response, "access_token", access_token, path="/")
         set_cookie(response, "refresh_token", refresh_token, path="/auth/refresh")
 
-        return users_chemas.AccessTokenOut(access_token="ok", token_type="bearer")
+        return users_schemas.AccessTokenOut(access_token="ok", token_type="bearer")
 
-    except HTTPException as err :
+    except HTTPException as err:
         internal_error(err)
-        raise 
+        raise
     except Exception as e:
         internal_error(e)
 
 
-@router.get("/me", response_model=users_chemas.UserOut)
-def get_logged_user(
+@router.get("/me", response_model=users_schemas.UserOut)
+async def get_logged_user(
     request: Request,
     access_token: str | None = Cookie(None, alias="access_token"),
     db: Session = Depends(database.get_db),
@@ -290,7 +316,8 @@ def get_logged_user(
         raise
     except Exception as e:
         internal_error(e)
-        
+
+
 def _delete_auth_cookies(response: Response):
     domain = _cookie_domain()
 
@@ -300,11 +327,10 @@ def _delete_auth_cookies(response: Response):
 
     # access normalmente é "/"
     response.delete_cookie("access_token", path="/", domain=domain)
-    
 
 
 @router.post("/logout")
-def logout_user(
+async def logout_user(
     request: Request,
     response: Response,
     refresh_token: str | None = Cookie(None, alias="refresh_token"),
@@ -314,7 +340,7 @@ def logout_user(
         if refresh_token:
             try:
                 fp = build_fingerprint(request, FINGERPRINT_SALT)
-                payload = assert_refresh_token_binding(request, refresh_token,fp)
+                payload = assert_refresh_token_binding(request, refresh_token, fp)
                 user_id = payload.get("sub")
                 # se quiser: revoke_all_user_tokens(db, int(user_id))
             except HTTPException:

@@ -308,3 +308,187 @@ b': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_r
 2026-04-09 18:56:06,465 - INFO - Nenhum cache expirado encontrado.
 2026-04-09 18:56:06,465 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
 2026-04-09 18:56:06,465 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-09 18:56:06.465023
+2026-04-10 10:33:53,889 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:33:53,892 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:33:53,892 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:33:53,894 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:33:53,895 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:06,021 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:06,024 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:06,024 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:06,136 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:06,139 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:06,139 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:14,521 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:14,524 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:14,524 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:14,530 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:14,534 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:14,534 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:23,196 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:23,199 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:23,199 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:23,200 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:23,203 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:23,203 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:31,817 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:31,817 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:31,817 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:31,817 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:31,827 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:31,827 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:41,048 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:41,050 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:41,052 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:41,052 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:41,054 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:41,054 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:49,684 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:49,684 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:49,687 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:49,687 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:49,687 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:49,687 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:58,367 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:58,371 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:58,371 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:34:58,372 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:34:58,375 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:34:58,376 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:06,997 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:06,997 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:06,997 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:06,997 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:06,997 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:06,997 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:15,643 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:15,645 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:15,646 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:15,646 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:15,647 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:15,648 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:24,310 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:24,311 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:24,313 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:24,313 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:24,314 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:24,314 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:32,937 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:32,940 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:32,940 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:32,946 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:32,948 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:32,948 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:41,569 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:41,572 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:41,572 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:41,574 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:41,577 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:41,577 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:50,195 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:50,198 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:50,198 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:50,201 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:50,204 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:50,204 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:58,784 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:58,787 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:58,787 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:35:58,787 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:35:58,789 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:35:58,790 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:36:07,392 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:36:07,395 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:36:07,395 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 10:36:07,407 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 10:36:07,410 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 10:36:07,411 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 11:11:25,062 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 11:11:25,066 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 11:11:25,066 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 11:11:42,360 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-10 11:11:42,721 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 172.16.66.123, Caminho: logs\logs.txt
+2026-04-10 11:11:42,721 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-10 11:11:42,721 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2026-04-10 11:11:42,722 - INFO - \U0001f504 Verificando atualizações incrementais...
+2026-04-10 11:11:42,722 - INFO - \U0001f504 Aplicando alterações de models no banco de dados...
+2026-04-10 11:11:42,722 - INFO - \U0001f4e6 Carregando modelos do pacote: app.models
+2026-04-10 11:11:42,722 - INFO - \u2705 Módulo importado: app.models.ai_models
+2026-04-10 11:11:42,722 - INFO - \u2705 Módulo importado: app.models.connection_models
+2026-04-10 11:11:42,722 - INFO - \u2705 Módulo importado: app.models.dbstatistics_models
+2026-04-10 11:11:42,722 - INFO - \u2705 Módulo importado: app.models.dbstructure_models
+2026-04-10 11:11:42,722 - INFO - \u2705 Módulo importado: app.models.geral_model
+2026-04-10 11:11:42,722 - INFO - \u2705 Módulo importado: app.models.queryhistory_models
+2026-04-10 11:11:42,722 - INFO - \u2705 Módulo importado: app.models.task_models
+2026-04-10 11:11:42,723 - INFO - \u2705 Módulo importado: app.models.user_model
+2026-04-10 11:11:42,723 - INFO - \U0001f4ca Carregamento concluído: 8 sucessos, 0 erros
+2026-04-10 11:11:42,727 - INFO - \U0001f4cb Tabelas existentes: 31
+2026-04-10 11:11:42,731 - INFO - \u2139\ufe0f Nenhuma nova tabela criada (todas já existiam)
+2026-04-10 11:11:42,731 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-10 11:11:42,929 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-10 11:11:42,933 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-10 11:11:42,970 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-10 11:11:43,194 - INFO - \U0001f464 Usuário admin já existente
+2026-04-10 11:11:43,207 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-10 11:11:43,207 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2026-04-10 11:11:43,208 - INFO - Nenhum cache expirado encontrado.
+2026-04-10 11:11:43,208 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
+2026-04-10 11:11:43,208 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-10 11:11:43.208192
+2026-04-10 11:12:40,113 - ERROR - \u274c refresh token não encontrado no BD
+2026-04-10 11:12:40,114 - ERROR - \u274c Erro interno: 422: Refresh token inválido ou expirado
+Traceback (most recent call last):
+  File "C:\Users\Francemy\Documents\python\gmTGBackend\app\routes\auth_routes.py", line 228, in refresh_access_token
+    raise HTTPException(
+fastapi.exceptions.HTTPException: 422: Refresh token inválido ou expirado
+
+2026-04-10 11:12:40,127 - ERROR - \u274c refresh token não encontrado no BD
+2026-04-10 11:12:40,128 - ERROR - \u274c Erro interno: 422: Refresh token inválido ou expirado
+Traceback (most recent call last):
+  File "C:\Users\Francemy\Documents\python\gmTGBackend\app\routes\auth_routes.py", line 228, in refresh_access_token
+    raise HTTPException(
+fastapi.exceptions.HTTPException: 422: Refresh token inválido ou expirado
+
+2026-04-10 11:12:50,094 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-10 11:12:50,353 - ERROR - \u274c Erro interno: 422: Refresh token inválido ou expirado
+Traceback (most recent call last):
+  File "C:\Users\Francemy\Documents\python\gmTGBackend\app\routes\auth_routes.py", line 228, in refresh_access_token
+    raise HTTPException(
+fastapi.exceptions.HTTPException: 422: Refresh token inválido ou expirado
+
+2026-04-10 11:12:59,990 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-10 11:13:00,258 - ERROR - Nenhum engine ativo para o usuário ID 1
+2026-04-10 11:13:00,276 - INFO - \U0001f50c Criando engine para SQL Server em 172.16.10.216:1433
+2026-04-10 11:13:11,866 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-04-10 11:13:11,872 - INFO - Usando cache para tabelas | connection_id=1 | user=1 | tables=1
+2026-04-10 11:52:24,466 - WARNING - python-dotenv could not parse statement starting at line 119
+2026-04-10 11:52:24,469 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-10 11:52:24,469 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-10 11:52:40,131 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-10 11:52:40,519 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 172.16.66.123, Caminho: logs\logs.txt
+2026-04-10 11:52:40,519 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-10 11:52:40,522 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2026-04-10 11:52:40,522 - INFO - \U0001f504 Verificando atualizações incrementais...
+2026-04-10 11:52:40,522 - INFO - \U0001f504 Aplicando alterações de models no banco de dados...
+2026-04-10 11:52:40,523 - INFO - \U0001f4e6 Carregando modelos do pacote: app.models
+2026-04-10 11:52:40,523 - INFO - \u2705 Módulo importado: app.models.ai_models
+2026-04-10 11:52:40,523 - INFO - \u2705 Módulo importado: app.models.connection_models
+2026-04-10 11:52:40,523 - INFO - \u2705 Módulo importado: app.models.dbstatistics_models
+2026-04-10 11:52:40,523 - INFO - \u2705 Módulo importado: app.models.dbstructure_models
+2026-04-10 11:52:40,523 - INFO - \u2705 Módulo importado: app.models.geral_model
+2026-04-10 11:52:40,523 - INFO - \u2705 Módulo importado: app.models.queryhistory_models
+2026-04-10 11:52:40,523 - INFO - \u2705 Módulo importado: app.models.task_models
+2026-04-10 11:52:40,523 - INFO - \u2705 Módulo importado: app.models.user_model
+2026-04-10 11:52:40,523 - INFO - \U0001f4ca Carregamento concluído: 8 sucessos, 0 erros
+2026-04-10 11:52:40,538 - INFO - \U0001f4cb Tabelas existentes: 31
+2026-04-10 11:52:40,542 - INFO - \u2139\ufe0f Nenhuma nova tabela criada (todas já existiam)
+2026-04-10 11:52:40,542 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-10 11:52:40,753 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-10 11:52:40,758 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-10 11:52:40,794 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-10 11:52:41,016 - INFO - \U0001f464 Usuário admin já existente
+2026-04-10 11:52:41,026 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-10 11:52:41,027 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2026-04-10 11:52:41,029 - INFO - \U0001f9f9 Cache expirado removido: e7b99007b67022a5a58f352778ac1323f1d317e5136822684c63df40f2593ed8.pkl.gz
+2026-04-10 11:52:41,029 - INFO - \U0001f9fe Total de 1/1 caches expirados removidos.
+2026-04-10 11:52:41,029 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
+2026-04-10 11:52:41,029 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-10 11:52:41.029853

@@ -1,31 +1,221 @@
-2026-04-11 15:01:54,388 - WARNING - \u26a0\ufe0f Logout com token inválido: 'NoneType' object has no attribute 'get'
-2026-04-11 15:01:54,394 - INFO - \U0001f6ab Token revogado
-2026-04-11 15:01:54,394 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:54,394 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:01:55,201 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 15:01:55,289 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 15:01:55,295 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 15:01:55,301 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 15:01:55,311 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 15:01:55,317 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 15:01:55,317 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 15:01:55,333 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:55,333 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:01:55,338 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:55,339 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:01:55,346 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:55,346 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:01:55,351 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:55,351 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:01:55,357 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:55,358 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:01:55,360 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:55,360 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:01:55,373 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:55,378 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:01:55,381 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:55,381 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:01:55,427 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 15:01:55,427 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 15:02:19,277 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
-2026-04-11 15:02:19,522 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-11 18:31:20,093 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:31:20,150 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:31:20,182 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:31:20,183 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:31:20,208 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:31:20,209 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:18,763 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:18,780 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:18,899 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:18,906 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:18,946 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:18,965 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:18,987 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:19,004 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:19,017 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:19,035 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:32:19,205 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,205 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,211 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,211 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,217 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,217 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,233 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,233 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,239 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,239 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,247 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,247 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,294 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,295 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,302 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,303 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,317 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,317 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,327 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,327 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,338 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,338 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:32:19,356 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:32:19,356 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:36:07,445 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:36:07,459 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:36:07,512 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:36:07,526 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:36:07,558 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:36:07,570 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:36:07,588 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:36:07,588 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:36:07,639 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:36:07,639 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:36:07,647 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:36:07,647 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:36:07,668 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:36:07,668 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:36:07,679 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:36:07,679 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:36:07,683 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:36:07,683 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:36:07,689 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:36:07,689 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:36:07,757 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:36:07,757 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:39:41,068 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:39:41,078 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:39:41,099 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:39:41,107 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:39:41,114 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:39:41,119 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:39:41,128 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:39:41,129 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:39:41,136 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:39:41,136 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:39:41,173 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:39:41,173 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:39:41,178 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:39:41,178 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:39:41,212 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:39:41,212 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:39:41,216 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:39:41,216 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:39:41,246 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:39:41,246 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:39:41,252 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:39:41,252 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:43:42,180 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:43:42,222 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:43:42,259 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:43:42,270 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:43:42,307 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:43:42,311 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:43:42,327 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:43:42,327 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:43:42,341 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:43:42,341 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:43:42,346 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:43:42,346 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:43:42,358 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:43:42,358 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:43:42,364 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:43:42,364 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:43:42,415 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:43:42,417 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:43:42,581 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:43:42,581 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:43:42,596 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:43:42,596 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:51:32,477 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-11 18:51:33,129 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-11 18:52:44,303 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-11 18:52:44,915 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-11 18:56:21,897 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-11 18:56:22,498 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-11 18:56:42,530 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:56:42,545 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 18:56:42,562 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:56:42,562 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:56:42,585 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 18:56:42,585 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 18:59:28,208 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-11 18:59:28,929 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-11 19:04:27,488 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-11 19:04:28,078 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-11 19:06:59,993 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-11 19:07:00,584 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-11 19:08:41,615 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-11 19:08:42,259 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-11 19:08:46,728 - ERROR - \U0001f6a8 Binding inválido: Sessão inválida (dispositivo diferente)
+2026-04-11 19:08:46,744 - INFO - \U0001f6ab Token revogado
+2026-04-11 19:08:46,744 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:46,753 - WARNING - \u274c Token revogado
+2026-04-11 19:08:46,753 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
+2026-04-11 19:08:46,771 - WARNING - \u274c Token revogado
+2026-04-11 19:08:46,772 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
+2026-04-11 19:08:46,780 - WARNING - \u274c Token revogado
+2026-04-11 19:08:46,781 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
+2026-04-11 19:08:46,791 - WARNING - \u274c Token revogado
+2026-04-11 19:08:46,791 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
+2026-04-11 19:08:46,804 - WARNING - \u274c Token revogado
+2026-04-11 19:08:46,805 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
+2026-04-11 19:08:46,814 - WARNING - \u26a0\ufe0f Logout com token inválido: Sessão inválida
+2026-04-11 19:08:46,818 - INFO - \U0001f6ab Token revogado
+2026-04-11 19:08:46,819 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:46,819 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:46,826 - WARNING - \u26a0\ufe0f Logout com token inválido: Sessão inválida
+2026-04-11 19:08:46,830 - INFO - \U0001f6ab Token revogado
+2026-04-11 19:08:46,831 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:46,831 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:46,836 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:46,837 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:46,843 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:46,843 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:46,848 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:46,848 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:46,867 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:46,867 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:46,875 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:46,875 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:46,879 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:46,880 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,429 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,438 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,700 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,700 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,700 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,701 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,741 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,742 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,743 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,743 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:08:58,761 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,761 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,774 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,777 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,802 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,802 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,804 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,804 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,816 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,820 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,845 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,845 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,862 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,863 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,866 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,866 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,872 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,873 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,878 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,878 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:58,906 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:58,908 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:08:59,024 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:08:59,024 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:05,559 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:09:05,600 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:09:05,706 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:09:05,737 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:09:05,797 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:09:05,826 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:09:05,874 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:09:05,875 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-11 19:09:05,900 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:05,907 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:06,002 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:06,002 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:06,010 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:06,010 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:06,087 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:06,102 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:06,132 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:06,133 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:06,137 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:06,137 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:06,151 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:06,152 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:06,160 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:06,160 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:06,286 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:06,286 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-11 19:09:06,309 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-11 19:09:06,309 - INFO - \U0001f44b Logout realizado user_id=None

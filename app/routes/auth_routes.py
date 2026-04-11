@@ -1,5 +1,6 @@
 import traceback
 from datetime import timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, Request
 from sqlalchemy.orm import Session
@@ -14,10 +15,10 @@ from app.token_storage import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_DAYS,
     refresh_token_time_left,
+    rotate_refresh_token,
     store_refresh_token,
     is_refresh_token_valid,
     revoke_token,
-    update_refresh_token,
     assert_refresh_token_binding,  # ✅ IMPORTANTE
 )
 from app.config.dotenv import get_env
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 COOKIE_SECURE = get_env("COOKIE_SECURE", "false").lower() == "true"
 COOKIE_SAMESITE = get_env("COOKIE_SAMESITE", "lax") or "none"
 COOKIE_DOMAIN = get_env("COOKIE_DOMAIN")
-
+TRUST_PROXY_HEADERS = get_env("TRUST_PROXY_HEADERS", "false").lower() == "true"
 FINGERPRINT_SALT = get_env("FINGERPRINT_SALT", "change-me-please")
 
 
@@ -37,8 +38,8 @@ def _cookie_domain():
     return COOKIE_DOMAIN if COOKIE_DOMAIN and COOKIE_DOMAIN != "localhost" else None
 
 
-def _to_seconds(value: int, unit: str) -> int:
-    v = int(value)
+def _to_seconds(value: Optional[int], unit: str) -> int:
+    v = int(value or 10)
     TEN_YEARS_SECONDS = 10 * 365 * 24 * 60 * 60
     if v > TEN_YEARS_SECONDS:
         return v
@@ -51,21 +52,54 @@ def _to_seconds(value: int, unit: str) -> int:
 
 
 def set_cookie(response: Response, key: str, value: str, path: str = "/"):
-    if key == "refresh_token":
-        max_age = _to_seconds(REFRESH_TOKEN_EXPIRE_DAYS, "days")
-    else:
-        max_age = _to_seconds(ACCESS_TOKEN_EXPIRE_MINUTES, "minutes")
+    try:
+        if key == "refresh_token":
+            max_age = _to_seconds(REFRESH_TOKEN_EXPIRE_DAYS, "days")
+        else:
+            max_age = _to_seconds(ACCESS_TOKEN_EXPIRE_MINUTES, "minutes")
 
-    response.set_cookie(
-        key=key,
-        value=value,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=max_age,
-        path=path,
-        domain=_cookie_domain(),
-    )
+        cookie_options = {
+            "key": key,
+            "value": value,
+            "httponly": TRUST_PROXY_HEADERS,
+            "secure": COOKIE_SECURE,
+            "samesite": COOKIE_SAMESITE,
+            "max_age": max_age,
+            "path": path,
+        }
+
+        domain = _cookie_domain()
+        if domain:
+            cookie_options["domain"] = domain
+
+        # 🔥 obrigatório quando SameSite=None
+        if COOKIE_SAMESITE.lower() == "none":
+            cookie_options["secure"] = COOKIE_SECURE
+
+        response.set_cookie(**cookie_options)
+
+    except Exception as e:
+        log_message(f"💥 erro ao definir cookie {key}: {e}", "error")
+
+
+def _delete_auth_cookies(response: Response):
+    domain = _cookie_domain()
+
+    cookie_options = {
+        "domain": domain,
+        "secure": COOKIE_SECURE,
+        "httponly": TRUST_PROXY_HEADERS,
+        "samesite": COOKIE_SAMESITE,
+    }
+
+    # 🔥 refresh pode ter múltiplos paths
+    for path in ("/", "/auth", "/auth/refresh"):
+        response.delete_cookie("refresh_token", path=path, **cookie_options)
+
+    # 🔥 access token normalmente raiz
+    response.delete_cookie("access_token", path="/", **cookie_options)
+
+    log_message("🍪 Cookies de autenticação removidos", "info")
 
 
 def internal_error(e: Exception):
@@ -75,7 +109,7 @@ def internal_error(e: Exception):
 
 def build_user_out(user: user_model.User, info_extra=None) -> users_schemas.UserOut:
     return users_schemas.UserOut(
-        id=str(user.id),
+        id=user.id,
         nome=user.nome,
         apelido=user.apelido,
         email=user.email,
@@ -99,34 +133,39 @@ def build_user_out(user: user_model.User, info_extra=None) -> users_schemas.User
 
 
 def get_payload_from_token_or_401(token: str) -> dict:
-    payload = auth.decode_token(token)
-    if not payload or not isinstance(payload, dict):
-        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
-    return payload
+    try:
+        payload = auth.decode_token(token)
+        if not payload or not isinstance(payload, dict):
+            raise ValueError("Payload inválido")
+        return payload
+    except Exception as e:
+        log_message(f"❌ Token inválido: {e}", "warning")
+        raise HTTPException(status_code=401, detail="Token inválido")
 
 
 def assert_access_token_binding(request: Request, access_token: str) -> dict:
-    """
-    Valida binding do access token com o fingerprint atual.
-    (Isto não consulta BD; é só o JWT vs request atual.)
-    """
     payload = get_payload_from_token_or_401(access_token)
     fp_now = build_fingerprint(request, FINGERPRINT_SALT)
 
-    # Comparações severas (se quiseres tolerância, mexe aqui)
+    # 🔒 1. fingerprint (obrigatório)
     if payload.get("fp") != fp_now.get("fp"):
-        raise HTTPException(
-            status_code=401, detail="Sessão inválida: fingerprint divergente"
-        )
+        raise HTTPException(status_code=401, detail="Sessão inválida")
 
-    if payload.get("ip") != fp_now.get("user_ip_prefix"):
-        raise HTTPException(status_code=401, detail="Sessão inválida: IP divergente")
+    # ⚠️ 2. IP (tolerante)
+    ip_token = payload.get("ip")
+    ip_now = fp_now.get("user_ip_prefix")
 
-    # Obs: user_agent no token pode estar normalizado/hashiado dependendo da tua implementação.
-    # Aqui assumo que estás guardando o ua bruto no token como você fez.
-    if payload.get("ua") != fp_now.get("user_agent"):
-        raise HTTPException(
-            status_code=401, detail="Sessão inválida: User-Agent divergente"
+    if ip_token and ip_now and ip_token != ip_now:
+        log_message(f"⚠️ IP divergente token={ip_token} atual={ip_now}", "warning")
+
+    # ⚠️ 3. User-Agent (tolerante)
+    ua_token = payload.get("ua")
+    ua_now = fp_now.get("user_agent")
+
+    if ua_token and ua_now and ua_token != ua_now:
+        log_message(
+            f"⚠️ UA divergente token={ua_token[:30]}... atual={ua_now[:30]}...",
+            "warning",
         )
 
     return payload
@@ -146,7 +185,7 @@ async def register_user(
 
         return {
             **db_user.__dict__,
-            "id": str(db_user.id),  # 🔥 aqui resolve
+            "id": db_user.id,  # 🔥 aqui resolve
             "permissions": list(db_user.permissions),
             "role": db_user.role,
         }
@@ -200,7 +239,7 @@ async def login_user(
         # ✅ CRÍTICO: guardar refresh token com fingerprint
         store_refresh_token(db, refresh_token, user.id, REFRESH_TOKEN_EXPIRE_DAYS, fp)
 
-        set_cookie(response, "refresh_token", refresh_token, path="/auth/refresh")
+        set_cookie(response, "refresh_token", refresh_token, path="/")
         set_cookie(response, "access_token", access_token, path="/")
 
         rep = reativar_connection(user.id, db)
@@ -224,30 +263,33 @@ async def refresh_access_token(
     db: Session = Depends(database.get_db),
 ):
     try:
-        if not refresh_token or not is_refresh_token_valid(db, refresh_token):
-            raise HTTPException(
-                status_code=422, detail="Refresh token inválido ou expirado"
-            )
+        if not refresh_token:
+            raise HTTPException(status_code=401, detail="Sessão inválida")
 
+        # 🔍 valida existência e estado
+        if not is_refresh_token_valid(db, refresh_token):
+            raise HTTPException(status_code=401, detail="Sessão expirada ou inválida")
+
+        # 🔐 fingerprint atual
         fp = build_fingerprint(request, FINGERPRINT_SALT)
 
-        # ✅ valida binding SEVERO (refresh no BD vs request atual)
+        # 🔒 valida binding (IP + UA)
         try:
             assert_refresh_token_binding(db, refresh_token, fp)
         except ValueError as e:
-            # opcional: revoga para matar a sessão imediatamente
-            log_message(f"erro valida binding SEVERO {e} ", "error")
+            log_message(f"🚨 Binding inválido: {e}", "error")
             revoke_token(db, refresh_token)
-            raise HTTPException(status_code=401, detail=str(e))
+            raise HTTPException(status_code=401, detail="Sessão inválida")
 
+        # 🔍 payload JWT
         payload = get_payload_from_token_or_401(refresh_token)
         user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(
-                status_code=401, detail="Refresh token inválido: sub ausente"
-            )
 
-        # Access token novo carrega o binding atual
+        if not user_id:
+            revoke_token(db, refresh_token)
+            raise HTTPException(status_code=401, detail="Token inválido")
+
+        # 🆕 novo access token
         access_token = auth.create_access_token(
             {
                 "sub": str(user_id),
@@ -257,7 +299,9 @@ async def refresh_access_token(
             }
         )
 
+        # 🔄 verifica se precisa rotacionar refresh
         _, is_expiring = refresh_token_time_left(db, refresh_token)
+
         if is_expiring:
             new_refresh = auth.create_refresh_token(
                 {
@@ -268,65 +312,54 @@ async def refresh_access_token(
                 }
             )
 
-            update_refresh_token(db, refresh_token, new_refresh)
+            # ✅ ROTACIONA (correto)
+            rotate_refresh_token(db, refresh_token, new_refresh, int(user_id), fp)
+
             refresh_token = new_refresh
+            log_message("🔄 Refresh token rotacionado", "info")
 
-            # IMPORTANTÍSSIMO: quando muda o refresh token, mantém o binding coerente no BD.
-            # Se o teu update_refresh_token só troca o token, o binding antigo continua válido (ok),
-            # mas se quiseres "reiniciar binding", revoga o antigo e cria novo registro no store.
-            # Aqui vou pelo mais seguro: cria novo registro e revoga o antigo.
-            store_refresh_token(db, refresh_token, int(user_id), fp=fp)
-
+        # 🍪 cookies seguras
         set_cookie(response, "access_token", access_token, path="/")
-        set_cookie(response, "refresh_token", refresh_token, path="/auth/refresh")
+        set_cookie(response, "refresh_token", refresh_token, path="/")
 
         return users_schemas.AccessTokenOut(access_token="ok", token_type="bearer")
 
     except HTTPException as err:
-        internal_error(err)
+        log_message(f"❌ HTTP error: {err.detail}", "warning")
         raise
+
     except Exception as e:
-        internal_error(e)
+        log_message(f"💥 Erro inesperado: {e}", "error")
+        raise HTTPException(status_code=500, detail="Erro interno no servidor")
 
 
 @router.get("/me", response_model=users_schemas.UserOut)
-async def get_logged_user(
+async def get_current_user(
     request: Request,
     access_token: str | None = Cookie(None, alias="access_token"),
     db: Session = Depends(database.get_db),
 ):
-    try:
-        if not access_token:
-            raise HTTPException(status_code=401, detail="Access token não fornecido")
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Não autenticado")
 
-        # ✅ severo: valida binding do access token
+    try:
         payload = assert_access_token_binding(request, access_token)
         user_id = payload.get("sub")
+
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Token inválido")
 
         user = db.get(user_model.User, int(user_id))
         if not user:
             raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-        rep = reativar_connection(user.id, db)
-        info_extra = rep.get("config") if rep.get("success") else None
-
-        return build_user_out(user, info_extra=info_extra)
+        return user
 
     except HTTPException:
         raise
     except Exception as e:
-        internal_error(e)
-
-
-def _delete_auth_cookies(response: Response):
-    domain = _cookie_domain()
-
-    # refresh pode ter sido setado em paths diferentes ao longo do tempo
-    for path in ("/auth/refresh", "/auth", "/"):
-        response.delete_cookie("refresh_token", path=path, domain=domain)
-
-    # access normalmente é "/"
-    response.delete_cookie("access_token", path="/", domain=domain)
+        log_message(f"💥 erro auth: {e}", "error")
+        raise HTTPException(status_code=401, detail="Sessão inválida")
 
 
 @router.post("/logout")
@@ -337,20 +370,39 @@ async def logout_user(
     db: Session = Depends(database.get_db),
 ):
     try:
+        user_id = None
+
         if refresh_token:
             try:
                 fp = build_fingerprint(request, FINGERPRINT_SALT)
-                payload = assert_refresh_token_binding(request, refresh_token, fp)
+
+                # 🔐 valida binding (sem quebrar fluxo)
+                payload = assert_refresh_token_binding(db, refresh_token, fp)
                 user_id = payload.get("sub")
-                # se quiser: revoke_all_user_tokens(db, int(user_id))
-            except HTTPException:
-                # não trava logout
-                pass
 
-            revoke_token(db, refresh_token)
+            except Exception as e:
+                # 🔥 NÃO trava logout
+                log_message(f"⚠️ Logout com token inválido: {e}", "warning")
 
+            finally:
+                # 🔒 sempre revoga se existir
+                revoke_token(db, refresh_token)
+
+        # 🔥 opcional: logout global (todos dispositivos)
+        # if user_id:
+        #     revoke_all_user_tokens(db, int(user_id))
+
+        # 🍪 remove cookies SEMPRE
         _delete_auth_cookies(response)
+
+        log_message(f"👋 Logout realizado user_id={user_id}", "info")
+
         return {"message": "Logout efetuado com sucesso."}
 
     except Exception as e:
-        internal_error(e)
+        log_message(f"💥 erro no logout: {e}", "error")
+
+        # ⚠️ mesmo com erro, remove cookies (UX primeiro)
+        _delete_auth_cookies(response)
+
+        return {"message": "Logout efetuado."}

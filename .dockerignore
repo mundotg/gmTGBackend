@@ -1,0 +1,56 @@
+# --- Python & Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Ambientes Virtuais ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Logs e Dados Temporários ---
+*.log
+Database_error_logger.log
+errorSQL_Logger.log
+*.pkl
+*.pkl.tmp
+# initialized.pkl
+tarefa.txt
+historico_completo.txt
+
+# --- Base de Dados Local (SQLite) ---
+*.db
+*.sqlite3
+
+# --- Docker & CI/CD ---
+.git/
+.gitignore
+.dockerignore
+docker-compose.yml
+azure-pipelines.yml
+Dockerfile
+
+# --- Configurações de IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Binários e Builds ---
+dist/
+build/
+*.spec
+main.spec
+
+# --- Ficheiros do SO ---
+.DS_Store
+Thumbs.db
+
+# --- Imagens e Relatórios Temporários ---
+app/relatorio/*.jpg
+app/relatorio/*.png
+app/relatorio/*.pdf

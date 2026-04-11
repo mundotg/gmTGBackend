@@ -26,6 +26,8 @@ class EmpresaSchema(BaseModel):
         from_attributes=True,
         populate_by_name=True,
     )
+
+
 # -----------------------------
 # 🛡️ Permission Schema
 # -----------------------------
@@ -35,6 +37,7 @@ class PermissionSchema(BaseModel):
     description: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 # -----------------------------
 # 🔑 Role Schema
@@ -46,7 +49,8 @@ class RoleSchema(BaseModel):
     permissions: list[PermissionSchema] = []
 
     model_config = ConfigDict(from_attributes=True)
-    
+
+
 # -----------------------------
 # 🔑 Role Simple (UserOut)
 # -----------------------------
@@ -83,7 +87,9 @@ class UserCreate(BaseModel):
     empresa: EmpresaSchema = Field(..., alias="companyData")
     cargo: Optional[CargoSchema] = Field(None, alias="positionData")
 
-    senha: Annotated[str, StringConstraints(min_length=8)] = Field(..., alias="password")
+    senha: Annotated[str, StringConstraints(min_length=8)] = Field(
+        ..., alias="password"
+    )
     confirmar_senha: Annotated[str, StringConstraints(min_length=8)] = Field(
         ..., alias="confirmPassword"
     )
@@ -149,6 +155,7 @@ class UserCreate(BaseModel):
             raise ValueError("Aceitação dos termos é obrigatória.")
         return v
 
+
 # =============================
 # 💾 DB Info Schema
 # =============================
@@ -170,7 +177,7 @@ class DbInfoSchema(BaseModel):
 # 👤 User Output Schema (FINAL)
 # =============================
 class UserOut(BaseModel):
-    id: str
+    id: int
     nome: str
     apelido: str
     email: EmailStr
@@ -185,7 +192,6 @@ class UserOut(BaseModel):
     info_extra: Optional[DbInfoSchema] = None
 
     model_config = ConfigDict(from_attributes=True)
-
 
 
 # =============================

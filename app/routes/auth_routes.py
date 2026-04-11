@@ -32,9 +32,12 @@ COOKIE_SAMESITE = get_env("COOKIE_SAMESITE", "lax") or "none"
 COOKIE_DOMAIN = get_env("COOKIE_DOMAIN")
 TRUST_PROXY_HEADERS = get_env("TRUST_PROXY_HEADERS", "false").lower() == "true"
 FINGERPRINT_SALT = get_env("FINGERPRINT_SALT", "change-me-please")
+ENV = get_env("ENV", "development").lower()
 
 
 def _cookie_domain():
+    if ENV == "production":
+        return COOKIE_DOMAIN if COOKIE_DOMAIN else None
     return COOKIE_DOMAIN if COOKIE_DOMAIN and COOKIE_DOMAIN != "localhost" else None
 
 

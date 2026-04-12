@@ -97,11 +97,12 @@ def _delete_auth_cookies(response: Response):
     }
 
     # 🔥 refresh pode ter múltiplos paths
-    for path in ("/", "/auth", "/auth/refresh"):
+    for path in ("/", "/auth", "/auth/refresh", ""):
         response.delete_cookie("refresh_token", path=path, **cookie_options)
 
     # 🔥 access token normalmente raiz
     response.delete_cookie("access_token", path="/", **cookie_options)
+    response.delete_cookie("bk_access_token", path="/")
 
     log_message("🍪 Cookies de autenticação removidos", "info")
 

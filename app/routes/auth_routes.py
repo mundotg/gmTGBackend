@@ -277,6 +277,8 @@ async def login_user(
         set_cookie(response, "access_token", access_token, path="/")
 
         rep = reativar_connection(user.id, db)
+
+        # print(f"Reativar connection response: {rep}")
         info_extra = rep.get("config") if rep.get("success") else None
 
         return users_schemas.LoginResponse(
@@ -386,10 +388,12 @@ async def get_current_user(
         user = db.get(user_model.User, int(user_id))
         if not user:
             raise HTTPException(status_code=404, detail="Usuário não encontrado")
-
+        rep = reativar_connection(user.id, db)
+        # print(f"Reativar connection response: {rep}")
+        info_extra = rep.get("config") if rep.get("success") else None
         # 🚀 A CORREÇÃO ESTÁ AQUI:
         # Em vez de devolver o 'user' bruto, passamos pela nossa função construtora!
-        return build_user_out(user)
+        return build_user_out(user, info_extra=info_extra)
 
     except HTTPException:
         raise

@@ -23,13 +23,14 @@ from app.ultils.logger import log_message
 # Helpers (commit/rollback + status filters + apply data)
 # ==============================================================================
 
+
 class CRUDCommitError(RuntimeError):
     pass
 
 
 VISIBLE_STRUCTURE_STATUS: Set[str] = {STATUS_ACTIVE}  # padrão
-VISIBLE_FIELD_STATUS: Set[str] = {STATUS_ACTIVE}      # padrão
-VISIBLE_ENUM_STATUS: Set[str] = {STATUS_ACTIVE}       # padrão
+VISIBLE_FIELD_STATUS: Set[str] = {STATUS_ACTIVE}  # padrão
+VISIBLE_ENUM_STATUS: Set[str] = {STATUS_ACTIVE}  # padrão
 
 
 def _status_filter(col, allowed: Iterable[str]) -> Any:
@@ -67,7 +68,9 @@ def _normalize_visible_status(
     allowed_all = {STATUS_ACTIVE, STATUS_INACTIVE, STATUS_DELETED, STATUS_ERROR}
     bad = [s for s in cleaned if s not in allowed_all]
     if bad:
-        raise ValueError(f"Status inválido(s): {bad}. Permitidos: {sorted(allowed_all)}")
+        raise ValueError(
+            f"Status inválido(s): {bad}. Permitidos: {sorted(allowed_all)}"
+        )
     return cleaned
 
 
@@ -75,10 +78,13 @@ def _normalize_visible_status(
 # CRUD: DBStructure
 # ==============================================================================
 
+
 def update_db_structure(db: Session, estrutura: DBStructure) -> DBStructure:
     try:
         db.add(estrutura)
-        _safe_commit(db, action="atualizar estrutura", context=f"table={estrutura.table_name}")
+        _safe_commit(
+            db, action="atualizar estrutura", context=f"table={estrutura.table_name}"
+        )
         db.refresh(estrutura)
         return estrutura
     finally:
@@ -101,7 +107,9 @@ def get_db_structures(
     ✅ Otimizado: SELECT só das colunas necessárias + sem relações
     """
     try:
-        status_list = _normalize_visible_status(visible_status, VISIBLE_STRUCTURE_STATUS)
+        status_list = _normalize_visible_status(
+            visible_status, VISIBLE_STRUCTURE_STATUS
+        )
 
         q = (
             db.query(DBStructure)
@@ -127,7 +135,9 @@ def get_db_structures(
         if not include_deleted_flag:
             q = q.filter(DBStructure.is_deleted.is_(False))
 
-        return q.order_by(DBStructure.schema_name.asc().nullsfirst(), DBStructure.table_name.asc()).all()
+        return q.order_by(
+            DBStructure.schema_name.asc().nullsfirst(), DBStructure.table_name.asc()
+        ).all()
     finally:
         # A sessão será fechada pelo caller (Depends(get_db))
         pass
@@ -153,8 +163,7 @@ def get_db_structures_by_conn_id_and_table(
             raise ValueError("table_name inválido.")
 
         status_list = _normalize_visible_status(
-            visible_status,
-            VISIBLE_STRUCTURE_STATUS
+            visible_status, VISIBLE_STRUCTURE_STATUS
         )
 
         q = (
@@ -221,6 +230,9 @@ def _norm_text(v: Optional[str]) -> Optional[str]:
     return s or None
 
 
+# Certifique-se de que DBStructure, STATUS_ACTIVE, _norm_schema e _norm_text estão importados
+
+
 def create_db_structure(
     db: Session,
     *,
@@ -271,7 +283,9 @@ def create_db_structure(
                 existing.Engine = _norm_text(engine)
                 existing.Charset = _norm_text(charset)
                 existing.Collation = _norm_text(collation)
-                db.flush()
+
+                # 🟢 CORREÇÃO 1: Efetiva a reativação da tabela no banco
+                db.commit()
                 return existing
 
             raise ValueError("Metadata da tabela já existe (DBStructure).")
@@ -289,11 +303,8 @@ def create_db_structure(
         )
 
         db.add(obj)
-        try:
-            db.flush()
-        except IntegrityError as e:
-            db.rollback()
-            raise ValueError("Metadata da tabela já existe (conflito de criação).") from e
+
+        _safe_commit(db, action="criar estrutura", context=f"table={table_name}")
 
         return obj
     finally:
@@ -354,9 +365,13 @@ def update_db_structure_by_name(
 
         obj = q.first()
         if not obj:
-            raise ValueError("Metadata da tabela não encontrada para atualização (DBStructure).")
+            raise ValueError(
+                "Metadata da tabela não encontrada para atualização (DBStructure)."
+            )
 
-        if (original_table_name != new_table_name) or (original_schema_n != new_schema_n):
+        if (original_table_name != new_table_name) or (
+            original_schema_n != new_schema_n
+        ):
             q2 = (
                 db.query(DBStructure.id)
                 .filter(DBStructure.db_connection_id == db_connection_id)
@@ -370,7 +385,9 @@ def update_db_structure_by_name(
 
             clash_id = q2.scalar()
             if clash_id and clash_id != obj.id:
-                raise ValueError("Já existe uma tabela com esse nome/schema (conflito de metadata).")
+                raise ValueError(
+                    "Já existe uma tabela com esse nome/schema (conflito de metadata)."
+                )
 
         obj.table_name = new_table_name
         obj.schema_name = new_schema_n
@@ -386,11 +403,9 @@ def update_db_structure_by_name(
         obj.status = STATUS_ACTIVE
         obj.is_deleted = False
 
-        try:
-            db.flush()
-        except IntegrityError as e:
-            db.rollback()
-            raise ValueError("Conflito ao atualizar metadata (unique constraint).") from e
+        _safe_commit(
+            db, action="atualizar estrutura", context=f"table={new_table_name}"
+        )
 
         return obj
     finally:
@@ -432,7 +447,7 @@ def soft_delete_db_structure_by_name(
 
         obj.is_deleted = True
         obj.status = STATUS_DELETED
-        db.flush()
+        db.commit()
     finally:
         # A sessão será fechada pelo caller
         pass
@@ -446,7 +461,9 @@ def get_structure_by_id(
     include_deleted_flag: bool = False,
 ) -> Optional[DBStructure]:
     try:
-        status_list = _normalize_visible_status(visible_status, VISIBLE_STRUCTURE_STATUS)
+        status_list = _normalize_visible_status(
+            visible_status, VISIBLE_STRUCTURE_STATUS
+        )
 
         q = (
             db.query(DBStructure)
@@ -487,7 +504,9 @@ def get_structure_by_id_and_name(
     include_deleted_flag: bool = False,
 ) -> Optional[DBStructure]:
     try:
-        status_list = _normalize_visible_status(visible_status, VISIBLE_STRUCTURE_STATUS)
+        status_list = _normalize_visible_status(
+            visible_status, VISIBLE_STRUCTURE_STATUS
+        )
 
         q = (
             db.query(DBStructure)
@@ -532,7 +551,9 @@ def get_structure_id_by_connection_and_table(
     include_deleted_flag: bool = False,
 ) -> Optional[int]:
     try:
-        status_list = _normalize_visible_status(visible_status, VISIBLE_STRUCTURE_STATUS)
+        status_list = _normalize_visible_status(
+            visible_status, VISIBLE_STRUCTURE_STATUS
+        )
 
         q = (
             db.query(DBStructure.id)
@@ -565,7 +586,9 @@ def delete_structure(db: Session, structure_id: int) -> bool:
             .first()
         )
         if not structure:
-            log_message(f"❌ Estrutura não encontrada para exclusão: ID {structure_id}", "error")
+            log_message(
+                f"❌ Estrutura não encontrada para exclusão: ID {structure_id}", "error"
+            )
             return False
 
         db.delete(structure)
@@ -577,7 +600,9 @@ def delete_structure(db: Session, structure_id: int) -> bool:
         pass
 
 
-def delete_structure_by_name(db: Session, structure_name: str, connection_id: int) -> bool:
+def delete_structure_by_name(
+    db: Session, structure_name: str, connection_id: int
+) -> bool:
     try:
         structure = (
             db.query(DBStructure)
@@ -586,15 +611,25 @@ def delete_structure_by_name(db: Session, structure_name: str, connection_id: in
                 noload(DBStructure.fields),
                 noload(DBStructure.connection),
             )
-            .filter(DBStructure.table_name == structure_name, DBStructure.db_connection_id == connection_id)
+            .filter(
+                DBStructure.table_name == structure_name,
+                DBStructure.db_connection_id == connection_id,
+            )
             .first()
         )
         if not structure:
-            log_message(f"❌ Estrutura não encontrada para exclusão: nome {structure_name}, conexão {connection_id}", "error")
+            log_message(
+                f"❌ Estrutura não encontrada para exclusão: nome {structure_name}, conexão {connection_id}",
+                "error",
+            )
             return False
 
         db.delete(structure)
-        _safe_commit(db, action="deletar estrutura", context=f"name={structure_name}, connection_id={connection_id}")
+        _safe_commit(
+            db,
+            action="deletar estrutura",
+            context=f"name={structure_name}, connection_id={connection_id}",
+        )
         log_message(f"⚠️ Estrutura com nome {structure_name} deletada.", "warning")
         return True
     finally:
@@ -605,6 +640,7 @@ def delete_structure_by_name(db: Session, structure_name: str, connection_id: in
 # ==============================================================================
 # CRUD: DBField
 # ==============================================================================
+
 
 def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> DBField:
     try:
@@ -624,13 +660,21 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
 
         if existing:
             _apply_model_data(existing, data)
-            _safe_commit(db, action="atualizar campo", context=f"structure_id={structure_id} field={field_in.name}")
+            _safe_commit(
+                db,
+                action="atualizar campo",
+                context=f"structure_id={structure_id} field={field_in.name}",
+            )
             db.refresh(existing)
             return existing
 
         obj = DBField(structure_id=structure_id, **data)
         db.add(obj)
-        _safe_commit(db, action="criar campo", context=f"structure_id={structure_id} field={field_in.name}")
+        _safe_commit(
+            db,
+            action="criar campo",
+            context=f"structure_id={structure_id} field={field_in.name}",
+        )
         db.refresh(obj)
         return obj
     finally:
@@ -671,7 +715,9 @@ def get_fields_by_structure_pk(
         if col:
             return col
 
-        col = base.filter(DBField.is_unique.is_(True), DBField.is_nullable.is_(False)).first()
+        col = base.filter(
+            DBField.is_unique.is_(True), DBField.is_nullable.is_(False)
+        ).first()
         if col:
             return col
 
@@ -812,7 +858,11 @@ def update_fields_by_tablename(
 
         _apply_model_data(field, data)
 
-        _safe_commit(db, action="atualizar campo", context=f"structure_id={structure_id} field={original_name}")
+        _safe_commit(
+            db,
+            action="atualizar campo",
+            context=f"structure_id={structure_id} field={original_name}",
+        )
         db.refresh(field)
         return field
     finally:
@@ -833,7 +883,9 @@ def delete_field(db: Session, field_id: int) -> bool:
             .first()
         )
         if not obj:
-            log_message(f"❌ Campo não encontrado para exclusão: ID {field_id}", "error")
+            log_message(
+                f"❌ Campo não encontrado para exclusão: ID {field_id}", "error"
+            )
             return False
 
         db.delete(obj)
@@ -859,7 +911,11 @@ def soft_delete_field_name(db: Session, field_name: str, structure_id: int) -> b
             )
             return False
 
-        _safe_commit(db, action="soft delete campo", context=f"name={field_name} structure_id={structure_id}")
+        _safe_commit(
+            db,
+            action="soft delete campo",
+            context=f"name={field_name} structure_id={structure_id}",
+        )
         log_message(
             f"⚠️ {updated} campo(s) com nome '{field_name}' marcado(s) como '{STATUS_DELETED}' na estrutura ID {structure_id}.",
             "warning",
@@ -873,6 +929,7 @@ def soft_delete_field_name(db: Session, field_name: str, structure_id: int) -> b
 # ==============================================================================
 # CRUD: DBEnumField
 # ==============================================================================
+
 
 def create_enum_field(db: Session, data: DBEnumField) -> DBEnumField:
     try:
@@ -891,11 +948,18 @@ def create_enum_field(db: Session, data: DBEnumField) -> DBEnumField:
             .first()
         )
         if existing:
-            log_message(f"⚠️ Valor ENUM '{data.value}' já existe para field ID {data.field_id}", "warning")
+            log_message(
+                f"⚠️ Valor ENUM '{data.value}' já existe para field ID {data.field_id}",
+                "warning",
+            )
             return existing
 
         db.add(data)
-        _safe_commit(db, action="criar enum", context=f"field_id={data.field_id} value={data.value}")
+        _safe_commit(
+            db,
+            action="criar enum",
+            context=f"field_id={data.field_id} value={data.value}",
+        )
         db.refresh(data)
         return data
     finally:
@@ -976,14 +1040,25 @@ def soft_delete_enum_field(db: Session, field_id: int, valor: str) -> bool:
         updated = (
             db.query(DBEnumField)
             .filter(DBEnumField.field_id == field_id, DBEnumField.value == valor)
-            .update({"status": STATUS_DELETED, "is_active": False}, synchronize_session=False)
+            .update(
+                {"status": STATUS_DELETED, "is_active": False},
+                synchronize_session=False,
+            )
         )
         if updated <= 0:
-            log_message(f"❌ Valor ENUM '{valor}' não encontrado para soft delete (field ID: {field_id})", "error")
+            log_message(
+                f"❌ Valor ENUM '{valor}' não encontrado para soft delete (field ID: {field_id})",
+                "error",
+            )
             return False
 
-        _safe_commit(db, action="soft delete enum", context=f"field_id={field_id} value={valor}")
-        log_message(f"⚠️ Valor ENUM '{valor}' marcado como '{STATUS_DELETED}' (field ID: {field_id})", "warning")
+        _safe_commit(
+            db, action="soft delete enum", context=f"field_id={field_id} value={valor}"
+        )
+        log_message(
+            f"⚠️ Valor ENUM '{valor}' marcado como '{STATUS_DELETED}' (field ID: {field_id})",
+            "warning",
+        )
         return True
     finally:
         # A sessão será fechada pelo caller
@@ -1002,12 +1077,20 @@ def delete_enum_field(db: Session, field_id: int, valor: str) -> bool:
             .first()
         )
         if not obj:
-            log_message(f"❌ Valor ENUM '{valor}' não encontrado para exclusão (field ID: {field_id})", "error")
+            log_message(
+                f"❌ Valor ENUM '{valor}' não encontrado para exclusão (field ID: {field_id})",
+                "error",
+            )
             return False
 
         db.delete(obj)
-        _safe_commit(db, action="deletar enum", context=f"field_id={field_id} value={valor}")
-        log_message(f"🗑️ Valor ENUM '{valor}' removido com sucesso (field ID: {field_id})", "warning")
+        _safe_commit(
+            db, action="deletar enum", context=f"field_id={field_id} value={valor}"
+        )
+        log_message(
+            f"🗑️ Valor ENUM '{valor}' removido com sucesso (field ID: {field_id})",
+            "warning",
+        )
         return True
     finally:
         # A sessão será fechada pelo caller

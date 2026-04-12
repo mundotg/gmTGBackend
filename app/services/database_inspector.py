@@ -161,9 +161,11 @@ def verificar_ou_atualizar_estrutura(
 
     try:
         if connection_id <= 0:
+            print(f"connection_id inválido: {connection_id}")
             raise ValueError("connection_id inválido")
 
         if not table_name.strip():
+            print(f"table_name inválido: '{table_name}'")
             raise ValueError("table_name inválido")
 
         structure = create_db_structure(

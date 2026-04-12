@@ -21,6 +21,7 @@ from app.ultils.logger import log_message
 # 🔒 SESSION MANAGER (ANTI-LEAK)
 # ============================================================
 
+
 @contextmanager
 def get_db_session():
     db = SessionLocal()
@@ -34,43 +35,64 @@ def get_db_session():
 #  DBStatistics
 # ============================================================
 
+
 def get_statistics_by_connection(connection_id: int) -> Optional[DBStatistics]:
     with get_db_session() as db:
         try:
             stmt = (
                 select(DBStatistics)
-                .options(load_only(
-                    DBStatistics.db_connection_id,
-                    DBStatistics.server_version,
-                    DBStatistics.tables_connected,
-                    DBStatistics.table_count,
-                    DBStatistics.view_count,
-                    DBStatistics.procedure_count,
-                    DBStatistics.function_count,
-                    DBStatistics.trigger_count,
-                    DBStatistics.index_count,
-                    DBStatistics.queries_today,
-                    DBStatistics.records_analyzed,
-                    DBStatistics.updated_at,
-                    DBStatistics.last_query_at,
-                ))
+                .options(
+                    load_only(
+                        DBStatistics.db_connection_id,
+                        DBStatistics.server_version,
+                        DBStatistics.tables_connected,
+                        DBStatistics.table_count,
+                        DBStatistics.view_count,
+                        DBStatistics.procedure_count,
+                        DBStatistics.function_count,
+                        DBStatistics.trigger_count,
+                        DBStatistics.index_count,
+                        DBStatistics.queries_today,
+                        DBStatistics.records_analyzed,
+                        DBStatistics.updated_at,
+                        DBStatistics.last_query_at,
+                    )
+                )
                 .where(DBStatistics.db_connection_id == connection_id)
             )
 
             return db.execute(stmt).scalar_one_or_none()
 
         except SQLAlchemyError as e:
-            log_message(f"❌ Erro ao buscar estatísticas {connection_id}: {str(e)}", "error")
+            log_message(
+                f"❌ Erro ao buscar estatísticas {connection_id}: {str(e)}", "error"
+            )
             return None
 
 
-def get_statistics_by_connection_geral(connection_id: int) -> Optional[ConnectionStatisticsOverview]:
+from typing import Optional
+from sqlalchemy import select, func
+from sqlalchemy.exc import SQLAlchemyError
+
+# Importe as bibliotecas de log/modelos que você já usa no seu arquivo...
+
+
+def get_statistics_by_connection_geral(
+    connection_id: int,
+) -> Optional[ConnectionStatisticsOverview]:
     with get_db_session() as db:
         try:
+            # 1. Debugando a primeira busca
+            # print(f"\n[DEBUG] Buscando estatísticas para o ID: {connection_id}")
             db_stat = get_statistics_by_connection(connection_id)
 
+            # Mostra o que exatamente a função retornou (dicionário, objeto SQLAlchemy, etc)
+            # print(f"[DEBUG] Resultado bruto de db_stat: {db_stat}")
+
             if not db_stat:
-                log_message(f"⚠️ Nenhuma estatística para conexão {connection_id}", "warning")
+                log_message(
+                    f"⚠️ Nenhuma estatística para conexão {connection_id}", "warning"
+                )
                 return None
 
             stmt_count = (
@@ -79,19 +101,42 @@ def get_statistics_by_connection_geral(connection_id: int) -> Optional[Connectio
                 .where(DBStructure.db_connection_id == connection_id)
             )
 
+            # 2. Debugando a contagem de tabelas
             table_count = db.execute(stmt_count).scalar() or 0
+            # print(
+            #     f"[DEBUG] Quantidade de tabelas encontradas na DBStructure: {table_count}"
+            # )
 
-            return ConnectionStatisticsOverview(
-                statistics=DBStatisticsCreate.model_validate(db_stat, from_attributes=True),
+            # 3. Debugando a conversão do Pydantic
+            try:
+                validated_stats = DBStatisticsCreate.model_validate(
+                    db_stat, from_attributes=True
+                )
+                # print(
+                #     f"[DEBUG] Pydantic validou os dados com sucesso: {validated_stats.model_dump()}"
+                # )
+            except Exception as validation_error:
+                # print(
+                #     f"[DEBUG ERROR] Falha na validação do Pydantic: {validation_error}"
+                # )
+                raise validation_error
+
+            resultado_final = ConnectionStatisticsOverview(
+                statistics=validated_stats,
                 total_structured_tables=table_count,
             )
+
+            # print(f"[DEBUG] Objeto final pronto para retorno: {resultado_final}")
+            return resultado_final
 
         except SQLAlchemyError as e:
             log_message(f"❌ Erro visão geral {connection_id}: {str(e)}", "error")
             return None
 
 
-def converter_stats(stats: ConnectionStatisticsOverview | None) -> Optional[Dict[str, Any]]:
+def converter_stats(
+    stats: ConnectionStatisticsOverview | None,
+) -> Optional[Dict[str, Any]]:
     if not stats or not stats.statistics:
         log_message("⚠️ Estatísticas não disponíveis.", "warning")
         return None
@@ -147,10 +192,14 @@ def create_statistics(stats: DBStatisticsCreate) -> Optional[DBStatistics]:
             return None
 
 
-def update_statistics(connection_id: int, updates: DBStatisticsUpdate) -> Optional[DBStatistics]:
+def update_statistics(
+    connection_id: int, updates: DBStatisticsUpdate
+) -> Optional[DBStatistics]:
     with get_db_session() as db:
         try:
-            stmt = select(DBStatistics).where(DBStatistics.db_connection_id == connection_id)
+            stmt = select(DBStatistics).where(
+                DBStatistics.db_connection_id == connection_id
+            )
             db_stat = db.execute(stmt).scalar_one_or_none()
 
             if not db_stat:
@@ -182,7 +231,9 @@ def update_statistics(connection_id: int, updates: DBStatisticsUpdate) -> Option
 
         except SQLAlchemyError as e:
             db.rollback()
-            log_message(f"❌ Erro ao atualizar stats {connection_id}: {str(e)}", "error")
+            log_message(
+                f"❌ Erro ao atualizar stats {connection_id}: {str(e)}", "error"
+            )
             return None
 
 
@@ -190,17 +241,20 @@ def update_statistics(connection_id: int, updates: DBStatisticsUpdate) -> Option
 #  TableRowCountCache
 # ============================================================
 
+
 def get_cached_row_count_all(connection_id: int) -> List[TableRowCountCache]:
     with get_db_session() as db:
         try:
             stmt = (
                 select(TableRowCountCache)
-                .options(load_only(
-                    TableRowCountCache.connection_id,
-                    TableRowCountCache.table_name,
-                    TableRowCountCache.row_count,
-                    TableRowCountCache.last_updated,
-                ))
+                .options(
+                    load_only(
+                        TableRowCountCache.connection_id,
+                        TableRowCountCache.table_name,
+                        TableRowCountCache.row_count,
+                        TableRowCountCache.last_updated,
+                    )
+                )
                 .where(TableRowCountCache.connection_id == connection_id)
             )
 
@@ -215,8 +269,7 @@ def get_cached_row_count_all_tupla(connection_id: int) -> List[Tuple[str, int]]:
     with get_db_session() as db:
         try:
             stmt = select(
-                TableRowCountCache.table_name,
-                TableRowCountCache.row_count
+                TableRowCountCache.table_name, TableRowCountCache.row_count
             ).where(TableRowCountCache.connection_id == connection_id)
 
             return list(db.execute(stmt).all())
@@ -226,7 +279,9 @@ def get_cached_row_count_all_tupla(connection_id: int) -> List[Tuple[str, int]]:
             return []
 
 
-def get_cached_row_count(connection_id: int, table_name: str, max_age_minutes: int = 60) -> Optional[int]:
+def get_cached_row_count(
+    connection_id: int, table_name: str, max_age_minutes: int = 60
+) -> Optional[int]:
     if not table_name:
         return None
 
@@ -234,13 +289,10 @@ def get_cached_row_count(connection_id: int, table_name: str, max_age_minutes: i
         try:
             limite = datetime.now(timezone.utc) - timedelta(minutes=max_age_minutes)
 
-            stmt = (
-                select(TableRowCountCache.row_count)
-                .where(
-                    TableRowCountCache.connection_id == connection_id,
-                    TableRowCountCache.table_name == table_name,
-                    TableRowCountCache.last_updated > limite,
-                )
+            stmt = select(TableRowCountCache.row_count).where(
+                TableRowCountCache.connection_id == connection_id,
+                TableRowCountCache.table_name == table_name,
+                TableRowCountCache.last_updated > limite,
             )
 
             row_count = db.execute(stmt).scalar()
@@ -251,7 +303,9 @@ def get_cached_row_count(connection_id: int, table_name: str, max_age_minutes: i
             return None
 
 
-def update_or_create_cache(connection_id: int, table_name: str, count: int) -> Optional[TableRowCountCache]:
+def update_or_create_cache(
+    connection_id: int, table_name: str, count: int
+) -> Optional[TableRowCountCache]:
     if not table_name:
         return None
 

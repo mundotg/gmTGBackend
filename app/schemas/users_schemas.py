@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Union
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -194,6 +194,24 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserOut2(BaseModel):
+    id: str
+    nome: str
+    apelido: str
+    email: str
+    telefone: Optional[str] = None
+
+    empresa: Optional[EmpresaSchema] = None
+    cargo: Optional[CargoSchema] = None
+
+    roles: Optional[List[RoleSimpleSchema]] = None
+    permissions: list[str] = []
+
+    info_extra: Optional[DbInfoSchema] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # =============================
 # 🔐 Auth Schemas
 # =============================
@@ -209,7 +227,8 @@ class TokenOut(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    user: UserOut
+    # O utilizador pode ser UserOut, UserOut2, ou None
+    user: Optional[Union[UserOut, UserOut2]] = None
     tokens: Optional[TokenOut] = None
 
 

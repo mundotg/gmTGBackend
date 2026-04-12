@@ -1,6 +1,6 @@
 import traceback
 from datetime import timedelta
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, Request
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from app.cruds import user_crud
 from app.models import user_model
 from app.request_fingerprint import build_fingerprint
 from app.schemas import users_schemas
-from app.services.crypto_utils import aes_decrypt
+from app.services.crypto_utils import aes_decrypt, aes_encrypt
 from app.token_storage import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_DAYS,
@@ -36,9 +36,10 @@ ENV = get_env("ENV", "development").lower()
 
 
 def _cookie_domain():
-    if ENV == "production":
-        return COOKIE_DOMAIN if COOKIE_DOMAIN else None
-    return COOKIE_DOMAIN if COOKIE_DOMAIN and COOKIE_DOMAIN != "localhost" else None
+    # if ENV == "production":
+    #     return COOKIE_DOMAIN if COOKIE_DOMAIN else None
+    # return COOKIE_DOMAIN if COOKIE_DOMAIN and COOKIE_DOMAIN != "localhost" else None
+    return COOKIE_DOMAIN or None
 
 
 def _to_seconds(value: Optional[int], unit: str) -> int:
@@ -110,13 +111,45 @@ def internal_error(e: Exception):
     raise HTTPException(status_code=500, detail="Erro interno no servidor.")
 
 
-def build_user_out(user: user_model.User, info_extra=None) -> users_schemas.UserOut:
-    return users_schemas.UserOut(
-        id=user.id,
-        nome=user.nome,
-        apelido=user.apelido,
-        email=user.email,
-        telefone=user.telefone,
+from typing import Any
+
+
+def build_user_out(
+    user: user_model.User, info_extra: Any = None
+) -> users_schemas.UserOut2:
+
+    # 1. Encriptar as Roles (Acessos do sistema)
+    roles_encriptadas = None
+
+    if user.role:
+        # Extrai os dados em segurança, ignorando variáveis internas do SQLAlchemy (ex: _sa_instance_state)
+        role_dict = {
+            k: v for k, v in user.role.__dict__.items() if not k.startswith("_")
+        }
+        role_dict["name"] = aes_encrypt(user.role.name)
+
+        role_schema = users_schemas.RoleSimpleSchema.model_validate(role_dict)
+        roles_encriptadas = [role_schema]
+
+    # 2. Encriptar a lista de Permissões
+    permissoes_encriptadas = (
+        [aes_encrypt(str(perm)) for perm in user.permissions]
+        if user.permissions
+        else []
+    )
+
+    # 3. Helper local para encriptar campos opcionais de forma limpa (DRY)
+    def _encrypt_if_exists(value: Any) -> str:
+        return aes_encrypt(str(value)) if value else ""
+
+    # 4. Montar o Schema final
+    return users_schemas.UserOut2(
+        id=aes_encrypt(str(user.id)),
+        nome=_encrypt_if_exists(user.nome),
+        apelido=_encrypt_if_exists(user.apelido),
+        email=_encrypt_if_exists(user.email),
+        telefone=_encrypt_if_exists(user.telefone),
+        # Empresa e Cargo
         empresa=(
             users_schemas.EmpresaSchema.model_validate(user.empresa)
             if user.empresa
@@ -125,12 +158,8 @@ def build_user_out(user: user_model.User, info_extra=None) -> users_schemas.User
         cargo=(
             users_schemas.CargoSchema.model_validate(user.cargo) if user.cargo else None
         ),
-        roles=(
-            users_schemas.RoleSimpleSchema.model_validate(user.role)
-            if user.role
-            else None
-        ),
-        permissions=list(user.permissions),
+        roles=roles_encriptadas,
+        permissions=permissoes_encriptadas,
         info_extra=info_extra,
     )
 
@@ -210,6 +239,8 @@ async def login_user(
     db: Session = Depends(database.get_db),
 ):
     try:
+
+        # print(f"credentials: {credentials}")
         user = user_crud.get_user_by_email(db, credentials.email)
         if not user:
             raise HTTPException(status_code=401, detail="E-mail não encontrado")
@@ -336,7 +367,7 @@ async def refresh_access_token(
         raise HTTPException(status_code=500, detail="Erro interno no servidor")
 
 
-@router.get("/me", response_model=users_schemas.UserOut)
+@router.get("/me", response_model=users_schemas.UserOut2)
 async def get_current_user(
     request: Request,
     access_token: str | None = Cookie(None, alias="access_token"),
@@ -356,7 +387,9 @@ async def get_current_user(
         if not user:
             raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-        return user
+        # 🚀 A CORREÇÃO ESTÁ AQUI:
+        # Em vez de devolver o 'user' bruto, passamos pela nossa função construtora!
+        return build_user_out(user)
 
     except HTTPException:
         raise

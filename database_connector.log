@@ -1,221 +1,129 @@
-2026-04-11 18:31:20,093 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:31:20,150 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:31:20,182 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:31:20,183 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:31:20,208 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:31:20,209 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:18,763 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:18,780 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:18,899 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:18,906 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:18,946 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:18,965 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:18,987 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:19,004 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:19,017 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:19,035 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:32:19,205 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,205 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,211 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,211 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,217 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,217 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,233 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,233 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,239 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,239 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,247 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,247 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,294 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,295 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,302 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,303 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,317 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,317 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,327 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,327 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,338 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,338 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:32:19,356 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:32:19,356 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:36:07,445 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:36:07,459 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:36:07,512 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:36:07,526 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:36:07,558 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:36:07,570 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:36:07,588 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:36:07,588 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:36:07,639 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:36:07,639 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:36:07,647 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:36:07,647 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:36:07,668 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:36:07,668 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:36:07,679 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:36:07,679 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:36:07,683 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:36:07,683 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:36:07,689 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:36:07,689 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:36:07,757 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:36:07,757 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:39:41,068 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:39:41,078 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:39:41,099 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:39:41,107 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:39:41,114 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:39:41,119 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:39:41,128 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:39:41,129 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:39:41,136 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:39:41,136 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:39:41,173 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:39:41,173 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:39:41,178 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:39:41,178 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:39:41,212 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:39:41,212 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:39:41,216 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:39:41,216 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:39:41,246 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:39:41,246 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:39:41,252 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:39:41,252 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:43:42,180 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:43:42,222 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:43:42,259 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:43:42,270 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:43:42,307 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:43:42,311 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:43:42,327 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:43:42,327 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:43:42,341 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:43:42,341 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:43:42,346 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:43:42,346 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:43:42,358 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:43:42,358 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:43:42,364 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:43:42,364 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:43:42,415 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:43:42,417 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:43:42,581 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:43:42,581 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:43:42,596 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:43:42,596 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:51:32,477 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
-2026-04-11 18:51:33,129 - INFO - \u2705 Refresh token armazenado com sucesso
-2026-04-11 18:52:44,303 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
-2026-04-11 18:52:44,915 - INFO - \u2705 Refresh token armazenado com sucesso
-2026-04-11 18:56:21,897 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
-2026-04-11 18:56:22,498 - INFO - \u2705 Refresh token armazenado com sucesso
-2026-04-11 18:56:42,530 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:56:42,545 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 18:56:42,562 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:56:42,562 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:56:42,585 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 18:56:42,585 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 18:59:28,208 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
-2026-04-11 18:59:28,929 - INFO - \u2705 Refresh token armazenado com sucesso
-2026-04-11 19:04:27,488 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
-2026-04-11 19:04:28,078 - INFO - \u2705 Refresh token armazenado com sucesso
-2026-04-11 19:06:59,993 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
-2026-04-11 19:07:00,584 - INFO - \u2705 Refresh token armazenado com sucesso
-2026-04-11 19:08:41,615 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
-2026-04-11 19:08:42,259 - INFO - \u2705 Refresh token armazenado com sucesso
-2026-04-11 19:08:46,728 - ERROR - \U0001f6a8 Binding inválido: Sessão inválida (dispositivo diferente)
-2026-04-11 19:08:46,744 - INFO - \U0001f6ab Token revogado
-2026-04-11 19:08:46,744 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:46,753 - WARNING - \u274c Token revogado
-2026-04-11 19:08:46,753 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
-2026-04-11 19:08:46,771 - WARNING - \u274c Token revogado
-2026-04-11 19:08:46,772 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
-2026-04-11 19:08:46,780 - WARNING - \u274c Token revogado
-2026-04-11 19:08:46,781 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
-2026-04-11 19:08:46,791 - WARNING - \u274c Token revogado
-2026-04-11 19:08:46,791 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
-2026-04-11 19:08:46,804 - WARNING - \u274c Token revogado
-2026-04-11 19:08:46,805 - WARNING - \u274c HTTP error: Sessão expirada ou inválida
-2026-04-11 19:08:46,814 - WARNING - \u26a0\ufe0f Logout com token inválido: Sessão inválida
-2026-04-11 19:08:46,818 - INFO - \U0001f6ab Token revogado
-2026-04-11 19:08:46,819 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:46,819 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:46,826 - WARNING - \u26a0\ufe0f Logout com token inválido: Sessão inválida
-2026-04-11 19:08:46,830 - INFO - \U0001f6ab Token revogado
-2026-04-11 19:08:46,831 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:46,831 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:46,836 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:46,837 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:46,843 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:46,843 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:46,848 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:46,848 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:46,867 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:46,867 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:46,875 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:46,875 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:46,879 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:46,880 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,429 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,438 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,700 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,700 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,700 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,701 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,741 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,742 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,743 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,743 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:08:58,761 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,761 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,774 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,777 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,802 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,802 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,804 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,804 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,816 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,820 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,845 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,845 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,862 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,863 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,866 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,866 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,872 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,873 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,878 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,878 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:58,906 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:58,908 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:08:59,024 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:08:59,024 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:05,559 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:09:05,600 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:09:05,706 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:09:05,737 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:09:05,797 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:09:05,826 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:09:05,874 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:09:05,875 - WARNING - \u274c HTTP error: Sessão inválida
-2026-04-11 19:09:05,900 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:05,907 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:06,002 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:06,002 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:06,010 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:06,010 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:06,087 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:06,102 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:06,132 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:06,133 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:06,137 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:06,137 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:06,151 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:06,152 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:06,160 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:06,160 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:06,286 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:06,286 - INFO - \U0001f44b Logout realizado user_id=None
-2026-04-11 19:09:06,309 - INFO - \U0001f36a Cookies de autenticação removidos
-2026-04-11 19:09:06,309 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-12 09:39:40,365 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-12 09:39:40,773 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-12 09:39:40,795 - ERROR - \u274c Erro interno: 1 validation error for UserOut2
+email
+  value is not a valid email address: An email address must have an @-sign. [type=value_error, input_value='HGXvEO%i$MJYRFhCo9hu)1g1...9cd0bb8cfbff0fb34fbf56b', input_type=str]
+Traceback (most recent call last):
+  File "C:\Users\Francemy\Documents\python\gmTGBackend\app\routes\auth_routes.py", line 272, in login_user
+    user=build_user_out(user, info_extra=info_extra)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Francemy\Documents\python\gmTGBackend\app\routes\auth_routes.py", line 136, in build_user_out
+    return users_schemas.UserOut2(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Francemy\Documents\python\gmTGBackend\venv\Lib\site-packages\pydantic\main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for UserOut2
+email
+  value is not a valid email address: An email address must have an @-sign. [type=value_error, input_value='HGXvEO%i$MJYRFhCo9hu)1g1...9cd0bb8cfbff0fb34fbf56b', input_type=str]
+
+2026-04-12 09:40:08,650 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-12 09:40:08,939 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-12 09:40:08,951 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-12 09:40:08,951 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-12 09:40:08,969 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-12 09:40:08,970 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-12 09:40:59,494 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-12 09:40:59,504 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-12 09:40:59,516 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-12 09:40:59,516 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-12 09:40:59,553 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-12 09:40:59,553 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-12 09:41:42,884 - WARNING - python-dotenv could not parse statement starting at line 130
+2026-04-12 09:41:42,889 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-12 09:41:42,889 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-12 09:41:43,376 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-12 09:41:58,186 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-12 09:41:58,929 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-12 09:41:58,929 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-12 09:41:58,932 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2026-04-12 09:41:58,932 - INFO - \U0001f504 Verificando atualizações incrementais...
+2026-04-12 09:41:58,932 - INFO - \U0001f504 Aplicando alterações de models no banco de dados...
+2026-04-12 09:41:58,932 - INFO - \U0001f4e6 Carregando modelos do pacote: app.models
+2026-04-12 09:41:58,932 - INFO - \u2705 Módulo importado: app.models.ai_models
+2026-04-12 09:41:58,934 - INFO - \u2705 Módulo importado: app.models.connection_models
+2026-04-12 09:41:58,934 - INFO - \u2705 Módulo importado: app.models.dbstatistics_models
+2026-04-12 09:41:58,934 - INFO - \u2705 Módulo importado: app.models.dbstructure_models
+2026-04-12 09:41:58,934 - INFO - \u2705 Módulo importado: app.models.geral_model
+2026-04-12 09:41:58,934 - INFO - \u2705 Módulo importado: app.models.queryhistory_models
+2026-04-12 09:41:58,934 - INFO - \u2705 Módulo importado: app.models.task_models
+2026-04-12 09:41:58,934 - INFO - \u2705 Módulo importado: app.models.user_model
+2026-04-12 09:41:58,934 - INFO - \U0001f4ca Carregamento concluído: 8 sucessos, 0 erros
+2026-04-12 09:41:59,012 - INFO - \U0001f4cb Tabelas existentes: 32
+2026-04-12 09:41:59,033 - INFO - \u2139\ufe0f Nenhuma nova tabela criada (todas já existiam)
+2026-04-12 09:41:59,033 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-12 09:41:59,140 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-12 09:41:59,151 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-12 09:41:59,247 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-12 09:41:59,681 - INFO - \U0001f464 Usuário admin já existente
+2026-04-12 09:41:59,697 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-12 09:41:59,697 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2026-04-12 09:41:59,697 - INFO - Nenhum cache expirado encontrado.
+2026-04-12 09:41:59,697 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
+2026-04-12 09:41:59,697 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 09:41:59.697957
+2026-04-12 09:42:02,541 - INFO - \U0001f50d Buscando usuário com email: admin@okayulatech.com
+2026-04-12 09:42:02,994 - INFO - \u2705 Refresh token armazenado com sucesso
+2026-04-12 09:45:54,479 - WARNING - python-dotenv could not parse statement starting at line 130
+2026-04-12 09:45:54,489 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-12 09:45:54,489 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-12 09:45:55,123 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-12 09:46:09,562 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-12 09:46:10,314 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-12 09:46:10,314 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-12 09:46:10,314 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2026-04-12 09:46:10,314 - INFO - \U0001f504 Verificando atualizações incrementais...
+2026-04-12 09:46:10,315 - INFO - \U0001f504 Aplicando alterações de models no banco de dados...
+2026-04-12 09:46:10,315 - INFO - \U0001f4e6 Carregando modelos do pacote: app.models
+2026-04-12 09:46:10,315 - INFO - \u2705 Módulo importado: app.models.ai_models
+2026-04-12 09:46:10,315 - INFO - \u2705 Módulo importado: app.models.connection_models
+2026-04-12 09:46:10,316 - INFO - \u2705 Módulo importado: app.models.dbstatistics_models
+2026-04-12 09:46:10,316 - INFO - \u2705 Módulo importado: app.models.dbstructure_models
+2026-04-12 09:46:10,316 - INFO - \u2705 Módulo importado: app.models.geral_model
+2026-04-12 09:46:10,316 - INFO - \u2705 Módulo importado: app.models.queryhistory_models
+2026-04-12 09:46:10,316 - INFO - \u2705 Módulo importado: app.models.task_models
+2026-04-12 09:46:10,316 - INFO - \u2705 Módulo importado: app.models.user_model
+2026-04-12 09:46:10,316 - INFO - \U0001f4ca Carregamento concluído: 8 sucessos, 0 erros
+2026-04-12 09:46:10,504 - INFO - \U0001f4cb Tabelas existentes: 32
+2026-04-12 09:46:10,527 - INFO - \u2139\ufe0f Nenhuma nova tabela criada (todas já existiam)
+2026-04-12 09:46:10,528 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-12 09:46:10,644 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-12 09:46:10,653 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-12 09:46:10,772 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-12 09:46:11,171 - INFO - \U0001f464 Usuário admin já existente
+2026-04-12 09:46:11,181 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-12 09:46:11,185 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2026-04-12 09:46:11,185 - INFO - Nenhum cache expirado encontrado.
+2026-04-12 09:46:11,185 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
+2026-04-12 09:46:11,185 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 09:46:11.185989
+2026-04-12 10:12:54,376 - WARNING - python-dotenv could not parse statement starting at line 130
+2026-04-12 10:12:54,381 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
+2026-04-12 10:12:54,381 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
+2026-04-12 10:12:54,904 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-12 10:13:08,188 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-12 10:13:08,674 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-12 10:13:08,674 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-12 10:13:08,675 - INFO - \U0001f512 Banco já inicializado anteriormente — sem alterações.
+2026-04-12 10:13:08,675 - INFO - \U0001f504 Verificando atualizações incrementais...
+2026-04-12 10:13:08,675 - INFO - \U0001f504 Aplicando alterações de models no banco de dados...
+2026-04-12 10:13:08,675 - INFO - \U0001f4e6 Carregando modelos do pacote: app.models
+2026-04-12 10:13:08,675 - INFO - \u2705 Módulo importado: app.models.ai_models
+2026-04-12 10:13:08,675 - INFO - \u2705 Módulo importado: app.models.connection_models
+2026-04-12 10:13:08,675 - INFO - \u2705 Módulo importado: app.models.dbstatistics_models
+2026-04-12 10:13:08,675 - INFO - \u2705 Módulo importado: app.models.dbstructure_models
+2026-04-12 10:13:08,675 - INFO - \u2705 Módulo importado: app.models.geral_model
+2026-04-12 10:13:08,675 - INFO - \u2705 Módulo importado: app.models.queryhistory_models
+2026-04-12 10:13:08,675 - INFO - \u2705 Módulo importado: app.models.task_models
+2026-04-12 10:13:08,676 - INFO - \u2705 Módulo importado: app.models.user_model
+2026-04-12 10:13:08,676 - INFO - \U0001f4ca Carregamento concluído: 8 sucessos, 0 erros
+2026-04-12 10:13:08,794 - INFO - \U0001f4cb Tabelas existentes: 32
+2026-04-12 10:13:08,808 - INFO - \u2139\ufe0f Nenhuma nova tabela criada (todas já existiam)
+2026-04-12 10:13:08,808 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-12 10:13:08,874 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-12 10:13:08,880 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-12 10:13:08,925 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-12 10:13:09,148 - INFO - \U0001f464 Usuário admin já existente
+2026-04-12 10:13:09,166 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-12 10:13:09,166 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
+2026-04-12 10:13:09,167 - INFO - Nenhum cache expirado encontrado.
+2026-04-12 10:13:09,167 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
+2026-04-12 10:13:09,167 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 10:13:09.167052

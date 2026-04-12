@@ -1,5 +1,6 @@
 # reset_db.py
 import sys
+import traceback
 from app import database
 from app.config.dotenv import get_env
 from app.models import (
@@ -42,7 +43,7 @@ def recreate_db():
         print(" Pronto para inserção de dados iniciais.")
         return True
     except Exception as e:
-        print(f"  Erro ao recriar o banco de dados: {e}")
+        print(f"  Erro ao recriar o banco de dados: {e}{traceback.format_exc()}")
         sys.exit(1)
         return False
 

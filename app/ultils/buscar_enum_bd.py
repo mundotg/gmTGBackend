@@ -3,7 +3,7 @@ from typing import Dict, List
 from sqlalchemy.orm import Session
 from sqlalchemy import Engine, text
 
-from app.cruds.dbstructure_crud import create_enum_field
+from app.cruds.dbstructure_crud import create_enum_field, list_enum_fields_by_field
 from app.models.dbstructure_models import DBEnumField, DBField, DBStructure
 from app.ultils.logger import log_message
 
@@ -144,25 +144,24 @@ def _fetch_enum_values(
     Caso contrário, busca diretamente no banco de dados.
     """
     enum_values: Dict[str, List[str]] = {}
-
     try:
         for col in columns:
             # 1. Busca valores já salvos localmente
-            # enums_local = list_enum_fields_by_field(db, col.id)
-            # if enums_local:
-            #     enum_values[col.name] = [e.valor for e in enums_local]
-            #     continue
+            enums_local = list_enum_fields_by_field(db, col.id)
+            if enums_local:
+                enum_values[col.name] = [e.value for e in enums_local]
+                continue
 
             # 2. Busca diretamente no banco de dados
             valores_enum = _get_values(col.type, db_type, col.name, structure.table_name, engine)
             enum_values[col.name] = []
 
             for valor in valores_enum.get(col.name, []):
-                enum_model = DBEnumField(field_id=col.id, valor=valor)
+                enum_model = DBEnumField(field_id=col.id, value=valor)
                 create_enum_field(db, enum_model)
                 enum_values[col.name].append(valor)
 
-        log_message(f"🟢 Valores ENUM sincronizados: {enum_values}", "info")
+        # log_message(f"🟢 Valores ENUM sincronizados: {enum_values}", "info")
         return enum_values
 
     except Exception as e:

@@ -1,12 +1,15 @@
-import json
-import os
-import traceback
-from datetime import datetime
-from pathlib import Path
-from typing import List, Optional
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request
+import inspect
+import json
+import traceback
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Union
+
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.config.cache_manager import cache_result
@@ -17,403 +20,190 @@ from app.relatorio.gerador_relatorio_excel import ExcelReportGenerator
 from app.relatorio.gerar_estrutura_tabela import ReportStructureBuilder
 from app.relatorio.gerar_resultado_consulta import QueryReportBuilder
 from app.relatorio.gerarpdf import GenericReportGenerator
-from app.schemas.dbstructure_schema import MetadataTableResponse
-from app.schemas.query_select_upAndInsert_schema import (
-    ParametrosRelatorioSchema,
-    QueryResultType,
-)
-from app.ultils.get_current_user_id_task import get_current_user_id_task
+from app.schemas.query_select_upAndInsert_schema import ParametrosRelatorioSchema, QueryPayload, QueryResultType
+from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
-# =============================
-# ⚙️ CONFIGURAÇÕES
-# =============================
 
 router = APIRouter(prefix="/relatorio", tags=["gerar relatorio"])
 
-REPORT_TEMP_DIR = get_env("REPORT_TEMP_DIR", "temp_reports")
-CACHE_TTL = get_env_int("CACHE_TTL", 900)  # 15 minutos
+REPORT_TEMP_DIR = Path(get_env("REPORT_TEMP_DIR", "temp_reports"))
+CACHE_TTL = get_env_int("CACHE_TTL", 900)
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOGO_PATH = BASE_DIR / "relatorio" / get_env("LOGO_PATH", "fotor-ai-20250218134257.jpg")
 
 FORMATO_PDF = "pdf"
 FORMATO_EXCEL = "excel"
-FORMATOS_VALIDOS = [FORMATO_PDF, FORMATO_EXCEL]
+FORMATOS_VALIDOS = {FORMATO_PDF, FORMATO_EXCEL}
 
-os.makedirs(REPORT_TEMP_DIR, exist_ok=True)
-
+REPORT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # =============================
-# 🛠️ FUNÇÕES AUXILIARES
+# Helpers Genéricos
 # =============================
 
-def _get_media_type(formato: str) -> str:
-    """Retorna o media type baseado no formato."""
-    return {
-        FORMATO_PDF: "application/pdf",
-        FORMATO_EXCEL: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }.get(formato, "application/octet-stream")
-
-
-def _criar_resposta_arquivo(file_path: str, tempo: float, formato: str) -> FileResponse:
-    """Cria resposta com arquivo para download."""
-    media_type = _get_media_type(formato)
-    filename = os.path.basename(file_path)
-
+def _criar_resposta_arquivo(file_path: Path, tempo: float, formato: str) -> FileResponse:
+    media_type = "application/pdf" if formato == FORMATO_PDF else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     headers = {
         "X-Tempo-Geracao": f"{tempo:.2f}s",
         "X-Formato": formato,
-        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Disposition": f'attachment; filename="{file_path.name}"',
     }
-
-    log_message(
-        f"📦 Preparando resposta do arquivo:\n"
-        f" • Caminho: {file_path}\n"
-        f" • Tipo MIME: {media_type}\n"
-        f" • Nome do Arquivo: {filename}\n"
-        f" • Cabeçalhos: {json.dumps(headers, indent=2, ensure_ascii=False)}"
-    )
-    
-    return FileResponse(
-        path=file_path,
-        media_type=media_type,
-        filename=filename,
-        headers=headers,
-    )
+    log_message(f"📦 Enviando arquivo: {file_path.name} | Tempo: {tempo:.2f}s")
+    return FileResponse(path=str(file_path), media_type=media_type, filename=file_path.name, headers=headers)
 
 
 def _gerar_nome_arquivo(tipo: str, user_id: int, extensao: str) -> str:
-    """Gera nome de arquivo único para relatório."""
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    return f"relatorio_{tipo}_{user_id}_{timestamp}.{extensao}"
+    return f"relatorio_{tipo}_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{extensao}"
 
 
-# =============================
-# 🧹 LIMPEZA DE ARQUIVOS
-# =============================
-
-def limpar_arquivos_temporarios(dias_retencao: int = 1):
-    """Remove relatórios antigos do diretório temporário."""
+def limpar_arquivos_temporarios(dias_retencao: int = 1) -> None:
     try:
-        agora = datetime.now()
-        extensoes = ["*.pdf", "*.xlsx"]
-        total_removidos = 0
-
-        for extensao in extensoes:
-            for arquivo in Path(REPORT_TEMP_DIR).glob(extensao):
-                if arquivo.is_file():
-                    tempo_criacao = datetime.fromtimestamp(arquivo.stat().st_ctime)
-                    if (agora - tempo_criacao).days > dias_retencao:
-                        arquivo.unlink(missing_ok=True)
-                        total_removidos += 1
-                        log_message(f"🧹 Removido: {arquivo.name}")
-
-        if total_removidos:
-            log_message(f"🧹 Total de arquivos removidos: {total_removidos}")
-
-    except Exception as e:
-        log_message(f"⚠️ Erro na limpeza: {e}\n{traceback.format_exc()}", "warning")
+        limite = datetime.now().timestamp() - (dias_retencao * 86400)
+        removidos = [
+            f.unlink(missing_ok=True) or f.name 
+            for pattern in ("*.pdf", "*.xlsx") 
+            for f in REPORT_TEMP_DIR.glob(pattern) 
+            if f.is_file() and f.stat().st_ctime < limite
+        ]
+        if removidos:
+            log_message(f"🧹 Total de arquivos temporários removidos: {len(removidos)}")
+    except Exception as exc:
+        log_message(f"⚠️ Erro na limpeza: {exc}", "warning")
 
 
-def _executar_limpeza_periodica(user_id: int):
-    """Executa limpeza periódica baseada no ID do usuário."""
-    if hash(str(user_id)) % 10 == 0:
-        limpar_arquivos_temporarios()
-
-
-# =============================
-# 🧩 RELATÓRIO DE ESTRUTURA
-# =============================
-
-@cache_result(ttl=CACHE_TTL, user_id="user_{user_id}")
-def gerar_relatorio_com_cache(
-    metadata_raw: List[MetadataTableResponse],
-    user_id: int,
-    db: Session,
-    formato: str = FORMATO_PDF,
-) -> str:
-    """Gera relatório de estrutura de banco de dados com cache por usuário."""
-    log_message(f"📥 Processando relatório de estrutura (formato: {formato})...")
-
-    _validar_dados_estrutura(metadata_raw, formato)
-
-    try:
-        return (
-            _gerar_estrutura_pdf(metadata_raw, user_id)
-            if formato == FORMATO_PDF
-            else _gerar_estrutura_excel(metadata_raw, user_id)
-        )
-    except Exception as e:
-        log_message(f"❌ Erro ao gerar relatório: {e}\n{traceback.format_exc()}", "error")
-        raise RuntimeError(f"Falha na geração do relatório: {e}")
-
-
-def _validar_dados_estrutura(metadata_raw: List[MetadataTableResponse], formato: str):
-    """Valida dados para relatório de estrutura."""
-    if not isinstance(metadata_raw, list):
-        raise TypeError("O campo 'metadata' deve ser uma lista.")
-    if not metadata_raw:
-        raise ValueError("A lista de metadados não pode estar vazia.")
-    if not all(isinstance(t, dict) for t in metadata_raw):
-        raise TypeError("Todos os elementos de 'metadata' devem ser objetos JSON.")
+def _validar_formato(formato: str) -> None:
     if formato not in FORMATOS_VALIDOS:
         raise ValueError(f"Formato inválido. Use: {', '.join(FORMATOS_VALIDOS)}")
 
 
-def _gerar_estrutura_pdf(metadata_raw: List[MetadataTableResponse], user_id: int) -> str:
-    """Gera relatório de estrutura em PDF."""
-    builder = ReportStructureBuilder(metadata_raw)
-    estrutura_pdf = builder.build()
-
-    filename = _gerar_nome_arquivo("metadados", user_id, "pdf")
-    file_path = os.path.join(REPORT_TEMP_DIR, filename)
-
-    generator = GenericReportGenerator(logo_path=LOGO_PATH)
-    generator.generate_report(file_path, estrutura_pdf)
-
-    log_message(f"✅ PDF gerado: {filename}")
-    return file_path
-
-
-def _gerar_estrutura_excel(metadata_raw: List[MetadataTableResponse], user_id: int) -> str:
-    """Gera relatório de estrutura em Excel."""
-    filename = _gerar_nome_arquivo("metadados", user_id, "xlsx")
-    file_path = os.path.join(REPORT_TEMP_DIR, filename)
-
-    generator = ExcelReportGenerator(logo_path=LOGO_PATH)
-    generator.generate_structure_report(file_path, metadata_raw)
-
-    log_message(f"✅ Excel gerado: {filename}")
-    return file_path
-
-
 # =============================
-# 🧩 RELATÓRIO DE RESULTADO DE QUERY
+# Módulos de Geração (Core)
 # =============================
 
-@cache_result(ttl=CACHE_TTL, user_id="user_{user_id}")
-def gerar_relatorio_query_com_cache(
-    query_result: QueryResultType,
-    user_id: int,
-    db: Session,
-    formato: str = FORMATO_PDF,
-) -> str:
-    """Gera relatório de resultado de query SQL com cache por usuário."""
-    log_message(f"📥 Processando relatório de query (formato: {formato})...")
-    _validar_dados_query(query_result, formato)
-
-    try:
-        return (
-            _gerar_query_pdf(query_result, user_id)
-            if formato == FORMATO_PDF
-            else _gerar_query_excel(query_result, user_id)
-        )
-    except Exception as e:
-        log_message(f"❌ Erro ao gerar relatório: {e}\n{traceback.format_exc()}", "error")
-        raise RuntimeError(f"Falha na geração do relatório: {e}")
+@cache_result(ttl=CACHE_TTL, user_id="user_relatorio_{user_id}")
+def gerar_relatorio_estrutura_com_cache(metadata_raw: List[Dict[str, Any]], user_id: int, db: Session, formato: str = FORMATO_PDF) -> str:
+    _validar_formato(formato)
+    if not metadata_raw or not isinstance(metadata_raw, list):
+        raise ValueError("Lista de metadados vazia ou inválida.")
+    
+    file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("metadados", user_id, "pdf" if formato == FORMATO_PDF else "xlsx")
+    
+    if formato == FORMATO_PDF:
+        GenericReportGenerator(logo_path=LOGO_PATH).generate_report(str(file_path), ReportStructureBuilder(metadata_raw).build())
+    else:
+        ExcelReportGenerator(logo_path=LOGO_PATH).generate_structure_report(str(file_path), metadata_raw)
+        
+    return str(file_path)
 
 
-def _validar_dados_query(query_result: QueryResultType, formato: str):
-    """Valida dados para relatório de query."""
-    if not isinstance(query_result, dict):
-        raise TypeError("O campo 'query_result' deve ser um objeto JSON.")
-    if formato not in FORMATOS_VALIDOS:
-        raise ValueError(f"Formato inválido. Use: {', '.join(FORMATOS_VALIDOS)}")
+# @cache_result(ttl=CACHE_TTL, user_id="user_relatorio_query_{user_id}")
+async def gerar_relatorio_query_com_cache(query_result: dict, user_id: int, db: Session, formato: str = FORMATO_PDF) -> str:
+    _validar_formato(formato)
+    
+    payload_obj = QueryPayload(**(query_result.get("QueryPayload") or query_result.get("queryPayload", {})))
+    payload_obj.limit = None
+    rs_dict = await QueryExecutionService().execute_query(payload_obj, db, user_id)
 
+    query_result["preview"] = rs_dict.get("preview", [])
+    query_result["duration_ms"] = rs_dict.get("duration_ms", query_result.get("duration_ms", 0))
 
-def _gerar_query_pdf(query_result: QueryResultType, user_id: int) -> str:
-    """Gera relatório de query em PDF."""
-    builder = QueryReportBuilder(query_result)
-    estrutura_pdf = builder.build()
+    
+    # 🚀 A CORREÇÃO ESTÁ AQUI: Remover AMBAS as chaves e NÃO voltar a injetar o payload_obj
+    query_result.pop("QueryPayload", None)
+    query_result.pop("queryPayload", None)
 
-    filename = _gerar_nome_arquivo("query", user_id, "pdf")
-    file_path = os.path.join(REPORT_TEMP_DIR, filename)
+    resultado_tipado = QueryResultType(**query_result)
+    file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("query", user_id, "pdf" if formato == FORMATO_PDF else "xlsx")
 
-    generator = GenericReportGenerator(logo_path=LOGO_PATH)
-    generator.generate_report(file_path, estrutura_pdf)
+    if formato == FORMATO_PDF:
+        GenericReportGenerator(logo_path=LOGO_PATH).generate_report(str(file_path), QueryReportBuilder(resultado_tipado).build())
+    else:
+        ExcelReportGenerator(logo_path=LOGO_PATH).generate_query_report(str(file_path), resultado_tipado)
+        
+    return str(file_path)
 
-    log_message(f"✅ PDF de query gerado: {filename}")
-    return file_path
+def gerar_relatorio_tarefas_com_cache(stats: dict, user_id: int, project: Optional[dict], sprint: Optional[dict], tasks: Optional[list], db: Session, formato: str = FORMATO_PDF) -> str:
+    _validar_formato(formato)
+    if formato != FORMATO_PDF:
+        raise ValueError("Relatório de tarefas suporta apenas PDF no momento.")
 
-
-def _gerar_query_excel(query_result: QueryResultType, user_id: int) -> str:
-    """Gera relatório de query em Excel."""
-    filename = _gerar_nome_arquivo("query", user_id, "xlsx")
-    file_path = os.path.join(REPORT_TEMP_DIR, filename)
-
-    generator = ExcelReportGenerator(logo_path=LOGO_PATH)
-    generator.generate_query_report(file_path, query_result)
-
-    log_message(f"✅ Excel de query gerado: {filename}")
-    return file_path
-
-
-# =============================
-# 📊 RELATÓRIO DE TAREFAS
-# =============================
-
-def gerar_relatorio_tarefas_com_cache(
-    stats: dict,
-    user_id: int,
-    project: Optional[dict],
-    sprint: Optional[dict],
-    tasks: Optional[List[dict]],
-    db: Session,
-    formato: str = FORMATO_PDF,
-) -> str:
-    """Gera relatório de tarefas (PDF ou Excel)."""
-    log_message(f"📥 Processando relatório de tarefas (formato: {formato})...")
-    _validar_dados_tarefas(stats, formato)
-
-    try:
-        return (
-            _gerar_tarefas_pdf(stats, project, sprint, tasks, user_id)
-            # if formato == FORMATO_PDF
-            # else _gerar_tarefas_excel(stats, project, sprint, tasks, user_id)
-        )
-    except Exception as e:
-        log_message(f"❌ Erro ao gerar relatório de tarefas: {e}\n{traceback.format_exc()}", "error")
-        raise RuntimeError(f"Falha na geração do relatório de tarefas: {e}")
-
-
-def _validar_dados_tarefas(stats: dict, formato: str):
-    if not isinstance(stats, dict):
-        raise TypeError("O campo 'stats' deve ser um objeto JSON.")
-    if formato not in FORMATOS_VALIDOS:
-        raise ValueError(f"Formato inválido. Use: {', '.join(FORMATOS_VALIDOS)}")
-
-
-def _gerar_tarefas_pdf(stats, project, sprint, tasks, user_id) -> str:
-    filename = _gerar_nome_arquivo("tarefas", user_id, "pdf")
-    file_path = os.path.join(REPORT_TEMP_DIR, filename)
-
+    file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("tarefas", user_id, "pdf")
+    antes = {p.name for p in Path(".").glob("relatorio_tarefas_*.pdf")}
+    
     gerar_relatorio_tarefas(stats, project, sprint, tasks, logo_path=str(LOGO_PATH))
+    
+    novos = sorted({p.name for p in Path(".").glob("relatorio_tarefas_*.pdf")} - antes)
+    if not novos:
+        raise FileNotFoundError("O gerador não produziu arquivo PDF detectável.")
 
-    generated_file = f"relatorio_tarefas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    if os.path.exists(generated_file):
-        os.rename(generated_file, file_path)
-
-    log_message(f"✅ PDF de tarefas gerado: {filename}")
-    return file_path
-
+    Path(novos[-1]).rename(file_path)
+    return str(file_path)
 
 
 # =============================
-# 📄 ENDPOINTS
+# Processador Unificado Central
 # =============================
 
-async def _processar_requisicao_relatorio(
-    request: Request,
-    user_id: int,
-    db: Session,
-    tipo_relatorio: str,
-    gerar_relatorio_fn,
-):
-    """Processa requisição de relatório de forma genérica."""
+# Dicionário que mapeia o tipo de relatório para a função geradora e a forma de extrair os argumentos
+PROCESSORS = {
+    "estrutura": (gerar_relatorio_estrutura_com_cache, lambda b: {"metadata_raw": b}),
+    "query": (gerar_relatorio_query_com_cache, lambda b: {"query_result": b}),
+    "tarefas": (gerar_relatorio_tarefas_com_cache, lambda b: {
+        "stats": b.get("stats"), "project": b.get("project"), "sprint": b.get("sprint"), "tasks": b.get("tasks")
+    })
+}
+
+async def _processar_relatorio_unificado(request: Request, user_id: int, db: Session, tipo: str) -> FileResponse | JSONResponse:
+    """Motor central: Lida com cache, timing, logs e erros de forma unificada para todos os endpoints."""
     start = datetime.now()
     try:
         payload = await request.json()
-        if not payload:
-            raise ValueError("Corpo da requisição vazio")
-        if "body" not in payload:
-            raise ValueError("O campo 'body' é obrigatório")
+        if not payload or "body" not in payload:
+            raise ValueError("O campo 'body' é obrigatório no corpo da requisição")
 
-        _executar_limpeza_periodica(user_id)
+        if user_id % 10 == 0: limpar_arquivos_temporarios()
 
+        body = payload["body"]
         parametros = ParametrosRelatorioSchema(**payload.get("parametros", {}))
-        dados_relatorio = payload["body"]
+        
+        # Obtém a função correta e constrói os parâmetros de injeção dinamicamente
+        gerar_fn, kwargs_builder = PROCESSORS[tipo]
+        if tipo == "tarefas" and not body.get("stats"):
+            raise ValueError("O campo 'stats' é obrigatório no body para tarefas")
 
-        file_path = gerar_relatorio_fn(dados_relatorio, user_id, db, parametros.formato)
+        # Invoca a função de geração de relatório (Sync ou Async)
+        resultado_fn = gerar_fn(**kwargs_builder(body), user_id=user_id, db=db, formato=parametros.formato)
+        
+        caminho_string = await resultado_fn if inspect.isawaitable(resultado_fn) else resultado_fn
+
         tempo = (datetime.now() - start).total_seconds()
+        log_message(f"✅ Sucesso: Relatório {tipo} {parametros.formato.upper()} finalizado.")
+        
+        return _criar_resposta_arquivo(Path(caminho_string), tempo, parametros.formato)
 
-        log_message(f"✅ Relatório {tipo_relatorio} {parametros.formato.upper()} entregue em {tempo:.2f}s")
-        return _criar_resposta_arquivo(file_path, tempo, parametros.formato)
+    except (ValueError, TypeError) as exc:
+        log_message(f"❌ Validação falhou ({tipo}): {exc}\n{traceback.format_exc()}", "error")
+        return JSONResponse(status_code=400, content={"erro": "Erro de Validação", "mensagem": str(exc)})
+    
+    except Exception as exc:
+        log_message(f"💥 Erro interno ({tipo}): {exc}\n{traceback.format_exc()}", "error")
+        return JSONResponse(status_code=500, content={"erro": "Erro interno do servidor", "mensagem": str(exc)})
 
-    except (ValueError, TypeError) as e:
-        tipo = "Validação" if isinstance(e, ValueError) else "Tipo de Dados"
-        log_message(f"❌ Erro de {tipo}: {e}\n{traceback.format_exc()}", "error")
-        return JSONResponse(
-            status_code=400 if isinstance(e, ValueError) else 422,
-            content={"erro": f"Erro de {tipo}", "mensagem": str(e)},
-        )
-    except Exception as e:
-        log_message(f"💥 Erro inesperado: {e}\n{traceback.format_exc()}", "error")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "erro": "Erro interno",
-                "mensagem": str(e),
-                "detalhes": traceback.format_exc().splitlines()[-3:],
-            },
-        )
 
+# =============================
+# Endpoints
+# =============================
 
 @router.post("/gerar-relatorio")
 async def gerar_relatorio(request: Request, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    return await _processar_requisicao_relatorio(request, user_id, db, "estrutura", gerar_relatorio_com_cache)
-
+    return await _processar_relatorio_unificado(request, user_id, db, "estrutura")
 
 @router.post("/gerar-relatorio-query")
 async def gerar_relatorio_query(request: Request, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    """Gera relatório de resultado de query SQL."""
-    return await _processar_requisicao_relatorio(request, user_id, db, "query", gerar_relatorio_query_com_cache)
-
+    return await _processar_relatorio_unificado(request, user_id, db, "query")
 
 @router.post("/gerar-relatorio-tarefas")
-async def gerar_relatorio_tarefas_endpoint(
-    request: Request,
-    db: Session = Depends(get_db),
-    # user_id: int = Depends(get_current_user_id),
-    user_id: int = Depends(get_current_user_id_task),
-):
-    """Gera relatório completo de gestão de tarefas."""
-    start = datetime.now()
-    try:
-        payload = await request.json()
-        if not payload:
-            raise ValueError("Corpo da requisição vazio")
-
-        body = payload.get("body", {})
-        stats = body.get("stats")
-        if not stats:
-            raise ValueError("O campo 'stats' é obrigatório")
-
-        project = body.get("project")
-        sprint = body.get("sprint")
-        tasks = body.get("tasks")
-        parametros = ParametrosRelatorioSchema(**payload.get("parametros", {}))
-
-        _executar_limpeza_periodica(user_id)
-
-        file_path = gerar_relatorio_tarefas_com_cache(
-            stats=stats,
-            user_id=user_id,
-            project=project,
-            sprint=sprint,
-            tasks=tasks,
-            db=db,
-            formato=parametros.formato,
-        )
-# 
-        tempo = (datetime.now() - start).total_seconds()
-        log_message(f"✅ Relatório de tarefas {parametros.formato.upper()} entregue em {tempo:.2f}s")
-        return _criar_resposta_arquivo(file_path, tempo, parametros.formato)
-
-    except (ValueError, TypeError) as e:
-        tipo = "Validação" if isinstance(e, ValueError) else "Tipo de Dados"
-        log_message(f"❌ Erro de {tipo}: {e}\n{traceback.format_exc()}", "error")
-        return JSONResponse(
-            status_code=400 if isinstance(e, ValueError) else 422,
-            content={"erro": f"Erro de {tipo}", "mensagem": str(e)},
-        )
-    except Exception as e:
-        log_message(f"💥 Erro no endpoint de tarefas: {e}\n{traceback.format_exc()}", "error")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "erro": "Falha ao gerar relatório de tarefas",
-                "mensagem": str(e),
-                "detalhes": traceback.format_exc().splitlines()[-3:],
-            },
-        )
+async def gerar_relatorio_tarefas_endpoint(request: Request, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
+    return await _processar_relatorio_unificado(request, user_id, db, "tarefas")

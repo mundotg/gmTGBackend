@@ -1,7 +1,7 @@
 from typing import Dict, Any, Tuple
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
-from app.ultils.logger import logger
+from app.ultils.logger import log_message
 
 class DatabaseManager:
     """Gerencia conexões com diferentes bancos de dados usando SQLAlchemy."""
@@ -59,7 +59,7 @@ class DatabaseManager:
         """Cria e retorna um SQLAlchemy engine configurado para o tipo de banco."""
         uri_template = DatabaseManager.DB_URIS.get(db_type)
         if not uri_template:
-            logger.error(f"❌ Tipo de banco de dados não suportado: {db_type}")
+            log_message(f"❌ Tipo de banco de dados não suportado: {db_type}", level="error")
             raise ValueError(f"Tipo de banco de dados não suportado: {db_type}")
 
         try:
@@ -74,7 +74,7 @@ class DatabaseManager:
                 TrustServerCertificate=config.get("TrustServerCertificate", "yes"),
             )
 
-            logger.debug(f"🔌 Criando engine para {db_type} em {config.get('host')}:{config.get('port')}")
+            log_message(f"🔌 Criando engine para {db_type} em {config.get('host')}:{config.get('port')}", level="debug")
 
             # Configurações padrão
             extra_args: Dict[str, Any] = {
@@ -99,7 +99,7 @@ class DatabaseManager:
             return engine
 
         except Exception as e:
-            logger.exception(f"❌ Erro ao montar URI de conexão para {db_type}: {e}")
+            log_message(f"❌ Erro ao montar URI de conexão para {db_type}: {e}", level="error")
             raise
 
     @staticmethod
@@ -117,13 +117,13 @@ class DatabaseManager:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
 
-            logger.info(f"✅ Conexão estabelecida com sucesso ({db_type})")
+            log_message(f"✅ Conexão estabelecida com sucesso ({db_type})", level="info")
             return session, engine
 
         except Exception as e:
-            logger.error(f"❌ Falha ao conectar ao {db_type}: {e}")
+            log_message(f"❌ Falha ao conectar ao {db_type}: {e}", level="error")
             if db_type == "PostgreSQL" and "SSL" in str(e):
-                logger.warning("🔁 Tentando fallback com tipo 'pg' (PostgreSQL sem SSL)")
+                log_message("🔁 Tentando fallback com tipo 'pg' (PostgreSQL sem SSL)", level="warning")
                 return DatabaseManager.connect("pg", config)
             raise
 
@@ -135,8 +135,8 @@ class DatabaseManager:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             session.close()
-            logger.info(f"✅ Teste de conexão bem-sucedido com {db_type}")
+            log_message(f"✅ Teste de conexão bem-sucedido com {db_type}", level="info")
             return True
         except Exception as e:
-            logger.error(f"❌ Teste de conexão falhou para {db_type}: {e}")
+            log_message(f"❌ Teste de conexão falhou para {db_type}: {e}", level="error")
             return False

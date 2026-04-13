@@ -1,59 +1,99 @@
+from __future__ import annotations
+
+from typing import Any, Optional
+
 from fastapi import Cookie, Header, HTTPException, status
-from typing import Optional
+
 from app.auth import decode_token
-from fastapi import  HTTPException, status, Cookie, Header
-from fastapi.security import HTTPBasic
-from typing import Optional
 
-security = HTTPBasic()
 
-def decode_tokenInit(token: str) -> Optional[str]:
+def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
+    if not authorization:
+        return None
+    parts = authorization.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header inválido. Use: Bearer <token>",
+        )
+    return parts[1].strip()
+
+
+def _get_sub_from_payload(payload: Any) -> Optional[str]:
     """
-    Função fake para validar token JWT.
-    Retorne o user_id (string ou int) se válido.
+    Suporta:
+      - payload dict: {"sub": "..."}
+      - payload string/int direto: "123" / 123
     """
-    if token == "meu_token_valido":
-        return "1"
-    return decode_token(token)
+    if payload is None:
+        return None
+
+    if isinstance(payload, dict):
+        sub = payload.get("sub")
+        return str(sub) if sub is not None else None
+
+    if isinstance(payload, (str, int)):
+        return str(payload)
+
+    # payload em formato inesperado
+    return None
 
 
+# def get_current_user_id(
+#     access_token: Optional[str] = Cookie(None, alias="access_token"),
+#     authorization: Optional[str] = Header(None),
+# ) -> int:
+#     # 1) token via cookie tem prioridade
+#     token = access_token or _extract_bearer_token(authorization)
+
+#     if not token:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Token não fornecido (cookie access_token ou Authorization Bearer).",
+#         )
+
+#     payload = decode_token(token)
+#     sub = _get_sub_from_payload(payload)
+
+#     if not sub:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Token inválido ou expirado.",
+#         )
+
+#     try:
+#         return int(sub)
+#     except ValueError:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Token inválido: 'sub' não é numérico.",
+#         )
 def get_current_user_id(
     access_token: Optional[str] = Cookie(None),
     authorization: Optional[str] = Header(None),
-    # credentials: HTTPBasicCredentials = Depends(security),
 ) -> int:
     token = None
 
-    # 1️⃣ Primeiro: verifica se veio no Cookie
     if access_token:
         token = access_token
-
-    # 2️⃣ Depois: verifica se veio Authorization: Bearer <token>
     elif authorization and authorization.startswith("Bearer "):
-        try:
-            token = authorization.split(" ")[1]
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authorization Bearer inválido principal"
-            )
+        parts = authorization.split(" ")
+        if len(parts) != 2 or not parts[1]:
+            raise HTTPException(status_code=401, detail="Authorization Bearer inválido")
+        token = parts[1]
 
-    # 3️⃣ Se não veio token -> tenta Basic Auth
-    # else:
-    #     if credentials.username != "admin" or credentials.password != "admin123":
-    #         raise HTTPException(
-    #             status_code=status.HTTP_401_UNAUTHORIZED,
-    #             detail="Credenciais Basic inválidas",
-    #             headers={"WWW-Authenticate": "Basic"},
-    #         )
-    #     return 1  # ID do admin hardcoded
+    payload = decode_tokenInit(token)  # agora deve devolver dict
+    if not payload or not isinstance(payload, dict):
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
 
-    # 4️⃣ Valida token (cookie ou bearer)
-    payload = decode_tokenInit(token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido ou expirado principal"
-        )
+    sub = payload.get("sub")
+    if not sub:
+        raise HTTPException(status_code=401, detail="Token inválido: sub ausente")
 
-    return int(payload)
+    return int(sub)
+
+
+def decode_tokenInit(token: str):
+    if token == "meu_token_valido":
+        return {"sub": "1"}   # ✅ devolve dict
+    return decode_token(token)

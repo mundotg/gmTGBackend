@@ -1,0 +1,1 @@
+docker exec -it minha-api tail -f /app/database_connector.log

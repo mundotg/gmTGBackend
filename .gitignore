@@ -18,6 +18,7 @@ env.bak/
 .env.development
 .env.production
 .env.test
+backups/
 
 # -------------------------------
 # 2. Cache e arquivos compilados
@@ -40,7 +41,8 @@ __pycache__/
 *.bin
 *.pid
 database_connector.log
-
+ocr_cache_data/
+temp_reports/
 # -------------------------------
 # 4. Dados de build e pacotes
 # -------------------------------
@@ -74,7 +76,7 @@ temp/
 tmp/
 cache/
 *.cache
-
+temp_reports/*
 # -------------------------------
 # 8. Arquivos auxiliares e documentação gerada
 # -------------------------------

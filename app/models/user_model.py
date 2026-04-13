@@ -1,142 +1,225 @@
-#models/user_model.py
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey, func
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Table,
+    func,
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
+from app.models.task_models import TimestampMixin, project_team_association
 
 
+# =============================
+# 🔐 Refresh Token
+# =============================
 class RefreshToken(Base):
-    """
-    Representa um token de atualização (refresh token) emitido para um usuário.
-    Usado para renovar o token de acesso sem exigir novo login.
-    """
     __tablename__ = "refresh_tokens"
 
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String, unique=True, index=True, nullable=False)
-
+    user_IP = Column(String(45), nullable=True)  # Armazena o IP do usuário (opcional)
+    user_agent = Column(
+        String(500), nullable=True
+    )  # Armazena o User-Agent do usuário (opcional)
     user_id = Column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
-        index=True
+        index=True,
     )
-
+    is_active = Column(Boolean, default=True)
     revoked = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     expires_at = Column(DateTime, nullable=False)
 
-    # Relação inversa com o usuário
     user = relationship("User", back_populates="refresh_tokens")
 
     def __repr__(self):
         return f"<RefreshToken(user_id={self.user_id}, revoked={self.revoked})>"
 
 
-# -----------------------------
-# 🏢 Tabela: Empresa
-# -----------------------------
+# =============================
+# 🏢 Empresa
+# =============================
 class Empresa(Base):
-    """
-    Representa uma empresa no sistema.
-    """
     __tablename__ = "empresas"
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(150), unique=True, nullable=False)
-    tamanho = Column(String(50), nullable=True)
-    nif = Column(String(50), unique=True, nullable=True)  # opcional
-    endereco = Column(String(255), nullable=True)
+    tamanho = Column(String(50))
+    nif = Column(String(50), unique=True)
+    endereco = Column(String(255))
     criado_em = Column(DateTime, default=datetime.utcnow)
-
-    # 🔗 Relação inversa
-    usuarios = relationship("User", back_populates="empresa_ref")
+    is_active = Column(Boolean, default=True)
+    users = relationship("User", back_populates="empresa")
 
     def __repr__(self):
         return f"<Empresa(id={self.id}, nome='{self.nome}')>"
 
 
-# -----------------------------
-# 🧩 Tabela: Cargo
-# -----------------------------
+# =============================
+# 🧩 Cargo
+# =============================
 class Cargo(Base):
-    """
-    Representa o cargo/função de um usuário dentro da empresa.
-    Exemplo: 'Desenvolvedor', 'Gerente', 'Analista', etc.
-    """
     __tablename__ = "cargos"
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), unique=True, nullable=False)
-    descricao = Column(String(255), nullable=True)
-    nivel = Column(String(50), nullable=True)  # exemplo: júnior, pleno, sênior
+    descricao = Column(String(255))
+    nivel = Column(String(50))
     criado_em = Column(DateTime, default=datetime.utcnow)
-
-    # 🔗 Relação inversa
-    usuarios = relationship("User", back_populates="cargo_ref")
+    is_active = Column(Boolean, default=True)
+    users = relationship("User", back_populates="cargo")
 
     def __repr__(self):
         return f"<Cargo(id={self.id}, nome='{self.nome}')>"
 
 
-# -----------------------------
-# 👤 Tabela: User
-# -----------------------------
-class User(Base):
-    """
-    Representa um usuário do sistema, com informações pessoais e corporativas.
-    """
+# =============================
+# 🔑 Role (RBAC)
+# =============================
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False)
+    description = Column(String(200))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+    users = relationship("User", back_populates="role")
+
+    permissions = relationship(
+        "Permission",
+        secondary="roles_permissions",
+        back_populates="roles",
+        lazy="select",
+    )
+
+    def __repr__(self):
+        return f"<Role(id={self.id}, name='{self.name}')>"
+
+
+# =============================
+# 👤 User (UNIFICADO)
+# =============================
+class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
 
-    # Informações pessoais
-    nome = Column(String(100), nullable=False)
-    apelido = Column(String(50), nullable=True)
-    email = Column(String(120), unique=True, index=True, nullable=False)
-    # userName = Column(String(100), unique=True, index=True, nullable=False)
-    telefone = Column(String(30), nullable=True)
-    # telefone2 =Column(String(30), nullable=True)
-
-    # Relações com empresa e cargo
-    empresa_id = Column(Integer, ForeignKey("empresas.id", ondelete="SET NULL"), nullable=True)
-    cargo_id = Column(Integer, ForeignKey("cargos.id", ondelete="SET NULL"), nullable=True)
+    # Dados pessoais
+    nome = Column(String(255), nullable=False)
+    apelido = Column(String(100))
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    telefone = Column(String(30))
+    avatar_url = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     # Segurança
     hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    email_verified = Column(Boolean, default=False)
+    concorda_termos = Column(Boolean, default=False)
 
-    # Termos
-    concorda_termos = Column(Boolean, default=False, nullable=False)
-
-    # 🔗 Relacionamentos
-    empresa_ref = relationship("Empresa", back_populates="usuarios")
-    cargo_ref = relationship("Cargo", back_populates="usuarios")
-
-    refresh_tokens = relationship(
-        "RefreshToken",
-        back_populates="user",
-        cascade="all, delete-orphan",
-        passive_deletes=True
+    # Relações organizacionais
+    empresa_id = Column(Integer, ForeignKey("empresas.id", ondelete="SET NULL"))
+    cargo_id = Column(Integer, ForeignKey("cargos.id", ondelete="SET NULL"))
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="SET NULL"))
+    settings = relationship(
+        "Settings", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
+
+    empresa = relationship("Empresa", back_populates="users")
+    cargo = relationship("Cargo", back_populates="users")
+    role = relationship("Role", back_populates="users")
+
+    # 🔗 Tokens
+    refresh_tokens = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    # 🔗 Projetos e tarefas
+    created_projects = relationship(
+        "Project", back_populates="owner_user", cascade="all, delete-orphan"
+    )
+
+    assigned_tasks = relationship(
+        "Task", back_populates="assigned_user", foreign_keys="[Task.assigned_to_id]"
+    )
+
+    delegated_tasks = relationship(
+        "Task", back_populates="delegated_user", foreign_keys="[Task.delegated_to_id]"
+    )
+
+    created_tasks = relationship(
+        "Task", back_populates="creator_user", foreign_keys="[Task.created_by_id]"
+    )
+
+    created_sprints = relationship(
+        "Sprint", back_populates="created_by", foreign_keys="[Sprint.created_by_id]"
+    )
+
+    # 🔗 Projetos em que participa
+    projects_participating = relationship(
+        "Project", secondary=project_team_association, back_populates="team_members"
+    )
+
     db_connections = relationship(
-        "DBConnection",
-        back_populates="owner",
-        cascade="all, delete-orphan"
+        "DBConnection", back_populates="owner", cascade="all, delete-orphan"
     )
     query_history = relationship(
-        "QueryHistory",
-        back_populates="user",
-        cascade="all, delete-orphan"
-    )
-    settings = relationship(
-        "Settings",
-        back_populates="user",
-        cascade="all, delete-orphan"
+        "QueryHistory", back_populates="user", cascade="all, delete-orphan"
     )
 
-    criado_em = Column(DateTime, default=datetime.utcnow)
+    chat_sessions = relationship("ChatSession", back_populates="user")
+
+    @property
+    def permissions(self) -> set[str]:
+        if not self.role or not self.role.permissions:
+            return set()
+        return {permission.name for permission in self.role.permissions}
 
     def __repr__(self):
-        return f"<User(id={self.id}, email='{self.email}', empresa_id={self.empresa_id}, cargo_id={self.cargo_id})>"
+        return f"<User(id='{self.id}', email='{self.email}')>"
+
+
+# =============================
+# 🛡️ Permissão
+# =============================
+class Permission(Base):
+    __tablename__ = "permissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False)
+    description = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    roles = relationship(
+        "Role", secondary="roles_permissions", back_populates="permissions"
+    )
+
+    def __repr__(self):
+        return f"<Permission(name='{self.name}')>"
+
+
+# =============================
+# 🛡️ Role-Permission Association Table
+# =============================
+roles_permissions = Table(
+    "roles_permissions",
+    Base.metadata,
+    Column(
+        "role_id", Integer, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column(
+        "permission_id",
+        Integer,
+        ForeignKey("permissions.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)

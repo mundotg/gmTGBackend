@@ -1,233 +1,449 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
+import traceback
+from datetime import timedelta
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, Request
 from sqlalchemy.orm import Session
+
 from app import database, auth
 from app.cruds import user_crud
 from app.models import user_model
-from app.schemas import users_chemas
+from app.request_fingerprint import build_fingerprint
+from app.schemas import users_schemas
+from app.services.crypto_utils import aes_decrypt, aes_encrypt
 from app.token_storage import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_DAYS,
     refresh_token_time_left,
+    rotate_refresh_token,
     store_refresh_token,
     is_refresh_token_valid,
     revoke_token,
-    update_refresh_token,
+    assert_refresh_token_binding,  # ✅ IMPORTANTE
 )
 from app.config.dotenv import get_env
-from app.ultils.ativar_session_bd import desativar_connection, reativar_connection
+from app.ultils.ativar_session_bd import reativar_connection
 from app.ultils.logger import log_message
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-# Configurações via .env
 COOKIE_SECURE = get_env("COOKIE_SECURE", "false").lower() == "true"
-COOKIE_SAMESITE = get_env("COOKIE_SAMESITE", "lax")
+COOKIE_SAMESITE = get_env("COOKIE_SAMESITE", "lax") or "none"
 COOKIE_DOMAIN = get_env("COOKIE_DOMAIN")
+TRUST_PROXY_HEADERS = get_env("TRUST_PROXY_HEADERS", "false").lower() == "true"
+FINGERPRINT_SALT = get_env("FINGERPRINT_SALT", "change-me-please")
+ENV = get_env("ENV", "development").lower()
 
 
-def set_cookie(response: Response, key: str, value: str, path="/"):
-    response.set_cookie(
-        key=key,
-        value=value,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite=COOKIE_SAMESITE,
-        max_age=(
-            REFRESH_TOKEN_EXPIRE_DAYS
-            if key == "refresh_token"
-            else ACCESS_TOKEN_EXPIRE_MINUTES
-        ),
-        path=path,
-        domain=COOKIE_DOMAIN if COOKIE_DOMAIN != "localhost" else None,
+def _cookie_domain():
+    # if ENV == "production":
+    #     return COOKIE_DOMAIN if COOKIE_DOMAIN else None
+    # return COOKIE_DOMAIN if COOKIE_DOMAIN and COOKIE_DOMAIN != "localhost" else None
+    return COOKIE_DOMAIN or None
+
+
+def _to_seconds(value: Optional[int], unit: str) -> int:
+    v = int(value or 10)
+    TEN_YEARS_SECONDS = 10 * 365 * 24 * 60 * 60
+    if v > TEN_YEARS_SECONDS:
+        return v
+
+    if unit == "minutes":
+        return int(timedelta(minutes=v).total_seconds())
+    if unit == "days":
+        return int(timedelta(days=v).total_seconds())
+    return v
+
+
+def set_cookie(response: Response, key: str, value: str, path: str = "/"):
+    try:
+        if key == "refresh_token":
+            max_age = _to_seconds(REFRESH_TOKEN_EXPIRE_DAYS, "days")
+        else:
+            max_age = _to_seconds(ACCESS_TOKEN_EXPIRE_MINUTES, "minutes")
+
+        cookie_options = {
+            "key": key,
+            "value": value,
+            "httponly": TRUST_PROXY_HEADERS,
+            "secure": COOKIE_SECURE,
+            "samesite": COOKIE_SAMESITE,
+            "max_age": max_age,
+            "path": path,
+        }
+
+        domain = _cookie_domain()
+        if domain:
+            cookie_options["domain"] = domain
+
+        # 🔥 obrigatório quando SameSite=None
+        if COOKIE_SAMESITE.lower() == "none":
+            cookie_options["secure"] = COOKIE_SECURE
+
+        response.set_cookie(**cookie_options)
+
+    except Exception as e:
+        log_message(f"💥 erro ao definir cookie {key}: {e}", "error")
+
+
+def _delete_auth_cookies(response: Response):
+    domain = _cookie_domain()
+
+    cookie_options = {
+        "domain": domain,
+        "secure": COOKIE_SECURE,
+        "httponly": TRUST_PROXY_HEADERS,
+        "samesite": COOKIE_SAMESITE,
+    }
+
+    # 🔥 refresh pode ter múltiplos paths
+    for path in ("/", "/auth", "/auth/refresh", ""):
+        response.delete_cookie("refresh_token", path=path, **cookie_options)
+
+    # 🔥 access token normalmente raiz
+    response.delete_cookie("access_token", path="/", **cookie_options)
+    response.delete_cookie("bk_access_token", path="/")
+
+    log_message("🍪 Cookies de autenticação removidos", "info")
+
+
+def internal_error(e: Exception):
+    log_message(f"❌ Erro interno: {str(e)}\n{traceback.format_exc()}", "error")
+    raise HTTPException(status_code=500, detail="Erro interno no servidor.")
+
+
+from typing import Any
+
+
+def build_user_out(
+    user: user_model.User, info_extra: Any = None
+) -> users_schemas.UserOut2:
+
+    # 1. Encriptar as Roles (Acessos do sistema)
+    roles_encriptadas = None
+
+    if user.role:
+        # Extrai os dados em segurança, ignorando variáveis internas do SQLAlchemy (ex: _sa_instance_state)
+        role_dict = {
+            k: v for k, v in user.role.__dict__.items() if not k.startswith("_")
+        }
+        role_dict["name"] = aes_encrypt(user.role.name)
+
+        role_schema = users_schemas.RoleSimpleSchema.model_validate(role_dict)
+        roles_encriptadas = [role_schema]
+
+    # 2. Encriptar a lista de Permissões
+    permissoes_encriptadas = (
+        [aes_encrypt(str(perm)) for perm in user.permissions]
+        if user.permissions
+        else []
     )
+
+    # 3. Helper local para encriptar campos opcionais de forma limpa (DRY)
+    def _encrypt_if_exists(value: Any) -> str:
+        return aes_encrypt(str(value)) if value else ""
+
+    # 4. Montar o Schema final
+    return users_schemas.UserOut2(
+        id=aes_encrypt(str(user.id)),
+        nome=_encrypt_if_exists(user.nome),
+        apelido=_encrypt_if_exists(user.apelido),
+        email=_encrypt_if_exists(user.email),
+        telefone=_encrypt_if_exists(user.telefone),
+        # Empresa e Cargo
+        empresa=(
+            users_schemas.EmpresaSchema.model_validate(user.empresa)
+            if user.empresa
+            else None
+        ),
+        cargo=(
+            users_schemas.CargoSchema.model_validate(user.cargo) if user.cargo else None
+        ),
+        roles=roles_encriptadas,
+        permissions=permissoes_encriptadas,
+        info_extra=info_extra,
+    )
+
+
+def get_payload_from_token_or_401(token: str) -> dict:
+    try:
+        payload = auth.decode_token(token)
+        if not payload or not isinstance(payload, dict):
+            raise ValueError("Payload inválido")
+        return payload
+    except Exception as e:
+        log_message(f"❌ Token inválido: {e}", "warning")
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+
+def assert_access_token_binding(request: Request, access_token: str) -> dict:
+    payload = get_payload_from_token_or_401(access_token)
+    fp_now = build_fingerprint(request, FINGERPRINT_SALT)
+
+    # 🔒 1. fingerprint (obrigatório)
+    if payload.get("fp") != fp_now.get("fp"):
+        raise HTTPException(status_code=401, detail="Sessão inválida")
+
+    # ⚠️ 2. IP (tolerante)
+    ip_token = payload.get("ip")
+    ip_now = fp_now.get("user_ip_prefix")
+
+    if ip_token and ip_now and ip_token != ip_now:
+        log_message(f"⚠️ IP divergente token={ip_token} atual={ip_now}", "warning")
+
+    # ⚠️ 3. User-Agent (tolerante)
+    ua_token = payload.get("ua")
+    ua_now = fp_now.get("user_agent")
+
+    if ua_token and ua_now and ua_token != ua_now:
+        log_message(
+            f"⚠️ UA divergente token={ua_token[:30]}... atual={ua_now[:30]}...",
+            "warning",
+        )
+
+    return payload
 
 
 @router.post(
     "/register",
-    response_model=users_chemas.UserOut,
+    response_model=users_schemas.UserOut,
     status_code=status.HTTP_201_CREATED,
 )
-def register_user(
-    user: users_chemas.UserCreate, db: Session = Depends(database.get_db)
+async def register_user(
+    user: users_schemas.UserCreate,
+    db: Session = Depends(database.get_db),
 ):
-    if user_crud.get_user_by_email(db, user.email):
-        raise HTTPException(status_code=400, detail="Email já cadastrado")
-    if user.senha != user.confirmar_senha:
-        raise HTTPException(status_code=400, detail="Senhas não coincidem.")
-    if not user.concorda_termos:
+    try:
+        db_user = user_crud.create_user(db, user)
+
+        return {
+            **db_user.__dict__,
+            "id": db_user.id,  # 🔥 aqui resolve
+            "permissions": list(db_user.permissions),
+            "role": db_user.role,
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
         raise HTTPException(
-            status_code=400, detail="Aceitação dos termos é obrigatória."
+            status_code=500, detail=f"Erro interno ao criar usuário: {str(e)}"
         )
-    return user_crud.create_user(db, user)
 
 
-# def login_user(credentials: users_chemas.UserLogin, response: Response, db: Session = Depends(database.get_db)):
-#     user = user_crud.get_user_by_email(db, credentials.email)
-#     print(user.email, "; ",user.hashed_password)
-#     if not user or not auth.verify_password(credentials.senha, user.hashed_password):
-#         raise HTTPException(status_code=401, detail="Credenciais inválidas")
-#     access_token = auth.create_access_token({"sub": str(user.id)})
-#     refresh_token = auth.create_refresh_token({"sub": str(user.id)})
-#     store_refresh_token(db, refresh_token, user.id)
-#     set_cookie(response, "refresh_token", refresh_token, path="/auth/refresh")
-#     set_cookie(response, "access_token", access_token)
-#     rep = reativar_connection(user.id, db)
-#     if rep["success"]: user.InfPlus = rep["config"]
-#     return {"user": user}
-
-
-@router.post("/login", response_model=users_chemas.LoginResponse)
-def login_user(
-    credentials: users_chemas.UserLogin,
+@router.post("/login", response_model=users_schemas.LoginResponse)
+async def login_user(
+    credentials: users_schemas.UserLogin,
+    request: Request,
     response: Response,
     db: Session = Depends(database.get_db),
 ):
-    # 🔍 Buscar usuário pelo e-mail
-    print(credentials)
-    user = user_crud.get_user_by_email(db, credentials.email)
+    try:
 
-    print(user)
-    if not user:
-        raise HTTPException(status_code=401, detail="E-mail não encontrado")
+        # print(f"credentials: {credentials}")
+        user = user_crud.get_user_by_email(db, credentials.email)
+        if not user:
+            raise HTTPException(status_code=401, detail="E-mail não encontrado")
 
-    # 🔑 Verificar senha
-    print(user.email, user.hashed_password)
-    if not auth.verify_password(credentials.senha, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Senha incorreta")
+        if not auth.verify_password(
+            aes_decrypt(credentials.senha), user.hashed_password
+        ):
+            raise HTTPException(status_code=401, detail="Senha incorreta")
 
-    # 🪪 Gerar tokens JWT
-    access_token = auth.create_access_token({"sub": str(user.id)})
-    refresh_token = auth.create_refresh_token({"sub": str(user.id)})
+        fp = build_fingerprint(request, FINGERPRINT_SALT)
 
-    # 💾 Salvar refresh token no banco
-    store_refresh_token(db, refresh_token, user.id)
-
-    # 🍪 Setar cookies seguros
-    # set_cookie(response, "refresh_token", refresh_token, path="/auth/refresh", httponly=True, secure=True)
-    # set_cookie(response, "access_token", access_token, httponly=True, secure=True)
-
-    # setar normal
-    set_cookie(response, "refresh_token", refresh_token, path="/auth/refresh")
-    set_cookie(response, "access_token", access_token)
-
-    # 🔁 Tentar reativar conexão de banco do usuário
-    rep = reativar_connection(user.id, db)
-    InfPlus = rep["config"] if rep.get("success") else None
-
-    # 📦 Retorno formatado
-    return users_chemas.LoginResponse(
-        user=users_chemas.UserOut(
-            id=user.id,
-            apelido=user.apelido,
-            empresa=(
-                users_chemas.EmpresaSchema.model_validate(user.empresa_ref)
-                if user.empresa_ref
-                else None
-            ),
-            cargo=(
-                users_chemas.CargoSchema.model_validate(user.cargo_ref)
-                if user.cargo_ref
-                else None
-            ),
-            nome=user.nome,
-            email=user.email,
-            telefone=user.telefone,
-            InfPlus=InfPlus,
+        access_token = auth.create_access_token(
+            {
+                "sub": str(user.id),
+                "fp": fp["fp"],
+                "ua": fp["user_agent"],
+                "ip": fp["user_ip_prefix"],
+            }
         )
-    )
+
+        refresh_token = auth.create_refresh_token(
+            {
+                "sub": str(user.id),
+                "fp": fp["fp"],
+                "ua": fp["user_agent"],
+                "ip": fp["user_ip_prefix"],
+            }
+        )
+
+        # ✅ CRÍTICO: guardar refresh token com fingerprint
+        store_refresh_token(db, refresh_token, user.id, REFRESH_TOKEN_EXPIRE_DAYS, fp)
+
+        set_cookie(response, "refresh_token", refresh_token, path="/")
+        set_cookie(response, "access_token", access_token, path="/")
+
+        rep = reativar_connection(user.id, db)
+
+        # print(f"Reativar connection response: {rep}")
+        info_extra = rep.get("config") if rep.get("success") else None
+
+        return users_schemas.LoginResponse(
+            user=build_user_out(user, info_extra=info_extra)
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        internal_error(e)
 
 
-@router.post("/refresh", response_model=users_chemas.AccessTokenOut)
-def refresh_access_token(
+@router.post("/refresh", response_model=users_schemas.AccessTokenOut)
+async def refresh_access_token(
+    request: Request,
     response: Response,
-    refresh_token: str = Cookie(None),
+    refresh_token: str | None = Cookie(None, alias="refresh_token"),
     db: Session = Depends(database.get_db),
 ):
-    if not refresh_token or not is_refresh_token_valid(db, refresh_token):
-        raise HTTPException(
-            status_code=422, detail="Refresh token inválido ou expirado"
+    try:
+        if not refresh_token:
+            raise HTTPException(status_code=401, detail="Sessão inválida")
+
+        # 🔍 valida existência e estado
+        if not is_refresh_token_valid(db, refresh_token):
+            raise HTTPException(status_code=401, detail="Sessão expirada ou inválida")
+
+        # 🔐 fingerprint atual
+        fp = build_fingerprint(request, FINGERPRINT_SALT)
+
+        # 🔒 valida binding (IP + UA)
+        try:
+            assert_refresh_token_binding(db, refresh_token, fp)
+        except ValueError as e:
+            log_message(f"🚨 Binding inválido: {e}", "error")
+            revoke_token(db, refresh_token)
+            raise HTTPException(status_code=401, detail="Sessão inválida")
+
+        # 🔍 payload JWT
+        payload = get_payload_from_token_or_401(refresh_token)
+        user_id = payload.get("sub")
+
+        if not user_id:
+            revoke_token(db, refresh_token)
+            raise HTTPException(status_code=401, detail="Token inválido")
+
+        # 🆕 novo access token
+        access_token = auth.create_access_token(
+            {
+                "sub": str(user_id),
+                "fp": fp["fp"],
+                "ua": fp["user_agent"],
+                "ip": fp["user_ip_prefix"],
+            }
         )
-    payload = auth.decode_token(refresh_token)
-    if not payload:
-        raise HTTPException(status_code=402, detail="Token inválido")
 
-    user_id = payload if isinstance(payload, str) else payload.get("sub")
-    access_token = auth.create_access_token({"sub": str(user_id)})
-    data_exp, isExpiring = refresh_token_time_left(db, refresh_token)
-    # print(f"Tempo restante para expiração do refresh token: {data_exp}, Está expirando? {isExpiring}")
-    if isExpiring:  # Se o token está prestes a expirar, renova
-        refresh_token2 = auth.create_refresh_token({"sub": str(user_id)})
-        update_refresh_token(db, refresh_token, refresh_token2)
-        set_cookie(response, "refresh_token", refresh_token2, path="/auth/refresh")
+        # 🔄 verifica se precisa rotacionar refresh
+        _, is_expiring = refresh_token_time_left(db, refresh_token)
 
-    set_cookie(response, "access_token", access_token)
-    set_cookie(response, "refresh_token", refresh_token, path="/auth/refresh")
+        if is_expiring:
+            new_refresh = auth.create_refresh_token(
+                {
+                    "sub": str(user_id),
+                    "fp": fp["fp"],
+                    "ua": fp["user_agent"],
+                    "ip": fp["user_ip_prefix"],
+                }
+            )
 
-    return users_chemas.AccessTokenOut(access_token="", token_type="")
+            # ✅ ROTACIONA (correto)
+            rotate_refresh_token(db, refresh_token, new_refresh, int(user_id), fp)
+
+            refresh_token = new_refresh
+            log_message("🔄 Refresh token rotacionado", "info")
+
+        # 🍪 cookies seguras
+        set_cookie(response, "access_token", access_token, path="/")
+        set_cookie(response, "refresh_token", refresh_token, path="/")
+
+        return users_schemas.AccessTokenOut(access_token="ok", token_type="bearer")
+
+    except HTTPException as err:
+        log_message(f"❌ HTTP error: {err.detail}", "warning")
+        raise
+
+    except Exception as e:
+        log_message(f"💥 Erro inesperado: {e}", "error")
+        raise HTTPException(status_code=500, detail="Erro interno no servidor")
 
 
-@router.get("/me", response_model=users_chemas.UserOut)
-def get_logged_user(
-    access_token: str = Cookie(None), db: Session = Depends(database.get_db)
+@router.get("/me", response_model=users_schemas.UserOut2)
+async def get_current_user(
+    request: Request,
+    access_token: str | None = Cookie(None, alias="access_token"),
+    db: Session = Depends(database.get_db),
 ):
-    # 🚫 Sem token
-    if access_token is None:
-        raise HTTPException(status_code=401, detail="Access token não fornecido")
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Não autenticado")
 
-    # 🔎 Decodificar e validar token
-    payload = auth.decode_token(access_token)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+    try:
+        payload = assert_access_token_binding(request, access_token)
+        user_id = payload.get("sub")
 
-    user_id = payload.get("sub") if isinstance(payload, dict) else payload
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Token malformado")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Token inválido")
 
-    # 🔍 Buscar usuário
-    user = db.get(user_model.User, int(user_id))
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        user = db.get(user_model.User, int(user_id))
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        rep = reativar_connection(user.id, db)
+        # print(f"Reativar connection response: {rep}")
+        info_extra = rep.get("config") if rep.get("success") else None
+        # 🚀 A CORREÇÃO ESTÁ AQUI:
+        # Em vez de devolver o 'user' bruto, passamos pela nossa função construtora!
+        return build_user_out(user, info_extra=info_extra)
 
-    # 🔁 Reativar conexão se existir
-    rep = reativar_connection(user.id, db)
-    InfPlus = rep["config"] if rep.get("success") else None
-
-    # ✅ Retornar dados formatados
-    return users_chemas.UserOut(
-        id=user.id,
-        apelido=user.apelido,
-        empresa=(
-            users_chemas.EmpresaSchema.model_validate(user.empresa_ref)
-            if user.empresa_ref
-            else None
-        ),
-        cargo=(
-            users_chemas.CargoSchema.model_validate(user.cargo_ref)
-            if user.cargo_ref
-            else None
-        ),
-        nome=user.nome,
-        email=user.email,
-        telefone=user.telefone,
-        InfPlus=InfPlus,
-    )
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_message(f"💥 erro auth: {e}", "error")
+        raise HTTPException(status_code=401, detail="Sessão inválida")
 
 
 @router.post("/logout")
-def logout_user(
+async def logout_user(
+    request: Request,
     response: Response,
-    refresh_token: str = Cookie(None),
+    refresh_token: str | None = Cookie(None, alias="refresh_token"),
     db: Session = Depends(database.get_db),
 ):
-    if refresh_token:
-        revoke_token(db, refresh_token)
-    payload = auth.decode_token(refresh_token)
-    if payload:
-        user_id = payload if isinstance(payload, str) else payload.get("sub")
-        resp = desativar_connection(db, user_id)
-        log_message("{resp}", "info")
+    try:
+        user_id = None
 
-    response.delete_cookie("refresh_token", path="/auth/refresh")
-    response.delete_cookie("access_token", path="/")
+        if refresh_token:
+            try:
+                fp = build_fingerprint(request, FINGERPRINT_SALT)
 
-    return {"message": "Logout efetuado com sucesso."}
+                # 🔐 valida binding (sem quebrar fluxo)
+                payload = assert_refresh_token_binding(db, refresh_token, fp)
+                user_id = payload.get("sub")
+
+            except Exception as e:
+                # 🔥 NÃO trava logout
+                log_message(f"⚠️ Logout com token inválido: {e}", "warning")
+
+            finally:
+                # 🔒 sempre revoga se existir
+                revoke_token(db, refresh_token)
+
+        # 🔥 opcional: logout global (todos dispositivos)
+        # if user_id:
+        #     revoke_all_user_tokens(db, int(user_id))
+
+        # 🍪 remove cookies SEMPRE
+        _delete_auth_cookies(response)
+
+        log_message(f"👋 Logout realizado user_id={user_id}", "info")
+
+        return {"message": "Logout efetuado com sucesso."}
+
+    except Exception as e:
+        log_message(f"💥 erro no logout: {e}", "error")
+
+        # ⚠️ mesmo com erro, remove cookies (UX primeiro)
+        _delete_auth_cookies(response)
+
+        return {"message": "Logout efetuado."}

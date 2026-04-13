@@ -1,9 +1,10 @@
-from datetime import datetime
-import traceback
+from datetime import datetime, timezone
 from typing import Optional, List
 from uuid import uuid4
+
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import exists
 
 from app.models.task_models import Project as ProjectORM, Sprint as SprintORM
 from app.schemas.sprint_schemas import SprintSchema
@@ -11,32 +12,60 @@ from app.ultils.logger import log_message
 
 
 # ==================================================
-# 🔹 CRUD DE SPRINTS
+# 🔹 CRUD DE SPRINTS (otimizado)
 # ==================================================
 
 def get_sprint(db: Session, sprint_id: str) -> Optional[SprintORM]:
     """Obtém uma sprint pelo ID."""
-    sprint = db.query(SprintORM).filter(SprintORM.id == sprint_id).first()
-    if not sprint:
-        log_message(f"Sprint {sprint_id} não encontrada", "warning")
-    return sprint
+    try:
+        sprint = db.query(SprintORM).filter(SprintORM.id == sprint_id).first()
+        if not sprint:
+            log_message(f"Sprint {sprint_id} não encontrada", "warning")
+        return sprint
+    except SQLAlchemyError as e:
+        log_message(f"💥 Erro ao buscar sprint {sprint_id}: {e}", "error")
+        return None
 
 
 def get_sprints(db: Session) -> List[SprintORM]:
     """Lista todas as sprints."""
-    return db.query(SprintORM).all()
+    try:
+        return (
+            db.query(SprintORM)
+            .order_by(SprintORM.created_at.desc() if hasattr(SprintORM, "created_at") else SprintORM.id.desc())
+            .all()
+        )
+    except SQLAlchemyError as e:
+        log_message(f"💥 Erro ao listar sprints: {e}", "error")
+        return []
 
 
 def get_sprints_by_project(db: Session, project_id: str) -> List[SprintORM]:
     """Lista todas as sprints de um projeto específico."""
-    return db.query(SprintORM).filter(SprintORM.project_id == project_id).all()
+    try:
+        return (
+            db.query(SprintORM)
+            .filter(SprintORM.project_id == project_id)
+            .order_by(
+                SprintORM.is_active.desc() if hasattr(SprintORM, "is_active") else SprintORM.id.desc(),
+                SprintORM.created_at.desc() if hasattr(SprintORM, "created_at") else SprintORM.id.desc(),
+            )
+            .all()
+        )
+    except SQLAlchemyError as e:
+        log_message(f"💥 Erro ao listar sprints do projeto {project_id}: {e}", "error")
+        return []
 
 
 def create_sprint(db: Session, project_id: str, sprint_data: SprintSchema) -> Optional[SprintORM]:
     """Cria uma nova sprint associada a um projeto."""
     try:
-        project = db.query(ProjectORM).filter(ProjectORM.id == project_id).first()
-        if not project:
+        # PERFORMANCE: exists() é bem mais barato do que carregar o Project inteiro
+        project_exists = db.query(
+            exists().where(ProjectORM.id == project_id)
+        ).scalar()
+
+        if not project_exists:
             log_message(f"❌ Projeto {project_id} não encontrado ao criar sprint", "warning")
             return None
 
@@ -66,12 +95,20 @@ def update_sprint(db: Session, sprint_id: str, sprint_data: SprintSchema) -> Opt
 
     try:
         data = sprint_data.model_dump(by_alias=False, exclude_unset=True)
-        for key, value in data.items():
-            setattr(sprint, key, value)
 
-        sprint.updated_at = datetime.utcnow() if hasattr(sprint, "updated_at") else None
-        db.commit()
-        db.refresh(sprint)
+        changed = False
+        for key, value in data.items():
+            if hasattr(sprint, key) and getattr(sprint, key) != value:
+                setattr(sprint, key, value)
+                changed = True
+
+        # só atualiza updated_at se mudou algo
+        if changed and hasattr(sprint, "updated_at"):
+            sprint.updated_at = datetime.now(timezone.utc)
+
+        if changed:
+            db.commit()
+            db.refresh(sprint)
 
         log_message(f"🔄 Sprint {sprint_id} atualizada com sucesso", "info")
         return sprint
@@ -94,19 +131,28 @@ def toggle_sprint_status(db: Session, sprint_id: str, activate: bool) -> Optiona
         return None
 
     try:
+        changed = False
+
         if activate:
-            # Desativa outras sprints do mesmo projeto
+            # Desativa outras sprints do mesmo projeto (bulk update mais rápido)
             db.query(SprintORM).filter(
                 SprintORM.project_id == sprint.project_id,
-                SprintORM.id != sprint.id
-            ).update({SprintORM.is_active: False})
+                SprintORM.id != sprint.id,
+                SprintORM.is_active.is_(True)
+            ).update({SprintORM.is_active: False}, synchronize_session=False)
 
-            sprint.is_active = True
+            if sprint.is_active is not True:
+                sprint.is_active = True
+                changed = True
         else:
-            sprint.is_active = False
+            if sprint.is_active is not False:
+                sprint.is_active = False
+                changed = True
 
-        sprint.updated_at = datetime.utcnow() if hasattr(sprint, "updated_at") else None
+        if hasattr(sprint, "updated_at") and (changed or activate):
+            sprint.updated_at = datetime.now(timezone.utc)
 
+        # Mesmo se "changed" for False, o update em batch pode ter acontecido quando activate=True.
         db.commit()
         db.refresh(sprint)
 
@@ -122,13 +168,18 @@ def toggle_sprint_status(db: Session, sprint_id: str, activate: bool) -> Optiona
 
 def delete_sprint(db: Session, sprint_id: str) -> bool:
     """Deleta uma sprint pelo ID."""
-    sprint = get_sprint(db, sprint_id)
-    if not sprint:
-        log_message(f"⚠️ Tentativa de deletar sprint inexistente: {sprint_id}", "warning")
-        return False
-
     try:
-        db.delete(sprint)
+        # PERFORMANCE: delete direto, sem carregar o objeto (mais rápido)
+        deleted = (
+            db.query(SprintORM)
+            .filter(SprintORM.id == sprint_id)
+            .delete(synchronize_session=False)
+        )
+
+        if not deleted:
+            log_message(f"⚠️ Tentativa de deletar sprint inexistente: {sprint_id}", "warning")
+            return False
+
         db.commit()
         log_message(f"🗑️ Sprint {sprint_id} deletada com sucesso", "info")
         return True

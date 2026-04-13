@@ -1,15 +1,30 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Protocol
 from sqlalchemy.orm import Session
-from app.schemas.query_delete_schema import DeleteRequest
-from app.ultils import QueryExecutionService
+from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.logger import log_message
+
+class DeleteRequest:
+    def __init__(self, table, conditions, parameter_values, dry_run, reason, user_id):
+        self.table = table
+        self.conditions = conditions
+        self.parameter_values = parameter_values
+        self.dry_run = dry_run
+        self.reason = reason
+        self.user_id = user_id
+
+    def __getattr__(self, name):
+        raise NotImplementedError
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
 
 class DeleteBatchService:
     """Serviço especializado para operações de DELETE em lote"""
     
     def __init__(self):
+        # Annotate query_service with a Protocol so static analyzers recognize `execute_delete` exists
         self.query_service = QueryExecutionService()
-    
     async def delete_batch_records(
         self,
         db: Session,

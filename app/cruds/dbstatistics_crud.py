@@ -1,8 +1,13 @@
-from typing import List, Optional, Tuple
-from sqlalchemy.orm import Session
+from typing import List, Optional, Tuple, Dict, Any
 from datetime import datetime, timedelta, timezone
+from contextlib import contextmanager
 
-from app.cruds.dbstructure_crud import get_db_structures
+from sqlalchemy import func, select
+from sqlalchemy.orm import load_only
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.database import SessionLocal
+from app.models.dbstructure_models import DBStructure
 from app.models.dbstatistics_models import DBStatistics, TableRowCountCache
 from app.schemas.dbstatistics_schema import (
     ConnectionStatisticsOverview,
@@ -12,169 +17,328 @@ from app.schemas.dbstatistics_schema import (
 from app.ultils.logger import log_message
 
 
-def get_statistics_by_connection(db: Session, connection_id: int) -> Optional[DBStatistics]:
-    """Retorna estatísticas de uma conexão específica."""
-    return db.query(DBStatistics).filter(DBStatistics.db_connection_id == connection_id).first()
+# ============================================================
+# 🔒 SESSION MANAGER (ANTI-LEAK)
+# ============================================================
+
+
+@contextmanager
+def get_db_session():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# ============================================================
+#  DBStatistics
+# ============================================================
+
+
+def get_statistics_by_connection(connection_id: int) -> Optional[DBStatistics]:
+    with get_db_session() as db:
+        try:
+            stmt = (
+                select(DBStatistics)
+                .options(
+                    load_only(
+                        DBStatistics.db_connection_id,
+                        DBStatistics.server_version,
+                        DBStatistics.tables_connected,
+                        DBStatistics.table_count,
+                        DBStatistics.view_count,
+                        DBStatistics.procedure_count,
+                        DBStatistics.function_count,
+                        DBStatistics.trigger_count,
+                        DBStatistics.index_count,
+                        DBStatistics.queries_today,
+                        DBStatistics.records_analyzed,
+                        DBStatistics.updated_at,
+                        DBStatistics.last_query_at,
+                    )
+                )
+                .where(DBStatistics.db_connection_id == connection_id)
+            )
+
+            return db.execute(stmt).scalar_one_or_none()
+
+        except SQLAlchemyError as e:
+            log_message(
+                f"❌ Erro ao buscar estatísticas {connection_id}: {str(e)}", "error"
+            )
+            return None
+
+
+from typing import Optional
+from sqlalchemy import select, func
+from sqlalchemy.exc import SQLAlchemyError
+
+# Importe as bibliotecas de log/modelos que você já usa no seu arquivo...
 
 
 def get_statistics_by_connection_geral(
-    db: Session, connection_id: int
+    connection_id: int,
 ) -> Optional[ConnectionStatisticsOverview]:
-    """
-    Retorna uma visão geral com as estatísticas e quantidade de tabelas registradas na estrutura.
-    """
-    db_stat = get_statistics_by_connection(db, connection_id)
-    if not db_stat:
-        log_message(f"⚠️ Nenhuma estatística encontrada para a conexão ID={connection_id}.", "warning")
-        return None
+    with get_db_session() as db:
+        try:
+            # 1. Debugando a primeira busca
+            # print(f"\n[DEBUG] Buscando estatísticas para o ID: {connection_id}")
+            db_stat = get_statistics_by_connection(connection_id)
 
-    estruturas = get_db_structures(db, connection_id=connection_id)
-    table_count = len(estruturas or [])
+            # Mostra o que exatamente a função retornou (dicionário, objeto SQLAlchemy, etc)
+            # print(f"[DEBUG] Resultado bruto de db_stat: {db_stat}")
 
-    return ConnectionStatisticsOverview(
-                statistics = DBStatisticsCreate.model_validate(db_stat, from_attributes=True),
-                total_structured_tables=table_count
+            if not db_stat:
+                log_message(
+                    f"⚠️ Nenhuma estatística para conexão {connection_id}", "warning"
+                )
+                return None
+
+            stmt_count = (
+                select(func.count(1))
+                .select_from(DBStructure)
+                .where(DBStructure.db_connection_id == connection_id)
             )
 
-def converter_stats(stats: ConnectionStatisticsOverview | None) -> dict | None:
-    """
-    Converte as estatísticas para o formato esperado pelo frontend.
-    """
+            # 2. Debugando a contagem de tabelas
+            table_count = db.execute(stmt_count).scalar() or 0
+            # print(
+            #     f"[DEBUG] Quantidade de tabelas encontradas na DBStructure: {table_count}"
+            # )
 
-    if not stats:
-        return None
-    if not stats.statistics:
+            # 3. Debugando a conversão do Pydantic
+            try:
+                validated_stats = DBStatisticsCreate.model_validate(
+                    db_stat, from_attributes=True
+                )
+                # print(
+                #     f"[DEBUG] Pydantic validou os dados com sucesso: {validated_stats.model_dump()}"
+                # )
+            except Exception as validation_error:
+                # print(
+                #     f"[DEBUG ERROR] Falha na validação do Pydantic: {validation_error}"
+                # )
+                raise validation_error
+
+            resultado_final = ConnectionStatisticsOverview(
+                statistics=validated_stats,
+                total_structured_tables=table_count,
+            )
+
+            # print(f"[DEBUG] Objeto final pronto para retorno: {resultado_final}")
+            return resultado_final
+
+        except SQLAlchemyError as e:
+            log_message(f"❌ Erro visão geral {connection_id}: {str(e)}", "error")
+            return None
+
+
+def converter_stats(
+    stats: ConnectionStatisticsOverview | None,
+) -> Optional[Dict[str, Any]]:
+    if not stats or not stats.statistics:
         log_message("⚠️ Estatísticas não disponíveis.", "warning")
         return None
-    return  {
-        "connection_id": stats.statistics.db_connection_id,
-        "tables_connected": stats.statistics.tables_connected,
-        "table_count": stats.statistics.table_count,
-        "view_count": stats.statistics.view_count,
-        "procedure_count": stats.statistics.procedure_count,
-        "function_count": stats.statistics.function_count,
-        "trigger_count": stats.statistics.trigger_count,
-        "index_count": stats.statistics.index_count,
-        "queries_today": stats.statistics.queries_today,
-        "records_analyzed": stats.statistics.records_analyzed,
-        "last_query_at": stats.statistics.last_query_at,
+
+    s = stats.statistics
+    return {
+        "connection_id": s.db_connection_id,
+        "tables_connected": s.tables_connected,
+        "table_count": s.table_count,
+        "view_count": s.view_count,
+        "procedure_count": s.procedure_count,
+        "function_count": s.function_count,
+        "trigger_count": s.trigger_count,
+        "index_count": s.index_count,
+        "queries_today": s.queries_today,
+        "records_analyzed": s.records_analyzed,
+        "last_query_at": s.last_query_at,
         "total_structured_tables": stats.total_structured_tables,
-        "server_version": str(stats.statistics.server_version) if stats.statistics.server_version else ""
+        "server_version": str(s.server_version) if s.server_version else "",
     }
- 
 
-def create_statistics(db: Session, stats: DBStatisticsCreate) -> DBStatistics:
-    """Cria uma nova entrada de estatísticas."""
-    db_stat = DBStatistics(
-        db_connection_id=stats.db_connection_id,
-        server_version=stats.server_version,
-        tables_connected=stats.tables_connected,
-        table_count=stats.table_count,
-        view_count=stats.view_count,
-        procedure_count=stats.procedure_count,
-        function_count=stats.function_count,
-        trigger_count=stats.trigger_count,
-        index_count=stats.index_count,
-        queries_today=stats.queries_today,
-        records_analyzed=stats.records_analyzed,
-        updated_at=datetime.now(timezone.utc),
-        last_query_at=stats.last_query_at or None,
-    )
 
-    db.add(db_stat)
-    db.commit()
-    db.refresh(db_stat)
+def create_statistics(stats: DBStatisticsCreate) -> Optional[DBStatistics]:
+    with get_db_session() as db:
+        try:
+            now = datetime.now(timezone.utc)
 
-    log_message(f"✅ Estatísticas criadas para conexão ID={stats.db_connection_id}", "success")
-    return db_stat
+            db_stat = DBStatistics(
+                db_connection_id=stats.db_connection_id,
+                server_version=stats.server_version,
+                tables_connected=stats.tables_connected,
+                table_count=stats.table_count,
+                view_count=stats.view_count,
+                procedure_count=stats.procedure_count,
+                function_count=stats.function_count,
+                trigger_count=stats.trigger_count,
+                index_count=stats.index_count,
+                queries_today=stats.queries_today,
+                records_analyzed=stats.records_analyzed,
+                updated_at=now,
+                last_query_at=stats.last_query_at,
+            )
+
+            db.add(db_stat)
+            db.commit()
+            db.refresh(db_stat)
+
+            return db_stat
+
+        except SQLAlchemyError as e:
+            db.rollback()
+            log_message(f"❌ Erro ao criar stats: {str(e)}", "error")
+            return None
 
 
 def update_statistics(
-    db: Session, connection_id: int, updates: DBStatisticsUpdate
+    connection_id: int, updates: DBStatisticsUpdate
 ) -> Optional[DBStatistics]:
-    """Atualiza as estatísticas de uma conexão existente."""
-    db_stat = get_statistics_by_connection(db, connection_id)
-    if not db_stat:
-        log_message(f"⚠️ Estatísticas não encontradas para conexão ID={connection_id}", "warning")
-        return None
+    with get_db_session() as db:
+        try:
+            stmt = select(DBStatistics).where(
+                DBStatistics.db_connection_id == connection_id
+            )
+            db_stat = db.execute(stmt).scalar_one_or_none()
 
-    update_data = updates.model_dump(exclude_unset=True)
+            if not db_stat:
+                return None
 
-    # Atualiza campos dinamicamente
-    for key, value in update_data.items():
-        setattr(db_stat, key, value)
+            update_data = updates.model_dump(exclude_unset=True)
 
-    # Sempre atualiza a data
-    db_stat.updated_at = datetime.now(timezone.utc)
-    if "queries_today" in update_data:
-        db_stat.last_query_at = update_data.get("last_query_at", datetime.now(timezone.utc))
+            if not update_data:
+                return db_stat
 
-    db.commit()
-    db.refresh(db_stat)
+            changed = False
 
-    log_message(f"ℹ️ Estatísticas atualizadas para conexão ID={connection_id}", "info")
-    return db_stat
+            for key, value in update_data.items():
+                if hasattr(db_stat, key) and getattr(db_stat, key) != value:
+                    setattr(db_stat, key, value)
+                    changed = True
 
-# cruds/table_row_count_cache.py
+            if changed:
+                now = datetime.now(timezone.utc)
+                db_stat.updated_at = now
 
-def get_cached_row_count_all(
-    db: Session, connection_id: int
-) -> List[TableRowCountCache]:
-    """
-    Retorna todos os registros de cache para uma conexão específica.
-    """
-    return db.query(TableRowCountCache).filter_by(
-        connection_id=connection_id
-    ).all()
-    
-    
-def get_cached_row_count_all_tupla(db: Session, connection_id: int) -> List[Tuple[str, int]]:
-    return (
-        db.query(TableRowCountCache.table_name, TableRowCountCache.row_count)
-        .filter(TableRowCountCache.connection_id == connection_id)
-        .all()
-    )
+                if "queries_today" in update_data:
+                    db_stat.last_query_at = update_data.get("last_query_at", now)
+
+                db.commit()
+                db.refresh(db_stat)
+
+            return db_stat
+
+        except SQLAlchemyError as e:
+            db.rollback()
+            log_message(
+                f"❌ Erro ao atualizar stats {connection_id}: {str(e)}", "error"
+            )
+            return None
+
+
+# ============================================================
+#  TableRowCountCache
+# ============================================================
+
+
+def get_cached_row_count_all(connection_id: int) -> List[TableRowCountCache]:
+    with get_db_session() as db:
+        try:
+            stmt = (
+                select(TableRowCountCache)
+                .options(
+                    load_only(
+                        TableRowCountCache.connection_id,
+                        TableRowCountCache.table_name,
+                        TableRowCountCache.row_count,
+                        TableRowCountCache.last_updated,
+                    )
+                )
+                .where(TableRowCountCache.connection_id == connection_id)
+            )
+
+            return list(db.execute(stmt).scalars().all())
+
+        except SQLAlchemyError as e:
+            log_message(f"❌ Erro cache all {connection_id}: {str(e)}", "error")
+            return []
+
+
+def get_cached_row_count_all_tupla(connection_id: int) -> List[Tuple[str, int]]:
+    with get_db_session() as db:
+        try:
+            stmt = select(
+                TableRowCountCache.table_name, TableRowCountCache.row_count
+            ).where(TableRowCountCache.connection_id == connection_id)
+
+            return list(db.execute(stmt).all())
+
+        except SQLAlchemyError as e:
+            log_message(f"❌ Erro cache tupla {connection_id}: {str(e)}", "error")
+            return []
 
 
 def get_cached_row_count(
-    db: Session, connection_id: int, table_name: str, max_age_minutes: int = 60
-) -> int | None:
-    """
-    Retorna o valor do cache se ainda estiver dentro do tempo válido.
-    Caso contrário, retorna None.
-    """
-    cache = db.query(TableRowCountCache).filter_by(
-        connection_id=connection_id,
-        table_name=table_name
-    ).first()
+    connection_id: int, table_name: str, max_age_minutes: int = 60
+) -> Optional[int]:
+    if not table_name:
+        return None
 
-    if cache and cache.last_updated:
-        limite = datetime.utcnow() - timedelta(minutes=max_age_minutes)
-        if cache.last_updated > limite:
-            return cache.row_count
+    with get_db_session() as db:
+        try:
+            limite = datetime.now(timezone.utc) - timedelta(minutes=max_age_minutes)
 
-    return None
+            stmt = select(TableRowCountCache.row_count).where(
+                TableRowCountCache.connection_id == connection_id,
+                TableRowCountCache.table_name == table_name,
+                TableRowCountCache.last_updated > limite,
+            )
 
-def update_or_create_cache(db: Session, connection_id: int, table_name: str, count: int):
-    """
-    Atualiza ou cria um novo cache com a contagem de registros.
-    """
-    cache = db.query(TableRowCountCache).filter_by(
-        connection_id=connection_id,
-        table_name=table_name
-    ).first()
+            row_count = db.execute(stmt).scalar()
+            return int(row_count) if row_count is not None else None
 
-    if cache:
-        cache.row_count = count
-        cache.last_updated = datetime.utcnow()
-    else:
-        cache = TableRowCountCache(
-            connection_id=connection_id,
-            table_name=table_name,
-            row_count=count,
-            last_updated=datetime.utcnow()
-        )
-        db.add(cache)
+        except SQLAlchemyError as e:
+            log_message(f"❌ Erro cache {table_name}: {str(e)}", "error")
+            return None
 
-    db.commit()
-    return cache
+
+def update_or_create_cache(
+    connection_id: int, table_name: str, count: int
+) -> Optional[TableRowCountCache]:
+    if not table_name:
+        return None
+
+    with get_db_session() as db:
+        try:
+            now = datetime.now(timezone.utc)
+
+            stmt = select(TableRowCountCache).where(
+                TableRowCountCache.connection_id == connection_id,
+                TableRowCountCache.table_name == table_name,
+            )
+
+            cache = db.execute(stmt).scalar_one_or_none()
+
+            if cache:
+                if cache.row_count != count:
+                    cache.row_count = count
+                cache.last_updated = now
+            else:
+                cache = TableRowCountCache(
+                    connection_id=connection_id,
+                    table_name=table_name,
+                    row_count=count,
+                    last_updated=now,
+                )
+                db.add(cache)
+
+            db.commit()
+            db.refresh(cache)
+
+            return cache
+
+        except SQLAlchemyError as e:
+            db.rollback()
+            log_message(f"❌ Erro upsert cache {table_name}: {str(e)}", "error")
+            return None

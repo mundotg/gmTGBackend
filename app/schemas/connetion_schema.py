@@ -139,3 +139,15 @@ class ConnectionLogPaginationOutput(BaseModel):
     limit: int
     total: int
     results: List[ConnectionLogOut]
+    
+class DatasetOpenResponse(BaseModel):
+    success: bool
+    source: str
+    filename: str
+    connection_id: int
+    table_name: str
+    total_rows: int
+    total_columns: int
+    columns: list[str]
+    preview: list[dict]
+    message: str

@@ -16,12 +16,19 @@ from sqlalchemy import Result, text
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.cruds.queryhistory_crud import create_query_history_async, get_query_history_by_user_and_query_async
+from app.cruds.queryhistory_crud import (
+    create_query_history_async,
+    get_query_history_by_user_and_query_async,
+)
 from app.models.connection_models import DBConnection
 from app.schemas.query_select_upAndInsert_schema import CondicaoFiltro, QueryPayload
-from app.schemas.queryhistory_schemas import QueryHistoryCreateAsync,  QueryType
+from app.schemas.queryhistory_schemas import QueryHistoryCreateAsync, QueryType
 from app.ultils.ativar_engine import ConnectionManager
-from app.ultils.build_query import get_count_query, get_filter_condition_with_operation, get_query_string_advance
+from app.ultils.build_query import (
+    get_count_query,
+    get_filter_condition_with_operation,
+    get_query_string_advance,
+)
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
@@ -29,6 +36,7 @@ from app.ultils.logger import log_message
 @dataclass
 class QueryExecutionResult:
     """Resultado da execução de uma query."""
+
     success: bool
     query: str
     duration_ms: int
@@ -43,13 +51,23 @@ class QueryExecutionResult:
 
 class QuerySecurityValidator:
     """Validador de segurança para queries SQL."""
-    
+
     # Palavras reservadas perigosas
     FORBIDDEN_KEYWORDS = {
-        "drop", "delete", "update", "insert", "alter", "truncate", 
-        "create", "grant", "revoke", "execute", "exec", "xp_"
+        "drop",
+        "delete",
+        "update",
+        "insert",
+        "alter",
+        "truncate",
+        "create",
+        "grant",
+        "revoke",
+        "execute",
+        "exec",
+        "xp_",
     }
-    
+
     # Padrão para identificadores válidos
     IDENTIFIER_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
@@ -67,7 +85,9 @@ class QuerySecurityValidator:
             # Suporta listas de inteiros em string separada por vírgula
             if isinstance(value, str) and "," in value:
                 try:
-                    return all(int(v.strip()) or v.strip() == "0" for v in value.split(","))
+                    return all(
+                        int(v.strip()) or v.strip() == "0" for v in value.split(",")
+                    )
                 except Exception:
                     return False
             try:
@@ -88,7 +108,16 @@ class QuerySecurityValidator:
             except Exception:
                 return False
         if column_type in ("bool", "boolean"):
-            return isinstance(value, bool) or value in (0, 1, "0", "1", "true", "false", "True", "False")
+            return isinstance(value, bool) or value in (
+                0,
+                1,
+                "0",
+                "1",
+                "true",
+                "false",
+                "True",
+                "False",
+            )
         # Para strings, limita tamanho e caracteres perigosos
         if column_type in ("str", "string", "varchar", "text", "char"):
             if not isinstance(value, str):
@@ -109,74 +138,23 @@ class QuerySecurityValidator:
         """Valida se um identificador SQL é seguro."""
         if not identifier or not isinstance(identifier, str):
             return False
-            
+
         # Verifica padrão de identificador válido
         if not cls.IDENTIFIER_PATTERN.match(identifier):
             return False
-            
+
         # Verifica palavras reservadas perigosas
         return identifier.lower() not in cls.FORBIDDEN_KEYWORDS
-    
+
     @classmethod
     def ensure_base_table_in_query(cls, payload: QueryPayload) -> QueryPayload:
         """Verifica se a tabela base está no SELECT ou WHERE, caso não esteja, substitui pela primeira tabela disponível."""
-        
-        # Verifica se a tabela base está presente no SELECT
-        base_table_in_select = False
-        if payload.aliaisTables:
-            for alias in payload.aliaisTables.keys():
-                if payload.baseTable in alias:
-                    base_table_in_select = True
-                    break
-        
-        # Verifica se a tabela base está presente no WHERE
-        base_table_in_where = False
-        if payload.where:
-            for condition in payload.where:
-                if condition.table_name_fil == payload.baseTable:
-                    base_table_in_where = True
-                    break
-        
-        # Se a tabela base não está em nenhum lugar, faz a substituição
-        if not base_table_in_select and not base_table_in_where:
-            # Encontra a primeira tabela disponível (excluindo a base)
-            available_tables = []
-            
-            # Procura tabelas no SELECT (aliaisTables)
-            if payload.aliaisTables:
-                for alias in payload.aliaisTables.keys():
-                    if '.' in alias:
-                        table_name = alias.split('.')[0]
-                        if table_name != payload.baseTable and table_name not in available_tables:
-                            available_tables.append(table_name)
-            
-            # Procura tabelas no WHERE
-            if payload.where:
-                for condition in payload.where:
-                    if (condition.table_name_fil != payload.baseTable and 
-                        condition.table_name_fil not in available_tables):
-                        available_tables.append(condition.table_name_fil)
-            
-            # Procura tabelas nos joins
-            if payload.joins:
-                for join_table in payload.joins.keys():
-                    if join_table != payload.baseTable and join_table not in available_tables:
-                        available_tables.append(join_table)
-            
-            # Procura na table_list
-            if payload.table_list:
-                for table in payload.table_list:
-                    if table != payload.baseTable and table not in available_tables:
-                        available_tables.append(table)
-            
-            # Substitui pela primeira tabela disponível
-            if available_tables:
-                new_base_table = available_tables[0]
-                # print(f"⚠️  Tabela base '{payload.baseTable}' não encontrada no SELECT ou WHERE. Substituindo por '{new_base_table}'")
-                payload.baseTable = new_base_table
-        
-        return payload
-    
+        from app.services.query_security_validator import QuerySecurityValidator as sv
+
+        security_validator = sv()
+        security_validator.validate_query_payload(payload)
+        return security_validator.ensure_base_table_in_query(payload)
+
     @classmethod
     def validate_query_payload(cls, payload: QueryPayload) -> None:
         """Valida apenas os campos críticos do payload para segurança."""
@@ -184,62 +162,82 @@ class QuerySecurityValidator:
             # 1. Validação ESSENCIAL: Tabelas
             if not cls.is_safe_identifier(payload.baseTable):
                 raise ValueError(f"Nome da tabela base inválido: {payload.baseTable}")
-            
+
             if payload.table_list:
                 for table in payload.table_list:
                     if not cls.is_safe_identifier(table):
                         raise ValueError(f"Nome da tabela na lista inválido: {table}")
-            
+
             # 2. Validação CRÍTICA: Joins (apenas estrutura básica)
             if payload.joins:
                 for table_name, join_option in payload.joins.items():
                     if not cls.is_safe_identifier(table_name):
-                        raise ValueError(f"Nome da tabela de join inválido: {table_name}")
-                    
+                        raise ValueError(
+                            f"Nome da tabela de join inválido: {table_name}"
+                        )
+
                     # Valida apenas condições principais dos joins
                     for condition in join_option.conditions:
                         # Valida apenas leftColumn (crítico para SQL injection)
                         if condition.leftColumn:
-                            parts = condition.leftColumn.split('.')
+                            parts = condition.leftColumn.split(".")
                             if len(parts) == 2:
-                                if not cls.is_safe_identifier(parts[0]) or not cls.is_safe_identifier(parts[1]):
-                                    raise ValueError(f"Coluna inválida em leftColumn: {condition.leftColumn}")
-                        
+                                if not cls.is_safe_identifier(
+                                    parts[0]
+                                ) or not cls.is_safe_identifier(parts[1]):
+                                    raise ValueError(
+                                        f"Coluna inválida em leftColumn: {condition.leftColumn}"
+                                    )
+
                         # Valida apenas rightColumn quando não usa value
                         if not condition.useValue and condition.rightColumn:
-                            parts = condition.rightColumn.split('.')
+                            parts = condition.rightColumn.split(".")
                             if len(parts) == 2:
-                                if not cls.is_safe_identifier(parts[0]) or not cls.is_safe_identifier(parts[1]):
-                                    raise ValueError(f"Coluna inválida em rightColumn: {condition.rightColumn}")
-            
+                                if not cls.is_safe_identifier(
+                                    parts[0]
+                                ) or not cls.is_safe_identifier(parts[1]):
+                                    raise ValueError(
+                                        f"Coluna inválida em rightColumn: {condition.rightColumn}"
+                                    )
+
             # 3. Validação ESSENCIAL: Condições WHERE
             if payload.where:
                 for condition in payload.where:
                     if not cls.is_safe_identifier(condition.table_name_fil):
-                        raise ValueError(f"Nome da tabela no filtro inválido: {condition.table_name_fil}")
+                        raise ValueError(
+                            f"Nome da tabela no filtro inválido: {condition.table_name_fil}"
+                        )
                     if not cls.is_safe_identifier(condition.column):
-                        raise ValueError(f"Nome da coluna no filtro inválido: {condition.column}")
-                    
+                        raise ValueError(
+                            f"Nome da coluna no filtro inválido: {condition.column}"
+                        )
+
                     # Valida apenas valores em operadores de risco
-                    if condition.operator in ['IN', 'NOT IN'] and condition.value:
+                    if condition.operator in ["IN", "NOT IN"] and condition.value:
                         if isinstance(condition.value, list):
                             for val in condition.value:
-                                if not cls.is_safe_value(val,condition.column_type):
-                                    raise ValueError(f"Valor inválido na condição IN: {val}")
-                        elif not cls.is_safe_value(condition.value,condition.column_type):
+                                if not cls.is_safe_value(val, condition.column_type):
+                                    raise ValueError(
+                                        f"Valor inválido na condição IN: {val}"
+                                    )
+                        elif not cls.is_safe_value(
+                            condition.value, condition.column_type
+                        ):
                             raise ValueError(f"Valor inválido: {condition.value}")
-            
+
             # 4. Validação RÁPIDA: Aliases (apenas formato básico)
             if payload.aliaisTables:
                 for alias, original in payload.aliaisTables.items():
-                    if '.' in alias:
-                        parts = alias.split('.')
+                    if "." in alias:
+                        parts = alias.split(".")
                         if len(parts) == 2:
-                            if not cls.is_safe_identifier(parts[0]) or not cls.is_safe_identifier(parts[1]):
+                            if not cls.is_safe_identifier(
+                                parts[0]
+                            ) or not cls.is_safe_identifier(parts[1]):
                                 raise ValueError(f"Alias inválido: {alias}")
                     elif not cls.is_safe_identifier(alias):
                         raise ValueError(f"Alias inválido: {alias}")
-                    
+
         except ValueError as e:
             raise
         except Exception as e:
@@ -248,11 +246,10 @@ class QuerySecurityValidator:
 
 class QueryFilterBuilder:
     """Construtor de filtros SQL com parâmetros seguros."""
-    
+
     @staticmethod
     async def build_where_clause(
-        conditions: List[CondicaoFiltro],
-        db_type: str = "postgres"
+        conditions: List[CondicaoFiltro], db_type: str = "postgres"
     ) -> Tuple[str, Dict[str, Any]]:
         """Constrói cláusula WHERE com parâmetros seguros."""
         if not conditions:
@@ -264,10 +261,10 @@ class QueryFilterBuilder:
         for i, condition in enumerate(conditions):
             # Validação de segurança já feita pelo SecurityValidator
             field = f"{condition.table_name_fil}.{condition.column}"
-            # print(f"🔍 DEBUG: Processando condição {condition}")
+            # print(f" DEBUG: Processando condição {condition}")
             # Gera nome único do parâmetro
             param_prefix = f"param_{i}"
-            
+
             sql_part = get_filter_condition_with_operation(
                 col_name=field,
                 col_type=condition.column_type,
@@ -276,8 +273,9 @@ class QueryFilterBuilder:
                 db_type=db_type,
                 operation=condition.operator,
                 param_name=param_prefix,
-                enum_values="",
-                value_otheir_between=condition.value2,
+                enum_values={},
+                value_otheir_between=str(condition.value2),
+                pattern=condition.pattern,
             )
 
             logic = condition.logicalOperator or "AND"
@@ -286,7 +284,7 @@ class QueryFilterBuilder:
         # Monta WHERE final
         if not where_clauses:
             return "", {}
-            
+
         where_sql = where_clauses[0][1]
         for logic, clause in where_clauses[1:]:
             where_sql += f" {logic} {clause}"
@@ -296,36 +294,36 @@ class QueryFilterBuilder:
 
 class QueryCacheManager:
     """Gerenciador de cache de queries."""
-    
+
     @staticmethod
     async def get_cached_result(
-        db: AsyncSession, 
-        user_id: int, 
-        connection_id: int, 
+        db: AsyncSession,
+        user_id: int,
+        connection_id: int,
         query_string: str,
-        is_count_query: bool
+        is_count_query: bool,
     ) -> Optional[QueryExecutionResult]:
         """Tenta recuperar resultado do cache."""
         try:
             cached = await get_query_history_by_user_and_query_async(
                 db, user_id, connection_id, query_string
             )
-            
+
             if not cached:
                 return None
-                
+
             # log_message("📋 Resultado recuperado do cache", "info")
-            
+
             # Se houve erro no cache, propaga o erro
-            if cached.error_message:
+            if cached.error_message:  # type: ignore
                 return QueryExecutionResult(
                     success=False,
-                    query=cached.query,
-                    duration_ms=cached.duration_ms,
+                    query=str(cached.query),
+                    duration_ms=cached.duration_ms,  # type: ignore
                     cached=True,
-                    error_message=cached.error_message
+                    error_message=cached.error_message,  # type: ignore
                 )
-            
+
             # Resultado de COUNT
             if is_count_query:
                 return QueryExecutionResult(
@@ -333,30 +331,32 @@ class QueryCacheManager:
                     query=cached.query,
                     duration_ms=cached.duration_ms,
                     cached=True,
-                    count=int(cached.result_preview) if cached.result_preview else 0
+                    count=int(cached.result_preview) if cached.result_preview else 0,
                 )
-            
+
             # Resultado de SELECT
-            preview_data = json.loads(cached.result_preview) if cached.result_preview else []
-            
+            preview_data = (
+                json.loads(cached.result_preview) if cached.result_preview else []
+            )
+
             columns = list(preview_data[0].keys()) if preview_data else []
-            
+
             return QueryExecutionResult(
                 success=True,
                 query=cached.query,
                 duration_ms=cached.duration_ms,
                 cached=True,
                 columns=columns,
-                preview=preview_data
+                preview=preview_data,
             )
-            
+
         except Exception as e:
             raise Exception(f"Erro ao acessar cache: {str(e)}{traceback.format_exc()}")
 
 
 class QueryExecutor:
     """Executor de queries SQL."""
-    
+
     def __init__(self, engine: AsyncEngine, db_type: str):
         self.engine = engine
         self.db_type = db_type
@@ -364,62 +364,62 @@ class QueryExecutor:
         self.MAX_PREVIEW_ROWS = 500
         # Tamanho do lote para fetchmany
         self.FETCH_BATCH_SIZE = 100
-    
+
     async def execute_query(
-            self,
-            query_string: str,
-            params: Optional[Dict[str, Any]] = None,
-            is_count_query: bool = False,
-            select_tables: List[str] = []
-        ):
-            """Executa a query SQL e retorna resultado e colunas."""
-            colunas: List[str] = []
-            try:
-                async with self.engine.connect() as conn:
-                    result: Result = await conn.execute(text(query_string), params or {})
+        self,
+        query_string: str,
+        params: Optional[Dict[str, Any]] = None,
+        is_count_query: bool = False,
+        select_tables: List[str] = [],
+    ):
+        """Executa a query SQL e retorna resultado e colunas."""
+        colunas: List[str] = []
+        try:
+            async with self.engine.connect() as conn:
+                result: Result = await conn.execute(text(query_string), params or {})
 
-                    if is_count_query:
-                        count_result = result.scalar_one_or_none()
-                        return count_result or 0, ["count"]
+                if is_count_query:
+                    count_result = result.scalar_one_or_none()
+                    return count_result or 0, ["count"]
 
-                    else:
-                        preview_rows: List[Dict[str, Any]] = []
-                        keys = list(result.keys())
-                        colunas = keys
+                else:
+                    preview_rows: List[Dict[str, Any]] = []
+                    keys = list(result.keys())
+                    colunas = keys
 
-                        fetched = 0
-                        while True:
-                            batch = result.fetchmany(self.FETCH_BATCH_SIZE)
-                            if not batch:
-                                break
+                    fetched = 0
+                    while True:
+                        batch = result.fetchmany(self.FETCH_BATCH_SIZE)
+                        if not batch:
+                            break
 
-                            for row in batch:
-                                if select_tables:
-                                    # se select informado, usa ordem do select
-                                    preview_rows.append(dict(zip(select_tables, row)))
-                                else:
-                                    preview_rows.append(dict(zip(keys, row)))
+                        for row in batch:
+                            if select_tables:
+                                # se select informado, usa ordem do select
+                                preview_rows.append(dict(zip(select_tables, row)))
+                            else:
+                                preview_rows.append(dict(zip(keys, row)))
 
-                                fetched += 1
-                                if fetched >= self.MAX_PREVIEW_ROWS:
-                                    break
-
+                            fetched += 1
                             if fetched >= self.MAX_PREVIEW_ROWS:
                                 break
 
-                        return preview_rows, colunas
-            except Exception as e:
-                raise Exception(f"Erro ao executar query: {e}{traceback.format_exc()}")
+                        if fetched >= self.MAX_PREVIEW_ROWS:
+                            break
+
+                    return preview_rows, colunas
+        except Exception as e:
+            raise Exception(f"Erro ao executar query: {e}{traceback.format_exc()}")
 
 
 class QueryService:
     """Serviço principal para execução de queries."""
-    
+
     def __init__(self):
         self.security_validator = QuerySecurityValidator()
         self.filter_builder = QueryFilterBuilder()
         self.cache_manager = QueryCacheManager()
-    
+
     async def execute_query_with_cache(
         self,
         db: AsyncSession,
@@ -427,41 +427,46 @@ class QueryService:
         connection: DBConnection,
         engine: AsyncEngine,
         query_payload: QueryPayload,
-        use_cache: bool = True
+        use_cache: bool = True,
     ) -> QueryExecutionResult:
         """Executa query com suporte a cache."""
         start_time = time()
-        
+
         try:
             # 1. Validação de segurança
             self.security_validator.validate_query_payload(query_payload)
-            query_payload = self.security_validator.ensure_base_table_in_query(query_payload)
-         
+            query_payload = self.security_validator.ensure_base_table_in_query(
+                query_payload
+            )
+
             # 2. Construção dos filtros
             filters, params = await self.filter_builder.build_where_clause(
                 query_payload.where or [], connection.type
             )
-            
+
             # 3. Construção da query
             query_string = await self._build_query_string(
                 query_payload, filters, connection.type
             )
-            
+
             if use_cache:
                 cached_result = await self.cache_manager.get_cached_result(
                     db, user_id, connection.id, query_string, query_payload.isCountQuery
                 )
                 if cached_result:
-                    return cached_result  
-            
+                    return cached_result
+
             # 5. Execução da query
             executor = QueryExecutor(engine, connection.type)
             result_data, columns = await executor.execute_query(
-                query_string, params, query_payload.isCountQuery, list(query_payload.aliaisTables.values())
+                query_string,
+                params,
+                query_payload.isCountQuery,
+                list(query_payload.aliaisTables.values()),
             )
-            
+
             duration_ms = int((time() - start_time) * 1000)
-            
+
             # CORREÇÃO: Para COUNT, usar count em vez de preview
             if query_payload.isCountQuery:
                 execution_result = QueryExecutionResult(
@@ -469,7 +474,7 @@ class QueryService:
                     query=query_string,
                     duration_ms=duration_ms,
                     count=result_data,  # ✅ Agora usa count
-                    params=params
+                    params=params,
                 )
             else:
                 # print(list(query_payload.aliaisTables.keys()) if query_payload.aliaisTables else columns)
@@ -477,18 +482,26 @@ class QueryService:
                     success=True,
                     query=query_string,
                     duration_ms=duration_ms,
-                    columns=list(query_payload.aliaisTables.keys()) if query_payload.aliaisTables else columns,
-                    preview=result_data, 
-                    params=params
+                    columns=(
+                        list(query_payload.aliaisTables.keys())
+                        if query_payload.aliaisTables
+                        else columns
+                    ),
+                    preview=result_data,
+                    params=params,
                 )
-            
+
             result_preview = None
             if not query_payload.isCountQuery and result_data:
-                result_preview = json.dumps(result_data[:10], default=str)  # salva apenas 10 linhas
+                result_preview = json.dumps(
+                    result_data[:10], default=str
+                )  # salva apenas 10 linhas
 
             # 7. Salvar no histórico
             await self._save_query_history(
-                db=db, user_id=user_id, connection_id=connection.id,
+                db=db,
+                user_id=user_id,
+                connection_id=connection.id,
                 query=query_string,
                 duration_ms=duration_ms,
                 result_preview=result_preview,
@@ -499,35 +512,44 @@ class QueryService:
                 meta_info={},
                 modified_by=None,
                 query_payload=query_payload,
-                row_count=len(result_data) if isinstance(result_data, list) else result_data
+                row_count=(
+                    len(result_data) if isinstance(result_data, list) else result_data
+                ),
             )
 
-            
             return execution_result
-            
+
         except Exception as e:
             duration_ms = int((time() - start_time) * 1000)
             error_message = _lidar_com_erro_sql(e)
-            
+
             # Salvar erro no histórico
             await self._save_query_history(
-                db=db, user_id=user_id, connection_id=connection.id, query=query_string if 'query_string' in locals() else "",
-                duration_ms=duration_ms, result_preview=None, is_count_query=query_payload.isCountQuery, error_message=error_message,
-                app_source="API", executed_by="system", meta_info={"error": error_message}, modified_by=None, query_payload=query_payload, row_count=None
+                db=db,
+                user_id=user_id,
+                connection_id=connection.id,
+                query=query_string if "query_string" in locals() else "",
+                duration_ms=duration_ms,
+                result_preview=None,
+                is_count_query=query_payload.isCountQuery,
+                error_message=error_message,
+                app_source="API",
+                executed_by="system",
+                meta_info={"error": error_message},
+                modified_by=None,
+                query_payload=query_payload,
+                row_count=None,
             )
-            
+
             return QueryExecutionResult(
                 success=False,
-                query=query_string if 'query_string' in locals() else "",
+                query=query_string if "query_string" in locals() else "",
                 duration_ms=duration_ms,
-                error_message=error_message
+                error_message=error_message,
             )
-    
+
     async def _build_query_string(
-        self, 
-        payload: QueryPayload, 
-        filters: str, 
-        db_type: str
+        self, payload: QueryPayload, filters: str, db_type: str
     ) -> str:
         """Constrói a string SQL da query."""
         if payload.isCountQuery:
@@ -591,8 +613,19 @@ class QueryService:
                 "row_count": row_count,
                 "base_table": getattr(query_payload, "baseTable", None),
                 "tables_involved": getattr(query_payload, "table_list", None),
-                "joins": list(getattr(query_payload, "joins", {}).keys()) if getattr(query_payload, "joins", None) else [],
-                "filters": [f"{w.table_name_fil}.{w.column} {w.operator} {w.value}" for w in getattr(query_payload, "where", [])] if getattr(query_payload, "where", None) else [],
+                "joins": (
+                    list(getattr(query_payload, "joins", {}).keys())
+                    if getattr(query_payload, "joins", None)
+                    else []
+                ),
+                "filters": (
+                    [
+                        f"{w.table_name_fil}.{w.column} {w.operator} {w.value}"
+                        for w in getattr(query_payload, "where", [])
+                    ]
+                    if getattr(query_payload, "where", None)
+                    else []
+                ),
                 "order_by": getattr(query_payload, "orderBy", None),
                 "limit": getattr(query_payload, "limit", None),
                 "offset": getattr(query_payload, "offset", None),
@@ -611,7 +644,11 @@ class QueryService:
                 query=query.strip(),
                 query_type=QueryType.COUNT if is_count_query else QueryType.SELECT,
                 duration_ms=duration_ms,
-                result_preview=result_preview if result_preview and len(result_preview) < 15000 else None,  # evita salvar preview muito grande
+                result_preview=(
+                    result_preview
+                    if result_preview and len(result_preview) < 15000
+                    else None
+                ),  # evita salvar preview muito grande
                 error_message=error_message,
                 is_favorite=False,
                 tags="count" if is_count_query else "select_preview",
@@ -633,15 +670,21 @@ class QueryService:
 
         except SQLAlchemyError as e:
             await db.rollback()
-            log_message(f"💥 Erro SQLAlchemy ao salvar histórico: {e}\n{traceback.format_exc()}", "error")
+            log_message(
+                f"💥 Erro SQLAlchemy ao salvar histórico: {e}\n{traceback.format_exc()}",
+                "error",
+            )
         except Exception as e:
             await db.rollback()
-            log_message(f"❌ Erro inesperado ao salvar histórico detalhado: {e}\n{traceback.format_exc()}", "error")
-
+            log_message(
+                f"❌ Erro inesperado ao salvar histórico detalhado: {e}\n{traceback.format_exc()}",
+                "error",
+            )
 
 
 # Instância global do serviço
 query_service = QueryService()
+
 
 async def executar_query_e_salvar_stream(
     db: AsyncSession,
@@ -725,7 +768,7 @@ async def executar_query_e_salvar_stream(
                     current_limit = min(chunk_size, total_limit - current_offset)
                     select_body.offset = current_offset
                     select_body.limit = current_limit
-                    
+
                     # print(f"🔍 DEBUG: Chunk {chunk_index + 1}/{total_chunks} - offset: {current_offset}, limit: {current_limit}")
 
                     yield f"event: info\ndata: {json.dumps({'info': f'Executando chunk {chunk_index + 1}/{total_chunks}'})}\n\n"
@@ -839,7 +882,9 @@ async def executar_query_e_salvar_stream(
             error_msg = str(e)
             # print(f"🔍 DEBUG: ERRO CAPTURADO: {error_msg}")
             # print(f"🔍 DEBUG: TRACEBACK: {traceback.format_exc()}")
-            log_message(f"❌ Erro no stream SSE: {error_msg}\n{traceback.format_exc()}", "error")
+            log_message(
+                f"❌ Erro no stream SSE: {error_msg}\n{traceback.format_exc()}", "error"
+            )
             yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
 
         finally:
@@ -847,7 +892,10 @@ async def executar_query_e_salvar_stream(
                 try:
                     await db.close()
                 except Exception as e:
-                    log_message(f"Erro ao fechar connection: {e}\n{traceback.format_exc()}", "warning")
+                    log_message(
+                        f"Erro ao fechar connection: {e}\n{traceback.format_exc()}",
+                        "warning",
+                    )
 
             # print("🔍 DEBUG: Entrando no finally")
             if engine:
@@ -857,16 +905,18 @@ async def executar_query_e_salvar_stream(
                     # print("🔍 DEBUG: Engine fechado")
                 except Exception as e:
                     # print(f"🔍 DEBUG: Erro ao fechar engine: {e}")
-                    log_message(f"Erro ao fechar engine: {e}{traceback.format_exc()}", "warning")
+                    log_message(
+                        f"Erro ao fechar engine: {e}{traceback.format_exc()}", "warning"
+                    )
 
     # ✅ CORREÇÃO: Retornar o StreamingResponse diretamente
     # print("🔍 DEBUG: Criando StreamingResponse")
     return StreamingResponse(
-        event_stream(), 
+        event_stream(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
-        }
+        },
     )

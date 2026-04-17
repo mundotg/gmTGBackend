@@ -26,6 +26,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+# -------- Microsoft SQL (FIX moderno) --------
+RUN curl https://packages.microsoft.com/keys/microsoft.asc \
+    | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/11/prod bullseye main" \
+    > /etc/apt/sources.list.d/mssql-release.list
+
+# (se precisares do driver)
+# RUN apt-get update && ACCEPT_EULA=Y apt-get install -y msodbcsql18
+
 # -------- Dependências Python --------
 COPY requirements.txt .
 
@@ -35,7 +44,7 @@ RUN pip install --upgrade pip setuptools wheel \
 # -------- Código --------
 COPY . .
 
-# -------- Segurança --------
+# -------- Segurança (APENAS NO FINAL) --------
 RUN useradd -m appuser && chown -R appuser /app
 USER appuser
 

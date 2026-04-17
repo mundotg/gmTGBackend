@@ -85,7 +85,12 @@ def store_refresh_token(
 
     except SQLAlchemyError as e:
         db.rollback()
-        log_message(f"❌ Erro ao salvar refresh token: {e}", "error")
+        log_message(
+            message=f"❌ Erro ao salvar refresh token: {e}",
+            level="error",
+            source="token_storage.py",
+            user=user_id,
+        )
         raise RuntimeError("Erro interno ao salvar token")
 
 
@@ -108,7 +113,12 @@ def is_refresh_token_valid(db: Session, token: str) -> bool:
         return True
 
     except Exception as e:
-        log_message(f"❌ Erro ao validar token: {e}", "error")
+        log_message(
+            message=f"❌ Erro ao validar token: {e}",
+            level="error",
+            source="token_storage.py",
+            db=db,
+        )
         return False
 
 

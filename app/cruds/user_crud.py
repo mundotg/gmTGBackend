@@ -1,5 +1,5 @@
 from sqlalchemy import func
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session, joinedload, load_only
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from app import auth
@@ -25,6 +25,25 @@ def get_user_by_email(db: Session, email: str):
             load_only(user_model.User.id, user_model.User.email, user_model.User.nome)
         )
         .filter(func.lower(user_model.User.email) == normalized_email)
+        .first()
+    )
+
+
+def get_user_by_id(db: Session, user_id: str):
+    return (
+        db.query(user_model.User)
+        .options(
+            load_only(
+                user_model.User.id,
+                user_model.User.email,
+                user_model.User.nome,
+            ),
+            joinedload(user_model.User.plan),
+            joinedload(user_model.User.storage_usage),
+            joinedload(user_model.User.network_metrics),
+            joinedload(user_model.User.request_usage),
+        )
+        .filter(user_model.User.id == user_id)
         .first()
     )
 

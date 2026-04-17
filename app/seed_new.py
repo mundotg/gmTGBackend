@@ -4,6 +4,7 @@ Seed inicial do sistema
 - Cargos
 - Roles
 - Permissões (RBAC)
+- Planos (Free, Pro, Enterprise)
 - Usuário Admin
 - Tipos de Projeto
 - Audit Log
@@ -15,8 +16,11 @@ from typing import Any, Dict, Optional, Tuple, Type
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password
+from app.models.clouds_models import Plan
 from app.models.task_models import AuditLog, TypeProjecto
 from app.models.user_model import Empresa, Cargo, Role, Permission, User
+
+# 👇 Importa o mode
 from app.ultils.logger import log_message
 
 
@@ -30,6 +34,13 @@ DEFAULT_EMPRESA = {
     "nif": "700000000",
     "endereco": "Rua das pedras, Golf 2 Projecto, Luanda",
 }
+
+# 👇 Adicionados os dados dos planos
+PLANOS_DATA = [
+    ("free", 100, 1000),  # nome, max_storage_mb (100MB), max_requests_per_day
+    ("pro", 10240, 999999),  # 10GB, ~1M requisições
+    ("enterprise", 1048576, 9999999),  # 1TB, Requisições massivas
+]
 
 CARGOS_DATA = [
     ("Admin", "Administrador do sistema", "sênior"),
@@ -50,13 +61,13 @@ ROLES_PERMISSIONS = {
             "auth:login",
             "auth:logout",
             "auth:refresh",
-            "user:manage" "user:create",
+            "user:manage",  # <-- Vírgula corrigida aqui!
+            "user:create",
             "user:read",
             "user:update",
             "user:delete",
             "user:invite",
             "user:deactivate",
-            "user:manage",
             # ROLES & PERMISSIONS
             "role:create",
             "role:read",
@@ -131,7 +142,6 @@ ROLES_PERMISSIONS = {
             "backup:restore",
             # analytics
             "analytics:db:view",
-            "audit:read",
             "analytics:project:view",
             "analytics:db:export",
             "analytics:project:export",
@@ -212,7 +222,7 @@ def get_or_create(
 
 
 # ==========================================================
-# 🏢 EMPRESA
+# 🏢 EMPRESA & PLANOS
 # ==========================================================
 
 
@@ -228,6 +238,26 @@ def seed_empresa(db: Session) -> Empresa:
         "success" if created else "info",
     )
     return empresa
+
+
+# 👇 Nova função para gerar os planos
+def seed_planos(db: Session) -> Plan:
+    plano_enterprise = None
+    for nome, max_storage, max_requests in PLANOS_DATA:
+        plano, created = get_or_create(
+            db,
+            Plan,
+            name=nome,
+            defaults={
+                "max_storage_mb": max_storage,
+                "max_requests_per_day": max_requests,
+            },
+        )
+        if nome == "enterprise":
+            plano_enterprise = plano
+
+    log_message("📦 Planos de subscrição sincronizados", "info")
+    return plano_enterprise
 
 
 # ==========================================================
@@ -252,7 +282,6 @@ def seed_cargos(db: Session) -> None:
 
 
 def seed_rbac(db: Session) -> None:
-    # Criar permissões únicas
     permission_map: Dict[str, Permission] = {}
 
     all_permissions = {
@@ -268,7 +297,6 @@ def seed_rbac(db: Session) -> None:
         )
         permission_map[perm_name] = perm
 
-    # Criar roles e associar permissões
     for role_name, data in ROLES_PERMISSIONS.items():
         role, _ = get_or_create(
             db,
@@ -276,8 +304,6 @@ def seed_rbac(db: Session) -> None:
             name=role_name,
             defaults={"description": data["description"]},
         )
-
-        # Sincronização forte (modelo Google/AWS)
         role.permissions = [permission_map[p] for p in data["permissions"]]
 
     log_message("🎭 RBAC sincronizado (roles + permissões)", "success")
@@ -288,7 +314,8 @@ def seed_rbac(db: Session) -> None:
 # ==========================================================
 
 
-def seed_admin_user(db: Session, empresa: Empresa) -> User:
+# 👇 Adicionado o parâmetro 'plano'
+def seed_admin_user(db: Session, empresa: Empresa, plano: Plan) -> User:
     cargo_admin = db.query(Cargo).filter_by(nome="Admin").first()
     role_admin = db.query(Role).filter_by(name="admin").first()
 
@@ -303,6 +330,7 @@ def seed_admin_user(db: Session, empresa: Empresa) -> User:
             "empresa_id": empresa.id,
             "cargo_id": cargo_admin.id if cargo_admin else None,
             "role_id": role_admin.id if role_admin else None,
+            "plan_id": plano.id,  # 🚀 AGORA O ADMIN TEM UM PLANO!
             "hashed_password": hash_password("Admin@123"),
             "concorda_termos": True,
             "is_active": True,
@@ -328,9 +356,13 @@ def seed_data(db: Session) -> None:
         empresa = seed_empresa(db)
         seed_cargos(db)
         seed_rbac(db)
-        admin = seed_admin_user(db, empresa)
 
-        # Tipos de projeto
+        # 👇 Cria os planos e recebe o plano enterprise
+        plano_admin = seed_planos(db)
+
+        # 👇 Passa o plano enterprise para o Admin
+        admin = seed_admin_user(db, empresa, plano_admin)
+
         for name, desc in PROJECT_TYPES:
             get_or_create(
                 db,
@@ -339,7 +371,6 @@ def seed_data(db: Session) -> None:
                 defaults={"description": desc},
             )
 
-        # Audit Log
         db.add(
             AuditLog(
                 user_id=str(admin.id),
@@ -355,5 +386,9 @@ def seed_data(db: Session) -> None:
 
     except Exception as e:
         db.rollback()
-        log_message(f"❌ Erro crítico no seed: {str(e)}", "error")
+        log_message(
+            message=f"❌ Erro crítico no seed: {str(e)}",
+            level="error",
+            source="seed_new.py",
+        )
         raise

@@ -2,40 +2,87 @@ import threading
 import time
 from datetime import datetime
 
-from app.config.cache_manager import (
-    CACHE_CLEANUP_INTERVAL,
-    clear_expired_cache_files,
-    _read_cache,  # função com @lru_cache
-)
+from app.config.cache_manager import MEMORY_CACHE_TTL
+from app.services.ocr._OCR_CACHE import MEMORY_CACHE
 from app.ultils.logger import log_message
 
+# importa do teu sistema
 
-def schedule_cache_cleanup():
+
+def schedule_cache_cleanup(interval: int = 60):
     """
-    Agenda a limpeza periódica de caches antigos.
-    Roda em segundo plano, sem bloquear a aplicação.
-    Inclui limpeza do cache LRU em memória.
+    Scheduler de limpeza:
+    - limpa cache em memória expirado (L1)
+    - opcional: limpa Redis por segurança (casos edge)
     """
 
     def _cleanup_loop():
-        log_message(f"[🧹 Cache Scheduler] Iniciando agendador de limpeza a cada {CACHE_CLEANUP_INTERVAL}s")
+        log_message(
+            f"[🧹 Cache Scheduler] Iniciado (intervalo: {interval}s)",
+            "info",
+        )
 
         while True:
             try:
-                # 1️⃣ Limpa arquivos expirados no disco
-                clear_expired_cache_files()
+                now = time.time()
 
-                # 2️⃣ Limpa também o cache em memória (LRU)
-                if hasattr(_read_cache, "cache_clear"):
-                    _read_cache.cache_clear()
-                    log_message("[🧠 LRU Cache] Cache em memória limpo com sucesso.", "debug")
+                # -------------------------
+                # 1️⃣ Limpeza L1 (RAM)
+                # -------------------------
+                removed = 0
 
-                log_message(f"[🧹 Cache Scheduler] Execução concluída às {datetime.now()}")
+                for key in list(MEMORY_CACHE.keys()):
+                    entry = MEMORY_CACHE.get(key)
+
+                    if not entry:
+                        continue
+
+                    ttl = entry.get("ttl", MEMORY_CACHE_TTL)
+
+                    if ttl is not None and (now - entry["ts"]) > ttl:
+                        MEMORY_CACHE.pop(key, None)
+                        removed += 1
+
+                if removed > 0:
+                    log_message(
+                        f"[🧠 L1 CLEANUP] {removed} entradas removidas",
+                        "debug",
+                    )
+
+                # -------------------------
+                # 2️⃣ Redis (opcional)
+                # -------------------------
+                # Normalmente NÃO precisa (Redis já expira sozinho)
+                # Mas útil se TTL = None ou bugs antigos
+
+                # Exemplo seguro:
+                # limpar apenas chaves antigas manualmente (se quiser ativar)
+                """
+                if redis_client:
+                    cursor = 0
+                    while True:
+                        cursor, keys = redis_client.scan(
+                            cursor=cursor,
+                            match=f"{CACHE_PREFIX}*",
+                            count=100
+                        )
+                        # aqui podias validar TTL se quiseres
+                        if cursor == 0:
+                            break
+                """
+
+                log_message(
+                    f"[🧹 Cache Scheduler] OK ({datetime.now()})",
+                    "debug",
+                )
+
             except Exception as e:
-                log_message(f"[🧹 Cache Scheduler] Erro ao limpar caches: {e}", "error")
+                log_message(
+                    f"[🧹 Cache Scheduler] ERRO: {e}",
+                    "error",
+                )
 
-            time.sleep(CACHE_CLEANUP_INTERVAL)
+            time.sleep(interval)
 
-    # Executa em thread separada (daemon = True para não bloquear encerramento do app)
     thread = threading.Thread(target=_cleanup_loop, daemon=True)
     thread.start()

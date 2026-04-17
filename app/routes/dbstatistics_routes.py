@@ -122,7 +122,7 @@ def get_fields_info_cached_wrapper(
 
 
 @cache_result(ttl=600, user_id="structures_only_{user_id}")
-def get_structures_names_only_cached(
+async def get_structures_names_only_cached(
     connection_id: int,
     user_id: int,
     db: Session,
@@ -131,7 +131,7 @@ def get_structures_names_only_cached(
 
 
 @cache_result(ttl=600, user_id="structures_full_{user_id}")
-def get_structures_names_cached(
+async def get_structures_names_cached(
     connection_id: int,
     user_id: int,
     db: Session,
@@ -140,7 +140,7 @@ def get_structures_names_cached(
 
 
 @cache_result(ttl=180, user_id="table_count_{user_id}")
-def get_table_count_cached(
+async def get_table_count_cached(
     connection_id: int,
     table_name: str,
     db: Session,
@@ -150,7 +150,7 @@ def get_table_count_cached(
 
 
 @cache_result(ttl=1800, user_id="stats_sync_{user_id}")
-def sync_connection_stats_cached(user_id: int, db: Session) -> Any:
+async def sync_connection_stats_cached(user_id: int, db: Session) -> Any:
     stats = sync_connection_statistics(user_id, db)
     if hasattr(stats, "__dict__"):
         stats = {k: v for k, v in stats.__dict__.items() if not k.startswith("_")}
@@ -211,7 +211,7 @@ async def get_structures_endpoint(
 ):
     try:
         active = _get_active_connection_or_400(db, user_id)
-        structures = get_structures_names_only_cached(
+        structures = await get_structures_names_only_cached(
             connection_id=active.connection_id,
             user_id=user_id,
             db=db,
@@ -238,7 +238,7 @@ async def get_structures_by_connection_id_endpoint(
 ):
     try:
         _validate_connection_access_or_404(db, connection_id)
-        structures = get_structures_names_only_cached(connection_id, user_id, db)
+        structures = await get_structures_names_only_cached(connection_id, user_id, db)
         return ResponseWrapper(success=True, data=structures)
     except HTTPException:
         raise
@@ -388,7 +388,7 @@ async def clear_cache_endpoint(
     user_id: int = Depends(get_current_user_id),
 ):
     try:
-        from app.config.cache_manager import clear_cache_for_function
+        from app.config.cache_manager import clear_cache
 
         functions_to_clear = [
             "get_tables_with_count_cached",
@@ -403,7 +403,7 @@ async def clear_cache_endpoint(
 
         cleared_count = 0
         for func_name in functions_to_clear:
-            cleared_count += clear_cache_for_function(func_name)
+            cleared_count += clear_cache(func_name)
 
         log_message(
             f"✅ Cache limpo para usuário {user_id}: {cleared_count} funções",

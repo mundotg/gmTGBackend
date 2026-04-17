@@ -88,9 +88,11 @@ def seed_data(db: Session):
                 cargos_criados.append(nome)
 
         log_message(
-            f"💼 Cargos criados: {', '.join(cargos_criados)}"
-            if cargos_criados
-            else "💼 Nenhum cargo novo necessário",
+            (
+                f"💼 Cargos criados: {', '.join(cargos_criados)}"
+                if cargos_criados
+                else "💼 Nenhum cargo novo necessário"
+            ),
             "success" if cargos_criados else "info",
         )
 
@@ -150,12 +152,13 @@ def seed_data(db: Session):
                 roles_criadas.append(name)
 
         log_message(
-            f"🎭 Roles criadas: {', '.join(roles_criadas)}"
-            if roles_criadas
-            else "🎭 Nenhuma role nova necessária",
+            (
+                f"🎭 Roles criadas: {', '.join(roles_criadas)}"
+                if roles_criadas
+                else "🎭 Nenhuma role nova necessária"
+            ),
             "success" if roles_criadas else "info",
         )
-        
 
         log_message("🔐 Criando permissões do sistema...", "info")
 
@@ -167,15 +170,12 @@ def seed_data(db: Session):
             "db_connection:delete": "Remover próprias conexões",
             "db_connection:read_company": "Visualizar conexões da empresa",
             "db_connection:read_all": "Visualizar todas as conexões",
-
             # 👤 Usuários
             "user:read": "Visualizar usuários",
             "user:manage": "Gerenciar usuários",
-
             # 📊 Queries
             "query:execute": "Executar queries",
             "query:history": "Ver histórico de queries",
-
             # 📁 Projetos
             "project:create": "Criar projetos",
             "project:update": "Editar projetos",
@@ -201,7 +201,6 @@ def seed_data(db: Session):
 
         role_permissions = {
             "admin": list(permissions_map.keys()),
-
             "manager": [
                 "db_connection:read_company",
                 "query:execute",
@@ -211,7 +210,6 @@ def seed_data(db: Session):
                 "project:view",
                 "user:read",
             ],
-
             "developer": [
                 "db_connection:create",
                 "db_connection:read",
@@ -219,46 +217,38 @@ def seed_data(db: Session):
                 "query:history",
                 "project:view",
             ],
-
             "user": [
                 "db_connection:read",
                 "query:execute",
                 "project:view",
             ],
-
             "devops": [
                 "db_connection:create",
                 "db_connection:update",
                 "db_connection:read_company",
                 "query:execute",
             ],
-
             "security_officer": [
                 "db_connection:read_all",
                 "query:history",
                 "user:read",
             ],
-
             "qa_tester": [
                 "project:view",
                 "query:execute",
             ],
-
             "product_owner": [
                 "project:create",
                 "project:update",
                 "project:view",
             ],
-
             "support_agent": [
                 "db_connection:read_company",
                 "query:history",
             ],
-
             "finance_manager": [
                 "project:view",
             ],
-
             "hr_manager": [
                 "user:read",
             ],
@@ -274,14 +264,10 @@ def seed_data(db: Session):
                 if permission and permission not in role.permissions:
                     role.permissions.append(permission)
 
-            log_message(
-                f"🔗 Permissões associadas à role '{role_name}'",
-                "success"
-            )
+            log_message(f"🔗 Permissões associadas à role '{role_name}'", "success")
 
         db.commit()
         log_message("✅ Seed de permissões finalizado!", "success")
-
 
         # -----------------------------
         # 📦 Tipos de Projeto
@@ -304,9 +290,11 @@ def seed_data(db: Session):
                 tipos_criados.append(name)
 
         log_message(
-            f"📦 Tipos de projeto criados: {', '.join(tipos_criados)}"
-            if tipos_criados
-            else "📦 Nenhum tipo de projeto novo necessário",
+            (
+                f"📦 Tipos de projeto criados: {', '.join(tipos_criados)}"
+                if tipos_criados
+                else "📦 Nenhum tipo de projeto novo necessário"
+            ),
             "success" if tipos_criados else "info",
         )
 
@@ -329,5 +317,9 @@ def seed_data(db: Session):
 
     except Exception as e:
         db.rollback()
-        log_message(f"❌ Erro durante seed: {str(e)}", "error")
+        log_message(
+            message=f"❌ Erro durante seed: {str(e)}",
+            level="error",
+            source="seed_admin.py",
+        )
         raise

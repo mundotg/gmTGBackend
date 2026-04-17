@@ -68,35 +68,16 @@ router = APIRouter(prefix="/conn", tags=["connections"])
 
 
 @cache_result(ttl=300, user_id="user_{user_id}")
-def get_db_connections_cached(db: Session, user_id: int):
-    return get_db_connections(db, user_id)
-
-
-@cache_result(ttl=300, user_id="user_{user_id}")
-def get_db_connections_pagination_cached(
+async def get_db_connections_pagination_cached(
     db: Session, user_id: int, page: int, limit: int
 ):
     return get_db_connections_pagination_v1(db, user_id, page, limit)
 
 
-@cache_result(ttl=600, user_id="user_{user_id}")
-def get_connection_logs_cached(db: Session, user_id: int):
-    return get_connection_logs(db, user_id)
-
-
-@cache_result(ttl=300, user_id="user_{user_id}")
-def get_connection_logs_pagination_cached(
-    db: Session,
-    user_id: int,
-    connection_id: Optional[int],
-    page: int,
-    limit: int,
-):
-    return get_connection_logs_pagination(db, user_id, connection_id or 0, page, limit)
-
-
 @cache_result(ttl=1800, user_id="user_{user_id}")
-def get_db_connection_by_id_cached(db: Session, conn_id: int) -> DBConnection | None:
+async def get_db_connection_by_id_cached(
+    db: Session, conn_id: int
+) -> DBConnection | None:
     return get_db_connection_by_id(db, conn_id)
 
 
@@ -406,7 +387,9 @@ async def list_connections_paginated(
     Lista conexões salvas com paginação.
     """
     try:
-        connections = get_db_connections_pagination_cached(db, user_id, page, limit)
+        connections = await get_db_connections_pagination_cached(
+            db, user_id, page, limit
+        )
         active_conn = get_active_connection_by_userid(db, user_id)
         active_conn_id = cast(int, active_conn.connection_id) if active_conn else None
 
@@ -496,7 +479,7 @@ async def get_credenciais(
     Obtém credenciais de uma conexão específica.
     """
     try:
-        conn = get_db_connection_by_id_cached(db, conn_id)
+        conn = await get_db_connection_by_id_cached(db, conn_id)
         conn = _validate_connection_owner(conn, conn_id)
 
         # CORRIGIDO: acessando como atributo, não como dicionário

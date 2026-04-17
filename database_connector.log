@@ -1,454 +1,224 @@
-2026-04-12 18:47:56,749 - ERROR - Nenhum engine ativo para o usuário ID 1
-2026-04-12 18:47:57,056 - INFO - \U0001f50c Criando engine para PostgreSQL em dpg-d7ce2277f7vs739hvelg-a.virginia-postgres.render.com:5432
-2026-04-12 18:48:01,311 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 18:48:01,313 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 18:48:01,316 - INFO - \U0001f50d Buscando conexão com ID 2
-2026-04-12 18:48:01,469 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 18:48:01,473 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 18:48:01,476 - INFO - \U0001f50d Buscando conexão com ID 2
-2026-04-12 18:48:01,481 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 18:48:01,486 - INFO - Usando cache para tabelas | connection_id=2 | user=1 | tables=2
-2026-04-12 18:48:01,500 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 18:48:01,505 - INFO - Usando cache para tabelas | connection_id=2 | user=1 | tables=2
-2026-04-12 18:48:59,382 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 18:48:59,385 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 18:48:59,385 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 18:48:59,755 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 18:49:11,702 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 18:49:12,225 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 18:49:12,225 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 18:49:12,226 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 18:49:12,226 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 18:49:12,405 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 18:49:12,413 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 18:49:12,489 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 18:49:12,729 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 18:49:12,741 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 18:49:12,743 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 18:49:12,745 - INFO - Nenhum cache expirado encontrado.
-2026-04-12 18:49:12,745 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 18:49:12,745 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 18:49:12.745384
-2026-04-12 18:53:40,586 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 18:53:40,591 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 18:53:40,591 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 18:53:41,007 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 18:53:51,600 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 18:53:52,065 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 18:53:52,065 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 18:53:52,065 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 18:53:52,065 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 18:53:52,184 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 18:53:52,193 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 18:53:52,258 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 18:53:52,482 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 18:53:52,493 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 18:53:52,493 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 18:53:52,495 - INFO - Nenhum cache expirado encontrado.
-2026-04-12 18:53:52,496 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 18:53:52,496 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 18:53:52.496377
-2026-04-12 18:54:06,444 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 18:54:06,447 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 18:54:06,447 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 18:54:06,796 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 18:54:18,179 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 18:54:18,688 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 18:54:18,689 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 18:54:18,689 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 18:54:18,689 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 18:54:18,842 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 18:54:18,851 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 18:54:18,943 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 18:54:19,178 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 18:54:19,189 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 18:54:19,190 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 18:54:19,192 - INFO - Nenhum cache expirado encontrado.
-2026-04-12 18:54:19,192 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 18:54:19,192 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 18:54:19.192629
-2026-04-12 18:54:20,831 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 18:54:20,836 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 18:54:20,836 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 18:54:21,226 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 18:54:31,136 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 18:54:31,621 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 18:54:31,621 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 18:54:31,623 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 18:54:31,623 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 18:54:31,802 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 18:54:31,802 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 18:54:31,860 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 18:54:32,090 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 18:54:32,096 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 18:54:32,101 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 18:54:32,102 - INFO - Nenhum cache expirado encontrado.
-2026-04-12 18:54:32,102 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 18:54:32,102 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 18:54:32.102077
-2026-04-12 18:57:19,535 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 18:57:19,539 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 18:57:19,539 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 18:57:19,906 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 18:57:30,817 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 18:57:31,423 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 18:57:31,425 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 18:57:31,425 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 18:57:31,425 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 18:57:31,554 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 18:57:31,560 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 18:57:31,610 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 18:57:31,837 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 18:57:31,845 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 18:57:31,845 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 18:57:31,847 - INFO - \U0001f9f9 Cache expirado removido: 1f402361c7f95e537e91575314caa25e3d7c059322e373e447462db730b750e0.pkl.gz
-2026-04-12 18:57:31,847 - INFO - \U0001f9fe Total de 1/2 caches expirados removidos.
-2026-04-12 18:57:31,847 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 18:57:31,847 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 18:57:31.847673
-2026-04-12 18:57:35,320 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 18:57:35,322 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 18:57:35,323 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 18:57:35,640 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 18:57:45,588 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 18:57:46,143 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 18:57:46,143 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 18:57:46,144 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 18:57:46,144 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 18:57:46,385 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 18:57:46,392 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 18:57:46,459 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 18:57:46,683 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 18:57:46,694 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 18:57:46,695 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 18:57:46,696 - INFO - Nenhum cache expirado encontrado.
-2026-04-12 18:57:46,696 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 18:57:46,696 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 18:57:46.696497
-2026-04-12 18:57:48,954 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 18:57:48,957 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 18:57:48,957 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 18:57:49,306 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 18:57:59,371 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 18:57:59,885 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 18:57:59,885 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 18:57:59,885 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 18:57:59,885 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 18:58:00,020 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 18:58:00,030 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 18:58:00,093 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 18:58:00,332 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 18:58:00,342 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 18:58:00,343 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 18:58:00,344 - INFO - Nenhum cache expirado encontrado.
-2026-04-12 18:58:00,345 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 18:58:00,345 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 18:58:00.345612
-2026-04-12 18:59:14,884 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 18:59:14,886 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 18:59:14,887 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 18:59:15,236 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 18:59:26,399 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 18:59:26,908 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 18:59:26,908 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 18:59:26,908 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 18:59:26,908 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 18:59:27,037 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 18:59:27,051 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 18:59:27,109 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 18:59:27,336 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 18:59:27,346 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 18:59:27,347 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 18:59:27,349 - INFO - Nenhum cache expirado encontrado.
-2026-04-12 18:59:27,349 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 18:59:27,349 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 18:59:27.349127
-2026-04-12 19:00:34,578 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 19:00:34,581 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 19:00:34,581 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 19:00:34,943 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 19:00:45,450 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 19:00:45,984 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 19:00:45,985 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 19:00:45,985 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 19:00:45,985 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 19:00:46,113 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 19:00:46,122 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 19:00:46,258 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 19:00:46,490 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 19:00:46,500 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 19:00:46,502 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 19:00:46,503 - INFO - Nenhum cache expirado encontrado.
-2026-04-12 19:00:46,503 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 19:00:46,503 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 19:00:46.503167
-2026-04-12 19:01:00,405 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:01:00,561 - ERROR - Nenhum engine ativo para o usuário ID 1
-2026-04-12 19:01:00,873 - INFO - \U0001f50c Criando engine para PostgreSQL em dpg-d7ce2277f7vs739hvelg-a.virginia-postgres.render.com:5432
-2026-04-12 19:01:05,529 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:01:05,531 - INFO - \U0001f50d Buscando conexão com ID 2
-2026-04-12 19:01:05,590 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:01:05,596 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:01:09,899 - INFO - Estrutura registrada | connection_id=2 | table=sql_features | schema=information_schema
-2026-04-12 19:01:09,907 - INFO - Estrutura registrada | connection_id=2 | table=sql_implementation_info | schema=information_schema
-2026-04-12 19:01:09,912 - INFO - Estrutura registrada | connection_id=2 | table=sql_parts | schema=information_schema
-2026-04-12 19:01:09,918 - INFO - Estrutura registrada | connection_id=2 | table=sql_sizing | schema=information_schema
-2026-04-12 19:01:09,923 - INFO - Estrutura registrada | connection_id=2 | table=schemata | schema=information_schema
-2026-04-12 19:01:09,928 - INFO - Estrutura registrada | connection_id=2 | table=domain_constraints | schema=information_schema
-2026-04-12 19:01:09,933 - INFO - Estrutura registrada | connection_id=2 | table=routine_column_usage | schema=information_schema
-2026-04-12 19:01:09,939 - INFO - Estrutura registrada | connection_id=2 | table=domain_udt_usage | schema=information_schema
-2026-04-12 19:01:09,944 - INFO - Estrutura registrada | connection_id=2 | table=domains | schema=information_schema
-2026-04-12 19:01:09,944 - INFO - Estrutura registrada | connection_id=2 | table=routine_table_usage | schema=information_schema
-2026-04-12 19:01:09,949 - INFO - Estrutura registrada | connection_id=2 | table=enabled_roles | schema=information_schema
-2026-04-12 19:01:09,955 - INFO - Estrutura registrada | connection_id=2 | table=routine_privileges | schema=information_schema
-2026-04-12 19:01:09,960 - INFO - Estrutura registrada | connection_id=2 | table=key_column_usage | schema=information_schema
-2026-04-12 19:01:09,965 - INFO - Estrutura registrada | connection_id=2 | table=parameters | schema=information_schema
-2026-04-12 19:01:09,974 - INFO - Estrutura registrada | connection_id=2 | table=referential_constraints | schema=information_schema
-2026-04-12 19:01:09,981 - INFO - Estrutura registrada | connection_id=2 | table=role_routine_grants | schema=information_schema
-2026-04-12 19:01:09,986 - INFO - Estrutura registrada | connection_id=2 | table=role_column_grants | schema=information_schema
-2026-04-12 19:01:09,992 - INFO - Estrutura registrada | connection_id=2 | table=routine_routine_usage | schema=information_schema
-2026-04-12 19:01:09,997 - INFO - Estrutura registrada | connection_id=2 | table=routines | schema=information_schema
-2026-04-12 19:01:10,002 - INFO - Estrutura registrada | connection_id=2 | table=routine_sequence_usage | schema=information_schema
-2026-04-12 19:01:10,009 - INFO - Estrutura registrada | connection_id=2 | table=sequences | schema=information_schema
-2026-04-12 19:01:10,012 - INFO - Estrutura registrada | connection_id=2 | table=information_schema_catalog_name | schema=information_schema
-2026-04-12 19:01:10,019 - INFO - Estrutura registrada | connection_id=2 | table=check_constraints | schema=information_schema
-2026-04-12 19:01:10,023 - INFO - Estrutura registrada | connection_id=2 | table=applicable_roles | schema=information_schema
-2026-04-12 19:01:10,029 - INFO - Estrutura registrada | connection_id=2 | table=administrable_role_authorizations | schema=information_schema
-2026-04-12 19:01:10,035 - INFO - Estrutura registrada | connection_id=2 | table=column_column_usage | schema=information_schema
-2026-04-12 19:01:10,039 - INFO - Estrutura registrada | connection_id=2 | table=attributes | schema=information_schema
-2026-04-12 19:01:10,044 - INFO - Estrutura registrada | connection_id=2 | table=collations | schema=information_schema
-2026-04-12 19:01:10,044 - INFO - Estrutura registrada | connection_id=2 | table=character_sets | schema=information_schema
-2026-04-12 19:01:10,054 - INFO - Estrutura registrada | connection_id=2 | table=check_constraint_routine_usage | schema=information_schema
-2026-04-12 19:01:10,059 - INFO - Estrutura registrada | connection_id=2 | table=collation_character_set_applicability | schema=information_schema
-2026-04-12 19:01:10,066 - INFO - Estrutura registrada | connection_id=2 | table=column_privileges | schema=information_schema
-2026-04-12 19:01:10,070 - INFO - Estrutura registrada | connection_id=2 | table=column_domain_usage | schema=information_schema
-2026-04-12 19:01:10,077 - INFO - Estrutura registrada | connection_id=2 | table=column_udt_usage | schema=information_schema
-2026-04-12 19:01:10,080 - INFO - Estrutura registrada | connection_id=2 | table=columns | schema=information_schema
-2026-04-12 19:01:10,085 - INFO - Estrutura registrada | connection_id=2 | table=constraint_column_usage | schema=information_schema
-2026-04-12 19:01:10,091 - INFO - Estrutura registrada | connection_id=2 | table=constraint_table_usage | schema=information_schema
-2026-04-12 19:01:10,096 - INFO - Estrutura registrada | connection_id=2 | table=data_type_privileges | schema=information_schema
-2026-04-12 19:01:10,101 - INFO - Estrutura registrada | connection_id=2 | table=table_constraints | schema=information_schema
-2026-04-12 19:01:10,106 - INFO - Estrutura registrada | connection_id=2 | table=role_usage_grants | schema=information_schema
-2026-04-12 19:01:10,106 - INFO - Estrutura registrada | connection_id=2 | table=table_privileges | schema=information_schema
-2026-04-12 19:01:10,116 - INFO - Estrutura registrada | connection_id=2 | table=role_table_grants | schema=information_schema
-2026-04-12 19:01:10,120 - INFO - Estrutura registrada | connection_id=2 | table=tables | schema=information_schema
-2026-04-12 19:01:10,122 - INFO - Estrutura registrada | connection_id=2 | table=transforms | schema=information_schema
-2026-04-12 19:01:10,130 - INFO - Estrutura registrada | connection_id=2 | table=user_defined_types | schema=information_schema
-2026-04-12 19:01:10,132 - INFO - Estrutura registrada | connection_id=2 | table=triggered_update_columns | schema=information_schema
-2026-04-12 19:01:10,138 - INFO - Estrutura registrada | connection_id=2 | table=triggers | schema=information_schema
-2026-04-12 19:01:10,147 - INFO - Estrutura registrada | connection_id=2 | table=udt_privileges | schema=information_schema
-2026-04-12 19:01:10,151 - INFO - Estrutura registrada | connection_id=2 | table=view_column_usage | schema=information_schema
-2026-04-12 19:01:10,157 - INFO - Estrutura registrada | connection_id=2 | table=role_udt_grants | schema=information_schema
-2026-04-12 19:01:10,158 - INFO - Estrutura registrada | connection_id=2 | table=usage_privileges | schema=information_schema
-2026-04-12 19:01:10,166 - INFO - Estrutura registrada | connection_id=2 | table=element_types | schema=information_schema
-2026-04-12 19:01:10,168 - INFO - Estrutura registrada | connection_id=2 | table=view_routine_usage | schema=information_schema
-2026-04-12 19:01:10,174 - INFO - Estrutura registrada | connection_id=2 | table=view_table_usage | schema=information_schema
-2026-04-12 19:01:10,180 - INFO - Estrutura registrada | connection_id=2 | table=_pg_foreign_table_columns | schema=information_schema
-2026-04-12 19:01:10,185 - INFO - Estrutura registrada | connection_id=2 | table=views | schema=information_schema
-2026-04-12 19:01:10,190 - INFO - Estrutura registrada | connection_id=2 | table=_pg_foreign_servers | schema=information_schema
-2026-04-12 19:01:10,194 - INFO - Estrutura registrada | connection_id=2 | table=foreign_data_wrapper_options | schema=information_schema
-2026-04-12 19:01:10,199 - INFO - Estrutura registrada | connection_id=2 | table=column_options | schema=information_schema
-2026-04-12 19:01:10,202 - INFO - Estrutura registrada | connection_id=2 | table=_pg_foreign_data_wrappers | schema=information_schema
-2026-04-12 19:01:10,205 - INFO - Estrutura registrada | connection_id=2 | table=foreign_data_wrappers | schema=information_schema
-2026-04-12 19:01:10,211 - INFO - Estrutura registrada | connection_id=2 | table=_pg_foreign_tables | schema=information_schema
-2026-04-12 19:01:10,216 - INFO - Estrutura registrada | connection_id=2 | table=foreign_server_options | schema=information_schema
-2026-04-12 19:01:10,221 - INFO - Estrutura registrada | connection_id=2 | table=foreign_servers | schema=information_schema
-2026-04-12 19:01:10,225 - INFO - Estrutura registrada | connection_id=2 | table=foreign_table_options | schema=information_schema
-2026-04-12 19:01:10,230 - INFO - Estrutura registrada | connection_id=2 | table=foreign_tables | schema=information_schema
-2026-04-12 19:01:10,237 - INFO - Estrutura registrada | connection_id=2 | table=_pg_user_mappings | schema=information_schema
-2026-04-12 19:01:10,242 - INFO - Estrutura registrada | connection_id=2 | table=user_mapping_options | schema=information_schema
-2026-04-12 19:01:10,246 - INFO - Estrutura registrada | connection_id=2 | table=user_mappings | schema=information_schema
-2026-04-12 19:01:10,246 - INFO - Estrutura registrada | connection_id=2 | table=projects | schema=public
-2026-04-12 19:01:10,253 - INFO - Estrutura registrada | connection_id=2 | table=typeprojecto | schema=public
-2026-04-12 19:01:10,257 - INFO - Estrutura registrada | connection_id=2 | table=active_connection | schema=public
-2026-04-12 19:01:10,264 - INFO - Estrutura registrada | connection_id=2 | table=connection_logs | schema=public
-2026-04-12 19:01:10,270 - INFO - Estrutura registrada | connection_id=2 | table=db_health_checks | schema=public
-2026-04-12 19:01:10,274 - INFO - Estrutura registrada | connection_id=2 | table=db_statistics | schema=public
-2026-04-12 19:01:10,277 - INFO - Estrutura registrada | connection_id=2 | table=table_row_count_cache | schema=public
-2026-04-12 19:01:10,283 - INFO - Estrutura registrada | connection_id=2 | table=knowledge_base | schema=public
-2026-04-12 19:01:10,288 - INFO - Estrutura registrada | connection_id=2 | table=training_data | schema=public
-2026-04-12 19:01:10,288 - INFO - Estrutura registrada | connection_id=2 | table=empresas | schema=public
-2026-04-12 19:01:10,293 - WARNING - Erro validação estrutura | connection_id=2 | table=users | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:10,298 - INFO - Estrutura registrada | connection_id=2 | table=cargos | schema=public
-2026-04-12 19:01:10,298 - INFO - Estrutura registrada | connection_id=2 | table=roles | schema=public
-2026-04-12 19:01:10,309 - INFO - Estrutura registrada | connection_id=2 | table=roles_permissions | schema=public
-2026-04-12 19:01:10,309 - INFO - Estrutura registrada | connection_id=2 | table=permissions | schema=public
-2026-04-12 19:01:10,317 - INFO - Estrutura registrada | connection_id=2 | table=audit_logs | schema=public
-2026-04-12 19:01:10,322 - INFO - Estrutura registrada | connection_id=2 | table=refresh_tokens | schema=public
-2026-04-12 19:01:10,326 - INFO - Estrutura registrada | connection_id=2 | table=settings | schema=public
-2026-04-12 19:01:10,330 - INFO - Estrutura registrada | connection_id=2 | table=db_connections | schema=public
-2026-04-12 19:01:10,335 - INFO - Estrutura registrada | connection_id=2 | table=chat_sessions | schema=public
-2026-04-12 19:01:10,340 - INFO - Estrutura registrada | connection_id=2 | table=usage_logs | schema=public
-2026-04-12 19:01:10,351 - INFO - Estrutura registrada | connection_id=2 | table=query_history | schema=public
-2026-04-12 19:01:10,368 - INFO - Estrutura registrada | connection_id=2 | table=db_structures | schema=public
-2026-04-12 19:01:10,383 - INFO - Estrutura registrada | connection_id=2 | table=messages | schema=public
-2026-04-12 19:01:10,392 - INFO - Estrutura registrada | connection_id=2 | table=project_team_association | schema=public
-2026-04-12 19:01:10,397 - INFO - Estrutura registrada | connection_id=2 | table=sprints | schema=public
-2026-04-12 19:01:10,404 - WARNING - Erro validação estrutura | connection_id=2 | table=db_fields | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:10,409 - INFO - Estrutura registrada | connection_id=2 | table=feedback | schema=public
-2026-04-12 19:01:10,424 - INFO - Estrutura registrada | connection_id=2 | table=tasks | schema=public
-2026-04-12 19:01:10,432 - INFO - Estrutura registrada | connection_id=2 | table=task_stats | schema=public
-2026-04-12 19:01:10,441 - INFO - Estrutura registrada | connection_id=2 | table=db_enum_fields | schema=public
-2026-04-12 19:01:10,445 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:01:10,527 - INFO - \U0001f50d Buscando conexão com ID 2
-2026-04-12 19:01:10,535 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:01:14,845 - WARNING - Erro validação estrutura | connection_id=2 | table=sql_features | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,847 - WARNING - Erro validação estrutura | connection_id=2 | table=sql_implementation_info | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,848 - WARNING - Erro validação estrutura | connection_id=2 | table=sql_parts | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,851 - WARNING - Erro validação estrutura | connection_id=2 | table=sql_sizing | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,852 - WARNING - Erro validação estrutura | connection_id=2 | table=schemata | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,854 - WARNING - Erro validação estrutura | connection_id=2 | table=domain_constraints | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,855 - WARNING - Erro validação estrutura | connection_id=2 | table=routine_column_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,856 - WARNING - Erro validação estrutura | connection_id=2 | table=domain_udt_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,857 - WARNING - Erro validação estrutura | connection_id=2 | table=domains | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,858 - WARNING - Erro validação estrutura | connection_id=2 | table=routine_table_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,860 - WARNING - Erro validação estrutura | connection_id=2 | table=enabled_roles | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,861 - WARNING - Erro validação estrutura | connection_id=2 | table=routine_privileges | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,862 - WARNING - Erro validação estrutura | connection_id=2 | table=key_column_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,864 - WARNING - Erro validação estrutura | connection_id=2 | table=parameters | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,865 - WARNING - Erro validação estrutura | connection_id=2 | table=referential_constraints | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,866 - WARNING - Erro validação estrutura | connection_id=2 | table=role_routine_grants | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,868 - WARNING - Erro validação estrutura | connection_id=2 | table=role_column_grants | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,869 - WARNING - Erro validação estrutura | connection_id=2 | table=routine_routine_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,871 - WARNING - Erro validação estrutura | connection_id=2 | table=routines | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,872 - WARNING - Erro validação estrutura | connection_id=2 | table=routine_sequence_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,873 - WARNING - Erro validação estrutura | connection_id=2 | table=sequences | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,875 - WARNING - Erro validação estrutura | connection_id=2 | table=information_schema_catalog_name | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,876 - WARNING - Erro validação estrutura | connection_id=2 | table=check_constraints | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,877 - WARNING - Erro validação estrutura | connection_id=2 | table=applicable_roles | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,879 - WARNING - Erro validação estrutura | connection_id=2 | table=administrable_role_authorizations | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,880 - WARNING - Erro validação estrutura | connection_id=2 | table=column_column_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,881 - WARNING - Erro validação estrutura | connection_id=2 | table=attributes | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,884 - WARNING - Erro validação estrutura | connection_id=2 | table=collations | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,885 - WARNING - Erro validação estrutura | connection_id=2 | table=character_sets | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,886 - WARNING - Erro validação estrutura | connection_id=2 | table=check_constraint_routine_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,888 - WARNING - Erro validação estrutura | connection_id=2 | table=collation_character_set_applicability | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,889 - WARNING - Erro validação estrutura | connection_id=2 | table=column_privileges | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,891 - WARNING - Erro validação estrutura | connection_id=2 | table=column_domain_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,892 - WARNING - Erro validação estrutura | connection_id=2 | table=column_udt_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,894 - WARNING - Erro validação estrutura | connection_id=2 | table=columns | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,895 - WARNING - Erro validação estrutura | connection_id=2 | table=constraint_column_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,896 - WARNING - Erro validação estrutura | connection_id=2 | table=constraint_table_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,898 - WARNING - Erro validação estrutura | connection_id=2 | table=data_type_privileges | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,899 - WARNING - Erro validação estrutura | connection_id=2 | table=table_constraints | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,900 - WARNING - Erro validação estrutura | connection_id=2 | table=role_usage_grants | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,902 - WARNING - Erro validação estrutura | connection_id=2 | table=table_privileges | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,903 - WARNING - Erro validação estrutura | connection_id=2 | table=role_table_grants | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,904 - WARNING - Erro validação estrutura | connection_id=2 | table=tables | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,906 - WARNING - Erro validação estrutura | connection_id=2 | table=transforms | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,907 - WARNING - Erro validação estrutura | connection_id=2 | table=user_defined_types | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,908 - WARNING - Erro validação estrutura | connection_id=2 | table=triggered_update_columns | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,910 - WARNING - Erro validação estrutura | connection_id=2 | table=triggers | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,911 - WARNING - Erro validação estrutura | connection_id=2 | table=udt_privileges | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,913 - WARNING - Erro validação estrutura | connection_id=2 | table=view_column_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,914 - WARNING - Erro validação estrutura | connection_id=2 | table=role_udt_grants | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,915 - WARNING - Erro validação estrutura | connection_id=2 | table=usage_privileges | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,917 - WARNING - Erro validação estrutura | connection_id=2 | table=element_types | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,919 - WARNING - Erro validação estrutura | connection_id=2 | table=view_routine_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,920 - WARNING - Erro validação estrutura | connection_id=2 | table=view_table_usage | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,921 - WARNING - Erro validação estrutura | connection_id=2 | table=_pg_foreign_table_columns | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,922 - WARNING - Erro validação estrutura | connection_id=2 | table=views | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,923 - WARNING - Erro validação estrutura | connection_id=2 | table=_pg_foreign_servers | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,924 - WARNING - Erro validação estrutura | connection_id=2 | table=foreign_data_wrapper_options | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,926 - WARNING - Erro validação estrutura | connection_id=2 | table=column_options | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,927 - WARNING - Erro validação estrutura | connection_id=2 | table=_pg_foreign_data_wrappers | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,928 - WARNING - Erro validação estrutura | connection_id=2 | table=foreign_data_wrappers | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,929 - WARNING - Erro validação estrutura | connection_id=2 | table=_pg_foreign_tables | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,931 - WARNING - Erro validação estrutura | connection_id=2 | table=foreign_server_options | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,932 - WARNING - Erro validação estrutura | connection_id=2 | table=foreign_servers | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,934 - WARNING - Erro validação estrutura | connection_id=2 | table=foreign_table_options | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,935 - WARNING - Erro validação estrutura | connection_id=2 | table=foreign_tables | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,936 - WARNING - Erro validação estrutura | connection_id=2 | table=_pg_user_mappings | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,937 - WARNING - Erro validação estrutura | connection_id=2 | table=user_mapping_options | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,938 - WARNING - Erro validação estrutura | connection_id=2 | table=user_mappings | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,939 - WARNING - Erro validação estrutura | connection_id=2 | table=projects | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,941 - WARNING - Erro validação estrutura | connection_id=2 | table=typeprojecto | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,942 - WARNING - Erro validação estrutura | connection_id=2 | table=active_connection | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,943 - WARNING - Erro validação estrutura | connection_id=2 | table=connection_logs | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,944 - WARNING - Erro validação estrutura | connection_id=2 | table=db_health_checks | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,945 - WARNING - Erro validação estrutura | connection_id=2 | table=db_statistics | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,948 - WARNING - Erro validação estrutura | connection_id=2 | table=table_row_count_cache | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,950 - WARNING - Erro validação estrutura | connection_id=2 | table=knowledge_base | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,952 - WARNING - Erro validação estrutura | connection_id=2 | table=training_data | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,953 - WARNING - Erro validação estrutura | connection_id=2 | table=empresas | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,954 - WARNING - Erro validação estrutura | connection_id=2 | table=users | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,955 - WARNING - Erro validação estrutura | connection_id=2 | table=cargos | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,956 - WARNING - Erro validação estrutura | connection_id=2 | table=roles | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,958 - WARNING - Erro validação estrutura | connection_id=2 | table=roles_permissions | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,959 - WARNING - Erro validação estrutura | connection_id=2 | table=permissions | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,961 - WARNING - Erro validação estrutura | connection_id=2 | table=audit_logs | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,962 - WARNING - Erro validação estrutura | connection_id=2 | table=refresh_tokens | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,963 - WARNING - Erro validação estrutura | connection_id=2 | table=settings | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,965 - WARNING - Erro validação estrutura | connection_id=2 | table=db_connections | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,967 - WARNING - Erro validação estrutura | connection_id=2 | table=chat_sessions | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,968 - WARNING - Erro validação estrutura | connection_id=2 | table=usage_logs | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,969 - WARNING - Erro validação estrutura | connection_id=2 | table=query_history | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,971 - WARNING - Erro validação estrutura | connection_id=2 | table=db_structures | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,972 - WARNING - Erro validação estrutura | connection_id=2 | table=messages | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,974 - WARNING - Erro validação estrutura | connection_id=2 | table=project_team_association | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,975 - WARNING - Erro validação estrutura | connection_id=2 | table=sprints | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,976 - WARNING - Erro validação estrutura | connection_id=2 | table=db_fields | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,977 - WARNING - Erro validação estrutura | connection_id=2 | table=feedback | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,979 - WARNING - Erro validação estrutura | connection_id=2 | table=tasks | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,980 - WARNING - Erro validação estrutura | connection_id=2 | table=task_stats | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:14,981 - WARNING - Erro validação estrutura | connection_id=2 | table=db_enum_fields | erro=Metadata da tabela já existe (DBStructure).
-2026-04-12 19:01:25,530 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
-2026-04-12 19:01:25,543 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
-2026-04-12 19:01:25,572 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:01:25,579 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
-2026-04-12 19:01:25,588 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
-2026-04-12 19:01:25,609 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:01:30,378 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
-2026-04-12 19:01:30,396 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
-2026-04-12 19:01:30,433 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:01:30,571 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
-2026-04-12 19:01:30,595 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
-2026-04-12 19:01:30,627 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:02:07,528 - WARNING - python-dotenv could not parse statement starting at line 132
-2026-04-12 19:02:07,536 - INFO - Sistema de cache inicializado: C:\Users\Francemy\Documents\python\gmTGBackend\app\config\cache
-2026-04-12 19:02:07,536 - INFO - Configurações: {'enabled': True, 'ttl_default': 3600, 'max_size_mb': 100, 'cleanup_interval': 3600, 'cleanup_probability': 0.01, 'max_old_files_remove': 10, 'disable_flag': False, 'directory': 'C:\\Users\\Francemy\\Documents\\python\\gmTGBackend\\app\\config\\cache', 'pickle_protocol': 4, 'log_hits': False, 'log_misses': False, 'use_gzip': True, 'gzip_compression_level': 6, 'memory_cache_ttl': 60}
-2026-04-12 19:02:07,955 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
-2026-04-12 19:02:17,813 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
-2026-04-12 19:02:18,250 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
-2026-04-12 19:02:18,251 - INFO - \U0001f4c4 Log file: logs\logs.txt
-2026-04-12 19:02:18,251 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
-2026-04-12 19:02:18,251 - INFO - \U0001f680 Iniciando seed do sistema...
-2026-04-12 19:02:18,372 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
-2026-04-12 19:02:18,381 - INFO - \U0001f4bc Cargos sincronizados
-2026-04-12 19:02:18,455 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
-2026-04-12 19:02:18,684 - INFO - \U0001f464 Usuário admin já existente
-2026-04-12 19:02:18,694 - INFO - \U0001f331 Seed executado com sucesso!
-2026-04-12 19:02:18,695 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2026-04-12 19:02:18,698 - INFO - Nenhum cache expirado encontrado.
-2026-04-12 19:02:18,698 - INFO - [\U0001f9e0 LRU Cache] Cache em memória limpo com sucesso.
-2026-04-12 19:02:18,698 - INFO - [\U0001f9f9 Cache Scheduler] Execução concluída às 2026-04-12 19:02:18.698798
-2026-04-12 19:02:36,784 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:02:36,801 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:02:36,802 - INFO - \U0001f50d Buscando conexão com ID 2
-2026-04-12 19:02:36,810 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:02:36,870 - INFO - Usando cache para tabelas | connection_id=2 | user=1 | tables=100
-2026-04-12 19:02:36,875 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:02:36,878 - INFO - \U0001f50d Buscando conexão com ID 2
-2026-04-12 19:02:36,880 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:02:36,886 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:02:36,889 - INFO - Usando cache para tabelas | connection_id=2 | user=1 | tables=100
-2026-04-12 19:02:43,094 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:02:43,114 - INFO - Usando cache para tabelas | connection_id=2 | user=1 | tables=100
-2026-04-12 19:02:43,131 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:02:43,142 - INFO - Usando cache para tabelas | connection_id=2 | user=1 | tables=100
-2026-04-12 19:03:14,969 - ERROR - Nenhum engine ativo para o usuário ID 1
-2026-04-12 19:03:14,969 - INFO - Tentando reativar conexão | user_id=1
-2026-04-12 19:03:15,022 - ERROR - Nenhum engine ativo para o usuário ID 1
-2026-04-12 19:03:15,343 - INFO - \U0001f50c Criando engine para PostgreSQL em dpg-d7ce2277f7vs739hvelg-a.virginia-postgres.render.com:5432
-2026-04-12 19:35:37,692 - INFO - \U0001f4dc Buscando logs | Conexão: todas | Página 1, Limite 10
-2026-04-12 19:35:37,749 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
-2026-04-12 19:35:37,793 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:35:40,464 - INFO - \U0001f4e1 Verificando conexão ativa do conexão 2
-2026-04-12 19:35:40,473 - INFO - Engine removido e fechado para usuário 1
-2026-04-12 19:35:40,474 - INFO - \U0001f501 Engine do usuário 1 descartado com sucesso.
-2026-04-12 19:35:40,474 - INFO - \U0001f4e1 Verificando conexão ativa do conexão 2
-2026-04-12 19:35:40,490 - INFO - \U0001f50c Conexão desativada para o usuário 2
-2026-04-12 19:35:40,491 - INFO - \U0001f50d Buscando conexão com ID 2
-2026-04-12 19:35:40,502 - INFO - \U0001f4d1 Log criado \u2192 conexão=2, ação='Desconexão manual', status='disconnected', usuário=1
-2026-04-12 19:35:40,525 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
-2026-04-12 19:35:40,556 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
-2026-04-12 19:35:45,305 - INFO - \U0001f4e1 Verificando conexão ativa do conexão 2
-2026-04-12 19:35:45,307 - INFO - \U0001f50d Buscando conexão com ID 2
-2026-04-12 19:35:45,314 - INFO - \U0001f512 0 conexões desativadas para o usuário 1
-2026-04-12 19:35:45,318 - INFO - \U0001f50c Criando engine para PostgreSQL em dpg-d7ce2277f7vs739hvelg-a.virginia-postgres.render.com:5432
-2026-04-12 19:35:49,698 - INFO - \U0001f501 Definindo nova conexão ativa para o usuário 1: conexão 2
-2026-04-12 19:35:49,702 - INFO - \u2705 Conexão ativa definida: user=1, conn=2
-2026-04-12 19:35:49,706 - INFO - \U0001f4d1 Log criado \u2192 conexão=2, ação='Conexão ativada', status='success', usuário=1
-2026-04-12 19:35:49,731 - INFO - \U0001f50d Buscando conexões | user=1 | page=1 | limit=10
-2026-04-12 19:35:49,762 - INFO - \U0001f4e1 Verificando conexão ativa do usuário 1
+2026-04-15 11:32:11,956 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:32:11.956870)
+2026-04-15 11:33:11,960 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:33:11.960563)
+2026-04-15 11:34:11,964 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:34:11.964551)
+2026-04-15 11:35:11,968 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:35:11.968262)
+2026-04-15 11:36:11,973 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:36:11.973587)
+2026-04-15 11:37:11,976 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:37:11.976570)
+2026-04-15 11:38:11,980 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:38:11.980512)
+2026-04-15 11:39:11,983 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:39:11.983100)
+2026-04-15 11:40:11,985 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:40:11.985858)
+2026-04-15 11:41:11,990 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:41:11.990033)
+2026-04-15 11:42:11,995 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:42:11.995274)
+2026-04-15 11:43:11,999 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:43:11.999785)
+2026-04-15 11:44:12,002 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:44:12.002699)
+2026-04-15 11:45:12,007 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:45:12.007070)
+2026-04-15 11:46:12,012 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:46:12.012141)
+2026-04-15 11:47:12,015 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:47:12.015057)
+2026-04-15 11:48:12,019 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:48:12.019488)
+2026-04-15 11:49:12,028 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:49:12.028386)
+2026-04-15 11:50:12,032 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:50:12.032217)
+2026-04-15 11:51:12,038 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:51:12.038032)
+2026-04-15 11:52:12,043 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:52:12.043985)
+2026-04-15 11:53:12,049 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:53:12.049090)
+2026-04-15 11:54:12,052 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:54:12.052525)
+2026-04-15 11:55:12,056 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:55:12.056958)
+2026-04-15 11:56:12,059 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:56:12.059539)
+2026-04-15 11:57:12,062 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:57:12.062677)
+2026-04-15 11:58:12,066 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:58:12.066407)
+2026-04-15 11:59:12,068 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 11:59:12.068793)
+2026-04-15 12:00:12,074 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:00:12.074997)
+2026-04-15 12:01:12,079 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:01:12.079114)
+2026-04-15 12:02:12,082 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:02:12.082253)
+2026-04-15 12:03:12,085 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:03:12.085310)
+2026-04-15 12:04:12,090 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:04:12.090253)
+2026-04-15 12:05:12,095 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:05:12.095086)
+2026-04-15 12:06:12,098 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:06:12.098842)
+2026-04-15 12:07:12,103 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:07:12.103958)
+2026-04-15 12:08:12,107 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:08:12.107442)
+2026-04-15 12:09:12,110 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:09:12.110849)
+2026-04-15 12:10:12,113 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:10:12.113559)
+2026-04-15 12:11:12,120 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:11:12.120254)
+2026-04-15 12:12:12,124 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:12:12.124860)
+2026-04-15 12:14:41,757 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:14:41.757425)
+2026-04-15 12:15:41,760 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:15:41.760472)
+2026-04-15 12:16:41,764 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:16:41.764090)
+2026-04-15 12:17:41,769 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:17:41.769389)
+2026-04-15 12:18:41,772 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:18:41.772791)
+2026-04-15 12:19:41,777 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:19:41.777159)
+2026-04-15 12:20:41,780 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:20:41.780345)
+2026-04-15 12:21:41,783 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:21:41.783976)
+2026-04-15 12:22:41,789 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:22:41.789020)
+2026-04-15 12:23:41,793 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:23:41.793808)
+2026-04-15 12:24:41,797 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:24:41.797108)
+2026-04-15 12:25:41,800 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:25:41.800202)
+2026-04-15 12:26:41,805 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:26:41.805046)
+2026-04-15 12:27:41,808 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:27:41.808568)
+2026-04-15 12:28:41,812 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:28:41.812428)
+2026-04-15 12:29:41,816 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:29:41.816305)
+2026-04-15 12:30:41,821 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:30:41.821504)
+2026-04-15 12:31:41,825 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:31:41.825673)
+2026-04-15 12:32:41,834 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:32:41.834716)
+2026-04-15 12:33:41,837 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:33:41.837800)
+2026-04-15 12:34:41,841 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:34:41.841275)
+2026-04-15 12:35:41,844 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:35:41.844648)
+2026-04-15 12:38:26,967 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:38:26.967976)
+2026-04-15 12:39:26,971 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:39:26.971492)
+2026-04-15 12:40:26,974 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:40:26.974230)
+2026-04-15 12:41:26,976 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:41:26.976857)
+2026-04-15 12:42:26,979 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:42:26.979998)
+2026-04-15 12:43:26,982 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:43:26.982082)
+2026-04-15 12:44:26,985 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:44:26.985543)
+2026-04-15 12:45:26,988 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:45:26.988627)
+2026-04-15 12:46:26,992 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:46:26.992708)
+2026-04-15 12:47:26,994 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:47:26.994870)
+2026-04-15 12:48:26,999 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:48:26.999416)
+2026-04-15 12:49:27,002 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:49:27.002788)
+2026-04-15 12:50:27,006 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:50:27.006140)
+2026-04-15 12:51:27,010 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:51:27.010309)
+2026-04-15 12:52:27,013 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:52:27.013418)
+2026-04-15 12:53:27,017 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:53:27.017865)
+2026-04-15 12:54:27,021 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:54:27.021929)
+2026-04-15 12:55:27,025 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:55:27.025639)
+2026-04-15 12:56:27,029 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:56:27.029147)
+2026-04-15 12:57:27,033 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:57:27.033560)
+2026-04-15 12:58:27,038 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:58:27.038315)
+2026-04-15 12:59:27,040 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 12:59:27.040971)
+2026-04-15 13:00:27,044 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:00:27.044874)
+2026-04-15 13:01:27,046 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:01:27.046964)
+2026-04-15 13:02:27,049 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:02:27.049982)
+2026-04-15 13:03:27,053 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:03:27.053675)
+2026-04-15 13:04:27,057 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:04:27.057007)
+2026-04-15 13:05:27,061 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:05:27.061803)
+2026-04-15 13:06:27,065 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:06:27.065133)
+2026-04-15 13:07:27,068 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:07:27.068800)
+2026-04-15 13:08:27,076 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:08:27.076298)
+2026-04-15 13:09:27,080 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:09:27.080379)
+2026-04-15 13:10:27,085 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:10:27.085913)
+2026-04-15 13:11:27,088 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:11:27.088900)
+2026-04-15 13:12:27,091 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:12:27.091798)
+2026-04-15 13:13:27,095 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:13:27.095131)
+2026-04-15 13:14:27,098 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:14:27.098573)
+2026-04-15 13:15:27,102 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:15:27.102965)
+2026-04-15 13:16:27,105 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:16:27.105934)
+2026-04-15 13:17:27,109 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:17:27.109370)
+2026-04-15 13:18:27,112 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:18:27.112506)
+2026-04-15 13:19:27,116 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:19:27.116830)
+2026-04-15 13:20:27,120 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:20:27.120810)
+2026-04-15 13:21:27,123 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:21:27.123131)
+2026-04-15 13:22:27,125 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:22:27.125856)
+2026-04-15 13:23:27,129 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:23:27.129772)
+2026-04-15 13:24:27,133 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:24:27.133472)
+2026-04-15 13:25:27,137 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:25:27.137948)
+2026-04-15 13:26:27,142 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:26:27.142865)
+2026-04-15 13:26:41,584 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-15 13:26:41,590 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-15 13:26:41,597 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-15 13:26:41,602 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-15 13:26:41,607 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-15 13:26:41,612 - WARNING - \u274c HTTP error: Sessão inválida
+2026-04-15 13:26:41,618 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-15 13:26:41,620 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-15 13:26:41,624 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-15 13:26:41,627 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-15 13:26:41,632 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-15 13:26:41,634 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-15 13:26:41,640 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-15 13:26:41,642 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-15 13:26:41,646 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-15 13:26:41,648 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-15 13:26:41,653 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-15 13:26:41,656 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-15 13:26:41,662 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-15 13:26:41,665 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-15 13:26:41,673 - INFO - \U0001f36a Cookies de autenticação removidos
+2026-04-15 13:26:41,678 - INFO - \U0001f44b Logout realizado user_id=None
+2026-04-15 13:27:27,146 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:27:27.146867)
+2026-04-15 13:28:27,149 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:28:27.149950)
+2026-04-15 13:29:27,155 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:29:27.155092)
+2026-04-15 13:30:27,159 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:30:27.159226)
+2026-04-15 13:31:27,162 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:31:27.162404)
+2026-04-15 13:32:27,166 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 13:32:27.166386)
+2026-04-15 15:54:44,832 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-15 15:54:56,402 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-15 15:54:56,879 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-15 15:54:57,127 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-15 15:54:57,130 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-15 15:54:57,131 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-15 15:54:57,143 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-15 15:54:57,198 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-15 15:54:57,270 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-15 15:54:57,277 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-15 15:54:57,519 - INFO - \U0001f464 Usuário admin já existente
+2026-04-15 15:54:57,537 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-15 15:54:57,539 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-15 15:54:57,541 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 15:54:57.541730)
+2026-04-15 15:55:57,544 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 15:55:57.544386)
+2026-04-15 15:56:57,547 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 15:56:57.547706)
+2026-04-15 15:57:57,552 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 15:57:57.552559)
+2026-04-15 15:58:57,556 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 15:58:57.556795)
+2026-04-15 15:59:57,559 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 15:59:57.559626)
+2026-04-15 16:00:57,562 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:00:57.562457)
+2026-04-15 16:01:57,567 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:01:57.567158)
+2026-04-15 16:02:57,570 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:02:57.570688)
+2026-04-15 16:03:57,574 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:03:57.574340)
+2026-04-15 16:04:57,578 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:04:57.578345)
+2026-04-15 16:05:57,581 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:05:57.581234)
+2026-04-15 16:06:57,585 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:06:57.585252)
+2026-04-15 16:07:57,589 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:07:57.589739)
+2026-04-15 16:08:57,594 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:08:57.594180)
+2026-04-15 16:09:57,597 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:09:57.597634)
+2026-04-15 16:10:57,600 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:10:57.600765)
+2026-04-15 16:11:57,604 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:11:57.604194)
+2026-04-15 16:12:57,608 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:12:57.608354)
+2026-04-15 16:13:57,612 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:13:57.612932)
+2026-04-15 16:14:57,615 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:14:57.615626)
+2026-04-15 16:15:57,617 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:15:57.617632)
+2026-04-15 16:16:57,632 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:16:57.632860)
+2026-04-15 16:17:57,637 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:17:57.637020)
+2026-04-15 16:18:57,640 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:18:57.640344)
+2026-04-15 16:19:57,644 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:19:57.644660)
+2026-04-15 16:20:57,647 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:20:57.647528)
+2026-04-15 16:21:57,650 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:21:57.650906)
+2026-04-15 16:22:57,655 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:22:57.655954)
+2026-04-15 16:23:57,660 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:23:57.660417)
+2026-04-15 16:24:57,664 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:24:57.664112)
+2026-04-15 16:25:57,668 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:25:57.668021)
+2026-04-15 16:26:57,671 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:26:57.671129)
+2026-04-15 16:27:57,673 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:27:57.673827)
+2026-04-15 16:28:57,678 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:28:57.678340)
+2026-04-15 16:29:57,681 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:29:57.681623)
+2026-04-15 16:30:57,684 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:30:57.684905)
+2026-04-15 16:31:57,688 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:31:57.688763)
+2026-04-15 16:32:57,691 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:32:57.691408)
+2026-04-15 16:33:57,694 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:33:57.694323)
+2026-04-15 16:34:57,696 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:34:57.696831)
+2026-04-15 16:35:57,700 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:35:57.700512)
+2026-04-15 16:36:57,705 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:36:57.705429)
+2026-04-15 16:37:57,709 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:37:57.709382)
+2026-04-15 16:38:57,712 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:38:57.712214)
+2026-04-15 16:39:57,783 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:39:57.777492)
+2026-04-15 16:40:57,787 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:40:57.787739)
+2026-04-15 16:41:57,791 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:41:57.791808)
+2026-04-15 16:42:57,795 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:42:57.795008)
+2026-04-15 16:43:57,797 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:43:57.797924)
+2026-04-15 16:44:57,801 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:44:57.801068)
+2026-04-15 16:45:57,806 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:45:57.806385)
+2026-04-15 16:46:57,808 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:46:57.808880)
+2026-04-15 16:47:57,813 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:47:57.813173)
+2026-04-15 16:48:57,816 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:48:57.816801)
+2026-04-15 16:49:57,819 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:49:57.819911)
+2026-04-15 16:50:57,823 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:50:57.823233)
+2026-04-15 16:51:57,917 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:51:57.916646)
+2026-04-15 16:52:57,920 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:52:57.920814)
+2026-04-15 16:53:57,925 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:53:57.925065)
+2026-04-15 16:54:57,928 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:54:57.928619)
+2026-04-15 16:55:57,934 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:55:57.934835)
+2026-04-15 16:56:57,938 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:56:57.938250)
+2026-04-15 16:57:57,942 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:57:57.942754)
+2026-04-15 16:58:57,947 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:58:57.947108)
+2026-04-15 16:59:57,951 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 16:59:57.951321)
+2026-04-15 17:00:57,959 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 17:00:57.959801)
+2026-04-15 17:01:57,964 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 17:01:57.964830)
+2026-04-15 17:02:57,970 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 17:02:57.970046)
+2026-04-15 17:03:57,994 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 17:03:57.994363)
+2026-04-15 17:04:58,009 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-15 17:04:58.009242)

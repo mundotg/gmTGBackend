@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import urlparse, urlunparse
 from app.config.dotenv import get_env
 from app.ultils.logger import log_message
 
@@ -38,7 +38,11 @@ def convert_to_asyncpg_url(url: str) -> str:
         )
     )
 
-    log_message(f"🔧 URL convertida para asyncpg (sem query parameters)")
+    log_message(
+        f"🔧 URL convertida para asyncpg (sem query parameters)",
+        source="database.py",
+        withBd=True,
+    )
 
     # troca o driver psycopg2 → asyncpg
     return clean_url.replace("postgresql://", "postgresql+asyncpg://")
@@ -115,11 +119,3 @@ def get_db():
 async def get_db_async():
     async with AsyncSessionLocal() as session:
         yield session
-
-
-# ============================================================
-# 🧩 DEBUG OPCIONAL
-# ============================================================
-def print_db_config():
-    log_message("🔗 URL base", DATABASE_URL)
-    log_message("⚡ URL assíncrona", ASYNC_DATABASE_URL)

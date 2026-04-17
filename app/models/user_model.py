@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List, Optional, Optional
 from sqlalchemy import (
     Column,
     Integer,
@@ -9,8 +10,9 @@ from sqlalchemy import (
     Table,
     func,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, mapped_column, relationship
 from app.database import Base
+from app.models.clouds_models import FileModel, Plan, Plan, StorageUsage
 from app.models.task_models import TimestampMixin, project_team_association
 
 
@@ -138,6 +140,19 @@ class User(Base, TimestampMixin):
     cargo = relationship("Cargo", back_populates="users")
     role = relationship("Role", back_populates="users")
 
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    plan: Mapped["Plan"] = relationship(back_populates="users")
+    files: Mapped[List["FileModel"]] = relationship(back_populates="user")
+    storage_usage: Mapped[Optional["StorageUsage"]] = relationship(
+        back_populates="user", uselist=False
+    )
+
+    request_usage = relationship("RequestUsage", back_populates="user", uselist=False)
+    network_metrics = relationship(
+        "NetworkMetric", back_populates="user", uselist=False
+    )
     # 🔗 Tokens
     refresh_tokens = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"

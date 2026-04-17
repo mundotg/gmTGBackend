@@ -22,9 +22,11 @@ from app.routes import (
     backup_restore_routes,
     database_operations_routes,
     delete_registro_routes,
+    logs_routes,
     ocr_routes,
     projects_task_routes,
     sprint_task_routes,
+    storage_routes,
     transfer_data_routes,
     user_routes,
     geral_routes,
@@ -123,7 +125,8 @@ app.include_router(queryhistory_routes.router)
 app.include_router(analytics_db_routes.router)
 app.include_router(project_analytics_routes.router)
 app.include_router(ai_chat_routes.router)
-
+app.include_router(logs_routes.router)
+app.include_router(storage_routes.router)
 
 # ------------------------------------------------------------
 # Execução (IMPORTANTE pro .exe)

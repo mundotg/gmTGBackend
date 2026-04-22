@@ -35,7 +35,10 @@ from datetime import datetime
 import os
 from app.ultils.logger import log_message
 
+import textwrap
 
+def split_text(text, max_chars=100):
+    return "<br/>".join(textwrap.wrap(text, max_chars))
 
 class GenericReportGenerator:
     """Gerador ultra-genérico de relatórios PDF com rodapé fixo"""
@@ -175,32 +178,55 @@ class GenericReportGenerator:
         height = data.get("height", 1)
         self.elements.append(Spacer(1, height * cm))
     
+
     def _add_table(self, data: dict):
-        """Adiciona tabela formatada com quebra automática de texto"""
+        """Adiciona tabela formatada com quebra automática de texto e proteção contra overflow"""
+        import textwrap
+
         columns = data.get("columns", [])
         rows = data.get("rows", [])
         col_widths = data.get("col_widths", None)
-        
+
         if not columns or not rows:
             return
-        
-        # Converte dados para Paragraph para permitir quebra de linha
-        def wrap_text(text, max_width=None):
-            """Converte texto em Paragraph para quebra automática"""
-            if text is None or text == "":
-                return Paragraph("", self.styles["Normal"])
+
+        # ================================
+        # 🧠 CONFIGURAÇÕES IMPORTANTES
+        # ================================
+        MAX_CHARS_PER_CELL = 300   # limite duro
+        WRAP_WIDTH = 50            # quebra de linha
+
+        def safe_text(text):
+            """Protege contra conteúdo gigante"""
+            if text is None:
+                return ""
             
+            text = str(text)
+
+            # corta textos absurdos
+            if len(text) > MAX_CHARS_PER_CELL:
+                text = text[:MAX_CHARS_PER_CELL] + "..."
+
+            # quebra em múltiplas linhas
+            return textwrap.fill(text, WRAP_WIDTH)
+
+        def wrap_text(text):
+            """Converte texto em Paragraph com quebra automática"""
+            text = safe_text(text)
+
             style = ParagraphStyle(
                 'CellText',
                 parent=self.styles['Normal'],
                 fontSize=9,
                 leading=11,
                 alignment=TA_CENTER,
-                wordWrap='CJK'  # Quebra de linha melhorada
             )
-            return Paragraph(str(text), style)
-        
-        # Converte cabeçalho
+
+            return Paragraph(text, style)
+
+        # ================================
+        # 🧱 CABEÇALHO
+        # ================================
         header_style = ParagraphStyle(
             'HeaderCell',
             parent=self.styles['Normal'],
@@ -210,35 +236,44 @@ class GenericReportGenerator:
             alignment=TA_CENTER,
             textColor=colors.white
         )
-        header_row = [Paragraph(str(col), header_style) for col in columns]
-        
-        # Converte linhas de dados
+
+        header_row = [Paragraph(safe_text(col), header_style) for col in columns]
+
+        # ================================
+        # 📊 LINHAS
+        # ================================
         wrapped_rows = []
         for row in rows:
             wrapped_row = [wrap_text(cell) for cell in row]
             wrapped_rows.append(wrapped_row)
-        
+
         table_data = [header_row] + wrapped_rows
-        
-        # Largura das colunas
+
+        # ================================
+        # 📏 LARGURA DAS COLUNAS
+        # ================================
         if col_widths:
             col_widths = [w * cm for w in col_widths]
         else:
             available_width = (A4[0] - 4*cm)
             col_widths = [available_width / len(columns)] * len(columns)
-        
-        # Cria tabela com altura mínima de linha
+
+        # ================================
+        # 🏗️ CRIA TABELA
+        # ================================
         table = Table(
-            table_data, 
-            colWidths=col_widths, 
+            table_data,
+            colWidths=col_widths,
             hAlign="CENTER",
-            repeatRows=1  # Repete cabeçalho em páginas seguintes
+            repeatRows=1
         )
-        
-        # Cores customizáveis
+
+        # ================================
+        # 🎨 ESTILO
+        # ================================
         header_color = data.get("header_color", "#1e3a8a")
         row_colors = data.get("row_colors", ["#ffffff", "#f8fafc"])
-        
+
         table.setStyle(TableStyle([
             # Cabeçalho
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(header_color)),
@@ -247,26 +282,28 @@ class GenericReportGenerator:
             ("FONTSIZE", (0, 0), (-1, 0), 10),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
-            ("TOPPADDING", (0, 0), (-1, 0), 10),
-            
+
             # Corpo
-            ("BACKGROUND", (0, 1), (-1, -1), colors.white),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor(c) for c in row_colors]),
-            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 1), (-1, -1), 9),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+
+            # Espaçamentos
             ("LEFTPADDING", (0, 0), (-1, -1), 6),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 1), (-1, -1), 8),
             ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
-            
-            # CRÍTICO: Permitir quebra de linha automática
-            ("WORDWRAP", (0, 0), (-1, -1), True),
         ]))
-        
-        self.elements.append(table)
-        self.elements.append(Spacer(1, 0.5*cm))
+
+        # ================================
+        # 🚑 FALLBACK (anti-crash)
+        # ================================
+        try:
+            self.elements.append(table)
+            self.elements.append(Spacer(1, 0.5*cm))
+        except Exception as e:
+            # fallback simples se der erro
+            log_message(f"⚠️ Erro ao renderizar tabela, fallback ativado: {e}", "error")
+            self.elements.append(Paragraph("⚠️ Erro ao renderizar tabela (dados muito grandes)", self.styles["Normal"]))
     
     def _add_image(self, data: dict):
         """Adiciona imagem"""
@@ -392,130 +429,3 @@ class GenericReportGenerator:
         doc.build(self.elements)
         log_message(f"✅ Relatório gerado com sucesso: {filename}")
 
-
-# # ========================================
-# # 🧪 EXEMPLOS DE USO
-# # ========================================
-
-# if __name__ == "__main__":
-    
-#     # Exemplo 1: Relatório simples
-#     print("📄 Gerando Exemplo 1: Relatório Simples")
-#     report_simple = [
-#         {"header": {"title": "Relatório de Vendas", "subtitle": "Outubro 2025"}},
-#         {"text": {"value": "Este relatório apresenta as vendas realizadas no mês.", "align": "center"}},
-#         {"spacer": {"height": 0.5}},
-#         {"table": {
-#             "columns": ["ID", "Cliente", "Valor", "Status"],
-#             "rows": [
-#                 [1, "Maria Silva", "R$ 350,00", "Concluído"],
-#                 [2, "João Pedro", "R$ 200,00", "Pendente"],
-#                 [3, "Ana Paula", "R$ 580,00", "Concluído"]
-#             ]
-#         }},
-#         {"footer": {"center": f"© {datetime.now().year} OrionForgeNexus - Relatório gerado automaticamente"}}
-#     ]
-    
-#     generator1 = GenericReportGenerator()
-#     generator1.generate_report("exemplo1_simples.pdf", report_simple)
-    
-    
-#     # Exemplo 2: Relatório completo com todos os elementos
-#     print("\n📄 Gerando Exemplo 2: Relatório Completo")
-#     report_complete = [
-#         {"header": {"title": "Relatório Executivo Completo", "subtitle": "Análise Trimestral - Q4 2025", "logo": False}},
-        
-#         {"text": {"value": "Sumário Executivo", "align": "left", "size": 14, "bold": True, "color": "#1e3a8a"}},
-#         {"line": {"color": "#1e3a8a", "width": 2}},
-#         {"spacer": {"height": 0.3}},
-        
-#         {"text": {
-#             "value": "Este documento apresenta uma análise detalhada do desempenho da empresa no último trimestre, incluindo métricas financeiras, operacionais e estratégicas.",
-#             "align": "justify"
-#         }},
-        
-#         {"spacer": {"height": 0.5}},
-#         {"text": {"value": "Principais Indicadores:", "bold": True}},
-#         {"list": {
-#             "items": [
-#                 "Receita total: R$ 1.250.000,00 (↑ 15% vs Q3)",
-#                 "Novos clientes: 47 empresas",
-#                 "Taxa de satisfação: 94,5%",
-#                 "Projetos concluídos: 23"
-#             ],
-#             "bullet": "✓"
-#         }},
-        
-#         {"spacer": {"height": 0.5}},
-#         {"text": {"value": "Detalhamento por Departamento", "size": 13, "bold": True, "color": "#475569"}},
-#         {"line": {}},
-        
-#         {"table": {
-#             "columns": ["Departamento", "Meta", "Realizado", "% Atingido"],
-#             "rows": [
-#                 ["Vendas", "R$ 800k", "R$ 850k", "106%"],
-#                 ["Marketing", "R$ 200k", "R$ 195k", "97%"],
-#                 ["Operações", "R$ 250k", "R$ 205k", "82%"]
-#             ],
-#             "header_color": "#059669",
-#             "row_colors": ["#ffffff", "#ecfdf5"]
-#         }},
-        
-#         {"pagebreak": {}},
-        
-#         {"text": {"value": "Próximas Ações Estratégicas", "size": 14, "bold": True, "align": "center"}},
-#         {"spacer": {"height": 0.3}},
-#         {"list": {
-#             "items": [
-#                 "Expandir equipe de desenvolvimento em 20%",
-#                 "Lançar novo produto no Q1 2026",
-#                 "Implementar sistema de CRM integrado",
-#                 "Reforçar presença em redes sociais"
-#             ]
-#         }},
-        
-#         {"spacer": {"height": 1}},
-#         {"text": {
-#             "value": "Relatório aprovado pela diretoria em 18/10/2025",
-#             "align": "right",
-#             "size": 9,
-#             "color": "#64748b"
-#         }},
-        
-#         {"footer": {
-#             "left": "OrionForgeNexus (oFn)",
-#             "center": "Documento Confidencial",
-#             "right": f"Gerado em {datetime.now().strftime('%d/%m/%Y')}"
-#         }}
-#     ]
-    
-#     generator2 = GenericReportGenerator()
-#     generator2.generate_report("exemplo2_completo.pdf", report_complete)
-    
-    
-#     # Exemplo 3: Relatório em modo paisagem
-#     print("\n📄 Gerando Exemplo 3: Relatório Paisagem (Landscape)")
-#     report_landscape = [
-#         {"header": {"title": "Dashboard de Projetos 2025"}},
-#         {"table": {
-#             "columns": ["ID", "Projeto", "Cliente", "Início", "Fim", "Status", "Orçamento", "Gasto", "Margem"],
-#             "rows": [
-#                 [1, "Sistema ERP", "Empresa A", "01/01", "30/06", "Concluído", "R$ 50k", "R$ 45k", "10%"],
-#                 [2, "App Mobile", "Empresa B", "15/02", "15/08", "Em Andamento", "R$ 30k", "R$ 22k", "27%"],
-#                 [3, "Site Institucional", "Empresa C", "10/03", "10/05", "Concluído", "R$ 15k", "R$ 14k", "7%"],
-#                 [4, "Consultoria TI", "Empresa D", "01/04", "01/12", "Em Andamento", "R$ 80k", "R$ 60k", "25%"]
-#             ],
-#             "col_widths": [1.5, 4, 3.5, 2, 2, 3, 2.5, 2.5, 2]
-#         }},
-#         {"footer": {"center": "OrionForgeNexus - Gestão de Projetos"}}
-#     ]
-    
-#     generator3 = GenericReportGenerator()
-#     generator3.generate_report("exemplo3_landscape.pdf", report_landscape, orientation="landscape")
-    
-    
-#     print("\n✅ Todos os exemplos foram gerados com sucesso!")
-#     print("📁 Arquivos criados:")
-#     print("   • exemplo1_simples.pdf")
-#     print("   • exemplo2_completo.pdf")
-#     print("   • exemplo3_landscape.pdf")

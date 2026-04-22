@@ -8,17 +8,27 @@ from sqlalchemy.engine import Engine, Result
 from sqlalchemy.sql import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.cruds.queryhistory_crud import create_query_history, get_query_history_by_user_and_query
+from app.cruds.queryhistory_crud import (
+    create_query_history,
+    get_query_history_by_user_and_query,
+)
 from app.models.connection_models import DBConnection
 from app.schemas.query_select_upAndInsert_schema import CondicaoFiltro, QueryPayload
 from app.schemas.queryhistory_schemas import QueryHistoryCreate
-from app.services.cloudeAi_execute_query import QueryFilterBuilder, QuerySecurityValidator
-from app.ultils.build_query import get_count_query, get_filter_condition_with_operation, get_query_string
+from app.services.cloudeAi_execute_query import (
+    QueryFilterBuilder,
+    QuerySecurityValidator,
+)
+from app.ultils.build_query import (
+    get_count_query,
+    get_filter_condition_with_operation,
+    get_query_string_advance,
+)
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
 # Limite de linhas a manter no preview (evita OOM)
-MAX_PREVIEW_ROWS = 500
+MAX_PREVIEW_ROWS = 50000
 # Tamanho do lote para fetchmany
 FETCH_BATCH_SIZE = 100
 
@@ -31,12 +41,16 @@ def is_safe_identifier(identifier: str) -> bool:
     if not identifier:
         return False
     # permite opcionalmente "schema.table"
-    return re.fullmatch(r"(?:[A-Za-z_][A-Za-z0-9_]*)(?:\.(?:[A-Za-z_][A-Za-z0-9_]*))?", identifier) is not None
+    return (
+        re.fullmatch(
+            r"(?:[A-Za-z_][A-Za-z0-9_]*)(?:\.(?:[A-Za-z_][A-Za-z0-9_]*))?", identifier
+        )
+        is not None
+    )
 
 
 def montar_filter_com_parametros(
-    conditions: Optional[List[CondicaoFiltro]],
-    db_type: str = "postgres"
+    conditions: Optional[List[CondicaoFiltro]], db_type: str = "postgres"
 ) -> Tuple[str, Dict[str, Any]]:
     """
     Monta a cláusula WHERE e o dicionário de parâmetros.
@@ -50,8 +64,12 @@ def montar_filter_com_parametros(
     params: Dict[str, Any] = {}
 
     for idx, cond in enumerate(conditions):
-        if not is_safe_identifier(cond.table_name_fil) or not is_safe_identifier(cond.column):
-            raise ValueError(f"Identificador inválido: {cond.table_name_fil}.{cond.column}")
+        if not is_safe_identifier(cond.table_name_fil) or not is_safe_identifier(
+            cond.column
+        ):
+            raise ValueError(
+                f"Identificador inválido: {cond.table_name_fil}.{cond.column}"
+            )
 
         field = f"{cond.table_name_fil}.{cond.column}"
         # gera um prefixo único para o param name
@@ -65,8 +83,9 @@ def montar_filter_com_parametros(
             db_type=db_type,
             operation=cond.operator,
             param_name=param_prefix,
-            enum_values="",
-            value_otheir_between=cond.value2
+            enum_values={},
+            value_otheir_between=cond.value2 or "",
+            pattern=cond.pattern,
         )
 
         logic = (cond.logicalOperator or "AND").strip().upper()
@@ -91,7 +110,7 @@ async def executar_query_e_salvar(
     connection: DBConnection,
     engine: Engine,
     queryrequest: QueryPayload,
-    chache_consulta: bool = False
+    chache_consulta: bool = False,
 ) -> Dict[str, Any]:
     """
     Executa a query de forma segura, salva histórico e retorna um dicionário com o resultado.
@@ -105,25 +124,37 @@ async def executar_query_e_salvar(
     if not queryrequest:
         raise ValueError("QueryPayload é obrigatório")
 
-    security_validator.ensure_base_table_in_query(queryrequest)
+    newQueryValidado = security_validator.ensure_base_table_in_query(queryrequest)
 
     # Filtros WHERE
     filters, params = await filter_builder.build_where_clause(
-                queryrequest.where or [], connection.type
-            )
+        newQueryValidado.where or [], connection.type
+    )
     # filters, params = montar_filter_com_parametros(queryrequest.where, connection.type)
-
     # Monta query (count ou select)
     if queryrequest.isCountQuery:
         query_string = get_count_query(
-            base_table=queryrequest.baseTable,
-            joins=queryrequest.joins or [],
+            base_table=newQueryValidado.baseTable,
+            joins=queryrequest.joins or {},
             filters=filters,
             distinct=queryrequest.distinct,
-            db_type=connection.type
+            db_type=connection.type,
         )
     else:
-        query_string = get_query_string(
+        query_string = get_query_string_advance(
+            base_table=queryrequest.baseTable,
+            select=queryrequest.select,
+            joins=queryrequest.joins,
+            aliases=queryrequest.aliaisTables,
+            filters=filters,
+            table_list=queryrequest.table_list,
+            order_by=queryrequest.orderBy,
+            max_rows=queryrequest.limit,
+            offset=queryrequest.offset,
+            db_type=connection.type,
+            distinct=queryrequest.distinct,
+        )
+        """ get_query_string(
             base_table=queryrequest.baseTable,
             joins=queryrequest.joins or [],
             select=queryrequest.select,
@@ -134,7 +165,7 @@ async def executar_query_e_salvar(
             offset=queryrequest.offset,
             db_type=connection.type,
             distinct=queryrequest.distinct
-        )
+        ) """
 
     log_message(f"📘 Query montada:\n{query_string}", "debug")
     log_message(f"📦 Parâmetros: {json.dumps(params, indent=2, default=str)}", "debug")
@@ -142,13 +173,16 @@ async def executar_query_e_salvar(
     # Check cache
     if chache_consulta:
         try:
-            consulta_existente = get_query_history_by_user_and_query(db, user_id, connection.id, query_string)
+            consulta_existente = get_query_history_by_user_and_query(
+                db, user_id, connection.id, query_string
+            )
             if consulta_existente:
-                log_message("⚠️ Consulta já registrada no histórico. Retornando resultado salvo.", "warning")
                 # se existiu erro operacional, repassa
                 if consulta_existente.error_message:
                     # se for erro operacional genérico, levanta para re-executar
-                    if "Erro operacional ao executar a consulta" in (consulta_existente.error_message or ""):
+                    if "Erro operacional ao executar a consulta" in (
+                        consulta_existente.error_message or ""
+                    ):
                         pass
                     else:
                         raise ValueError(consulta_existente.error_message)
@@ -160,11 +194,19 @@ async def executar_query_e_salvar(
                         "count": count_value,
                         "query": consulta_existente.query,
                         "duration_ms": consulta_existente.duration_ms,
-                        "cached": True
+                        "cached": True,
                     }
                 else:
-                    preview_data = json.loads(consulta_existente.result_preview) if consulta_existente.result_preview else []
-                    columns = list(preview_data[0].keys()) if isinstance(preview_data, list) and preview_data else []
+                    preview_data = (
+                        json.loads(consulta_existente.result_preview)
+                        if consulta_existente.result_preview
+                        else []
+                    )
+                    columns = (
+                        list(preview_data[0].keys())
+                        if isinstance(preview_data, list) and preview_data
+                        else []
+                    )
                     return {
                         "success": True,
                         "query": consulta_existente.query,
@@ -172,7 +214,7 @@ async def executar_query_e_salvar(
                         "duration_ms": consulta_existente.duration_ms,
                         "columns": columns,
                         "preview": preview_data,
-                        "cached": True
+                        "cached": True,
                     }
         except Exception as e:
             # erro ao consultar cache: loga e segue para executar ao invés de falhar
@@ -220,9 +262,13 @@ async def executar_query_e_salvar(
 
                 result_preview = json.dumps(preview_rows, default=str)
 
-                log_message(f"✅ Preview gerado com {fetched} linhas (cap {MAX_PREVIEW_ROWS}).", "debug")
+                log_message(
+                    f"✅ Preview gerado com {fetched} linhas (cap {MAX_PREVIEW_ROWS}).",
+                    "debug",
+                )
 
         log_message("✅ Query executada com sucesso.", "success")
+        print(len(result_preview))
 
     except SQLAlchemyError as sa_err:
         # trata erros SQL de forma específica
@@ -251,8 +297,14 @@ async def executar_query_e_salvar(
             is_favorite=False,
             tags="count" if queryrequest.isCountQuery else "select",
             app_source="API",  # ou "Console", "UI", dependendo da origem
-            client_ip=queryrequest.client_ip if hasattr(queryrequest, "client_ip") else None,
-            executed_by=queryrequest.executed_by if hasattr(queryrequest, "executed_by") else f"user_{user_id}",
+            client_ip=(
+                queryrequest.client_ip if hasattr(queryrequest, "client_ip") else None
+            ),
+            executed_by=(
+                queryrequest.executed_by
+                if hasattr(queryrequest, "executed_by")
+                else f"user_{user_id}"
+            ),
             modified_by=None,  # só será usado em updates posteriores
             meta_info={
                 "base_table": queryrequest.baseTable,
@@ -265,7 +317,7 @@ async def executar_query_e_salvar(
                 "connection_type": connection.type,
             },
         )
-        create_query_history(db=db, data=historico)
+        create_query_history(db=db, user_id=user_id, data=historico)
     except Exception as hist_err:
         log_message(f"⚠️ Falha ao salvar histórico: {hist_err}", "warning")
 
@@ -278,9 +330,13 @@ async def executar_query_e_salvar(
     if queryrequest.isCountQuery:
         return {
             "success": True,
-            "count": int(result_preview) if result_preview is not None and str(result_preview).isdigit() else 0,
+            "count": (
+                int(result_preview)
+                if result_preview is not None and str(result_preview).isdigit()
+                else 0
+            ),
             "query": query_string,
-            "duration_ms": duration_ms
+            "duration_ms": duration_ms,
         }
 
     return {
@@ -290,5 +346,5 @@ async def executar_query_e_salvar(
         "duration_ms": duration_ms,
         "columns": colunas,
         "preview": json.loads(result_preview) if result_preview else [],
-        "cached": False
+        "cached": False,
     }

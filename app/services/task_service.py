@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from app.cruds.task_cruds import delegate_task, get_paginated_query, get_tasks, add_task,  update_task, delete_task, validate_task
 from app.models.connection_models import DBConnection
-from app.models.task_models import AuditLog, Project, Role, Sprint, Task, TaskStats, TypeProjecto, Usuario,project_team_association
+from app.models.task_models import AuditLog, Project, Sprint, Task, TaskStats, TypeProjecto, project_team_association
+from app.models.user_model import Role, User
 from app.schemas.task_schema import  TaskSchema, TaskStatsSchema
 from app.ultils.logger import log_message
 
@@ -357,7 +358,7 @@ def get_paginacao_service(
     """
 
     model_map: Dict[str, Type] = {
-        "user": Usuario,
+        "user": User,
         "project": Project,
         "task": Task,
         "sprint": Sprint,

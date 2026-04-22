@@ -1,156 +1,177 @@
-from datetime import datetime, timezone
 import time
 import traceback
+from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.cruds.queryhistory_crud import create_query_history
 from app.schemas.query_select_upAndInsert_schema import InsertRequest
-from app.schemas.queryhistory_schemas import QueryHistoryCreate
+from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryType
 from app.services.editar_linha import _convert_column_type_for_string_one, quote_identifier
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
-
 
 def build_insert_query(table_name, db_type, insert_values):
     """Constrói a query de inserção dinâmica."""
     if not insert_values:
         return None
 
+    # print(f"DEBUG: db_type in build_insert_query = '{db_type}'")  # DEBUG
+    
     columns = []
     values = []
 
     for col, info in insert_values.items():
         value = info.get("value")
         col_type = info.get("type_column", "text")  # default string
-        columns.append(quote_identifier(db_type, col))
+        
+        # Quote the column name
+        quoted_col = quote_identifier(db_type, col)
+        # print(f"DEBUG: Column '{col}' -> quoted as '{quoted_col}'")  # DEBUG
+        
+        columns.append(quoted_col)
         values.append(_convert_column_type_for_string_one(value, col_type))
 
+    # Quote the table name
+    quoted_table = quote_identifier(db_type, table_name)
+    # print(f"DEBUG: Table '{table_name}' -> quoted as '{quoted_table}'")  # DEBUG
+
     query = text(f"""
-        INSERT INTO {quote_identifier(db_type, table_name)}
+        INSERT INTO {quoted_table}
         ({', '.join(columns)})
         VALUES ({', '.join(values)});
     """)
+    
+    # print(f"DEBUG: Final query: {query}")  # DEBUG
     return query
+
 def insert_row_service(
     data: InsertRequest,
     engine: Engine,
     user_id: int,
     db_type: str,
     connection_id: str,
-    db: Session
-):
+    db: Session,
+    client_ip: Optional[str] = None,
+    app_source: str = "API",
+    executed_by: str = "sistema",
+    modified_by: Optional[str] = None,
+) -> dict:
     """
     Insere novos registros em uma ou mais tabelas com base em `data.createdRow`.
-    Agora com registro de histórico completo e metadados.
+    Garante transação ACID: Se uma tabela falhar, todas as inserções são revertidas.
     """
     resposta_query = ""
     query_string = ""
-    duration_ms = 0
+    start_time = time.time()
+    
     total_inseridos = 0
     total_tabelas = 0
+    sucesso = False
+    error_msg = None
+    traceback_str = None
 
     try:
-        start = time.time()
+        # 🚀 Inicia a Transação
         with engine.begin() as conn:
             for table_name, raw_values in data.createdRow.items():
-                total_tabelas += 1
+                
+                # 1. Estruturação dos dados
                 insert_values = {
                     col: {
                         "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
-                        "type_column": field["type_column"] if isinstance(field, dict) else getattr(field, "type_column", "text")
+                        "type_column": field.get("type_column", "text") if isinstance(field, dict) else getattr(field, "type_column", "text")
                     }
                     for col, field in raw_values.items()
                 }
 
+                # Se não houver dados, pula para a próxima tabela sem quebrar a transação
                 if not insert_values:
-                    raise ValueError(f"Tabela {table_name}: Nenhuma coluna para inserir")
-                # print("insert_values",insert_values)
+                    log_message(f"Aviso: Tabela '{table_name}' ignorada (nenhuma coluna informada).", "warning")
+                    continue
+
+                total_tabelas += 1
+
+                # 2. Monta a Query
                 query = build_insert_query(
                     table_name=table_name,
                     db_type=db_type,
                     insert_values=insert_values
                 )
 
-                query_string += f"{table_name}: {query}\n"
+                if query is None:
+                    continue
+
+                query_string += f"-- INSERT em {table_name}\n{query}\n"
+                
+                # 3. Execução
                 rs = conn.execute(query)
-                total_inseridos += rs.rowcount or 0
-                resposta_query += f"\n{table_name}: {rs.rowcount} linha(s) inserida(s)"
+                linhas_afetadas = rs.rowcount or 0
+                
+                total_inseridos += linhas_afetadas
+                resposta_query += f"{table_name}: {linhas_afetadas} linha(s) inserida(s).\n"
 
-        duration_ms = int((time.time() - start) * 1000)
+        sucesso = True
+        log_message(f"✅ Registro(s) inserido(s) com sucesso:\n{resposta_query}", "success")
 
-        # ✅ Monta o histórico completo com metadados adicionais
-        historico = QueryHistoryCreate(
-            user_id=user_id,
-            db_connection_id=connection_id,
-            query=query_string.strip(),
-            query_type="INSERT",
-            executed_at=datetime.now(timezone.utc),
-            duration_ms=duration_ms,
-            result_preview=resposta_query or "Nenhuma linha inserida",
-            error_message=None,
-            is_favorite=False,
-            tags="insert",
-            app_source="API",
-            client_ip=getattr(data, "client_ip", None),
-            executed_by=getattr(data, "executed_by", f"user_{user_id}"),
-            modified_by=None,
-            meta_info={
-                "tabelas_afetadas": list(data.createdRow.keys()),
-                "total_inseridos": total_inseridos,
-                "total_tabelas": total_tabelas,
-                "tempo_execucao_ms": duration_ms,
-                "db_type": db_type,
-                "connection_id": connection_id,
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        )
-
-        create_query_history(db=db, data=historico)
-        log_message(f"✅ Registro(s) inserido(s) com sucesso: {resposta_query}", "success")
-
-        return {
-            "status": "sucesso",
-            "inserted": data.createdRow,
-            "response": resposta_query,
-            "tempo_ms": duration_ms,
-            "linhas_inseridas": total_inseridos
-        }
-
+    except SQLAlchemyError as sa_err:
+        error_msg = _lidar_com_erro_sql(sa_err)
+        traceback_str = traceback.format_exc()
+        log_message(f"❌ Erro de Banco de Dados no INSERT: {error_msg}", "error")
     except Exception as e:
-        duration_ms = int((time.time() - start) * 1000) if duration_ms == 0 else duration_ms
-        error_msg = _lidar_com_erro_sql(e)
-        log_message(f"❌ Erro ao inserir registros: {error_msg}", "error")
+        error_msg = str(e)
+        traceback_str = traceback.format_exc()
+        log_message(f"❌ Erro inesperado no INSERT: {error_msg}", "error")
 
-        # 🔥 Grava histórico mesmo em caso de erro
-        historico = QueryHistoryCreate(
-            user_id=user_id,
-            db_connection_id=connection_id,
-            query=query_string.strip() or "INSERT falhou antes de montar a query",
-            query_type="INSERT",
-            executed_at=datetime.now(timezone.utc),
-            duration_ms=duration_ms,
-            result_preview=resposta_query or "Sem resultado devido ao erro",
-            error_message=error_msg,
-            is_favorite=False,
-            tags="insert_error",
-            app_source="API",
-            client_ip=getattr(data, "client_ip", None),
-            executed_by=getattr(data, "executed_by", f"user_{user_id}"),
-            modified_by=None,
-            meta_info={
-                "tabelas_afetadas": list(data.createdRow.keys()) if hasattr(data, "createdRow") else [],
-                "tempo_execucao_ms": duration_ms,
-                "db_type": db_type,
-                "connection_id": connection_id,
-                "exception_type": type(e).__name__,
-                "traceback": traceback.format_exc()
-            }
-        )
+    # ==========================================
+    # 🧾 SALVAMENTO DO HISTÓRICO (Roda sempre)
+    # ==========================================
+    duration_ms = int((time.time() - start_time) * 1000)
 
-        try:
-            create_query_history(db=db, data=historico)
-        except Exception as hist_err:
-            log_message(f"⚠️ Falha ao salvar histórico de erro: {hist_err}", "warning")
+    historico = QueryHistoryCreate(
+        user_id=user_id,
+        db_connection_id=connection_id, # type: ignore
+        query=query_string.strip() or "INSERT não gerou query.",
+        query_type=QueryType.INSERT,
+        executed_at=datetime.now(timezone.utc),
+        duration_ms=duration_ms,
+        result_preview=resposta_query.strip() if sucesso else "Sem resultado devido a falha.",
+        error_message=error_msg,
+        is_favorite=False,
+        tags="insert" if sucesso else "insert_error",
+        app_source=app_source,
+        client_ip=getattr(data, "client_ip", client_ip),
+        executed_by=getattr(data, "executed_by", executed_by) or f"user_{user_id}",
+        modified_by=modified_by,
+        meta_info={
+            "tabelas_afetadas": list(data.createdRow.keys()) if hasattr(data, "createdRow") else [],
+            "total_inseridos": total_inseridos,
+            "total_tabelas": total_tabelas,
+            "db_type": db_type,
+            "status": "success" if sucesso else "failed",
+            "traceback": traceback_str if not sucesso else None,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    )
 
+    try:
+        create_query_history(db=db, user_id=user_id, data=historico)
+    except Exception as hist_err:
+        log_message(f"⚠️ Falha ao salvar histórico de INSERT: {hist_err}", "warning")
+
+    # ==========================================
+    # 🚀 RETORNO / EXCEÇÃO
+    # ==========================================
+    if not sucesso:
         raise ValueError(error_msg)
+
+    return {
+        "status": "sucesso",
+        "inserted": data.createdRow,
+        "response": resposta_query.strip(),
+        "tempo_ms": duration_ms,
+        "linhas_inseridas": total_inseridos
+    }

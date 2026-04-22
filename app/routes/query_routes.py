@@ -6,7 +6,7 @@ Versão melhorada com melhor estrutura, segurança e tratamento de erros.
 import traceback
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict,Optional
+from typing import Any, Dict, Optional
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -22,13 +22,15 @@ from app.schemas.query_select_upAndInsert_schema import (
     UpdateRequest,
 )
 
-from app.services.cloudeAi_execute_query import executar_query_e_salvar_stream
+# from app.services.cloudeAi_execute_query import executar_query_e_salvar_stream
+from app.services.execute_query_select_stream import executar_query_e_salvar_stream
 from app.services.insert_row_service import insert_row_service
 from app.services.insert_service_auto import insert_row_service_auto
 from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.ativar_engine import ConnectionManager
-from app.ultils.build_query import update_row_service
 from app.ultils.logger import log_message
+from app.ultils.update_line_build_exe import update_row_service
+
 
 class QueryChannelManager:
     """Gerenciador de canais de query com limpeza automática."""
@@ -130,7 +132,12 @@ async def update_row_endpoint(
 
             log_message(f"Atualizando linha para usuário {user_id}", "info")
             result = update_row_service(
-                data, engine, user_id, connection.type, connection.id, db
+                data,
+                engine,
+                user_id,
+                connection.type,
+                connection.id,
+                db,  # pyright: ignore[reportArgumentType]
             )
 
             log_message("Linha atualizada com sucesso", "success")
@@ -160,7 +167,7 @@ async def insert_row_endpoint(
 
             log_message(f"Inserindo linha para usuário {user_id}", "info")
             result = insert_row_service(
-                data, engine, user_id, connection.type, connection.id, db
+                data, engine, user_id, connection.type, connection.id, db  # type: ignore
             )
 
             log_message("Linha inserida com sucesso", "success")
@@ -287,7 +294,7 @@ async def execute_query_sse_endpoint(
                 status_code=400, detail="Query payload não encontrado no canal"
             )
 
-        log_message(f"query_payload:{query_payload} ", "info")
+        # log_message(f"query_payload:{query_payload} ", "info")
         # print(query_payload.aliaisTables)
         # Remove o canal após uso (one-time use)
         channel_manager.remove_channel(channel_id)
@@ -365,4 +372,3 @@ async def cleanup_channels_endpoint():
         "active_channels": len(channel_manager.channels),
         "message": f"Removidos {cleaned} canais expirados",
     }
-

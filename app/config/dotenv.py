@@ -1,9 +1,40 @@
 import os
+import sys
 from dotenv import load_dotenv
 from typing import Optional, Union
 
-# Carrega variáveis do arquivo .env
-load_dotenv()
+
+def load_env():
+    possible_paths = []
+
+    # 1. Caminho do executável (PyInstaller)
+    if getattr(sys, "frozen", False):
+        possible_paths.append(os.path.join(getattr(sys, "_MEIPASS"), ".env"))
+        possible_paths.append(os.path.join(os.path.dirname(sys.executable), ".env"))
+
+    # 2. Diretório atual (onde o script roda)
+    possible_paths.append(os.path.join(os.getcwd(), ".env"))
+
+    # 3. Diretório do arquivo
+    possible_paths.append(os.path.join(os.path.dirname(__file__), ".env"))
+
+    # 4. Caminho custom (se definido)
+    custom_env = os.getenv("ENV_PATH")
+    if custom_env:
+        possible_paths.append(custom_env)
+
+    # 🔎 Carrega o primeiro .env que existir
+    for path in possible_paths:
+        if os.path.exists(path):
+            load_dotenv(path, override=False)
+            print(f"[ENV] Carregado: {path}")
+            return
+
+    print("[ENV] Nenhum .env encontrado, usando variáveis do sistema")
+
+
+load_env()
+
 
 def get_env(name: str, default: Optional[str] = None) -> Optional[str]:
     """
@@ -17,6 +48,7 @@ def get_env(name: str, default: Optional[str] = None) -> Optional[str]:
     - str | None: Valor da variável ou o padrão informado.
     """
     return os.getenv(name, default)
+
 
 def get_env_bool(name: str, default: bool = False) -> bool:
     """
@@ -32,9 +64,10 @@ def get_env_bool(name: str, default: bool = False) -> bool:
     value = get_env(name)
     if value is None:
         return default
-    
-    true_values = ['true', '1', 'yes', 'on', 't', 'y']
+
+    true_values = ["true", "1", "yes", "on", "t", "y"]
     return value.lower() in true_values
+
 
 def get_env_int(name: str, default: Optional[int] = None) -> Optional[int]:
     """
@@ -50,11 +83,12 @@ def get_env_int(name: str, default: Optional[int] = None) -> Optional[int]:
     value = get_env(name)
     if value is None:
         return default
-    
+
     try:
         return int(value)
     except (ValueError, TypeError):
         return default
+
 
 def get_env_float(name: str, default: Optional[float] = None) -> Optional[float]:
     """
@@ -70,13 +104,16 @@ def get_env_float(name: str, default: Optional[float] = None) -> Optional[float]
     value = get_env(name)
     if value is None:
         return default
-    
+
     try:
         return float(value)
     except (ValueError, TypeError):
         return default
 
-def get_env_list(name: str, separator: str = ',', default: Optional[list] = None) -> list:
+
+def get_env_list(
+    name: str, separator: str = ",", default: Optional[list] = None
+) -> list:
     """
     Retorna o valor de uma variável de ambiente como lista.
 
@@ -91,10 +128,13 @@ def get_env_list(name: str, separator: str = ',', default: Optional[list] = None
     value = get_env(name)
     if value is None:
         return default or []
-    
+
     return [item.strip() for item in value.split(separator) if item.strip()]
 
-def get_env_list_cors(name: str, default: Optional[list] = None, separator: str = ",") -> list:
+
+def get_env_list_cors(
+    name: str, default: Optional[list] = None, separator: str = ","
+) -> list:
     """
     Retorna uma lista de origens CORS a partir da variável de ambiente.
 
@@ -103,6 +143,7 @@ def get_env_list_cors(name: str, default: Optional[list] = None, separator: str 
     - BACKEND_CORS_ORIGINS=["http://localhost:3000", "https://app.com"]
     """
     import json
+
     value = get_env(name)
 
     if not value:
@@ -133,6 +174,7 @@ def set_env(name: str, value: str) -> None:
     """
     os.environ[name] = value
 
+
 def require_env(name: str) -> str:
     """
     Retorna o valor de uma variável de ambiente obrigatória.
@@ -151,70 +193,78 @@ def require_env(name: str) -> str:
         raise ValueError(f"Variável de ambiente obrigatória '{name}' não definida")
     return value
 
+
 # Funções de conveniência para configurações específicas
 def get_app_config() -> dict:
     """Retorna configurações da aplicação."""
     return {
-        'name': get_env('APP_NAME', 'GeradorDadosInteligente'),
-        'env': get_env('APP_ENV', 'development'),
-        'debug': get_env_bool('APP_DEBUG', True),
-        'locale': get_env('APP_LOCALE', 'pt_PT')
+        "name": get_env("APP_NAME", "GeradorDadosInteligente"),
+        "env": get_env("APP_ENV", "development"),
+        "debug": get_env_bool("APP_DEBUG", True),
+        "locale": get_env("APP_LOCALE", "pt_PT"),
     }
+
 
 def get_cache_config() -> dict:
     """Retorna configurações de cache."""
     return {
-        'enabled': get_env_bool('CACHE_ENABLED', True),
-        'ttl': get_env_int('CACHE_TTL_SECONDS', 3600),
-        'max_size_mb': get_env_int('CACHE_MAX_SIZE_MB', 100),
-        'cleanup_interval': get_env_int('CACHE_CLEANUP_INTERVAL', 3600)
+        "enabled": get_env_bool("CACHE_ENABLED", True),
+        "ttl": get_env_int("CACHE_TTL_SECONDS", 3600),
+        "max_size_mb": get_env_int("CACHE_MAX_SIZE_MB", 100),
+        "cleanup_interval": get_env_int("CACHE_CLEANUP_INTERVAL", 3600),
     }
+
 
 def get_database_config() -> dict:
     """Retorna configurações do banco de dados."""
     return {
-        'host': get_env('DB_HOST', 'localhost'),
-        'port': get_env_int('DB_PORT', 5432),
-        'name': get_env('DB_NAME', 'meu_banco'),
-        'user': get_env('DB_USER', 'usuario'),
-        'password': get_env('DB_PASSWORD', 'senha_segura'),
-        'schema': get_env('DB_SCHEMA', 'public')
+        "host": get_env("DB_HOST", "localhost"),
+        "port": get_env_int("DB_PORT", 5432),
+        "name": get_env("DB_NAME", "meu_banco"),
+        "user": get_env("DB_USER", "usuario"),
+        "password": get_env("DB_PASSWORD", "senha_segura"),
+        "schema": get_env("DB_SCHEMA", "public"),
     }
+
 
 def get_log_config() -> dict:
     """Retorna configurações de log."""
     return {
-        'level': get_env('LOG_LEVEL', 'INFO'),
-        'file': get_env('LOG_FILE', 'app.log'),
-        'max_size_mb': get_env_int('LOG_MAX_SIZE_MB', 10),
-        'backup_count': get_env_int('LOG_BACKUP_COUNT', 5)
+        "level": get_env("LOG_LEVEL", "INFO"),
+        "file": get_env("LOG_FILE", "app.log"),
+        "max_size_mb": get_env_int("LOG_MAX_SIZE_MB", 10),
+        "backup_count": get_env_int("LOG_BACKUP_COUNT", 5),
     }
+
 
 def get_generator_config() -> dict:
     """Retorna configurações do gerador de dados."""
     return {
-        'default_locale': get_env('GENERATOR_DEFAULT_LOCALE', 'pt_PT'),
-        'max_retries': get_env_int('GENERATOR_MAX_RETRIES', 3),
-        'unique_retries': get_env_int('GENERATOR_UNIQUE_RETRIES', 100),
-        'null_probability': get_env_float('GENERATOR_NULL_PROBABILITY', 0.05)
+        "default_locale": get_env("GENERATOR_DEFAULT_LOCALE", "pt_PT"),
+        "max_retries": get_env_int("GENERATOR_MAX_RETRIES", 3),
+        "unique_retries": get_env_int("GENERATOR_UNIQUE_RETRIES", 100),
+        "null_probability": get_env_float("GENERATOR_NULL_PROBABILITY", 0.05),
     }
+
 
 def get_faker_config() -> dict:
     """Retorna configurações do Faker."""
     return {
-        'locale': get_env('FAKER_LOCALE', 'pt_PT'),
-        'seed': get_env_int('FAKER_SEED'),
-        'providers': get_env_list('FAKER_PROVIDERS')
+        "locale": get_env("FAKER_LOCALE", "pt_PT"),
+        "seed": get_env_int("FAKER_SEED"),
+        "providers": get_env_list("FAKER_PROVIDERS"),
     }
+
 
 # Validação básica ao carregar o módulo
 def _validate_required_config():
     """Valida configurações obrigatórias."""
-    required_vars = ['APP_NAME', 'SECRET_KEY']
-    
+    required_vars = ["APP_NAME", "SECRET_KEY"]
+
     for var in required_vars:
         if get_env(var) is None:
             print(f"AVISO: Variável de ambiente '{var}' não está definida")
+
 
 # Executa validação ao importar
 _validate_required_config()

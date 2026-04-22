@@ -1,29 +1,140 @@
-2025-10-22 08:37:35,905 - INFO - \U0001f680 Iniciando seed de dados...
-2025-10-22 08:37:36,153 - INFO - \U0001f3e2 Empresa já existe: OkayulaTech Lda
-2025-10-22 08:37:36,172 - INFO - \U0001f4bc Nenhum cargo novo necessário — já existiam
-2025-10-22 08:37:36,177 - INFO - \U0001f464 Usuário administrador já existe.
-2025-10-22 08:37:36,198 - INFO - \U0001f3ad Nenhuma role nova necessária — já existiam
-2025-10-22 08:37:36,205 - INFO - \U0001f4e6 Nenhum tipo de projeto novo necessário — já existiam
-2025-10-22 08:37:36,210 - INFO - \U0001f468\u200d\U0001f4bc Usuário administrador de tarefas já existe.
-2025-10-22 08:37:36,224 - INFO - \U0001f9fe Log de auditoria criado para o seed inicial
-2025-10-22 08:37:36,224 - INFO - \U0001f331 Seed concluído com sucesso!
-2025-10-22 08:37:36,224 - INFO - [\U0001f9f9 Cache Scheduler] Iniciando agendador de limpeza a cada 3600s
-2025-10-22 08:37:36,230 - INFO - \U0001f9f9 Cache expirado removido: 1eb1907b23de75e7c3099cc965c11487178de3b06801fab9602507f00cfe2c22.pkl.gz
-2025-10-22 08:37:36,233 - INFO - \U0001f9f9 Cache expirado removido: 2cc0f81656ee53618aad93fcf59f7f42629b80a318f1daaa57e8145f844be967.pkl.gz
-2025-10-22 08:37:36,235 - INFO - \U0001f9f9 Cache expirado removido: 35fd1a54cca55e5937d6750bf83c24624877ff5c92d459301ffcd52684a1e5b3.pkl.gz
-2025-10-22 08:37:36,238 - INFO - \U0001f9f9 Cache expirado removido: 3c7e875ea8b95cd0ab6de62638c13883efebf9ad518a3d69008875663f9710ce.pkl.gz
-2025-10-22 08:37:36,239 - INFO - \U0001f9f9 Cache expirado removido: 566f088fbd6c12e319ce017bbd9d514d86a7566a30da2e283878ca674b1a4fc8.pkl.gz
-2025-10-22 08:37:36,241 - INFO - \U0001f9f9 Cache expirado removido: 5d0c298727b5021b7bc3af2ee869adefc7f015967129bcc0ccd669eee76944a1.pkl.gz
-2025-10-22 08:37:36,243 - INFO - \U0001f9f9 Cache expirado removido: 7a8141207759f54b3cbfd62b880caaed3a280baab11a792c345c6aff727fb887.pkl.gz
-2025-10-22 08:37:36,246 - INFO - \U0001f9f9 Cache expirado removido: 7abdaced17343198344cde8f2ebfb6a4a12100ed4d68f2441307978b1931827d.pkl.gz
-2025-10-22 08:37:36,248 - INFO - \U0001f9f9 Cache expirado removido: 96302d0bb7b3a98673b16958c33e054b34c8d37aee34bb3cd14a7d7cf44a8d35.pkl.gz
-2025-10-22 08:37:36,250 - INFO - \U0001f9f9 Cache expirado removido: a40a7e7416177656b9ff185675557c42a86d8206ba0f905d1702151edac85e02.pkl.gz
-2025-10-22 08:37:36,252 - INFO - \U0001f9f9 Cache expirado removido: b58fabbcce2078799e5ef7b45e8bbf54e732636d1027a5ed70d6aed3a0778e22.pkl.gz
-2025-10-22 08:37:36,254 - INFO - \U0001f9f9 Cache expirado removido: b9ba879e31aae3978f07fc94d6d3a84c052e873698d1a632643e6c76f7461a06.pkl.gz
-2025-10-22 08:37:36,256 - INFO - \U0001f9f9 Cache expirado removido: c0764050aa8b443aee4ae15fb7652d2960dc635c3d5e850f32ddbc55735fc79e.pkl.gz
-2025-10-22 08:37:36,257 - INFO - \U0001f9f9 Cache expirado removido: c6d8915529cab478f1f33879d85b426065e6173b43ece06295c8f716b7d52510.pkl.gz
-2025-10-22 08:37:36,258 - INFO - \U0001f9f9 Cache expirado removido: d456c7b8ae83c8733994a30fd6582eb2b88bff469d98dcf46efafbe412a63887.pkl.gz
-2025-10-22 08:37:36,260 - INFO - \U0001f9f9 Cache expirado removido: e01116afd272f86a92e7a47e1c591e82f0e42adcf708ce30cea151fcb9d0e99d.pkl.gz
-2025-10-22 08:37:36,261 - INFO - \U0001f9f9 Cache expirado removido: e01d8f52bf4cc69a876a2f0a9a3037f4876d9d7905766aa3c99c35fd7017544d.pkl.gz
-2025-10-22 08:37:36,263 - INFO - \U0001f9f9 Cache expirado removido: f051973294ad1bdb52c8978f6f6c055eca9b8e71ae7504ff7de3bf94b522a7c6.pkl.gz
-2025-10-22 08:37:36,263 - INFO - \U0001f9fe Total de 18/20 caches expirados removidos.
+2026-04-22 17:43:47,315 - ERROR - [\U0001f9f9 Cache Scheduler] ERRO: 'ts'
+2026-04-22 17:44:46,712 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-22 17:44:51,854 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-22 17:44:52,198 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 172.16.66.123, Caminho: logs\logs.txt
+2026-04-22 17:44:52,318 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-22 17:44:52,320 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-22 17:44:52,322 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-22 17:44:52,328 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-22 17:44:52,376 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-22 17:44:52,427 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-22 17:44:52,433 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-22 17:44:52,659 - INFO - \U0001f464 Usuário admin já existente
+2026-04-22 17:44:52,669 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-22 17:44:52,671 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-22 17:44:52,674 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 17:44:52.674187)
+2026-04-22 21:02:11,371 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-22 21:02:19,054 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-22 21:02:19,504 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-22 21:02:23,232 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-22 21:02:23,838 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-22 21:02:24,436 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-22 21:02:25,448 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-22 21:02:28,380 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-22 21:02:47,325 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-22 21:02:48,593 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-22 21:02:50,100 - INFO - \U0001f464 Usuário admin já existente
+2026-04-22 21:02:51,804 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-22 21:02:52,436 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-22 21:02:53,039 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:02:53.039423)
+2026-04-22 21:03:53,636 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:03:53.636951)
+2026-04-22 21:04:54,278 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:04:54.278647)
+2026-04-22 21:05:54,896 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:05:54.896864)
+2026-04-22 21:06:26,702 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-22 21:06:31,392 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-22 21:06:31,710 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-22 21:06:35,174 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-22 21:06:35,773 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-22 21:06:36,394 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-22 21:06:37,423 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-22 21:06:40,383 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-22 21:06:59,242 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-22 21:07:00,517 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-22 21:07:01,983 - INFO - \U0001f464 Usuário admin já existente
+2026-04-22 21:07:03,635 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-22 21:07:04,295 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-22 21:08:13,401 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-22 21:08:18,038 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-22 21:08:18,369 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-22 21:08:21,767 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-22 21:08:22,370 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-22 21:08:22,989 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-22 21:08:24,061 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-22 21:08:27,077 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-22 21:08:46,521 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-22 21:08:48,177 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-22 21:08:49,702 - INFO - \U0001f464 Usuário admin já existente
+2026-04-22 21:08:51,393 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-22 21:08:52,030 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-22 21:08:52,615 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:08:52.615759)
+2026-04-22 21:09:53,315 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:09:53.315513)
+2026-04-22 21:10:53,992 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:10:53.992600)
+2026-04-22 21:11:54,624 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:11:54.624481)
+2026-04-22 21:12:55,251 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:12:55.251188)
+2026-04-22 21:13:55,870 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:13:55.870769)
+2026-04-22 21:14:24,700 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-22 21:14:29,908 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-22 21:14:30,319 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-22 21:14:33,700 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-22 21:14:34,717 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-22 21:14:35,344 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-22 21:14:36,397 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-22 21:14:39,397 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-22 21:14:58,515 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-22 21:14:59,795 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-22 21:15:01,309 - INFO - \U0001f464 Usuário admin já existente
+2026-04-22 21:15:02,926 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-22 21:15:03,530 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-22 21:15:04,123 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:15:04.123348)
+2026-04-22 21:15:46,062 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-22 21:15:50,916 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-22 21:15:51,298 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-22 21:15:54,680 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-22 21:15:55,288 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-22 21:15:55,886 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-22 21:15:56,956 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-22 21:15:59,888 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-22 21:16:19,947 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-22 21:16:21,193 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-22 21:16:22,632 - INFO - \U0001f464 Usuário admin já existente
+2026-04-22 21:16:24,277 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-22 21:16:24,886 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-22 21:16:25,483 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:16:25.483132)
+2026-04-22 21:17:26,106 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:17:26.106300)
+2026-04-22 21:18:26,726 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:18:26.726175)
+2026-04-22 21:18:46,917 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-22 21:18:52,249 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-22 21:18:52,625 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-22 21:18:57,063 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-22 21:18:57,684 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-22 21:18:58,285 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-22 21:18:59,295 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-22 21:19:02,484 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-22 21:19:22,864 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-22 21:19:24,107 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-22 21:19:25,569 - INFO - \U0001f464 Usuário admin já existente
+2026-04-22 21:19:27,352 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-22 21:19:27,963 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-22 21:19:28,581 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:19:28.581717)
+2026-04-22 21:20:29,191 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:20:29.191084)
+2026-04-22 21:20:58,734 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-22 21:21:03,641 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-22 21:21:04,020 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-22 21:21:08,026 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-22 21:21:08,643 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-22 21:21:09,310 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-22 21:21:10,540 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-22 21:21:13,842 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-22 21:21:33,736 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-22 21:21:34,988 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-22 21:21:36,504 - INFO - \U0001f464 Usuário admin já existente
+2026-04-22 21:21:38,179 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-22 21:21:39,092 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-22 21:21:39,721 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:21:39.721258)
+2026-04-22 21:22:40,324 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:22:40.324728)
+2026-04-22 21:23:40,942 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:23:40.942349)
+2026-04-22 21:24:41,569 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:24:41.569099)
+2026-04-22 21:24:56,766 - INFO - \U0001f527 URL convertida para asyncpg (sem query parameters)
+2026-04-22 21:25:01,554 - ERROR - Erro ao inicializar gerador com locale pt_PT: Calling `.seed()` on instances is deprecated. Use the class method `Faker.seed()` instead.
+2026-04-22 21:25:01,910 - INFO - [LOG PATH] SO: Windows, Ambiente: Localhost, Host: DEVPCBACK, IP: 192.168.32.1, Caminho: logs\logs.txt
+2026-04-22 21:25:06,115 - INFO - \U0001f4c4 Log file: logs\logs.txt
+2026-04-22 21:25:06,712 - WARNING - \U0001f6ab Sincronização automática desativada (ENV=production, FORCE_DB_RESET=False)
+2026-04-22 21:25:07,321 - INFO - \U0001f680 Iniciando seed do sistema...
+2026-04-22 21:25:08,372 - INFO - \U0001f3e2 Empresa já existente: OkayulaTech Lda
+2026-04-22 21:25:12,009 - INFO - \U0001f4bc Cargos sincronizados
+2026-04-22 21:25:32,007 - INFO - \U0001f3ad RBAC sincronizado (roles + permissões)
+2026-04-22 21:25:33,286 - INFO - \U0001f4e6 Planos de subscrição sincronizados
+2026-04-22 21:25:34,799 - INFO - \U0001f464 Usuário admin já existente
+2026-04-22 21:25:36,898 - INFO - \U0001f331 Seed executado com sucesso!
+2026-04-22 21:25:37,500 - INFO - [\U0001f9f9 Cache Scheduler] Iniciado (intervalo: 60s)
+2026-04-22 21:25:38,126 - INFO - [\U0001f9f9 Cache Scheduler] OK (2026-04-22 21:25:38.126269)

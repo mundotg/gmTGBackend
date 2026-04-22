@@ -1,13 +1,22 @@
-from typing import List, Optional
+from typing import Any, Callable, List, Optional, Union
 import uuid
-from sqlalchemy import Boolean, Date, DateTime, Engine, Numeric, text
-from app.cruds.queryhistory_crud import create_query_history
-from app.schemas.query_select_upAndInsert_schema import AdvancedJoinOption, DistinctList, JoinOption, OrderByOption, UpdateRequest
-from app.schemas.queryhistory_schemas import  QueryHistoryCreate
-from app.services.editar_linha import _convert_column_type_for_string_one, quote_identifier
-from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
-from app.ultils.logger import log_message
-from app.ultils.logica_de_join_advance import build_join_clause
+from sqlalchemy import Boolean, Date, DateTime, Numeric, TextClause, text
+from app.schemas.query_select_upAndInsert_schema import (
+    AdvancedJoinOption,
+    DistinctList,
+    JoinOption,
+    OrderByOption,
+    Pattern,
+)
+from app.services.editar_linha import (
+    _convert_column_type_for_string_one,
+    quote_identifier,
+)
+from app.ultils.logica_de_join_advance import (
+    build_contains_condition,
+    build_join_clause,
+)
+
 
 def is_valid_uuid(value: str) -> bool:
     try:
@@ -15,60 +24,72 @@ def is_valid_uuid(value: str) -> bool:
         return True
     except ValueError:
         return False
-    
-def build_contains_condition(
-    field_escaped: str,
-    operation: str,
-    value: str,
-    db_type: str,
-    col_type: str,
-    param_name: str,
-    params: dict
-) -> str:
+
+
+def _normalize_table_name(table_name: Optional[str]) -> str:
+    if not table_name:
+        return ""
+
+    normalized = table_name.strip().replace('"', "").lower()
+
+    # mantém schema+tabela se existir
+    if "." in normalized:
+        parts = [p.strip() for p in normalized.split(".") if p.strip()]
+        return ".".join(parts)
+
+    return normalized
+
+
+def _normalize_table_variants(table_name: Optional[str]) -> set[str]:
     """
-    Monta condição SQL para operações 'Contém' e 'Não Contém',
-    suportando TEXT, DATE, JSON e conversão automática para INTEGER/NUMERIC.
-    Compatível com PostgreSQL, MySQL, SQL Server e Oracle.
+    Gera variantes para comparar:
+    - public.query_history
+    - query_history
     """
-    col_type_str = col_type.lower()
-    like_value = f"%{value}%"
-    params[param_name] = like_value
-    not_ = "NOT " if operation == "Não Contém" else ""
+    normalized = _normalize_table_name(table_name)
+    if not normalized:
+        return set()
 
-    db_type = db_type.lower()
+    variants = {normalized}
 
-    # Strings e JSON → LIKE direto
-    if any(t in col_type_str for t in ["text", "char", "json"]):
-        return f"{field_escaped} {not_}LIKE :{param_name}"
+    if "." in normalized:
+        variants.add(normalized.split(".")[-1])
 
-    # Datas → precisa converter para texto dependendo do banco
-    elif "date" in col_type_str or "time" in col_type_str:
-        if db_type in ["postgres", "postgresql"]:
-            return f"CAST({field_escaped} AS TEXT) {not_}LIKE :{param_name}"
-        elif db_type == "mysql":
-            return f"CAST({field_escaped} AS CHAR) {not_}LIKE :{param_name}"
-        elif db_type in ["sqlserver", "mssql"]:
-            return f"CONVERT(VARCHAR, {field_escaped}, 120) {not_}LIKE :{param_name}"
-        elif db_type == "oracle":
-            return f"TO_CHAR({field_escaped}, 'YYYY-MM-DD HH24:MI:SS') {not_}LIKE :{param_name}"
-        else:
-            raise ValueError(f"Banco de dados '{db_type}' não suportado para operação Contém em datas.")
+    return variants
 
-    # Números → CAST para string
-    elif any(t in col_type_str for t in ["int", "numeric", "decimal", "float", "double"]):
-        if db_type in ["postgres", "postgresql"]:
-            return f"CAST({field_escaped} AS TEXT) {not_}LIKE :{param_name}"
-        elif db_type == "mysql":
-            return f"CAST({field_escaped} AS CHAR) {not_}LIKE :{param_name}"
-        elif db_type in ["sqlserver", "mssql"]:
-            return f"CAST({field_escaped} AS NVARCHAR(MAX)) {not_}LIKE :{param_name}"
-        elif db_type == "oracle":
-            return f"TO_CHAR({field_escaped}) {not_}LIKE :{param_name}"
-        else:
-            raise ValueError(f"Banco de dados '{db_type}' não suportado para operação Contém em números.")
 
-    # Caso não seja suportado
-    raise ValueError(f"Operação '{operation}' não suportada para tipo '{col_type}'.")
+def _sanitize_table_list(
+    base_table: str,
+    table_list: Optional[List[str]],
+) -> List[str]:
+    """
+    Remove duplicados e remove a base_table da table_list.
+    """
+    if not table_list:
+        return []
+
+    base_variants = _normalize_table_variants(base_table)
+    seen: set[str] = set()
+    result: list[str] = []
+
+    for table in table_list:
+        normalized = _normalize_table_name(table)
+        if not normalized:
+            continue
+
+        short_name = normalized.split(".")[-1]
+        candidates = {normalized, short_name}
+
+        if candidates & base_variants:
+            continue
+
+        if normalized in seen:
+            continue
+
+        seen.add(normalized)
+        result.append(table)
+
+    return result
 
 
 def get_filter_condition_with_operation(
@@ -80,7 +101,8 @@ def get_filter_condition_with_operation(
     operation: str = "",
     value_otheir_between: str = "",
     param_name: Optional[str] = None,
-    enum_values: Optional[dict] = None
+    enum_values: Optional[dict] = None,
+    pattern: Optional[Pattern] = None,
 ) -> str:
     """
     Gera a cláusula SQL parametrizada com base no tipo da coluna e operação desejada.
@@ -100,7 +122,11 @@ def get_filter_condition_with_operation(
     db_type_lower = db_type.lower()
     value = value.strip()
 
-    if value == "" and operation not in ["Entre"] and operation not in ["IS NULL", "IS NOT NULL"]:
+    if (
+        value == ""
+        and operation not in ["Entre"]
+        and operation not in ["IS NULL", "IS NOT NULL"]
+    ):
         raise ValueError(f"Valor vazio para '{col_name}' com operação '{operation}'.")
 
     # Escapar nome da coluna
@@ -121,8 +147,14 @@ def get_filter_condition_with_operation(
     # 🔹 Booleanos
     if "boolean" in col_type_str or isinstance(col_type, Boolean):
         bool_map = {
-            "true": True, "1": True, "yes": True, "sim": True,
-            "false": False, "0": False, "no": False, "não": False
+            "true": True,
+            "1": True,
+            "yes": True,
+            "sim": True,
+            "false": False,
+            "0": False,
+            "no": False,
+            "não": False,
         }
         if value.lower() not in bool_map:
             raise ValueError(f"Valor booleano inválido para '{col_name}'.")
@@ -130,24 +162,21 @@ def get_filter_condition_with_operation(
         return f"{col_escaped} = :{param_name}"
 
     # 🔹 Tipos
-    is_date = any(t in col_type_str for t in ["date", "timestamp", "time"]) or isinstance(col_type, (Date, DateTime))
-    is_number = any(t in col_type_str for t in ["int", "decimal", "float", "numeric"]) or isinstance(col_type, Numeric)
+    is_date = any(
+        t in col_type_str for t in ["date", "timestamp", "time"]
+    ) or isinstance(col_type, (Date, DateTime))
+    is_number = any(
+        t in col_type_str for t in ["int", "decimal", "float", "numeric"]
+    ) or isinstance(col_type, Numeric)
     # is_text = any(t in col_type_str for t in ["text", "char", "varchar"])
 
     def basic_op(field_escaped: str) -> str:
-        op_map = {
-            "=": "=",
-            "!=": "!=",
-            "<": "<",
-            "<=": "<=",
-            ">": ">",
-            ">=": ">="
-            }
+        op_map = {"=": "=", "!=": "!=", "<": "<", "<=": "<=", ">": ">", ">=": ">="}
 
         if operation in op_map:
             params[param_name] = float(value) if is_number else value
             return f"{field_escaped} {op_map[operation]} :{param_name}"
-        
+
         elif operation == "IS NULL":
             return f"{field_escaped} IS NULL"
 
@@ -156,29 +185,39 @@ def get_filter_condition_with_operation(
 
         elif operation == "Entre":
             # Verificar se value_otheir_between tem valor válido
-            if not value_otheir_between or not str(value_otheir_between).strip() or str(value_otheir_between).strip() == "-1":
+            if (
+                not value_otheir_between
+                or not str(value_otheir_between).strip()
+                or str(value_otheir_between).strip() == "-1"
+            ):
                 # Se value_otheir_between é inválido, verificar se value tem */-1
-                if value and '*/-1' in str(value):
-                    parts = str(value).split('*/-1')
+                if value and "*/-1" in str(value):
+                    parts = str(value).split("*/-1")
                     if len(parts) == 2:
                         value_min = parts[0]
                         value_max = parts[1]
                     else:
-                        raise ValueError(f"Separador '*/-1' encontrado mas não produziu dois valores em '{col_name}': {value}")
+                        raise ValueError(
+                            f"Separador '*/-1' encontrado mas não produziu dois valores em '{col_name}': {value}"
+                        )
                 else:
-                    raise ValueError(f"Segundo valor ausente para operação 'Entre' em '{col_name}'")
+                    raise ValueError(
+                        f"Segundo valor ausente para operação 'Entre' em '{col_name}'"
+                    )
             else:
                 # Usar os valores separados normalmente
                 value_min = value
                 value_max = value_otheir_between
-            
+
             # Validar valores
             value_min = str(value_min).strip()
             value_max = str(value_max).strip()
-            
+
             if not value_min or not value_max:
-                raise ValueError(f"Valores mínimo e máximo são obrigatórios para operador 'Entre' em '{col_name}'")
-            
+                raise ValueError(
+                    f"Valores mínimo e máximo são obrigatórios para operador 'Entre' em '{col_name}'"
+                )
+
             # Converter para float se for número
             if is_number:
                 params[f"{param_name}_min"] = float(value_min)
@@ -186,7 +225,7 @@ def get_filter_condition_with_operation(
             else:
                 params[f"{param_name}_min"] = value_min
                 params[f"{param_name}_max"] = value_max
-            
+
             return f"{field_escaped} BETWEEN :{param_name}_min AND :{param_name}_max"
 
         elif operation in ["Contém", "Não Contém"]:
@@ -197,12 +236,15 @@ def get_filter_condition_with_operation(
                 col_type=col_type,
                 db_type=db_type,
                 param_name=param_name,
-                params=params
+                params=params,
+                pattern=pattern,
             )
         elif operation in ["IN", "NOT IN"]:
             values_list = [v.strip() for v in value.split(",") if v.strip()]
             if not values_list:
-                raise ValueError(f"Lista vazia para operação '{operation}' em '{col_name}'.")
+                raise ValueError(
+                    f"Lista vazia para operação '{operation}' em '{col_name}'."
+                )
 
             placeholders = []
             for i, v in enumerate(values_list):
@@ -221,11 +263,17 @@ def get_filter_condition_with_operation(
             params[param_name] = value
             return f"{field_escaped} > :{param_name}"
 
-        raise ValueError(f"Operação '{operation}' não suportada para tipo '{col_type}'.")
+        raise ValueError(
+            f"Operação '{operation}' não suportada para tipo '{col_type}'."
+        )
 
     # 🔹 JSON
     if "json" in col_type_str:
-        json_expr = f"{col_escaped}::TEXT" if db_type_lower in ["postgres", "postgresql"] else f"CAST({col_escaped} AS TEXT)"
+        json_expr = (
+            f"{col_escaped}::TEXT"
+            if db_type_lower in ["postgres", "postgresql"]
+            else f"CAST({col_escaped} AS TEXT)"
+        )
         return basic_op(json_expr)
 
     # 🔹 Datas (formatar conforme banco)
@@ -243,59 +291,232 @@ def get_filter_condition_with_operation(
     # 🔹 Número ou Texto
     return basic_op(col_escaped)
 
+
 def format_column(db_type: str, col: str, alias: Optional[str] = None) -> str:
     """
-    Formata uma coluna com quote e alias (se existir).
+    Formata uma coluna com quote e alias, escapando palavras reservadas.
     """
-    if alias and alias != col:
-        return f"{quote_identifier(db_type, col)} AS {quote_identifier(db_type, alias)}"
-    return quote_identifier(db_type, col)
+    # Lista de palavras reservadas comuns do SQL
+    RESERVED_KEYWORDS = {
+        "default",
+        "select",
+        "insert",
+        "update",
+        "delete",
+        "from",
+        "where",
+        "order",
+        "group",
+        "by",
+        "having",
+        "join",
+        "inner",
+        "left",
+        "right",
+        "outer",
+        "on",
+        "as",
+        "and",
+        "or",
+        "not",
+        "null",
+        "is",
+        "true",
+        "false",
+        "primary",
+        "key",
+        "foreign",
+        "references",
+        "table",
+        "column",
+        "index",
+        "create",
+        "alter",
+        "drop",
+        "truncate",
+        "grant",
+        "revoke",
+        "commit",
+        "rollback",
+        "savepoint",
+        "begin",
+        "transaction",
+        "lock",
+        "unlock",
+        "user",
+        "role",
+        "database",
+        "schema",
+        "view",
+        "function",
+        "procedure",
+        "trigger",
+        "event",
+        "type",
+        "domain",
+        "constraint",
+        "check",
+        "unique",
+        "current",
+        "time",
+        "date",
+        "timestamp",
+        "interval",
+        "year",
+        "month",
+        "day",
+        "hour",
+        "minute",
+        "second",
+        "zone",
+        "value",
+        "values",
+    }
 
-def build_select_view(db_type: str, select: Optional[list[str]], aliases: Optional[dict[str, str]]) -> str:
+    def needs_escape(identifier: str) -> bool:
+        """Verifica se um identificador precisa ser escapado."""
+        # Remove quotes existentes para verificar o nome puro
+        clean = identifier.strip('"`[]')
+        return clean.lower() in RESERVED_KEYWORDS or not clean.isidentifier()
+
+    def quote_identifier_safe(db_type: str, identifier: str) -> str:
+        """
+        Versão melhorada do quote_identifier que também escapa palavras reservadas.
+        """
+        # Se já está quotado, retorna como está
+        if (
+            (identifier.startswith('"') and identifier.endswith('"'))
+            or (identifier.startswith("`") and identifier.endswith("`"))
+            or (identifier.startswith("[") and identifier.endswith("]"))
+        ):
+            return identifier
+
+        # Divide por pontos para tratar cada parte
+        parts = identifier.split(".")
+        quoted_parts = []
+
+        for part in parts:
+            # Limpa a parte
+            clean_part = part.strip('"`[]')
+
+            # Verifica se precisa escapar
+            if needs_escape(clean_part):
+                if db_type.lower() == "postgresql":
+                    quoted_parts.append(f'"{clean_part}"')
+                elif db_type.lower() == "mssql" or db_type.lower() == "sqlserver":
+                    quoted_parts.append(f"[{clean_part}]")
+                else:  # mysql, mariadb, sqlite
+                    quoted_parts.append(f"`{clean_part}`")
+            else:
+                # Usa o quote padrão do banco
+                if db_type.lower() == "postgresql":
+                    quoted_parts.append(f'"{clean_part}"')
+                elif db_type.lower() == "mssql" or db_type.lower() == "sqlserver":
+                    quoted_parts.append(f"[{clean_part}]")
+                else:
+                    quoted_parts.append(f"`{clean_part}`")
+
+        return ".".join(quoted_parts)
+
+    # Escapa a coluna se necessário
+    col_quoted = quote_identifier_safe(db_type, col)
+
+    if alias:
+        # Trata o alias de forma especial
+        # Se o alias já tem quotes, usa como está
+        if (
+            (alias.startswith('"') and alias.endswith('"'))
+            or (alias.startswith("`") and alias.endswith("`"))
+            or (alias.startswith("[") and alias.endswith("]"))
+        ):
+            return f"{col_quoted} AS {alias}"
+
+        # Escapa o alias se necessário
+        clean_alias = alias.strip('"`[]')
+        if needs_escape(clean_alias):
+            if db_type.lower() == "postgresql":
+                return f'{col_quoted} AS "{clean_alias}"'
+            elif db_type.lower() == "mssql" or db_type.lower() == "sqlserver":
+                return f"{col_quoted} AS [{clean_alias}]"
+            else:
+                return f"{col_quoted} AS `{clean_alias}`"
+        else:
+            # Alias sem pontos, usa quote padrão
+            quote_char = "`" if db_type.lower() == "mysql" else '"'
+            return f"{col_quoted} AS {quote_char}{alias}{quote_char}"
+
+    return col_quoted
+
+
+def build_select_view(
+    db_type: str,
+    select: Optional[list[str]],
+    aliases: Optional[dict[str, str]],
+) -> str:
     """
-    Monta o SELECT, considerando select explícito e aliases.
-    - Se select foi enviado → usa select.
-    - Se select é None/[] e aliases existe → usa aliases como fonte.
-    - Caso contrário → usa '*'.
+    Monta o SELECT com escape de palavras reservadas.
+    - Se select foi enviado → usa select
+    - Aplica alias apenas quando existir alias real
+    - Se select vazio e aliases existir → usa aliases como fonte
+    - Caso contrário → usa '*'
     """
-    if select and len(select) > 0:
-        return ", ".join(
-            format_column(db_type, col, aliases.get(col) if aliases else None)
-            for col in select
-        )
-    elif aliases:
-        return ", ".join(
-            format_column(db_type, col, alias) for col, alias in aliases.items()
-        )
-    else:
+    try:
+        if select and len(select) > 0:
+            parts = []
+            for col in select:
+                alias = aliases.get(col) if aliases else None
+                parts.append(format_column(db_type, col, alias))
+            return ", ".join(parts)
+
+        if aliases:
+            return ", ".join(
+                format_column(db_type, col, alias) for col, alias in aliases.items()
+            )
+
         return "*"
-    
-from typing import Optional, Union
 
-def format_order_by(db_type: str, order_by: Optional[list[Union[dict, "OrderByOption"]]] = None) -> str:
+    except Exception as e:
+        # Log do erro e fallback
+        from app.ultils.logger import log_message
+
+        log_message(f"Erro ao construir SELECT: {str(e)}", level="error")
+        # Fallback seguro: retorna *
+        return "*"
+
+
+def format_order_by(
+    db_type: str,
+    order_by: Optional[List[Union[dict, "OrderByOption"]]] = None,
+) -> str:
     """
-    Monta a cláusula ORDER BY a partir de uma lista de dicts ou objetos OrderByOption.
+    Garante ORDER BY válido.
     """
     if not order_by:
-        return ""
+        return "ORDER BY (SELECT NULL)"
 
     order_parts = []
-    for item in order_by:
-        # Caso venha como objeto Pydantic
-        if hasattr(item, "column") and hasattr(item, "direction"):
-            col = item.column
-            direction = item.direction or "ASC"
-        else:  # Caso venha como dict
-            col = item.get("column")
-            direction = item.get("direction", "ASC")
 
-        if not col:
+    for item in order_by:
+        if hasattr(item, "column"):
+            col = item.column  # type: ignore
+            direction = item.direction or "ASC"  # type: ignore
+        else:
+            col = item.get("column")  # type: ignore
+            direction = item.get("direction", "ASC")  # type: ignore
+
+        if not col or not str(col).strip():
             continue
 
-        order_parts.append(f"{quote_identifier(db_type, col)} {direction.upper()}")
+        direction = str(direction).upper()
+        if direction not in ("ASC", "DESC"):
+            direction = "ASC"
 
-    return "ORDER BY " + ", ".join(order_parts) if order_parts else ""
+        order_parts.append(f"{quote_identifier(db_type, col)} {direction}")
 
+    if not order_parts:
+        return "ORDER BY (SELECT NULL)"
+
+    return "ORDER BY " + ", ".join(order_parts)
 
 
 def get_query_string(
@@ -309,7 +530,7 @@ def get_query_string(
     order_by: Optional[list[OrderByOption]] = None,
     offset: Optional[int] = None,
     distinct: Optional[DistinctList] = None,
-    aliases: Optional[dict[str, str]] = None
+    aliases: Optional[dict[str, str]] = None,
 ) -> str:
     """
     Gera uma query SQL adaptada ao tipo de banco de dados, com DISTINCT, filtros, joins, ordenação e paginação.
@@ -334,12 +555,13 @@ def get_query_string(
     else:
         join_sql = ""
 
-
     # SELECT
     select_view = build_select_view(db_type, select, aliases)
 
     if distinct and distinct.useDistinct:
-        distinct_cols = ", ".join(quote_identifier(db_type, col) for col in distinct.distinct_columns)
+        distinct_cols = ", ".join(
+            quote_identifier(db_type, col) for col in distinct.distinct_columns
+        )
         if db_type in {"postgres", "postgresql"} and distinct_cols:
             query = f"SELECT DISTINCT ON ({distinct_cols}) {select_view} FROM {quoted_base_table}{join_sql}"
         else:
@@ -353,15 +575,15 @@ def get_query_string(
 
     # ORDER BY
     if order_by and len(order_by) > 0:
-        query += f" {format_order_by(db_type, order_by)}"
+        query += f" {format_order_by(db_type, order_by)}"  # type: ignore
 
     # Paginação
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
         query += f" LIMIT {max_rows}"
         if offset is not None:
             query += f" OFFSET {offset}"
-    
-    elif db_type in {"mssql", "sql server","sqlserver"}:
+
+    elif db_type in {"mssql", "sql server", "sqlserver"}:
         if not order_by or len(order_by) == 0:
             query += f" ORDER BY (SELECT NULL)"  # fallback
         query += f" OFFSET {offset or 0} ROWS FETCH NEXT {max_rows} ROWS ONLY"
@@ -375,8 +597,6 @@ def get_query_string(
         else:
             query = f"SELECT * FROM ({query}) WHERE ROWNUM <= {max_rows}"
     return query
-
-
 
 
 def get_query_string_advance(
@@ -385,7 +605,7 @@ def get_query_string_advance(
     filters: Optional[str] = None,
     select: Optional[List[str]] = None,
     table_list: Optional[List[str]] = None,
-    max_rows: int = 1000,
+    max_rows: Optional[int] = None,
     db_type: str = "mysql",
     order_by: Optional[list[OrderByOption]] = None,
     offset: Optional[int] = None,
@@ -393,48 +613,97 @@ def get_query_string_advance(
     aliases: Optional[dict[str, str]] = None,
 ) -> str:
     """
-    Gera uma query SQL adaptada ao tipo de banco de dados,
-    com DISTINCT, filtros, joins, ordenação e paginação.
+    Gera query SQL adaptada ao banco, com JOIN, filtros, ordenação, DISTINCT e paginação.
     """
     db_type = db_type.lower()
     quoted_base_table = quote_identifier(db_type, base_table)
 
-    # --- JOINs ---
-    join_sql = build_join_clause(db_type, base_table, joins, table_list)
+    safe_table_list = _sanitize_table_list(base_table, table_list)
 
-    
-    # SELECT
+    join_sql = build_join_clause(
+        db_type=db_type,
+        base_table=base_table,
+        joins=joins,
+        table_list=safe_table_list,
+    )
+
+    print("JOIN SQL:", join_sql)
+
     select_view = build_select_view(db_type, select, aliases)
 
+    # ==========================================
+    # BLOCO MODIFICADO: Apenas a lógica do Distinct
+    # ==========================================
     if distinct and distinct.useDistinct:
-        distinct_cols = ", ".join(quote_identifier(db_type, col) for col in distinct.distinct_columns)
+        distinct_cols_list = [
+            quote_identifier(db_type, col) for col in distinct.distinct_columns
+        ]
+        distinct_cols = ", ".join(distinct_cols_list)
+
         if db_type in {"postgres", "postgresql"} and distinct_cols:
-            query = f"SELECT DISTINCT ON ({distinct_cols}) {select_view} FROM {quoted_base_table}{join_sql}"
+            query = (
+                f"SELECT DISTINCT ON ({distinct_cols}) "
+                f"{select_view} "
+                f"FROM {quoted_base_table}{join_sql}"
+            )
+        elif distinct_cols:
+            # 1. Pega a primeira coluna para a ordenação obrigatória da Window Function
+            first_col = distinct_cols_list[0]
+
+            # 2. Prepara o filtro para aplicar DENTRO da subquery
+            filter_str = f" {filters}" if filters else ""
+
+            if db_type in {"oracle", "oracledb"}:
+                query = (
+                    f"SELECT * FROM ("
+                    f"  SELECT {select_view}, "
+                    f"  ROW_NUMBER() OVER(PARTITION BY {distinct_cols} ORDER BY {first_col}) AS _rn "
+                    f"  FROM {quoted_base_table}{join_sql}{filter_str}"
+                    f") _sub WHERE _rn = 1"
+                )
+            else:
+                query = (
+                    f"SELECT * FROM ("
+                    f"  SELECT {select_view}, "
+                    f"  ROW_NUMBER() OVER(PARTITION BY {distinct_cols} ORDER BY {first_col}) AS _rn "
+                    f"  FROM {quoted_base_table}{join_sql}{filter_str}"
+                    f") AS _sub WHERE _rn = 1"
+                )
+
+            # 3. TRUQUE: Como já aplicamos o filtro DENTRO da subquery acima,
+            # zeramos a variável aqui para que o 'if filters:' lá em baixo não duplique e quebre a query.
+            filters = None
+
         else:
             query = f"SELECT DISTINCT {select_view} FROM {quoted_base_table}{join_sql}"
     else:
         query = f"SELECT {select_view} FROM {quoted_base_table}{join_sql}"
+    # ==========================================
 
-    # WHERE
+    # Todo o resto do seu código permanece INTACTO
     if filters:
         query += f" {filters}"
 
-    # ORDER BY
     if order_by and len(order_by) > 0:
-        query += f" {format_order_by(db_type, order_by)}"
+        query += f" {format_order_by(db_type, order_by)}"  # type: ignore
 
-    # Paginação
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
-        query += f" LIMIT {max_rows}"
+        if max_rows is not None:
+            query += f" LIMIT {max_rows}"
         if offset is not None:
             query += f" OFFSET {offset}"
-    
-    elif db_type in {"mssql", "sql server","sqlserver"}:
+
+    elif db_type in {"mssql", "sql server", "sqlserver"}:
         if not order_by or len(order_by) == 0:
-            query += f" ORDER BY (SELECT NULL)"  # fallback
-        query += f" OFFSET {offset or 0} ROWS FETCH NEXT {max_rows} ROWS ONLY"
+            query += " ORDER BY (SELECT NULL)"
+        query += f" OFFSET {offset or 0} ROWS"
+        if max_rows is not None:
+            query += f" FETCH NEXT {max_rows} ROWS ONLY"
 
     elif db_type == "oracle":
+        if max_rows is None:
+            max_rows = 1000
+
         if offset is not None:
             query = (
                 f"SELECT * FROM (SELECT a.*, ROWNUM rnum FROM ({query}) a "
@@ -443,202 +712,173 @@ def get_query_string_advance(
         else:
             query = f"SELECT * FROM ({query}) WHERE ROWNUM <= {max_rows}"
 
+    # print("query:",query)
     return query
 
 
 def get_count_query(
     base_table: str,
-    joins: Optional[List[JoinOption]] = None,
+    joins: Optional[Any] = None,  # Ajuste para dict[str, AdvancedJoinOption]
     filters: Optional[str] = None,
-    distinct: Optional[DistinctList] = None,
-    db_type: str = "mysql"
+    distinct: Optional[Any] = None,  # Ajuste para DistinctList
+    db_type: str = "mysql",
 ) -> str:
     """
-    Gera uma query SQL para contar registros, considerando joins, filtros e DISTINCT.
+    Gera uma query SQL otimizada para contar registros.
+
+    Otimizações:
+    - Usa COUNT(*) quando possível (mais rápido)
+    - Para DISTINCT com colunas, usa COUNT(DISTINCT colunas) para 1 coluna
+    - Usa Subquery para múltiplas colunas DISTINCT (Padrão universal e evita erro de sintaxe)
+    - Adiciona hints de otimização para bancos específicos
     """
     db_type = db_type.lower()
     quoted_base_table = quote_identifier(db_type, base_table)
 
     # JOINs
-    if joins:
-         # --- JOINs ---
-        join_sql = build_join_clause(db_type, base_table, joins, None)
-    else:
-        join_sql = ""
+    join_sql = build_join_clause(db_type, base_table, joins, None) if joins else ""
 
-    # COUNT com DISTINCT
-    if distinct and distinct.useDistinct and distinct.distinct_columns:
-        distinct_cols = ", ".join(quote_identifier(db_type, col) for col in distinct.distinct_columns)
-        query = f"SELECT COUNT(DISTINCT {distinct_cols}) FROM {quoted_base_table}{join_sql}"
+    # Prepara o filtro com espaço inicial seguro
+    filter_sql = f" {filters}" if filters else ""
+
+    # Verifica se há Distinct e Colunas especificadas
+    use_distinct = getattr(distinct, "useDistinct", False) if distinct else False
+    distinct_cols_raw = getattr(distinct, "distinct_columns", []) if distinct else []
+
+    if use_distinct and distinct_cols_raw:
+        distinct_cols_list = [
+            quote_identifier(db_type, col) for col in distinct_cols_raw
+        ]
+        distinct_cols_str = ", ".join(distinct_cols_list)
+
+        # SE TIVER MAIS DE 1 COLUNA -> Usa Subquery (Universal: SQL Server, MySQL, Postgres, etc.)
+        if len(distinct_cols_list) > 1:
+            # Oracle não aceita 'AS' antes do alias da subquery
+            alias_prefix = "" if db_type in {"oracle", "oracledb"} else "AS "
+
+            # ATENÇÃO: O filter_sql precisa estar DENTRO da subquery
+            query = (
+                f"SELECT COUNT(*) FROM ("
+                f"  SELECT DISTINCT {distinct_cols_str} "
+                f"  FROM {quoted_base_table}{join_sql}{filter_sql}"
+                f") {alias_prefix}_count_sub"
+            )
+            # Como o filtro já foi aplicado dentro da subquery, limpamos a variável
+            # para não ser concatenada novamente lá no final.
+            filter_sql = ""
+
+        # SE TIVER SÓ 1 COLUNA -> COUNT(DISTINCT) nativo funciona
+        else:
+            query = f"SELECT COUNT(DISTINCT {distinct_cols_str}) FROM {quoted_base_table}{join_sql}"
+
+    # SEM DISTINCT -> COUNT(*) é o mais rápido
     else:
         query = f"SELECT COUNT(*) FROM {quoted_base_table}{join_sql}"
 
-    # WHERE
-    if filters:
-        query += f" {filters}"
+    # Aplica o WHERE (se já não tiver sido aplicado na subquery)
+    if filter_sql:
+        query += filter_sql
+
+    # ==========================================
+    # HINTS E OTIMIZAÇÕES ESPECÍFICAS DE BANCO
+    # Só aplicamos se for uma contagem limpa (sem distinct, joins e filtros)
+    # ==========================================
+    if not joins and not filters and not use_distinct:
+        if db_type in {"mysql", "mariadb"}:
+            query = f"SELECT /*+ NO_ICP({quoted_base_table}) */ COUNT(*) FROM {quoted_base_table}"
+
+        elif db_type in {"mssql", "sql server", "sqlserver"}:
+            query = f"SELECT COUNT(*) FROM {quoted_base_table} WITH (NOLOCK)"
+
+        elif db_type == "oracle":
+            query = f"SELECT /*+ PARALLEL({quoted_base_table}, 2) */ COUNT(*) FROM {quoted_base_table}"
 
     return query
 
-def build_update_query(table_name, db_type, updated_values, primary_key, primary_value):
+
+# Versão alternativa ainda mais otimizada para casos específicos
+def get_count_query_optimized(
+    base_table: str,
+    joins: Optional[dict[str, AdvancedJoinOption]] = None,
+    filters: Optional[str] = None,
+    distinct: Optional[DistinctList] = None,
+    db_type: str = "mysql",
+    use_estimate: bool = False,
+) -> str:
+    """
+    Versão ultra-otimizada que pode usar estatísticas do banco para COUNT aproximado.
+
+    Args:
+        use_estimate: Se True, tenta usar métodos aproximados (mais rápidos, menos precisos)
+    """
+    db_type = db_type.lower()
+    quoted_base_table = quote_identifier(db_type, base_table)
+
+    # Se queremos estimativa e não há filtros complexos
+    if use_estimate and not filters and not distinct:
+        if db_type in {"postgresql", "postgres"}:
+            # PostgreSQL: usa estatísticas do planner
+            return f"SELECT reltuples::bigint AS estimate FROM pg_class WHERE relname = '{base_table.split('.')[-1]}'"
+
+        elif db_type in {"mysql", "mariadb"}:
+            # MySQL: usa informações do INFORMATION_SCHEMA
+            schema = base_table.split(".")[0] if "." in base_table else None
+            table = base_table.split(".")[-1]
+            if schema:
+                return f"SELECT table_rows FROM information_schema.tables WHERE table_schema = '{schema}' AND table_name = '{table}'"
+            else:
+                return f"SELECT table_rows FROM information_schema.tables WHERE table_name = '{table}'"
+
+        elif db_type in {"mssql", "sql server", "sqlserver"}:
+            # SQL Server: usa estatísticas
+            return f"SELECT rows FROM sys.partitions WHERE object_id = OBJECT_ID('{base_table}') AND index_id IN (0,1)"
+
+    # Se não, usa COUNT normal
+    return get_count_query(base_table, joins, filters, distinct, db_type)
+
+
+# Função auxiliar para decidir qual estratégia de COUNT usar
+def should_use_estimate(
+    total_rows: Optional[int] = None, table_size: str = "unknown"
+) -> bool:
+    """
+    Decide se deve usar COUNT estimado baseado no tamanho da tabela.
+
+    Args:
+        total_rows: Número aproximado de linhas (se conhecido)
+        table_size: 'small', 'medium', 'large', 'unknown'
+    """
+    if total_rows is not None:
+        return total_rows > 1000000  # > 1 milhão de linhas
+
+    # Baseado em heurística
+    size_map = {"small": False, "medium": False, "large": True, "unknown": False}
+    return size_map.get(table_size, False)
+
+
+def build_update_query(
+    table_name, db_type, updated_values, primary_key, primary_value
+) -> TextClause | None:
     """Constrói a query de atualização dinâmica."""
     set_clauses = []
     for col, info in updated_values.items():
         value = info.get("value")
         col_type = info.get("type_column", "text")  # default string
-        set_clauses.append(f"{quote_identifier(db_type, col)} = {_convert_column_type_for_string_one(value, col_type)}")
+        set_clauses.append(
+            f"{quote_identifier(db_type, col)} = {_convert_column_type_for_string_one(value, col_type)}"
+        )
 
     if not set_clauses:
         return None
 
-    primary_value_formatted = f"'{primary_value}'" if isinstance(primary_value, str) else str(primary_value)
-    query = text(f"""
+    primary_value_formatted = (
+        f"'{primary_value}'" if isinstance(primary_value, str) else str(primary_value)
+    )
+    query = text(
+        f"""
         UPDATE {quote_identifier(db_type, table_name)}
         SET {', '.join(set_clauses)}
         WHERE {quote_identifier(db_type, primary_key)} = {primary_value_formatted};
-    """)
+    """
+    )
     return query
-
-from sqlalchemy.orm import Session
-def update_row_service(
-    data: UpdateRequest,
-    engine: Engine,
-    user_id: int,
-    db_type: str,
-    connection_id: str,
-    db: Session,
-    client_ip: str = None,
-    app_source: str = "API",
-    executed_by: str = "sistema",
-    modified_by: str = None,
-):
-    """
-    Atualiza registros existentes em uma ou mais tabelas e salva no histórico completo.
-
-    Args:
-        data (UpdateRequest): Dados contendo as tabelas, chaves primárias e colunas a atualizar.
-        engine (Engine): Conexão SQLAlchemy para execução da query.
-        user_id (int): ID do usuário executando a operação.
-        db_type (str): Tipo de banco (ex: 'postgres', 'mysql', 'sqlite').
-        connection_id (str): ID da conexão do banco de dados.
-        db (Session): Sessão SQLAlchemy para salvar histórico.
-        client_ip (str, optional): Endereço IP do cliente.
-        app_source (str, optional): Origem da execução (ex: API, Console, UI).
-        executed_by (str, optional): Nome de quem executou (usuário ou sistema).
-        modified_by (str, optional): Usuário que modificou o registro.
-
-    Returns:
-        dict: Resumo da operação com status e linhas afetadas.
-    """
-    import time
-    from datetime import datetime, timezone
-
-    resposta_query = ""
-    query_string = ""
-    duration_ms = 0
-    start = time.time()
-
-    try:
-        with engine.begin() as conn:
-            for table_name, primary_key_data in data.tables_primary_keys_values.items():
-                # ✅ Validação da chave primária
-                primary_key = primary_key_data.get("primaryKey")
-                primary_value = primary_key_data.get("valor")
-                if not primary_key or primary_value is None:
-                    raise ValueError(f"Tabela '{table_name}' não contém chave primária válida")
-
-                # ✅ Obtenção e estruturação dos dados a atualizar
-                raw_values = data.updatedRow.get(table_name, {})
-                updated_values = {
-                    col: {
-                        "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
-                        "type_column": field.get("type_column", "text") if isinstance(field, dict) else getattr(field, "type_column", "text")
-                    }
-                    for col, field in raw_values.items()
-                }
-
-                if not updated_values:
-                    raise ValueError(f"Tabela '{table_name}': Nenhuma coluna para atualizar")
-
-                # ✅ Monta a query SQL final
-                query = build_update_query(
-                    table_name=table_name,
-                    db_type=db_type,
-                    updated_values=updated_values,
-                    primary_key=primary_key,
-                    primary_value=primary_value
-                )
-
-                # ✅ Execução da query
-                query_string += f"{table_name}: {query}\n"
-                rs = conn.execute(query)
-                resposta_query += f"\n{table_name}: {rs.rowcount} linha(s) atualizada(s)"
-
-        duration_ms = int((time.time() - start) * 1000)
-
-        # ✅ Criação do histórico completo
-        historico = QueryHistoryCreate(
-            user_id=user_id,
-            db_connection_id=connection_id,
-            query=query_string.strip(),
-            query_type="UPDATE",
-            executed_at=datetime.now(timezone.utc),
-            duration_ms=duration_ms,
-            result_preview=resposta_query or "Nenhuma linha atualizada",
-            error_message=None,
-            is_favorite=False,
-            tags="update",
-            app_source=app_source,
-            client_ip=client_ip,
-            executed_by=executed_by,
-            modified_by=modified_by or executed_by,
-            meta_info={
-                "db_type": db_type,
-                "tables_updated": list(data.updatedRow.keys()),
-                "primary_keys": data.tables_primary_keys_values,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        )
-
-        create_query_history(db=db, data=historico)
-        log_message(f"Atualização concluída: {resposta_query}")
-
-        return {
-            "status": resposta_query or "Nenhuma linha atualizada",
-            "updated": data.updatedRow,
-            "response": resposta_query
-        }
-
-    except Exception as e:
-        duration_ms = int((time.time() - start) * 1000)
-        error_msg = _lidar_com_erro_sql(e)
-
-        # ✅ Log e histórico de erro completo
-        log_message(f"Erro ao atualizar registro: {error_msg}", "error")
-
-        historico = QueryHistoryCreate(
-            user_id=user_id,
-            db_connection_id=connection_id,
-            query=query_string.strip() or "UPDATE falhou antes de montar a query",
-            query_type="UPDATE",
-            executed_at=datetime.now(timezone.utc),
-            duration_ms=duration_ms,
-            result_preview=resposta_query or "Sem resultado devido ao erro",
-            error_message=error_msg,
-            is_favorite=False,
-            tags="error",
-            app_source=app_source,
-            client_ip=client_ip,
-            executed_by=executed_by,
-            modified_by=modified_by or executed_by,
-            meta_info={
-                "db_type": db_type,
-                "tables_attempted": list(data.updatedRow.keys()),
-                "primary_keys": data.tables_primary_keys_values,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        )
-
-        create_query_history(db=db, data=historico)
-        raise ValueError(error_msg)
-
-

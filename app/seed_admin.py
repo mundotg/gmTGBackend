@@ -1,294 +1,325 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
+
 from app.auth import hash_password
 from app.ultils.logger import log_message
+from app.models.user_model import Empresa, Cargo, Role, User
+from app.models.task_models import TypeProjecto, AuditLog
 
-from app.models.user_model import Empresa, Cargo, User
-from app.models.task_models import Usuario as UserTask, Role, TypeProjecto, AuditLog
+
+def get_or_create(db: Session, model, defaults=None, **filters):
+    """
+    Helper genérico para criar registros se não existirem
+    """
+    instance = db.query(model).filter_by(**filters).first()
+    if instance:
+        return instance, False
+
+    params = {**filters, **(defaults or {})}
+    instance = model(**params)
+    db.add(instance)
+    db.flush()
+    return instance, True
 
 
 def seed_data(db: Session):
     """
-    Popula a base de dados com:
-    - Empresa padrão
-    - Cargos base
-    - Usuário administrador
-    - Roles padrão
-    - Tipos de projeto
-    - Usuário admin no módulo de tarefas
-    - Registro inicial no AuditLog
+    Seed inicial do sistema:
+    - Empresa
+    - Cargos
+    - Usuário Admin
+    - Roles
+    - Tipos de Projeto
+    - AuditLog
     """
 
     log_message("🚀 Iniciando seed de dados...", "info")
 
-    # -----------------------------
-    # 🏢 Empresa padrão
-    # -----------------------------
-    empresa_nome = "OkayulaTech Lda"
-    empresa = db.query(Empresa).filter_by(nome=empresa_nome).first()
-
-    if not empresa:
-        empresa = Empresa(
-            nome=empresa_nome,
-            tamanho="51-200",
-            nif="700000000",
-            endereco="Rua das pedras, Golf 2 Projecto, Luanda",
-            criado_em=datetime.utcnow(),
+    try:
+        # -----------------------------
+        # 🏢 Empresa padrão
+        # -----------------------------
+        empresa, created = get_or_create(
+            db,
+            Empresa,
+            nome="OkayulaTech Lda",
+            defaults=dict(
+                tamanho="51-200",
+                nif="700000000",
+                endereco="Rua das pedras, Golf 2 Projecto, Luanda",
+            ),
         )
-        db.add(empresa)
-        db.flush()
-        log_message(f"🏢 Empresa criada: {empresa.nome}", "success")
-    else:
-        log_message(f"🏢 Empresa já existe: {empresa.nome}", "info")
 
-    # -----------------------------
-    # 💼 Cargos base
-    # -----------------------------
-    cargos_base = [
-        {"nome": "Admin", "descricao": "Administrador do sistema", "nivel": "sênior"},
-        {
-            "nome": "Gerente",
-            "descricao": "Responsável pela equipe e decisões estratégicas",
-            "nivel": "pleno",
-        },
-        {
-            "nome": "Desenvolvedor",
-            "descricao": "Cria e mantém sistemas e aplicações",
-            "nivel": "pleno",
-        },
-        {
-            "nome": "Analista",
-            "descricao": "Analisa e projeta soluções para problemas técnicos",
-            "nivel": "júnior",
-        },
-        {
-            "nome": "Designer UX/UI",
-            "descricao": "Projeta experiências e interfaces de usuário",
-            "nivel": "pleno",
-        },
-        {
-            "nome": "Engenheiro de Dados",
-            "descricao": "Gerencia pipelines e estruturas de dados complexos",
-            "nivel": "sênior",
-        },
-        {
-            "nome": "DevOps Engineer",
-            "descricao": "Automatiza e mantém infraestrutura de desenvolvimento",
-            "nivel": "sênior",
-        },
-        {
-            "nome": "Product Owner",
-            "descricao": "Define visão e prioridades de produtos",
-            "nivel": "pleno",
-        },
-        {
-            "nome": "Scrum Master",
-            "descricao": "Facilita processos ágeis e comunicação da equipe",
-            "nivel": "pleno",
-        },
-        {
-            "nome": "QA Tester",
-            "descricao": "Executa testes e garante a qualidade do software",
-            "nivel": "júnior",
-        },
-        {
-            "nome": "Analista de Suporte",
-            "descricao": "Atende usuários e resolve problemas técnicos",
-            "nivel": "júnior",
-        },
-        {
-            "nome": "Gestor Financeiro",
-            "descricao": "Gerencia orçamento e finanças da empresa",
-            "nivel": "sênior",
-        },
-        {
-            "nome": "Recursos Humanos",
-            "descricao": "Gerencia recrutamento, benefícios e clima organizacional",
-            "nivel": "pleno",
-        },
-        {
-            "nome": "Marketing Digital",
-            "descricao": "Planeja e executa campanhas de marketing online",
-            "nivel": "pleno",
-        },
-        {
-            "nome": "Consultor Técnico",
-            "descricao": "Presta consultoria e orientação em soluções tecnológicas",
-            "nivel": "sênior",
-        },
-    ]
+        log_message(
+            f"🏢 Empresa {'criada' if created else 'já existente'}: {empresa.nome}",
+            "success" if created else "info",
+        )
 
-    cargos_criados = []
-    for cargo_data in cargos_base:
-        cargo = db.query(Cargo).filter_by(nome=cargo_data["nome"]).first()
-        if not cargo:
-            cargo = Cargo(**cargo_data)
-            db.add(cargo)
-            cargos_criados.append(cargo_data["nome"])
-            db.flush()
+        # -----------------------------
+        # 💼 Cargos base
+        # -----------------------------
+        cargos_base = [
+            ("Admin", "Administrador do sistema", "sênior"),
+            ("Gerente", "Responsável pela equipe e decisões estratégicas", "pleno"),
+            ("Desenvolvedor", "Cria e mantém sistemas e aplicações", "pleno"),
+            ("Analista", "Analisa e projeta soluções técnicas", "júnior"),
+            ("Designer UX/UI", "Projeta experiências e interfaces", "pleno"),
+            ("Engenheiro de Dados", "Gerencia pipelines de dados", "sênior"),
+            ("DevOps Engineer", "Automação e infraestrutura", "sênior"),
+            ("Product Owner", "Define visão do produto", "pleno"),
+            ("Scrum Master", "Facilita processos ágeis", "pleno"),
+            ("QA Tester", "Garante qualidade do software", "júnior"),
+            ("Analista de Suporte", "Suporte técnico", "júnior"),
+            ("Gestor Financeiro", "Gestão financeira", "sênior"),
+            ("Recursos Humanos", "Gestão de pessoas", "pleno"),
+            ("Marketing Digital", "Marketing online", "pleno"),
+            ("Consultor Técnico", "Consultoria tecnológica", "sênior"),
+        ]
 
-    if cargos_criados:
-        log_message(f"💼 Cargos criados: {', '.join(cargos_criados)}", "success")
-    else:
-        log_message("💼 Nenhum cargo novo necessário — já existiam", "info")
+        cargos_criados = []
+        for nome, descricao, nivel in cargos_base:
+            _, created = get_or_create(
+                db,
+                Cargo,
+                nome=nome,
+                defaults=dict(descricao=descricao, nivel=nivel),
+            )
+            if created:
+                cargos_criados.append(nome)
 
-    # -----------------------------
-    # 👤 Usuário administrador (sistema principal)
-    # -----------------------------
-    admin_email = "admin@okayulaTech.com"
-    admin_user = db.query(User).filter_by(email=admin_email).first()
+        log_message(
+            (
+                f"💼 Cargos criados: {', '.join(cargos_criados)}"
+                if cargos_criados
+                else "💼 Nenhum cargo novo necessário"
+            ),
+            "success" if cargos_criados else "info",
+        )
 
-    if not admin_user:
+        # -----------------------------
+        # 👤 Usuário Administrador
+        # -----------------------------
         cargo_admin = db.query(Cargo).filter_by(nome="Admin").first()
-        hashed_pw = hash_password("Admin@123")
 
-        admin_user = User(
-            nome="Administrador",
-            apelido="Geral",
-            email=admin_email,
-            telefone="+244900000001",
-            empresa_id=empresa.id,
-            cargo_id=cargo_admin.id,
-            hashed_password=hashed_pw,
-            concorda_termos=True,
-            criado_em=datetime.utcnow(),
+        admin_user, created = get_or_create(
+            db,
+            User,
+            email="admin@okayulaTech.com",
+            defaults=dict(
+                nome="Administrador",
+                apelido="Geral",
+                telefone="+244900000001",
+                empresa_id=empresa.id,
+                cargo_id=cargo_admin.id,
+                hashed_password=hash_password("Admin@123"),
+                concorda_termos=True,
+            ),
         )
 
-        db.add(admin_user)
-        db.commit()
-        db.refresh(admin_user)
-
-        log_message(f"✅ Usuário administrador criado: {admin_user.email}", "success")
-    else:
-        log_message("👤 Usuário administrador já existe.", "info")
-
-    # -----------------------------
-    # 🎭 Roles padrão
-    # -----------------------------
-    roles_base = [
-        {"name": "admin", "description": "Acesso total ao sistema"},
-        {"name": "manager", "description": "Gerencia projetos e equipes"},
-        {"name": "user", "description": "Acesso básico ao sistema"},
-        {
-            "name": "developer",
-            "description": "Desenvolve e mantém funcionalidades técnicas",
-        },
-        {
-            "name": "qa_tester",
-            "description": "Executa testes e garante a qualidade do software",
-        },
-        {
-            "name": "product_owner",
-            "description": "Define e prioriza funcionalidades do produto",
-        },
-        {
-            "name": "scrum_master",
-            "description": "Facilita processos ágeis e remove impedimentos",
-        },
-        {
-            "name": "data_analyst",
-            "description": "Analisa e interpreta dados para suporte à decisão",
-        },
-        {
-            "name": "devops",
-            "description": "Gerencia infraestrutura, deploys e automação",
-        },
-        {
-            "name": "security_officer",
-            "description": "Garante a segurança de dados e acessos",
-        },
-        {
-            "name": "support_agent",
-            "description": "Atende solicitações e problemas de usuários",
-        },
-        {
-            "name": "hr_manager",
-            "description": "Gerencia o recrutamento e o bem-estar da equipe",
-        },
-        {
-            "name": "finance_manager",
-            "description": "Controla orçamentos, despesas e relatórios financeiros",
-        },
-    ]
-
-    roles_criadas = []
-    for role_data in roles_base:
-        role = db.query(Role).filter_by(name=role_data["name"]).first()
-        if not role:
-            role = Role(**role_data)
-            db.add(role)
-            roles_criadas.append(role_data["name"])
-            db.flush()
-
-    if roles_criadas:
-        log_message(f"🎭 Roles criadas: {', '.join(roles_criadas)}", "success")
-    else:
-        log_message("🎭 Nenhuma role nova necessária — já existiam", "info")
-
-    # -----------------------------
-    # 📦 Tipos de Projeto
-    # -----------------------------
-    tipos_projetos = [
-        {"name": "Interno", "description": "Projetos internos da empresa"},
-        {"name": "Externo", "description": "Projetos para clientes"},
-        {"name": "Pesquisa", "description": "Projetos experimentais ou de estudo"},
-    ]
-
-    tipos_criados = []
-    for tipo_data in tipos_projetos:
-        tipo = db.query(TypeProjecto).filter_by(name=tipo_data["name"]).first()
-        if not tipo:
-            tipo = TypeProjecto(**tipo_data)
-            db.add(tipo)
-            tipos_criados.append(tipo_data["name"])
-            db.flush()
-
-    if tipos_criados:
         log_message(
-            f"📦 Tipos de projeto criados: {', '.join(tipos_criados)}", "success"
+            f"👤 Usuário admin {'criado' if created else 'já existente'}",
+            "success" if created else "info",
         )
-    else:
-        log_message("📦 Nenhum tipo de projeto novo necessário — já existiam", "info")
 
-    # -----------------------------
-    # 👨‍💼 Usuário administrador (módulo de tarefas)
-    # -----------------------------
-    task_admin_email = "admin.tasks@okayulaTech.com"
-    task_admin = db.query(UserTask).filter_by(email=task_admin_email).first()
+        # -----------------------------
+        # 🎭 Roles padrão
+        # -----------------------------
+        roles_base = [
+            ("admin", "Acesso total ao sistema"),
+            ("manager", "Gerencia projetos e equipes"),
+            ("user", "Acesso básico"),
+            ("developer", "Desenvolvimento técnico"),
+            ("qa_tester", "Qualidade de software"),
+            ("product_owner", "Gestão de produto"),
+            ("scrum_master", "Agilidade"),
+            ("data_analyst", "Análise de dados"),
+            ("devops", "Infraestrutura e deploy"),
+            ("security_officer", "Segurança"),
+            ("support_agent", "Suporte"),
+            ("hr_manager", "Recursos Humanos"),
+            ("finance_manager", "Financeiro"),
+        ]
 
-    if not task_admin:
-        role_admin = db.query(Role).filter_by(name="admin").first()
-        task_admin = UserTask(
-            nome="Administrador de Tarefas",
-            user_id = admin_user.id,
-            email=task_admin_email,
-            senha=hash_password("AdminTask@123"),
-            role_id=role_admin.id,
-            is_active=True,
-            email_verified=True,
-            created_at=datetime.utcnow(),
-        )
-        db.add(task_admin)
-        db.commit()
-        db.refresh(task_admin)
+        roles_criadas = []
+        for name, description in roles_base:
+            _, created = get_or_create(
+                db,
+                Role,
+                name=name,
+                defaults=dict(description=description),
+            )
+            if created:
+                roles_criadas.append(name)
+
         log_message(
-            f"✅ Usuário administrador de tarefas criado: {task_admin.email}", "success"
+            (
+                f"🎭 Roles criadas: {', '.join(roles_criadas)}"
+                if roles_criadas
+                else "🎭 Nenhuma role nova necessária"
+            ),
+            "success" if roles_criadas else "info",
         )
-    else:
-        log_message("👨‍💼 Usuário administrador de tarefas já existe.", "info")
 
-    # -----------------------------
-    # 🧾 Registro no AuditLog
-    # -----------------------------
-    audit_entry = AuditLog(
-        user_id=str(task_admin.id),
-        action="Seed inicial executado",
-        entity="Sistema",
-        entity_id="seed-init",
-        timestamp=datetime.utcnow(),
-    )
-    db.add(audit_entry)
-    db.commit()
+        log_message("🔐 Criando permissões do sistema...", "info")
 
-    log_message("🧾 Log de auditoria criado para o seed inicial", "info")
-    log_message("🌱 Seed concluído com sucesso!", "success")
+        permissions_base = {
+            # 🔌 DB Connections
+            "db_connection:create": "Criar conexões de banco de dados",
+            "db_connection:read": "Visualizar próprias conexões",
+            "db_connection:update": "Editar próprias conexões",
+            "db_connection:delete": "Remover próprias conexões",
+            "db_connection:read_company": "Visualizar conexões da empresa",
+            "db_connection:read_all": "Visualizar todas as conexões",
+            # 👤 Usuários
+            "user:read": "Visualizar usuários",
+            "user:manage": "Gerenciar usuários",
+            # 📊 Queries
+            "query:execute": "Executar queries",
+            "query:history": "Ver histórico de queries",
+            # 📁 Projetos
+            "project:create": "Criar projetos",
+            "project:update": "Editar projetos",
+            "project:delete": "Remover projetos",
+            "project:view": "Visualizar projetos",
+        }
+
+        permissions_map = {}
+
+        for name, description in permissions_base.items():
+            permission = db.query(Permission).filter_by(name=name).first()
+            if not permission:
+                permission = Permission(name=name, description=description)
+                db.add(permission)
+                db.flush()
+                log_message(f"➕ Permissão criada: {name}", "success")
+
+            permissions_map[name] = permission
+
+        # ============================
+        # 🎭 Vínculo ROLE → PERMISSIONS
+        # ============================
+
+        role_permissions = {
+            "admin": list(permissions_map.keys()),
+            "manager": [
+                "db_connection:read_company",
+                "query:execute",
+                "query:history",
+                "project:create",
+                "project:update",
+                "project:view",
+                "user:read",
+            ],
+            "developer": [
+                "db_connection:create",
+                "db_connection:read",
+                "query:execute",
+                "query:history",
+                "project:view",
+            ],
+            "user": [
+                "db_connection:read",
+                "query:execute",
+                "project:view",
+            ],
+            "devops": [
+                "db_connection:create",
+                "db_connection:update",
+                "db_connection:read_company",
+                "query:execute",
+            ],
+            "security_officer": [
+                "db_connection:read_all",
+                "query:history",
+                "user:read",
+            ],
+            "qa_tester": [
+                "project:view",
+                "query:execute",
+            ],
+            "product_owner": [
+                "project:create",
+                "project:update",
+                "project:view",
+            ],
+            "support_agent": [
+                "db_connection:read_company",
+                "query:history",
+            ],
+            "finance_manager": [
+                "project:view",
+            ],
+            "hr_manager": [
+                "user:read",
+            ],
+        }
+
+        for role_name, perms in role_permissions.items():
+            role = db.query(Role).filter_by(name=role_name).first()
+            if not role:
+                continue
+
+            for perm_name in perms:
+                permission = permissions_map.get(perm_name)
+                if permission and permission not in role.permissions:
+                    role.permissions.append(permission)
+
+            log_message(f"🔗 Permissões associadas à role '{role_name}'", "success")
+
+        db.commit()
+        log_message("✅ Seed de permissões finalizado!", "success")
+
+        # -----------------------------
+        # 📦 Tipos de Projeto
+        # -----------------------------
+        tipos_projeto = [
+            ("Interno", "Projetos internos da empresa"),
+            ("Externo", "Projetos para clientes"),
+            ("Pesquisa", "Projetos experimentais"),
+        ]
+
+        tipos_criados = []
+        for name, description in tipos_projeto:
+            _, created = get_or_create(
+                db,
+                TypeProjecto,
+                name=name,
+                defaults=dict(description=description),
+            )
+            if created:
+                tipos_criados.append(name)
+
+        log_message(
+            (
+                f"📦 Tipos de projeto criados: {', '.join(tipos_criados)}"
+                if tipos_criados
+                else "📦 Nenhum tipo de projeto novo necessário"
+            ),
+            "success" if tipos_criados else "info",
+        )
+
+        # -----------------------------
+        # 🧾 Audit Log
+        # -----------------------------
+        db.add(
+            AuditLog(
+                user_id=str(admin_user.id),
+                action="Seed inicial executado",
+                entity="Sistema",
+                entity_id="seed-init",
+                timestamp=datetime.utcnow(),
+            )
+        )
+
+        db.commit()
+        log_message("🧾 Log de auditoria criado", "info")
+        log_message("🌱 Seed concluído com sucesso!", "success")
+
+    except Exception as e:
+        db.rollback()
+        log_message(
+            message=f"❌ Erro durante seed: {str(e)}",
+            level="error",
+            source="seed_admin.py",
+        )
+        raise

@@ -115,7 +115,7 @@ rich==14.3.3
 rich-toolkit==0.19.7
 rignore==0.7.6
 rsa==4.9.1
-oracledb>=3.0.0
+oracledb>=3.4.2
 ruamel.yaml==0.19.1
 safetensors==0.7.0
 sentry-sdk==2.57.0

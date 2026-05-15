@@ -22,9 +22,11 @@ from app.services.schema_manager_field import (
     AuditContext,
 )
 from app.services.schema_manager_table import (
+    execute_create_schema,
     execute_create_table,
     execute_alter_table,
     execute_drop_table,
+    AuditContext as TableAuditContext,
 )
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.get_id_by_token import get_current_user_id
@@ -335,8 +337,6 @@ async def update_field(
 # ============================================================
 # 🗑️ FIELD: DELETE
 # ============================================================
-
-
 @router.delete(
     "/field/{table_name}/{column_name}",
     response_model=ResponseWrapper,
@@ -480,8 +480,6 @@ async def delete_tables_bulk(
 # ============================================================
 # ➕ TABLE: CREATE
 # ============================================================
-
-
 @router.post("/table/", response_model=ResponseWrapper, summary="Criar nova Tabela")
 async def create_table(
     request: Request,
@@ -515,6 +513,14 @@ async def create_table(
         connectionModel_ref = connectionModel
         engine_ref = engine
         _ensure_connection_id(connectionModel, connection_id)
+        if payload.newSchema and payload.schema_name:
+            execute_create_schema(
+                db=db,
+                engine=engine,
+                connection_model=connectionModel,
+                schema_name=payload.schema_name,
+                audit_ctx=TableAuditContext(user_id=user_id),
+            )
 
         await _run_sync(
             execute_create_table,
@@ -541,8 +547,6 @@ async def create_table(
 # ============================================================
 # ✏️ TABLE: UPDATE / RENAME
 # ============================================================
-
-
 @router.put(
     "/table/{original_table_name}",
     response_model=ResponseWrapper,
@@ -592,6 +596,14 @@ async def update_table(
         connectionModel_ref = connectionModel
         engine_ref = engine
         _ensure_connection_id(connectionModel, connection_id)
+        if payload.newSchema and payload.schema_name:
+            execute_create_schema(
+                db=db,
+                engine=engine,
+                connection_model=connectionModel,
+                schema_name=payload.schema_name,
+                audit_ctx=TableAuditContext(user_id=user_id),
+            )
 
         await _run_sync(
             execute_alter_table,
@@ -621,8 +633,6 @@ async def update_table(
 # ============================================================
 # 🗑️ TABLE: DELETE
 # ============================================================
-
-
 @router.delete(
     "/table/{table_name}",
     response_model=ResponseWrapper,

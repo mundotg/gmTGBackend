@@ -1,4 +1,3 @@
-
 import traceback
 from aiosqlite import OperationalError
 from fastapi import Depends, HTTPException
@@ -19,7 +18,7 @@ defaults = {
     "SQLite": "SQLite",
     "sqlserver": "SQL Server",
     "oracle": "Oracle",
-    "mariadb": "MariaDB"
+    "mariadb": "MariaDB",
 }
 
 
@@ -37,8 +36,8 @@ def get_session_by_connection_id(connection_id: int, db: Session = Depends(get_d
         "port": connection.port,
         "database": connection.database_name,
         "service": connection.service if hasattr(connection, "service_name") else "xe",
-        "sslmode"       : connection.sslmode,
-        "trustServerCertificate" : connection.trustServerCertificate
+        "sslmode": connection.sslmode,
+        "trustServerCertificate": connection.trustServerCertificate,
     }
 
     try:
@@ -49,15 +48,14 @@ def get_session_by_connection_id(connection_id: int, db: Session = Depends(get_d
 
             if not db_path:
                 raise HTTPException(
-                    status_code=400,
-                    detail="Caminho do ficheiro SQLite não encontrado."
+                    status_code=400, detail="Caminho do ficheiro SQLite não encontrado."
                 )
 
             engine = create_engine(f"sqlite:///{db_path}")
-            rs= ""
+            rs = ""
             with engine.connect() as conn:
-                rs=conn.execute(text("SELECT 1"))
-                
+                rs = conn.execute(text("SELECT 1"))
+
             # info = _verify_sqlite_connection(engine,connection.database_name)
             # print(rs)
             # print("dialect:", info["dialect"])
@@ -77,13 +75,20 @@ def get_session_by_connection_id(connection_id: int, db: Session = Depends(get_d
         return engine
 
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao conectar ao banco de dados: {str(e)} {traceback.format_exc()}")
-    
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao conectar ao banco de dados: {str(e)} {traceback.format_exc()}",
+        )
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro inesperado: {str(e)}{traceback.format_exc()}")
-    
+        raise HTTPException(
+            status_code=500, detail=f"Erro inesperado: {str(e)}{traceback.format_exc()}"
+        )
+
+
 from sqlalchemy import create_engine, text
 from fastapi import HTTPException
+
 
 def get_session_by_connection(connection: DBConnection):
     if not connection:
@@ -97,14 +102,16 @@ def get_session_by_connection(connection: DBConnection):
 
             if not db_path:
                 raise HTTPException(
-                    status_code=400,
-                    detail="Caminho do ficheiro SQLite não encontrado."
+                    status_code=400, detail="Caminho do ficheiro SQLite não encontrado."
                 )
 
             engine = create_engine(f"sqlite:///{db_path}")
 
             with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
+                if db_type == "oracle":
+                    conn.execute(text("SELECT 1 FROM dual"))
+                else:
+                    conn.execute(text("SELECT 1"))
 
             return engine
 
@@ -120,43 +127,49 @@ def get_session_by_connection(connection: DBConnection):
         }
 
         db_config = defaults.get(connection.type)
+
+        # print(f"db_config: {db_config}")
         if not db_config:
             raise HTTPException(
                 status_code=400,
-                detail=f"Tipo de banco de dados '{connection.type}' não é suportado."
+                detail=f"Tipo de banco de dados '{connection.type}' não é suportado.",
             )
 
         engine = DatabaseManager.get_engine(db_config, config)
 
         with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+            if db_type == "oracle":
+                conn.execute(text("SELECT 1 FROM dual"))
+            else:
+                conn.execute(text("SELECT 1"))
 
         return engine
 
     except OperationalError as e:
-        log_message("❌ Falha de conexão (OperationalError) ao conectar ao banco", level="error")
-        log_message(str(e), level="error")
+        # log_message(
+        #     "❌ Falha de conexão (OperationalError) ao conectar ao banco", level="error"
+        # )
+        log_message(f"❌ Erro: {str(e)}{traceback.format_exc()}", level="error")
         raise HTTPException(
             status_code=503,
-            detail="Não foi possível conectar ao banco (timeout/host/porta/instância/firewall)."
+            detail="Não foi possível conectar ao banco (timeout/host/porta/instância/firewall).",
         )
 
     except SQLAlchemyError as e:
-        log_message("❌ Erro SQLAlchemy ao conectar ao banco", level="error")
-        log_message(str(e), level="error")
+        # log_message("❌ Erro SQLAlchemy ao conectar ao banco", level="error")
+        log_message(f"❌ Erro: {str(e)}{traceback.format_exc()}", level="error")
         raise HTTPException(
-            status_code=503,
-            detail="Falha ao conectar ao banco de dados."
+            status_code=503, detail="Falha ao conectar ao banco de dados."
         )
 
     except Exception as e:
-        log_message("❌ Erro inesperado ao conectar ao banco", level="error")
-        log_message(str(e), level="error")
+        # log_message("❌ Erro inesperado ao conectar ao banco", level="error")
+        log_message(f"❌ Erro: {str(e)}{traceback.format_exc()}", level="error")
         raise HTTPException(
-            status_code=500,
-            detail="Erro interno ao criar/testar engine."
+            status_code=500, detail="Erro interno ao criar/testar engine."
         )
-    
+
+
 def get_test_by_connection(conn_data: DBConnection, db: Session):
     config = {
         "user": conn_data.username,
@@ -165,8 +178,8 @@ def get_test_by_connection(conn_data: DBConnection, db: Session):
         "port": conn_data.port,
         "database": conn_data.database_name,
         "service": conn_data.service,  # mais seguro
-        "sslmode"       : conn_data.sslmode,
-        "trustServerCertificate" : conn_data.trustServerCertificate
+        "sslmode": conn_data.sslmode,
+        "trustServerCertificate": conn_data.trustServerCertificate,
     }
     session, engine = DatabaseManager.connect(conn_data.type, config)
     session.close()

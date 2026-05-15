@@ -405,6 +405,8 @@ def format_column(db_type: str, col: str, alias: Optional[str] = None) -> str:
                     quoted_parts.append(f'"{clean_part}"')
                 elif db_type.lower() == "mssql" or db_type.lower() == "sqlserver":
                     quoted_parts.append(f"[{clean_part}]")
+                elif db_type.lower() == "oracle":
+                    quoted_parts.append(f"{clean_part}")
                 else:  # mysql, mariadb, sqlite
                     quoted_parts.append(f"`{clean_part}`")
             else:
@@ -413,7 +415,9 @@ def format_column(db_type: str, col: str, alias: Optional[str] = None) -> str:
                     quoted_parts.append(f'"{clean_part}"')
                 elif db_type.lower() == "mssql" or db_type.lower() == "sqlserver":
                     quoted_parts.append(f"[{clean_part}]")
-                else:
+                elif db_type.lower() == "oracle":
+                    quoted_parts.append(f"{clean_part}")
+                else:  # mysql, mariadb, sqlite
                     quoted_parts.append(f"`{clean_part}`")
 
         return ".".join(quoted_parts)
@@ -438,6 +442,8 @@ def format_column(db_type: str, col: str, alias: Optional[str] = None) -> str:
                 return f'{col_quoted} AS "{clean_alias}"'
             elif db_type.lower() == "mssql" or db_type.lower() == "sqlserver":
                 return f"{col_quoted} AS [{clean_alias}]"
+            elif db_type.lower() == "oracle":
+                return f'{col_quoted} AS "{clean_alias}"'
             else:
                 return f"{col_quoted} AS `{clean_alias}`"
         else:
@@ -874,11 +880,9 @@ def build_update_query(
     primary_value_formatted = (
         f"'{primary_value}'" if isinstance(primary_value, str) else str(primary_value)
     )
-    query = text(
-        f"""
+    query = text(f"""
         UPDATE {quote_identifier(db_type, table_name)}
         SET {', '.join(set_clauses)}
         WHERE {quote_identifier(db_type, primary_key)} = {primary_value_formatted};
-    """
-    )
+    """)
     return query

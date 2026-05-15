@@ -158,7 +158,7 @@ class TableDDLRequest(BaseModel):
     """
 
     connection_id: int = Field(..., description="ID da conexão do banco de dados alvo")
-
+    newSchema: Optional[bool] = Field(..., description="novo schema")
     # Nome/schema da tabela alvo
     table_name: str = Field(
         ..., description="Nome da tabela (novo nome em caso de rename)"

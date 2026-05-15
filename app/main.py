@@ -21,6 +21,7 @@ from app.routes import (
     auth_routes,
     backup_restore_routes,
     database_operations_routes,
+    sqleditor_routes,
     delete_registro_routes,
     logs_routes,
     ocr_routes,
@@ -127,6 +128,7 @@ app.include_router(project_analytics_routes.router)
 app.include_router(ai_chat_routes.router)
 app.include_router(logs_routes.router)
 app.include_router(storage_routes.router)
+app.include_router(sqleditor_routes.router)
 
 # ------------------------------------------------------------
 # Execução (IMPORTANTE pro .exe)

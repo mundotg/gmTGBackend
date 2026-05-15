@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import traceback
@@ -17,6 +18,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.config.cache_manager import cache_result
@@ -36,6 +38,7 @@ from app.cruds.connection_cruds import (
     query_connections_simple,
     set_active_connection,
     upsert_db_connection,
+    get_connection_by_id,
 )
 from app.database import get_db
 from app.models.connection_models import DBConnection
@@ -117,23 +120,39 @@ def _log_and_raise(
     raise HTTPException(status_code=status_code, detail=message)
 
 
-def _cleanup_engine(user_id: int) -> None:
+async def _cleanup_engine(connection_id: int) -> None:
     """
-    Descarta engine ativo do usuário, se existir.
+    Descarta engines associados à conexão.
     """
+
     try:
-        current_engine = EngineManager.get(user_id)
+
+        current_engine = EngineManager.get(connection_id)
+
+        current_engine_async = EngineManager.async_get(connection_id)
+
         if current_engine:
+
             current_engine.dispose()
-            EngineManager.remove(user_id)
-            log_message(
-                f"🔁 Engine do usuário {user_id} descartado com sucesso.", level="info"
-            )
-    except ValueError:
-        log_message(f"ℹ️ Nenhum engine ativo para o usuário {user_id}.", level="info")
-    except Exception as e:
+
+            EngineManager.remove(connection_id)
+
+        if current_engine_async:
+
+            await current_engine_async.dispose()
+
+            await EngineManager.async_remove(connection_id)
+
         log_message(
-            f"⚠️ Erro ao limpar engine do usuário {user_id}: {str(e)}", level="warning"
+            f"🔁 Engine da conexão {connection_id} descartado com sucesso.",
+            level="info",
+        )
+
+    except Exception as e:
+
+        log_message(
+            f"⚠️ Erro ao limpar engine da conexão {connection_id}: {str(e)}",
+            level="warning",
         )
 
 
@@ -200,8 +219,17 @@ async def save_connection(
             action="Erro ao salvar conexão",
             message="Erro ao salvar conexão.",
             status_code=status.HTTP_400_BAD_REQUEST,
-            details={"error": str(e), "trace": traceback.format_exc()},
+            details={"error": f"{str(e)} {traceback.format_exc()}"},
         )
+
+
+_user_locks = {}
+
+
+def _get_user_lock(user_id: int):
+    if user_id not in _user_locks:
+        _user_locks[user_id] = asyncio.Lock()
+    return _user_locks[user_id]
 
 
 @router.post("/connect/", response_model=DbConnectionOutput)
@@ -214,75 +242,98 @@ async def test_and_connect(
     Testa a conexão de forma assíncrona, salva ou atualiza e define como ativa.
     """
     db_conn = None
+    engine = None
+    lock = _get_user_lock(user_id)
 
     try:
         conn_data = request.conn_data
         action_type = request.tipo
 
-        # 1. Limpeza prévia da engine antiga no EngineManager
-        _cleanup_engine(user_id)
+        # 🔒 evita concorrência por usuário
+        async with lock:
 
-        # 2. TESTE DE CONEXÃO (Ponto crítico de bloqueio)
-        # Executamos em threadpool para que o teste do driver (ex: pyodbc) não trave o backend
-        engine = await run_in_threadpool(get_session_by_connection, conn_data)
+            # 1. Limpeza prévia
+            await _cleanup_engine(user_id)
 
-        if not engine:
-            raise ValueError("Não foi possível criar a Engine de conexão.")
+            # 2. TESTE DE CONEXÃO (com proteção)
+            try:
+                engine = await run_in_threadpool(get_session_by_connection, conn_data)
+            except Exception:
+                raise ValueError("Falha ao criar engine de conexão.")
 
-        # 3. Persistência e Lógica de Negócio
-        # Usamos blocos separados para garantir que a engine só vá para o cache se o DB local salvar
-        if action_type == "con":
-            db_conn = create_db_connection(db, user_id, conn_data)
-        elif action_type == "upsert":
-            db_conn = upsert_db_connection(db, user_id, conn_data)
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Tipo de operação inválido. Use 'con' ou 'upsert'.",
+            if not engine:
+                raise ValueError("Não foi possível criar a Engine de conexão.")
+
+            # 3. Persistência
+            if action_type == "con":
+                db_conn = create_db_connection(db, user_id, conn_data)
+            elif action_type == "upsert":
+                db_conn = upsert_db_connection(db, user_id, conn_data)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Tipo inválido. Use 'con' ou 'upsert'.",
+                )
+
+            if not db_conn or not db_conn.id:
+                raise ValueError("Erro ao salvar conexão no banco.")
+
+            # 4. Atualiza banco primeiro (consistência)
+            desactivate_all_connections(db, user_id)
+            set_active_connection(db, user_id, db_conn.id)
+
+            # 5. Só depois seta no cache
+            EngineManager.set(engine, user_id)
+
+            # 6. Log seguro (sem dados sensíveis)
+            create_connection_log(
+                db,
+                connection_id=db_conn.id,
+                action="Conexão testada e ativada",
+                status="success",
+                details={
+                    "database": conn_data.database_name,
+                    "type": conn_data.type,
+                    "host": conn_data.host,
+                },
+                user_id=user_id,
             )
-
-        if not db_conn or not db_conn.id:
-            raise ValueError("Falha ao persistir dados da conexão no banco local.")
-
-        # 4. Ativação da Conexão
-        # Definimos no Cache de memória (EngineManager) e no Banco de Dados
-        EngineManager.set(engine, user_id)
-        desactivate_all_connections(db, user_id)
-        set_active_connection(db, user_id, db_conn.id)
-
-        # 5. Log de Auditoria
-        create_connection_log(
-            db,
-            connection_id=db_conn.id,
-            action="Conexão testada e ativada",
-            status="success",
-            details={
-                "database": conn_data.database_name,
-                "type": conn_data.type,
-                "host": conn_data.host,
-            },
-            user_id=user_id,
-        )
 
         return _build_connection_output(
             connection_id=db_conn.id,
-            message=f"✅ Conexão com {conn_data.database_name} estabelecida e salva.",
+            message="✅ Conexão estabelecida e ativada com sucesso.",
             connected=True,
         )
 
-    except Exception as e:
-        # Se algo falhou, garantimos que a engine não fique órfã no cache
-        _cleanup_engine(user_id)
+    except DBAPIError as e:
+        error_msg = "Erro de banco de dados ao tentar conectar."
+        error_detail = str(e)
 
-        _log_and_raise(
-            db=db,
-            user_id=user_id,
-            action="Tentativa de conexão falhou",
-            message="Falha ao conectar. Verifique as credenciais e o acesso à rede.",
-            status_code=status.HTTP_400_BAD_REQUEST,
-            connection_id=db_conn.id if db_conn else None,
-            details={"error": str(e), "trace": traceback.format_exc()},
-        )
+    except ValueError as e:
+        error_msg = str(e)
+        error_detail = str(e)
+
+    except Exception as e:
+        error_msg = "Erro inesperado ao conectar."
+        error_detail = str(e)
+
+    # 🚨 cleanup seguro (fora do lock também funciona)
+    try:
+        await _cleanup_engine(user_id)
+        if engine:
+            engine.dispose()
+    except Exception:
+        pass
+
+    _log_and_raise(
+        db=db,
+        user_id=user_id,
+        action="Tentativa de conexão falhou",
+        message=error_msg,
+        status_code=status.HTTP_400_BAD_REQUEST,
+        connection_id=db_conn.id if db_conn else None,
+        details={"error": f"{error_detail} {traceback.format_exc()}"},
+    )
 
 
 @router.put("/connect-toggle/", response_model=DbConnectionOutput)
@@ -299,7 +350,7 @@ async def connect_or_disconnect(
 
         # 1. LÓGICA DE DESCONEXÃO
         if active_conn and active_conn.status:
-            _cleanup_engine(user_id)
+            await _cleanup_engine(user_id)
 
             # CORRIGIDO: Acesso via ponto (objeto) em vez de colchetes
             disconnect_active_connection(db, active_conn.connection_id)
@@ -419,7 +470,7 @@ async def list_connections_paginated(
             action="Erro ao listar conexões",
             message=f"Erro interno ao listar conexões. {str(e)}{traceback.print_exc()}",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            details={"error": str(e)},
+            details={"error": f"{str(e)} {traceback.format_exc()}"},
         )
 
 
@@ -553,7 +604,7 @@ async def test_connection(
             message="Erro ao testar conexão.",
             status_code=status.HTTP_400_BAD_REQUEST,
             connection_id=temp_conn.id if temp_conn else None,
-            details={"error": str(e), "trace": traceback.format_exc()},
+            details={"error": f"{str(e)} {traceback.format_exc()}"},
         )
 
 
@@ -588,6 +639,30 @@ async def listar_elementos_connections(
         limit=limit,
         filters=filters,
     )
+
+
+@router.get("/db_full/{connection_id}")
+def get_connection(
+    connection_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Buscar conexão por ID
+    """
+
+    connection = get_connection_by_id(
+        db=db,
+        user_id=user_id,
+        connection_id=connection_id,
+    )
+    # print("entrou")
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Connection not found",
+        )
+    return connection
 
 
 # =========================================================

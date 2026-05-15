@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Ajuste os imports conforme a estrutura do seu projeto
 from app.models.connection_models import DBConnection
+from app.services.crypto_utils import aes_decrypt
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
 
@@ -31,32 +32,38 @@ MAX_RESTORE_FILE_MB = 1024 * 5  # 5GB
 # 🔧 Helpers de Sistema e Caminhos
 # ===============================================================
 
+
 def _ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
+
 
 def _is_local_host(host: str) -> bool:
     """Verifica se o host é a máquina local."""
     h = (host or "").strip().lower()
-    return h in ("localhost", "127.0.0.1", "::1", ".", "(local)") or h.startswith("localhost")
+    return h in ("localhost", "127.0.0.1", "::1", ".", "(local)") or h.startswith(
+        "localhost"
+    )
+
 
 def _fix_windows_permissions(path: str) -> None:
     """
     Executa o comando icacls para dar permissão total ao grupo 'Todos' (Everyone).
     Essencial para SQL Server local escrever na pasta do usuário.
     """
-    if os.name != 'nt':
+    if os.name != "nt":
         return
 
     try:
         abs_path = os.path.abspath(path)
         # *S-1-1-0 é o SID universal para 'Everyone' (funciona em PT/EN/etc)
         cmd = ["icacls", abs_path, "/grant", "*S-1-1-0:(OI)(CI)F", "/T", "/Q"]
-        
+
         # Roda síncrono e silencia a saída
         subprocess.run(cmd, capture_output=True, check=False)
         log_message(f"🔓 Permissões Windows ajustadas para: {abs_path}", level="info")
     except Exception as e:
         log_message(f"⚠️ Tentativa de ajustar permissões falhou: {e}", level="warning")
+
 
 def _resolve_binary(bin_name: str, *, explicit_path: Optional[str] = None) -> str:
     """
@@ -83,14 +90,31 @@ def _resolve_binary(bin_name: str, *, explicit_path: Optional[str] = None) -> st
             if os.path.isdir(base):
                 try:
                     # Pega a versão mais alta instalada
-                    versions = sorted([d for d in os.listdir(base) if d.isdigit()], key=lambda x: int(x), reverse=True)
+                    versions = sorted(
+                        [d for d in os.listdir(base) if d.isdigit()],
+                        key=lambda x: int(x),
+                        reverse=True,
+                    )
                     for v in versions:
-                        candidate = os.path.join(base, v, "bin", bin_name if bin_name.endswith(".exe") else f"{bin_name}.exe")
+                        candidate = os.path.join(
+                            base,
+                            v,
+                            "bin",
+                            (
+                                bin_name
+                                if bin_name.endswith(".exe")
+                                else f"{bin_name}.exe"
+                            ),
+                        )
                         if os.path.exists(candidate):
                             return candidate
-                except Exception: pass
+                except Exception:
+                    pass
 
-    raise RuntimeError(f"Executável '{bin_name}' não encontrado. Instale-o ou adicione ao PATH.")
+    raise RuntimeError(
+        f"Executável '{bin_name}' não encontrado. Instale-o ou adicione ao PATH."
+    )
+
 
 def _mssql_backup_target_path(parts: _ConnParts, local_filepath: str) -> str:
     """
@@ -102,44 +126,60 @@ def _mssql_backup_target_path(parts: _ConnParts, local_filepath: str) -> str:
 
     if _is_local_host(parts.host):
         return abs_local
-    
+
     # Lógica para servidor remoto (opcional, requer configuração extra)
     # Se você tiver uma pasta compartilhada, pode configurar via ENV
     unc_base = os.environ.get("MSSQL_BACKUP_UNC", "").strip()
     if unc_base:
         filename = os.path.basename(abs_local)
         return os.path.join(unc_base, filename)
-        
+
     # Se for remoto e não tiver UNC configurado, vai falhar, mas tentamos o local como fallback
-    log_message("⚠️ SQL Server remoto detectado. Se o backup falhar, verifique se o servidor tem acesso a este caminho.", level="warning")
+    log_message(
+        "⚠️ SQL Server remoto detectado. Se o backup falhar, verifique se o servidor tem acesso a este caminho.",
+        level="warning",
+    )
     return abs_local
+
 
 # ... (Funções auxiliares _now_stamp, _driver_name, _safe_filename_part mantidas iguais) ...
 def _now_stamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
+
 def _driver_name(url: Any) -> str:
     name = url.get_backend_name().lower()
-    if "postgres" in name: return "postgresql"
-    if "mysql" in name or "mariadb" in name: return "mysql"
-    if "sqlite" in name: return "sqlite"
-    if "oracle" in name: return "oracle"
-    if "mssql" in name or "sqlserver" in name: return "mssql"
+    print(name)
+    if "postgres" in name:
+        return "postgresql"
+    if "mysql" in name or "mariadb" in name:
+        return "mysql"
+    if "sqlite" in name:
+        return "sqlite"
+    if "oracle" in name:
+        return "oracle"
+    if "mssql" in name or "sqlserver" in name:
+        return "mssql"
     return name
+
 
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9_\-\.]+")
 
+
 def _safe_filename_part(value: str, fallback: str = "default") -> str:
     v = (value or "").strip()
-    if not v: return fallback
+    if not v:
+        return fallback
     v = v.replace(os.sep, "_").replace("/", "_").replace("\\", "_")
     v = _SAFE_NAME_RE.sub("_", v)
     return v.strip("._-") or fallback
+
 
 def _build_backup_filename(db_name: str, ext: str) -> str:
     safe_db = _safe_filename_part(db_name, "default")
     safe_ext = _safe_filename_part(ext, "bin")
     return f"{safe_db}_backup_{_now_stamp()}.{safe_ext}"
+
 
 def _mask_cmd(cmd: List[str]) -> str:
     masked: List[str] = []
@@ -159,20 +199,23 @@ def _mask_cmd(cmd: List[str]) -> str:
             key, _ = arg.split("=", 1)
             masked.append(f"{key}=***")
             continue
-        if "/" in arg and "@" in arg: # Oracle
+        if "/" in arg and "@" in arg:  # Oracle
             try:
                 creds, host = arg.split("@", 1)
                 if "/" in creds:
                     u, _ = creds.split("/", 1)
                     masked.append(f"{u}/***@{host}")
                     continue
-            except: pass
+            except:
+                pass
         masked.append(arg)
     return " ".join(masked)
+
 
 def _require_int_positive(name: str, value: Any) -> None:
     if not isinstance(value, int) or value <= 0:
         raise ValueError(f"{name} deve ser um inteiro > 0. Recebido: {value!r}")
+
 
 def _file_exists_and_nonempty(path: str) -> None:
     if not os.path.exists(path):
@@ -180,9 +223,11 @@ def _file_exists_and_nonempty(path: str) -> None:
     if os.path.getsize(path) == 0:
         raise RuntimeError(f"Arquivo gerado está vazio (0 bytes): {path}")
 
+
 def _write_text_file(path: str, content: str) -> None:
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
+
 
 def _file_size_mb(path: str) -> float:
     try:
@@ -190,9 +235,11 @@ def _file_size_mb(path: str) -> float:
     except OSError:
         return 0.0
 
+
 # ===============================================================
 # ⚙️ Executor de Comandos (Async/Threaded)
 # ===============================================================
+
 
 async def _run_command_async(
     cmd: List[str],
@@ -210,11 +257,7 @@ async def _run_command_async(
 
     def _exec_sync():
         return subprocess.run(
-            cmd,
-            env=env,
-            stdin=stdin_file,
-            capture_output=True,
-            timeout=timeout_sec
+            cmd, env=env, stdin=stdin_file, capture_output=True, timeout=timeout_sec
         )
 
     try:
@@ -230,11 +273,17 @@ async def _run_command_async(
     full_output = f"STDOUT: {out}\nSTDERR: {err}"
 
     # Detecção de erros comuns
-    if result.returncode != 0 or "Access is denied" in out or "Operating system error 5" in out:
+    if (
+        result.returncode != 0
+        or "Access is denied" in out
+        or "Operating system error 5" in out
+    ):
         log_message(f"❌ Falha ao {description}: {full_output}", level="error")
         raise RuntimeError(f"Erro no banco de dados: {out} {err}")
 
-    log_message(f"✅ {description.capitalize()} concluído em {duration}s", level="success")
+    log_message(
+        f"✅ {description.capitalize()} concluído em {duration}s", level="success"
+    )
 
     if len(out) > MAX_STDOUT_CHARS:
         return out[:MAX_STDOUT_CHARS] + "\n...[truncado]..."
@@ -243,22 +292,29 @@ async def _run_command_async(
 
 # --- Compressão / Descompressão ---
 
+
 def _compress_file_sync(filepath: str) -> str:
     gz_path = filepath + ".gz"
-    with open(filepath, "rb") as f_in, gzip.open(gz_path, "wb", compresslevel=6) as f_out:
+    with open(filepath, "rb") as f_in, gzip.open(
+        gz_path, "wb", compresslevel=6
+    ) as f_out:
         shutil.copyfileobj(f_in, f_out)
     os.remove(filepath)
     return gz_path
 
+
 async def _compress_file_async(filepath: str) -> str:
     return await asyncio.to_thread(_compress_file_sync, filepath)
 
+
 def _extract_file_sync(filepath: str) -> str:
-    if not filepath.endswith(".gz"): return filepath
+    if not filepath.endswith(".gz"):
+        return filepath
     out_path = filepath[:-3]
     with gzip.open(filepath, "rb") as f_in, open(out_path, "wb") as f_out:
         shutil.copyfileobj(f_in, f_out)
     return out_path
+
 
 async def _extract_file_async(filepath: str) -> str:
     return await asyncio.to_thread(_extract_file_sync, filepath)
@@ -272,28 +328,108 @@ class _ConnParts:
     host: str
     port: str
     password: str
+    sslmode: str
+    service: str
+    trustServerCertificate: str
 
 
 def _conn_parts_from_engine(engine: Any, _conn: DBConnection) -> _ConnParts:
     driver = _driver_name(engine.url)
+    # db_name = _conn.database_name or "default"
+    # user = _conn.username or ""
+    # host = _conn.host or "localhost"
+    # port = str(_conn.port) if _conn.port else ""
+    # password = _conn.password or ""
+    # print(
+    #     "first: ",
+    #     f"\ndb_name: {db_name} , user: {user}\nhost: {host}\nport: {port}\npassword: {password}",
+    # )
     db_name = _conn.database_name or "default"
-    user = _conn.username or ""
-    host = _conn.host or "localhost"
+    user = aes_decrypt(_conn.username) or ""
+    host = aes_decrypt(_conn.host) or "localhost"
     port = str(_conn.port) if _conn.port else ""
-    password = _conn.password or ""
-    return _ConnParts(driver, db_name, user, host, port, password)
+    password = aes_decrypt(_conn.password) or ""
+    sslmode = _conn.sslmode or None
+    service = _conn.service or None
+    trustServerCertificate = _conn.trustServerCertificate or None
+    # print(
+    #     "second: ",
+    #     f"\ndb_name: {db_name} , user: {user}\nhost: {host}\nport: {port}\npassword: {password}",
+    # )
+    return _ConnParts(
+        driver,
+        db_name,
+        user,
+        host,
+        port,
+        password,
+        sslmode,
+        service,
+        trustServerCertificate,
+    )
 
 
-def _build_env(password: str) -> Dict[str, str]:
+def _build_env_universal(parts: _ConnParts) -> Dict[str, str]:
     env = os.environ.copy()
-    if password:
-        env["PGPASSWORD"] = password
-        env["MYSQL_PWD"] = password
+
+    # 🔐 PASSWORDS
+    if parts.password:
+        env["PGPASSWORD"] = parts.password
+        env["MYSQL_PWD"] = parts.password
+
+    # 🌐 NORMALIZA HOST LOCAL
+    is_local = parts.host in ["localhost", "127.0.0.1", "::1"]
+
+    # =========================
+    # 🐘 POSTGRESQL
+    # =========================
+    if parts.driver == "postgresql":
+        if parts.sslmode:
+            env["PGSSLMODE"] = parts.sslmode
+        else:
+            env["PGSSLMODE"] = "disable" if is_local else "require"
+
+    # =========================
+    # 🐬 MYSQL
+    # =========================
+    elif parts.driver == "mysql":
+        if parts.sslmode:
+            env["MYSQL_SSL_MODE"] = parts.sslmode
+        else:
+            env["MYSQL_SSL_MODE"] = "DISABLED" if is_local else "REQUIRED"
+
+    # =========================
+    # 🧱 MSSQL
+    # =========================
+    elif parts.driver in ["mssql", "sqlserver"]:
+        if parts.trustServerCertificate:
+            env["MSSQL_TRUST_CERT"] = "yes"
+        else:
+            env["MSSQL_TRUST_CERT"] = "no"
+
+    # =========================
+    # 🏛️ ORACLE
+    # =========================
+    elif parts.driver == "oracle":
+        if parts.sslmode:
+            env["ORACLE_SSL"] = parts.sslmode
+
+    # =========================
+    # 🪶 SQLITE
+    # =========================
+    # nada
+
     return env
 
 
 def _backup_ext_for_driver(driver: str) -> str:
-    mapping = { "postgresql": "backup", "mysql": "sql", "sqlite": "db", "oracle": "dmp", "mssql": "bak" }
+    mapping = {
+        "postgresql": "backup",
+        "mysql": "sql",
+        "sqlite": "db",
+        "oracle": "dmp",
+        "mssql": "bak",
+    }
     return mapping.get(driver, "bin")
 
 
@@ -309,6 +445,7 @@ def _validate_conn_parts(parts: _ConnParts) -> None:
 # 💾 BACKUP (Async)
 # ===============================================================
 
+
 async def backup_database(
     db: AsyncSession,
     user_id: int,
@@ -317,38 +454,64 @@ async def backup_database(
 ) -> str:
     _require_int_positive("user_id", user_id)
     _require_int_positive("connection_id", connection_id)
-    
+
     # Prepara diretório e permissões
     await asyncio.to_thread(_ensure_dir, BACKUP_DIR)
     await asyncio.to_thread(_fix_windows_permissions, BACKUP_DIR)
 
-    engine, _conn = await ConnectionManager.get_engine_idconn_async(db, user_id, connection_id)
+    engine, _conn = await ConnectionManager.get_engine_idconn_async(
+        db, user_id, connection_id
+    )
     parts = _conn_parts_from_engine(engine, _conn)
     _validate_conn_parts(parts)
 
     ext = _backup_ext_for_driver(parts.driver)
     filename = _build_backup_filename(parts.db_name, ext)
     filepath = os.path.join(BACKUP_DIR, filename)
-    env = _build_env(parts.password)
+    env = _build_env_universal(parts)
 
     log_message(f"💾 Backup iniciado: {parts.db_name} [{parts.driver}]", level="info")
 
     try:
         if parts.driver == "postgresql":
             # Busca binário pg_dump (aceita override via ENV 'PG_DUMP_PATH')
-            pg_bin = _resolve_binary("pg_dump", explicit_path=os.environ.get("PG_DUMP_PATH"))
+            pg_bin = _resolve_binary(
+                "pg_dump", explicit_path=os.environ.get("PG_DUMP_PATH")
+            )
             cmd = [
-                pg_bin, "-h", parts.host, "-p", parts.port or "5432", "-U", parts.user,
-                "-F", "c", "-f", filepath, parts.db_name,
+                pg_bin,
+                "-h",
+                parts.host,
+                "-p",
+                parts.port or "5432",
+                "-U",
+                parts.user,
+                "-F",
+                "c",
+                "-f",
+                filepath,
+                parts.db_name,
             ]
             await _run_command_async(cmd, env, "backup pg")
 
         elif parts.driver == "mysql":
-            mysql_bin = _resolve_binary("mysqldump", explicit_path=os.environ.get("MYSQLDUMP_PATH"))
+            mysql_bin = _resolve_binary(
+                "mysqldump", explicit_path=os.environ.get("MYSQLDUMP_PATH")
+            )
             cmd = [
-                mysql_bin, "-h", parts.host, "-P", parts.port or "3306", "-u", parts.user,
-                "--single-transaction", "--quick", "--routines", "--triggers",
-                "--databases", parts.db_name,
+                mysql_bin,
+                "-h",
+                parts.host,
+                "-P",
+                parts.port or "3306",
+                "-u",
+                parts.user,
+                "--single-transaction",
+                "--quick",
+                "--routines",
+                "--triggers",
+                "--databases",
+                parts.db_name,
             ]
             dump_content = await _run_command_async(cmd, env, "backup mysql")
             await asyncio.to_thread(_write_text_file, filepath, dump_content)
@@ -364,21 +527,33 @@ async def backup_database(
             _resolve_binary("exp")
             conn_str = f"{parts.user}/{parts.password}@{parts.host}:{parts.port}/{parts.db_name}"
             cmd = [
-                "exp", conn_str, f"file={filepath}", f"log={filepath}.log",
-                f"owner={parts.user}", "statistics=none"
+                "exp",
+                conn_str,
+                f"file={filepath}",
+                f"log={filepath}.log",
+                f"owner={parts.user}",
+                "statistics=none",
             ]
             await _run_command_async(cmd, env, "backup oracle")
 
         elif parts.driver == "mssql" or parts.driver == "sqlserver":
-            sqlcmd_bin = _resolve_binary("sqlcmd", explicit_path=os.environ.get("SQLCMD_PATH"))
-            
+            sqlcmd_bin = _resolve_binary(
+                "sqlcmd", explicit_path=os.environ.get("SQLCMD_PATH")
+            )
+
             # Determina o caminho correto para o servidor SQL escrever
             target_path = _mssql_backup_target_path(parts, filepath)
 
             cmd = [
-                sqlcmd_bin, "-S", f"{parts.host},{parts.port or '1433'}",
-                "-U", parts.user, "-P", parts.password,
-                "-Q", f"BACKUP DATABASE [{parts.db_name}] TO DISK='{target_path}' WITH FORMAT",
+                sqlcmd_bin,
+                "-S",
+                f"{parts.host},{parts.port or '1433'}",
+                "-U",
+                parts.user,
+                "-P",
+                parts.password,
+                "-Q",
+                f"BACKUP DATABASE [{parts.db_name}] TO DISK='{target_path}' WITH FORMAT",
             ]
             await _run_command_async(cmd, env, "backup mssql")
 
@@ -396,15 +571,16 @@ async def backup_database(
     except Exception as e:
         log_message(f"🔥 Erro no backup: {e}\n{traceback.format_exc()}", level="error")
         if os.path.exists(filepath):
-            try: os.remove(filepath)
-            except: pass
+            try:
+                os.remove(filepath)
+            except:
+                pass
         raise
 
 
 # ===============================================================
 # 🔁 RESTORE (Async)
 # ===============================================================
-
 async def restore_backup(
     db: AsyncSession,
     user_id: int,
@@ -413,7 +589,7 @@ async def restore_backup(
 ) -> None:
     _require_int_positive("user_id", user_id)
     _require_int_positive("connection_id", connection_id)
-    
+
     if not filepath or not os.path.exists(filepath):
         raise FileNotFoundError(f"Arquivo não encontrado: {filepath}")
 
@@ -428,31 +604,58 @@ async def restore_backup(
         extracted_path = await _extract_file_async(filepath)
         final_restore_path = extracted_path
 
-    engine, _conn = await ConnectionManager.get_engine_idconn_async(db, user_id, connection_id)
+    engine, _conn = await ConnectionManager.get_engine_idconn_async(
+        db, user_id, connection_id
+    )
     parts = _conn_parts_from_engine(engine, _conn)
-    env = _build_env(parts.password)
+    env = _build_env_universal(parts)
 
     log_message(f"♻️ Restaurando em: {parts.db_name} [{parts.driver}]", level="info")
 
     try:
         if parts.driver == "postgresql":
-            pg_restore_bin = _resolve_binary("pg_restore", explicit_path=os.environ.get("PG_RESTORE_PATH"))
+            pg_restore_bin = _resolve_binary(
+                "pg_restore", explicit_path=os.environ.get("PG_RESTORE_PATH")
+            )
             cmd = [
-                pg_restore_bin, "-h", parts.host, "-p", parts.port or "5432", "-U", parts.user,
-                "-d", parts.db_name, "--clean", "--if-exists", "--no-owner", "--no-acl",
+                pg_restore_bin,
+                "-h",
+                parts.host,
+                "-p",
+                parts.port or "5432",
+                "-U",
+                parts.user,
+                "-d",
+                parts.db_name,
+                "--clean",
+                "--if-exists",
+                "--no-owner",
+                "--no-acl",
                 final_restore_path,
             ]
             await _run_command_async(cmd, env, "restore pg")
 
         elif parts.driver == "mysql":
-            mysql_bin = _resolve_binary("mysql", explicit_path=os.environ.get("MYSQL_PATH"))
-            cmd = [mysql_bin, "-h", parts.host, "-P", parts.port or "3306", "-u", parts.user, parts.db_name]
+            mysql_bin = _resolve_binary(
+                "mysql", explicit_path=os.environ.get("MYSQL_PATH")
+            )
+            cmd = [
+                mysql_bin,
+                "-h",
+                parts.host,
+                "-P",
+                parts.port or "3306",
+                "-u",
+                parts.user,
+                parts.db_name,
+            ]
             with open(final_restore_path, "rb") as f_stream:
                 await _run_command_async(cmd, env, "restore mysql", stdin_file=f_stream)
 
         elif parts.driver == "sqlite":
             db_path = engine.url.database
-            if not db_path: raise RuntimeError("Path SQLite inválido.")
+            if not db_path:
+                raise RuntimeError("Path SQLite inválido.")
             await asyncio.to_thread(shutil.copy2, final_restore_path, db_path)
 
         elif parts.driver == "oracle":
@@ -462,15 +665,24 @@ async def restore_backup(
             await _run_command_async(cmd, env, "restore oracle")
 
         elif parts.driver == "mssql" or parts.driver == "sqlserver":
-            sqlcmd_bin = _resolve_binary("sqlcmd", explicit_path=os.environ.get("SQLCMD_PATH"))
-            
-            # Para SQL Server, o restore precisa ler do disco. 
+            sqlcmd_bin = _resolve_binary(
+                "sqlcmd", explicit_path=os.environ.get("SQLCMD_PATH")
+            )
+
+            # Para SQL Server, o restore precisa ler do disco.
             # Se for local, abs_path resolve. Se remoto, precisaria ser UNC (não implementado full aqui).
             abs_path = os.path.abspath(final_restore_path)
-            
+
             cmd = [
-                sqlcmd_bin, "-S", f"{parts.host},{parts.port or '1433'}", "-U", parts.user, "-P", parts.password,
-                "-Q", f"USE master; ALTER DATABASE [{parts.db_name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; RESTORE DATABASE [{parts.db_name}] FROM DISK='{abs_path}' WITH REPLACE; ALTER DATABASE [{parts.db_name}] SET MULTI_USER;",
+                sqlcmd_bin,
+                "-S",
+                f"{parts.host},{parts.port or '1433'}",
+                "-U",
+                parts.user,
+                "-P",
+                parts.password,
+                "-Q",
+                f"USE master; ALTER DATABASE [{parts.db_name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; RESTORE DATABASE [{parts.db_name}] FROM DISK='{abs_path}' WITH REPLACE; ALTER DATABASE [{parts.db_name}] SET MULTI_USER;",
             ]
             await _run_command_async(cmd, env, "restore mssql")
 
@@ -481,6 +693,7 @@ async def restore_backup(
 
     finally:
         if extracted_path and os.path.exists(extracted_path):
-            try: os.remove(extracted_path)
+            try:
+                os.remove(extracted_path)
             except Exception as e:
                 log_message(f"⚠️ Falha ao limpar temp: {e}", level="warning")

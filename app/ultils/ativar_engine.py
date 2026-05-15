@@ -1,6 +1,7 @@
 import ssl  # 👈 ADICIONADO: Necessário para o ssl_context
 import traceback
 from typing import Tuple
+from urllib.parse import quote_plus
 
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -153,6 +154,7 @@ class ConnectionManager:
         # 🔎 verifica se engine já existe na cache
         engine = EngineManager.async_get(user_id)
         if engine:
+            print(f"Engine obtida da cache para user_id={engine.dialect}")
             return engine, connection
 
         # cria engine nova
@@ -168,6 +170,11 @@ class ConnectionManager:
         db_type = (connection.type or "").lower()
         engineManager = DatabaseManager()
 
+        password = aes_decrypt(connection.password) if connection.password else ""
+        if password:
+            if "@" in password:
+                password = quote_plus(password)
+
         try:
             if db_type == "sqlite":
                 db_path = aes_decrypt(connection.host)
@@ -178,9 +185,7 @@ class ConnectionManager:
                     "user": (
                         aes_decrypt(connection.username) if connection.username else ""
                     ),
-                    "password": (
-                        aes_decrypt(connection.password) if connection.password else ""
-                    ),
+                    "password": (password or ""),
                     "host": aes_decrypt(connection.host),
                     "port": connection.port,
                     "database": connection.database_name,
@@ -233,7 +238,10 @@ class ConnectionManager:
 
             # 🔎 teste de conexão (com tratamento para garantir que a ligação devolve à pool)
             async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
+                if db_type == "oracle":
+                    await conn.execute(text("SELECT 1 FROM dual"))
+                else:
+                    await conn.execute(text("SELECT 1"))
                 await conn.commit()  # Assegura a libertação limpa
 
             log_message(f"✅ Engine criada ({connection.type})", "info")

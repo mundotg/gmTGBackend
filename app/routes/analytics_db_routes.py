@@ -68,24 +68,20 @@ DB_QUERIES: Dict[str, Dict[str, Callable]] = {
     "mysql": {
         "size": lambda conn: safe_scalar(
             conn,
-            text(
-                """
+            text("""
             SELECT SUM(data_length + index_length)
             FROM information_schema.tables
             WHERE table_schema = DATABASE()
-        """
-            ),
+        """),
             0,
         ),
         "rows": lambda conn: safe_scalar(
             conn,
-            text(
-                """
+            text("""
             SELECT SUM(table_rows)
             FROM information_schema.tables
             WHERE table_schema = DATABASE()
-        """
-            ),
+        """),
             0,
         ),
         "tx": lambda conn: safe_scalar(
@@ -96,24 +92,20 @@ DB_QUERIES: Dict[str, Dict[str, Callable]] = {
     "sqlserver": {
         "size": lambda conn: safe_scalar(
             conn,
-            text(
-                """
+            text("""
             SELECT SUM(CAST(size AS BIGINT)) * 8 * 1024
             FROM sys.master_files
             WHERE database_id = DB_ID()
-        """
-            ),
+        """),
             0,
         ),
         "rows": lambda conn: safe_scalar(
             conn,
-            text(
-                """
+            text("""
             SELECT SUM(row_count)
             FROM sys.dm_db_partition_stats
             WHERE index_id IN (0,1)
-        """
-            ),
+        """),
             0,
         ),
         "tx": lambda conn: safe_scalar(
@@ -121,13 +113,11 @@ DB_QUERIES: Dict[str, Dict[str, Callable]] = {
         ),
         "deadlocks": lambda conn: safe_scalar(
             conn,
-            text(
-                """
+            text("""
             SELECT cntr_value
             FROM sys.dm_os_performance_counters
             WHERE counter_name = 'Number of Deadlocks/sec'
-        """
-            ),
+        """),
             0,
         ),
     },
@@ -157,11 +147,14 @@ DB_QUERIES: Dict[str, Dict[str, Callable]] = {
 def fetch_db_metrics(engine: Engine, conn_info: DBConnection):
     db_type = (conn_info.type or "").lower()
 
+    # Normalização
     if db_type in ["postgres"]:
         db_type = "postgresql"
+
     if db_type in ["mssql"]:
         db_type = "sqlserver"
 
+    # MongoDB
     if db_type in ["mongodb", "mongo"]:
         return {
             "tableSizeTotal": "N/A",
@@ -171,26 +164,79 @@ def fetch_db_metrics(engine: Engine, conn_info: DBConnection):
             "engine": "mongo",
         }
 
+    # DB não suportada
     if db_type not in DB_QUERIES:
         raise Exception(f"DB não suportada: {db_type}")
 
     queries = DB_QUERIES[db_type]
 
-    with engine.connect() as conn:
-        size = queries["size"](conn)
-        rows = queries["rows"](conn)
-        tx = queries["tx"](conn)
-        deadlocks = queries["deadlocks"](conn)
+    try:
+        with engine.connect() as conn:
 
-        size = int(size) if size and size < 10**18 else 0
+            # =========================
+            # EXECUÇÃO SEGURA
+            # =========================
+            try:
+                size = queries["size"](conn)
+            except Exception:
+                size = 0
 
-        return {
-            "tableSizeTotal": format_size(size),
-            "rowCountTotal": int(rows),
-            "activeTransactions": int(tx),
-            "deadlocks": int(deadlocks),
-            "engine": db_type,
-        }
+            try:
+                rows = queries["rows"](conn)
+            except Exception:
+                rows = 0
+
+            try:
+                tx = queries["tx"](conn)
+            except Exception:
+                tx = 0
+
+            try:
+                deadlocks = queries["deadlocks"](conn)
+            except Exception:
+                deadlocks = 0
+
+            # =========================
+            # NORMALIZAÇÃO
+            # =========================
+            try:
+                size = int(size or 0)
+
+                # proteção overflow
+                if size > 10**18:
+                    size = 0
+
+            except Exception:
+                size = 0
+
+            try:
+                rows = int(rows or 0)
+            except Exception:
+                rows = 0
+
+            try:
+                tx = int(tx or 0)
+            except Exception:
+                tx = 0
+
+            try:
+                deadlocks = int(deadlocks or 0)
+            except Exception:
+                deadlocks = 0
+
+            # =========================
+            # RESULTADO FINAL
+            # =========================
+            return {
+                "tableSizeTotal": format_size(size),
+                "rowCountTotal": rows,
+                "activeTransactions": tx,
+                "deadlocks": deadlocks,
+                "engine": db_type,
+            }
+
+    except Exception as e:
+        raise Exception(f"Erro ao buscar métricas do banco ({db_type}): {str(e)}")
 
 
 # =========================

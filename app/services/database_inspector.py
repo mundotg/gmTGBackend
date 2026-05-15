@@ -28,7 +28,6 @@ from app.ultils.Database_error_logger import _lidar_com_erro_sql
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
 
-
 # ============================================================
 # Helpers
 # ============================================================
@@ -90,6 +89,30 @@ def _get_schemas(engine: Engine, inspector: Any) -> list[Optional[str]]:
         return [default_schema]
 
 
+def _normalize_oracle_identifier(value: Optional[str]) -> Optional[str]:
+    """
+    Oracle:
+    - sem aspas => vira UPPERCASE
+    - com aspas => preserva case-sensitive
+
+    Ex:
+        users      -> USERS
+        app.table  -> APP.TABLE
+        "Users"    -> "Users"
+    """
+
+    if value is None:
+        return None
+
+    value = value.strip()
+
+    # se estiver quoted preserva
+    if value.startswith('"') and value.endswith('"'):
+        return value
+
+    return value.upper()
+
+
 def _list_tables_and_views(
     engine: Engine,
     inspector: Any,
@@ -100,38 +123,87 @@ def _list_tables_and_views(
 
     dialect = engine.dialect.name.lower()
 
-    def _add_items(names: list[str], schema: Optional[str], kind: str):
+    def _normalize_name(name: str) -> str:
+
+        # Oracle normaliza para maiúsculo
+        if dialect == "oracle":
+            return _normalize_oracle_identifier(name)
+
+        return name
+
+    def _normalize_schema(schema: Optional[str]) -> Optional[str]:
+
+        if dialect == "oracle":
+            return _normalize_oracle_identifier(schema)
+
+        return schema
+
+    def _add_items(
+        names: list[str],
+        schema: Optional[str],
+        kind: str,
+    ):
+
+        normalized_schema = _normalize_schema(schema)
 
         for name in names:
 
-            item = (name, schema, kind)
+            normalized_name = _normalize_name(name)
+
+            item = (
+                normalized_name,
+                normalized_schema,
+                kind,
+            )
 
             if item not in seen:
                 seen.add(item)
                 results.append(item)
 
+    # SQLITE
     if dialect == "sqlite":
 
         try:
-            _add_items(inspector.get_table_names(), None, "table")
+            _add_items(
+                inspector.get_table_names(),
+                None,
+                "table",
+            )
 
         except Exception as e:
-            log_message(f"Erro ao obter tabelas SQLite: {e}", "warning")
+            log_message(
+                f"Erro ao obter tabelas SQLite: {e}",
+                "warning",
+            )
 
         try:
-            _add_items(inspector.get_view_names(), None, "view")
+            _add_items(
+                inspector.get_view_names(),
+                None,
+                "view",
+            )
 
         except Exception as e:
-            log_message(f"Erro ao obter views SQLite: {e}", "warning")
+            log_message(
+                f"Erro ao obter views SQLite: {e}",
+                "warning",
+            )
 
         return results
 
+    # OUTROS BANCOS
     schemas = _get_schemas(engine, inspector)
 
     for schema in schemas:
 
         try:
-            _add_items(inspector.get_table_names(schema=schema), schema, "table")
+            tables = inspector.get_table_names(schema=schema)
+
+            _add_items(
+                tables,
+                schema,
+                "table",
+            )
 
         except Exception as e:
             log_message(
@@ -140,7 +212,13 @@ def _list_tables_and_views(
             )
 
         try:
-            _add_items(inspector.get_view_names(schema=schema), schema, "view")
+            views = inspector.get_view_names(schema=schema)
+
+            _add_items(
+                views,
+                schema,
+                "view",
+            )
 
         except Exception as e:
             log_message(
@@ -323,7 +401,7 @@ def get_strutures_names(
     """
     Retorna tabelas e views como estruturas, sincronizando metadados.
     """
-    structures = get_db_structures(db, connection_id)
+    structures = None  # get_db_structures(db, connection_id)
     if structures:
         for item in structures:
             sincronizar_metadados_da_tabela_simple(

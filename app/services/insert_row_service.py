@@ -10,43 +10,47 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.cruds.queryhistory_crud import create_query_history
 from app.schemas.query_select_upAndInsert_schema import InsertRequest
 from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryType
-from app.services.editar_linha import _convert_column_type_for_string_one, quote_identifier
+from app.services.editar_linha import (
+    _convert_column_type_for_string_one,
+    quote_identifier,
+)
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
+
 def build_insert_query(table_name, db_type, insert_values):
     """Constrói a query de inserção dinâmica."""
+
     if not insert_values:
         return None
 
-    # print(f"DEBUG: db_type in build_insert_query = '{db_type}'")  # DEBUG
-    
     columns = []
     values = []
 
     for col, info in insert_values.items():
         value = info.get("value")
-        col_type = info.get("type_column", "text")  # default string
-        
-        # Quote the column name
+        col_type = info.get("type_column", "text")
+
         quoted_col = quote_identifier(db_type, col)
-        # print(f"DEBUG: Column '{col}' -> quoted as '{quoted_col}'")  # DEBUG
-        
+
         columns.append(quoted_col)
+
         values.append(_convert_column_type_for_string_one(value, col_type))
 
-    # Quote the table name
     quoted_table = quote_identifier(db_type, table_name)
-    # print(f"DEBUG: Table '{table_name}' -> quoted as '{quoted_table}'")  # DEBUG
 
-    query = text(f"""
+    query_sql = f"""
         INSERT INTO {quoted_table}
         ({', '.join(columns)})
-        VALUES ({', '.join(values)});
-    """)
-    
-    # print(f"DEBUG: Final query: {query}")  # DEBUG
-    return query
+        VALUES ({', '.join(values)})
+    """
+
+    # Oracle não aceita ; via driver
+    if db_type.lower() == "oracle":
+        query_sql = query_sql.rstrip(";").strip()
+
+    return text(query_sql)
+
 
 def insert_row_service(
     data: InsertRequest,
@@ -67,7 +71,7 @@ def insert_row_service(
     resposta_query = ""
     query_string = ""
     start_time = time.time()
-    
+
     total_inseridos = 0
     total_tabelas = 0
     sucesso = False
@@ -78,44 +82,57 @@ def insert_row_service(
         # 🚀 Inicia a Transação
         with engine.begin() as conn:
             for table_name, raw_values in data.createdRow.items():
-                
+
                 # 1. Estruturação dos dados
                 insert_values = {
                     col: {
-                        "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
-                        "type_column": field.get("type_column", "text") if isinstance(field, dict) else getattr(field, "type_column", "text")
+                        "value": (
+                            field["value"]
+                            if isinstance(field, dict)
+                            else getattr(field, "value", None)
+                        ),
+                        "type_column": (
+                            field.get("type_column", "text")
+                            if isinstance(field, dict)
+                            else getattr(field, "type_column", "text")
+                        ),
                     }
                     for col, field in raw_values.items()
                 }
 
                 # Se não houver dados, pula para a próxima tabela sem quebrar a transação
                 if not insert_values:
-                    log_message(f"Aviso: Tabela '{table_name}' ignorada (nenhuma coluna informada).", "warning")
+                    log_message(
+                        f"Aviso: Tabela '{table_name}' ignorada (nenhuma coluna informada).",
+                        "warning",
+                    )
                     continue
 
                 total_tabelas += 1
 
                 # 2. Monta a Query
                 query = build_insert_query(
-                    table_name=table_name,
-                    db_type=db_type,
-                    insert_values=insert_values
+                    table_name=table_name, db_type=db_type, insert_values=insert_values
                 )
 
                 if query is None:
                     continue
 
                 query_string += f"-- INSERT em {table_name}\n{query}\n"
-                
+
                 # 3. Execução
                 rs = conn.execute(query)
                 linhas_afetadas = rs.rowcount or 0
-                
+
                 total_inseridos += linhas_afetadas
-                resposta_query += f"{table_name}: {linhas_afetadas} linha(s) inserida(s).\n"
+                resposta_query += (
+                    f"{table_name}: {linhas_afetadas} linha(s) inserida(s).\n"
+                )
 
         sucesso = True
-        log_message(f"✅ Registro(s) inserido(s) com sucesso:\n{resposta_query}", "success")
+        log_message(
+            f"✅ Registro(s) inserido(s) com sucesso:\n{resposta_query}", "success"
+        )
 
     except SQLAlchemyError as sa_err:
         error_msg = _lidar_com_erro_sql(sa_err)
@@ -133,12 +150,14 @@ def insert_row_service(
 
     historico = QueryHistoryCreate(
         user_id=user_id,
-        db_connection_id=connection_id, # type: ignore
+        db_connection_id=connection_id,  # type: ignore
         query=query_string.strip() or "INSERT não gerou query.",
         query_type=QueryType.INSERT,
         executed_at=datetime.now(timezone.utc),
         duration_ms=duration_ms,
-        result_preview=resposta_query.strip() if sucesso else "Sem resultado devido a falha.",
+        result_preview=(
+            resposta_query.strip() if sucesso else "Sem resultado devido a falha."
+        ),
         error_message=error_msg,
         is_favorite=False,
         tags="insert" if sucesso else "insert_error",
@@ -147,14 +166,16 @@ def insert_row_service(
         executed_by=getattr(data, "executed_by", executed_by) or f"user_{user_id}",
         modified_by=modified_by,
         meta_info={
-            "tabelas_afetadas": list(data.createdRow.keys()) if hasattr(data, "createdRow") else [],
+            "tabelas_afetadas": (
+                list(data.createdRow.keys()) if hasattr(data, "createdRow") else []
+            ),
             "total_inseridos": total_inseridos,
             "total_tabelas": total_tabelas,
             "db_type": db_type,
             "status": "success" if sucesso else "failed",
             "traceback": traceback_str if not sucesso else None,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
     )
 
     try:
@@ -173,5 +194,5 @@ def insert_row_service(
         "inserted": data.createdRow,
         "response": resposta_query.strip(),
         "tempo_ms": duration_ms,
-        "linhas_inseridas": total_inseridos
+        "linhas_inseridas": total_inseridos,
     }

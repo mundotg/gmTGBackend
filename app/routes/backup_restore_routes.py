@@ -7,8 +7,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import AsyncGenerator, Dict, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query
+import shutil
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -200,6 +200,48 @@ async def backup_stream(
 # ============================================================
 # 🔁 RESTORE STREAM
 # ============================================================
+# ============================================================
+# 📤 UPLOAD DE ARQUIVO PARA RESTORE
+# ============================================================
+
+
+@router.post("/restore/{connection_id}/upload")
+async def upload_restore_file(
+    connection_id: int,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db_async),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Recebe o arquivo de backup do frontend, salva no diretório de backups
+    e retorna o caminho para ser consumido pelo endpoint de stream (SSE).
+    """
+    _ensure_backup_dir()
+
+    if not file.filename:
+        raise _http_error(400, "Nenhum arquivo enviado.")
+
+    # Gera um nome seguro e único para evitar colisão e directory traversal
+    safe_filename = (
+        f"restore_{user_id}_{connection_id}_{uuid.uuid4().hex[:8]}_{file.filename}"
+    )
+    file_path = os.path.join(BACKUP_DIR, safe_filename)
+
+    try:
+        # Salva o arquivo no disco em blocos (seguro para arquivos grandes)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        log_message(
+            f"[User {user_id}] Erro ao salvar arquivo de restore: {str(e)}",
+            level="error",
+        )
+        raise _http_error(500, f"Falha ao salvar o arquivo no servidor: {str(e)}")
+    finally:
+        await file.close()
+
+    # Retorna o 'filepath' exatamente como o frontend espera
+    return {"filepath": file_path, "message": "Upload concluído com sucesso."}
 
 
 @router.get("/restore/{connection_id}/stream")

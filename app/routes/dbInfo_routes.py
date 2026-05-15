@@ -3,6 +3,7 @@
 import json
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
+from rich import traceback
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
@@ -201,7 +202,8 @@ async def get_metadata_fields(
         raise
     except Exception as e:
         log_message(
-            f"❌ Erro em get_metadata_fields [{table_name}]: {e}", level="error"
+            f"❌ Erro em get_metadata_fields [{table_name}]: {e} {traceback.format_exc()}",
+            level="error",
         )
         raise HTTPException(
             status_code=500, detail="Não foi possível ler as colunas desta tabela."

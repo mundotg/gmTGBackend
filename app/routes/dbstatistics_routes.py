@@ -121,7 +121,7 @@ async def get_fields_info_cached_wrapper(
     )
 
 
-@cache_result(ttl=600, user_id="structures_only_{parn_user_id}_{connection_id}")
+# @cache_result(ttl=100, user_id="structures_only_{parn_user_id}_{connection_id}")
 async def get_structures_names_only_cached(
     connection_id: int,
     parn_user_id: int,
@@ -130,7 +130,7 @@ async def get_structures_names_only_cached(
     return get_strutures_names_only(connection_id, parn_user_id, db)
 
 
-@cache_result(ttl=600, user_id="structures_full_{parn_user_id}")
+# @cache_result(ttl=100, user_id="structures_full_{parn_user_id}")
 async def get_structures_names_cached(
     connection_id: int,
     parn_user_id: int,

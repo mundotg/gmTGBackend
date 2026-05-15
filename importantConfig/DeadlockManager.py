@@ -263,7 +263,7 @@ DATABASE_MONITORING_QUERIES = {
     },
     "oracle": {
         "blocking": ORACLE_BLOCKING,
-    }
+    },
 }
 
 import asyncio
@@ -279,9 +279,7 @@ class DeadlockManager:
     SUPPORTED_POSTGRES = ("postgresql", "postgresql+psycopg2")
     SUPPORTED_MSSQL = ("mssql", "mssql+pyodbc")
     SUPPORTED_MYSQL = ("mysql", "mysql+pymysql", "mariadb")
-    SUPPORTED_ORACLE = ("oracle", "oracle+cx_oracle")
-
-    
+    SUPPORTED_ORACLE = ("oracle", "oracle+oracledb")
 
     # ---------------------------------------------------------
 
@@ -293,7 +291,7 @@ class DeadlockManager:
         self.MYSQLQUERY = MYSQLQUERY
         self.SQLSERVERQUERY = SQLSERVERQUERY
         self.ORACLEQUERY = ORACLEQUERY
-        
+
     def _query_deadlocks(self):
         if self.driver in self.SUPPORTED_POSTGRES:
             return text(self.POSTGRESQUERY)
@@ -327,22 +325,30 @@ class DeadlockManager:
 
         except Exception as e:
             erro_trace = traceback.format_exc()
-            log_message(f"❌ Erro ao listar deadlocks: {e}\n{erro_trace}", level="error")
+            log_message(
+                f"❌ Erro ao listar deadlocks: {e}\n{erro_trace}", level="error"
+            )
             return [{"erro": str(e), "driver": self.driver}]
 
     def _registrar_historico_deadlock(self, processos):
-        self._deadlock_history.append({
-            "timestamp": datetime.now().isoformat(),
-            "processos": processos,
-            "quantidade": len(processos)
-        })
+        self._deadlock_history.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "processos": processos,
+                "quantidade": len(processos),
+            }
+        )
         self._deadlock_history = self._deadlock_history[-100:]
 
     def obter_historico_deadlocks(self):
         return self._deadlock_history
 
     def _get_kill_query(self, pid: int):
-        if self.driver in (*self.SUPPORTED_POSTGRES, *self.SUPPORTED_MYSQL, *self.SUPPORTED_MSSQL):
+        if self.driver in (
+            *self.SUPPORTED_POSTGRES,
+            *self.SUPPORTED_MYSQL,
+            *self.SUPPORTED_MSSQL,
+        ):
             return text("KILL :pid"), {"pid": pid}
 
         if self.driver == "sqlite":
@@ -375,16 +381,14 @@ class DeadlockManager:
                 resultados.append({"pid": pid, "resultado": res})
                 await asyncio.sleep(0.1)
 
-        return {
-            "status": "ok",
-            "quantidade": len(resultados),
-            "resultados": resultados
-        }
+        return {"status": "ok", "quantidade": len(resultados), "resultados": resultados}
 
     async def obter_estatisticas_gerais(self):
         processos = await self.listar_processos_em_deadlock()
 
-        bloqueadores = {p.get("blocking_user") for p in processos if p.get("blocking_user")}
+        bloqueadores = {
+            p.get("blocking_user") for p in processos if p.get("blocking_user")
+        }
         bloqueados = {p.get("blocked_user") for p in processos if p.get("blocked_user")}
 
         return {
@@ -392,5 +396,5 @@ class DeadlockManager:
             "bloqueadores_unicos": list(bloqueadores),
             "bloqueados_unicos": list(bloqueados),
             "driver": self.driver,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }

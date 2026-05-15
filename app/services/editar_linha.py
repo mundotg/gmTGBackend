@@ -6,6 +6,8 @@ from app.ultils.logger import log_message
 from datetime import datetime
 import uuid
 import json
+import re
+from functools import lru_cache
 
 
 def _map_column_type(col_type: str):
@@ -177,69 +179,81 @@ def _convert_column_type_for_string_one_V1(value, col_type):
         return None
 
 
+# =========================================================
+# RESERVED KEYWORDS
+# =========================================================
+
 RESERVED_KEYWORDS = {
-    "default",
+    # SQL
     "select",
     "insert",
     "update",
     "delete",
     "from",
     "where",
-    "order",
-    "group",
-    "by",
-    "having",
     "join",
     "inner",
     "left",
     "right",
+    "full",
     "outer",
+    "cross",
     "on",
+    "group",
+    "order",
+    "by",
+    "having",
+    "limit",
+    "offset",
+    "union",
+    "all",
+    "distinct",
+    "exists",
+    "between",
+    "like",
+    "in",
     "as",
     "and",
     "or",
     "not",
     "null",
     "is",
-    "true",
-    "false",
-    "primary",
-    "key",
-    "foreign",
-    "references",
+    # DDL
     "table",
     "column",
     "index",
-    "create",
-    "alter",
-    "drop",
-    "truncate",
-    "grant",
-    "revoke",
+    "view",
+    "sequence",
+    "trigger",
+    "procedure",
+    "function",
+    "package",
+    "database",
+    "schema",
+    "tablespace",
+    # Constraints
+    "primary",
+    "foreign",
+    "references",
+    "constraint",
+    "unique",
+    "check",
+    "default",
+    # Transactions
     "commit",
     "rollback",
     "savepoint",
-    "begin",
     "transaction",
     "lock",
-    "unlock",
+    # Users
     "user",
     "role",
-    "database",
-    "schema",
-    "view",
-    "function",
-    "procedure",
-    "trigger",
-    "event",
-    "type",
-    "domain",
-    "constraint",
-    "check",
-    "unique",
+    "grant",
+    "revoke",
+    # Date
     "current",
-    "time",
     "date",
+    "time",
     "timestamp",
     "interval",
     "year",
@@ -248,67 +262,236 @@ RESERVED_KEYWORDS = {
     "hour",
     "minute",
     "second",
-    "zone",
+    # Boolean
+    "true",
+    "false",
+    # Misc
     "value",
     "values",
+    "type",
+    "event",
 }
 
+# =========================================================
+# DATABASE CONFIG
+# =========================================================
 
-def needs_quoting(identifier_part: str, db_type: str) -> bool:
-    if not identifier_part:
-        return False
+DB_QUOTES = {
+    "postgresql": '"',
+    "postgres": '"',
+    "sqlite": '"',
+    "oracle": '"',
+    "mysql": "`",
+    "mariadb": "`",
+    "sqlserver": "[",
+    "mssql": "[",
+}
+
+# =========================================================
+# REGEX
+# =========================================================
+
+VALID_IDENTIFIER_REGEX = re.compile(r"^[A-Za-z_][A-Za-z0-9_$#]*$")
+
+# =========================================================
+# HELPERS
+# =========================================================
+
+
+@lru_cache(maxsize=2048)
+def quote_char(db_type: str) -> str:
+    """
+    Retorna caractere de escape do banco.
+    """
+    return DB_QUOTES.get(db_type.lower(), '"')
+
+
+def normalize_identifier(identifier: str) -> str:
+    """
+    Remove espaços extras.
+    """
+    return identifier.strip()
+
+
+def is_reserved_keyword(identifier: str) -> bool:
+    return identifier.lower() in RESERVED_KEYWORDS
+
+
+def has_invalid_chars(identifier: str) -> bool:
+    """
+    Oracle aceita:
+    A-Z 0-9 _ $ #
+
+    PostgreSQL/MySQL aceitam parecido.
+    """
+    return not bool(VALID_IDENTIFIER_REGEX.match(identifier))
+
+
+def starts_with_number(identifier: str) -> bool:
+    return identifier[0].isdigit()
+
+
+def is_case_sensitive_required(
+    identifier: str,
+    db_type: str,
+) -> bool:
+    """
+    PostgreSQL:
+    Tudo vira lowercase se não usar aspas.
+
+    Oracle:
+    Tudo vira UPPERCASE.
+
+    Então:
+    CamelCase precisa quote.
+    """
 
     db_type = db_type.lower()
 
-    # 🔥 POSTGRESQL / SQLITE → case-sensitive se usar maiúsculas
-    if db_type in ["postgresql", "postgres", "sqlite"]:
-        if identifier_part != identifier_part.lower():
-            return True
+    if db_type in ["postgresql", "postgres"]:
+        return identifier != identifier.lower()
 
-    # 🔥 MYSQL → normalmente não precisa por causa do case-insensitive
-    # (mas ainda precisa para keywords e caracteres inválidos)
+    if db_type == "oracle":
+        return identifier != identifier.upper()
 
-    # palavra reservada
-    if identifier_part.lower() in RESERVED_KEYWORDS:
+    return False
+
+
+def needs_quoting(
+    identifier: str,
+    db_type: str,
+) -> bool:
+    """
+    Decide se precisa escapar.
+    """
+
+    if not identifier:
+        return False
+
+    identifier = normalize_identifier(identifier)
+
+    if is_reserved_keyword(identifier):
         return True
 
-    # caracteres inválidos
-    if not identifier_part.replace("_", "").isalnum():
+    if starts_with_number(identifier):
         return True
 
-    # começa com número
-    if identifier_part[0].isdigit():
+    if has_invalid_chars(identifier):
+        return True
+
+    if is_case_sensitive_required(identifier, db_type):
         return True
 
     return False
 
 
-def quote_char(db_type: str) -> str:
-    db_type = db_type.lower()
-
-    if db_type in ["postgresql", "postgres", "sqlite"]:
-        return '"'
-    elif db_type in ["mysql", "mariadb"]:
-        return "`"
-    else:
-        return '"'  # fallback seguro
-
-
-def quote_identifier(db_type: str, identifier: str) -> str:
+def quote_part(
+    db_type: str,
+    identifier_part: str,
+) -> str:
     """
-    Escapa identificadores SQL corretamente por banco.
-    Suporta: schema.tabela.coluna
+    Escapa uma única parte:
+    schema
+    table
+    column
     """
-    db_type = db_type.lower()
-    parts = identifier.split(".")
+
+    identifier_part = normalize_identifier(identifier_part)
+
+    if not identifier_part:
+        return ""
+
+    if not needs_quoting(identifier_part, db_type):
+        return identifier_part
+
     qchar = quote_char(db_type)
 
-    quoted_parts = []
+    # SQL Server usa []
+    if qchar == "[":
+        escaped = identifier_part.replace("]", "]]")
+        return f"[{escaped}]"
 
-    for part in parts:
-        if needs_quoting(part, db_type):
-            quoted_parts.append(f"{qchar}{part}{qchar}")
-        else:
-            quoted_parts.append(part)
+    # PostgreSQL / Oracle / SQLite / MySQL
+    escaped = identifier_part.replace(qchar, qchar * 2)
+
+    return f"{qchar}{escaped}{qchar}"
+
+
+def quote_identifier(
+    db_type: str,
+    identifier: str,
+) -> str:
+    """
+    Escapa:
+    schema.table.column
+
+    Exemplo:
+
+    postgres:
+        public.users.id
+        -> public.users.id
+
+    postgres camelCase:
+        public.UserTable.id
+        -> public."UserTable".id
+
+    oracle:
+        SYSTEM.TABLE_TEST.ID
+
+    mysql:
+        `user`.`order`
+    """
+
+    if not identifier:
+        return identifier
+
+    db_type = db_type.lower()
+
+    # remove:
+    # .table
+    # table.
+    # schema..table
+    raw_parts = identifier.split(".")
+
+    parts = []
+
+    for part in raw_parts:
+        part = normalize_identifier(part)
+
+        if not part:
+            continue
+
+        parts.append(part)
+
+    if not parts:
+        return ""
+
+    quoted_parts = [quote_part(db_type, part) for part in parts]
 
     return ".".join(quoted_parts)
+
+
+# =========================================================
+# FULL TABLE NAME
+# =========================================================
+
+
+def build_table_name(
+    db_type: str,
+    table: str,
+    schema: str | None = None,
+) -> str:
+    """
+    Monta:
+    schema.table
+    ou:
+    table
+    """
+
+    table = quote_identifier(db_type, table)
+
+    if schema and schema.strip():
+        schema = quote_identifier(db_type, schema)
+        return f"{schema}.{table}"
+
+    return table

@@ -107,10 +107,10 @@ class QueryService:
                 params=params,
             )
 
-            log_message(f"📘 Query montada:\n{query_string}", "debug")
-            log_message(
-                f"📦 Parâmetros: {json.dumps(params, indent=2, default=str)}", "debug"
-            )
+            # log_message(f"📘 Query montada:\n{query_string}", "wa")
+            # log_message(
+            #     f"📦 Parâmetros: {json.dumps(params, indent=2, default=str)}", "debug"
+            # )
 
             return execution_result
 
@@ -402,15 +402,15 @@ class QueryService:
 
             await create_query_history_async(db=db, data=history_data)
 
-            log_message(
-                f"✅ Histórico salvo: "
-                f"User={user_id}, Conn={connection_id}, "
-                f"Duração={duration_ms}ms, "
-                f"Tabelas={meta_context.get('tables_involved')}, "
-                f"Linhas={row_count}, "
-                f"Status={meta_context['status']}",
-                "success",
-            )
+            # log_message(
+            #     f"✅ Histórico salvo: "
+            #     f"User={user_id}, Conn={connection_id}, "
+            #     f"Duração={duration_ms}ms, "
+            #     f"Tabelas={meta_context.get('tables_involved')}, "
+            #     f"Linhas={row_count}, "
+            #     f"Status={meta_context['status']}",
+            #     "success",
+            # )
 
         except SQLAlchemyError as exc:
             await db.rollback()

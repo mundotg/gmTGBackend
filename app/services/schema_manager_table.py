@@ -26,7 +26,6 @@ from app.cruds.dbstructure_crud import (
 
 from app.ultils.Database_error_logger import DDLExecutionError, _lidar_com_erro_sql
 
-
 # ============================================================
 # ✅ CORE HELPERS (poucos métodos)
 # ============================================================
@@ -455,7 +454,7 @@ def execute_create_table(
         else:
             sql = f"CREATE TABLE {safe_table} (id INT);"
     elif db_type == "oracle":
-        sql = f"CREATE TABLE {safe_table} (id NUMBER);"
+        sql = f"CREATE TABLE {safe_table} (id NUMBER)"
     elif db_type == "sqlite":
         ine = "IF NOT EXISTS " if getattr(payload, "if_not_exists", True) else ""
         sql = f"CREATE TABLE {ine}{safe_table} (id INTEGER);"
@@ -764,3 +763,77 @@ def execute_drop_table(
             extra={"error": details},
         )
         raise
+
+
+def execute_create_schema(
+    db: Session,
+    engine: Engine,
+    connection_model: DBConnection,
+    schema_name: str,
+    *,
+    if_not_exists: bool = True,
+    audit_ctx: AuditContext,
+) -> None:
+    db_type = _validate_dialect(connection_model.type)
+
+    schema_name = schema_name.strip()
+
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", schema_name):
+        raise ValueError("Nome de schema inválido.")
+
+    safe_schema = quote_identifier(db_type, schema_name)
+
+    # =========================
+    # 🐘 POSTGRESQL
+    # =========================
+    if db_type in ["postgresql", "postgres"]:
+        sql = f"CREATE SCHEMA {'IF NOT EXISTS ' if if_not_exists else ''}{safe_schema};"
+
+    # =========================
+    # 🐬 MYSQL → schema = database
+    # =========================
+    elif db_type in ["mysql", "mariadb"]:
+        sql = (
+            f"CREATE DATABASE {'IF NOT EXISTS ' if if_not_exists else ''}{safe_schema};"
+        )
+
+    # =========================
+    # 🧱 MSSQL
+    # =========================
+    elif db_type in ["mssql", "sqlserver"]:
+        if if_not_exists:
+            sql = (
+                f"IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = '{schema_name}') "
+                f"BEGIN EXEC('CREATE SCHEMA {schema_name}') END"
+            )
+        else:
+            sql = f"CREATE SCHEMA {safe_schema};"
+
+    # =========================
+    # 🏛️ ORACLE → schema = user
+    # =========================
+    elif db_type == "oracle":
+        raise ValueError("Oracle: criar schema requer criação de USER.")
+
+    # =========================
+    # 🪶 SQLITE
+    # =========================
+    elif db_type == "sqlite":
+        raise ValueError("SQLite não suporta schema.")
+
+    else:
+        raise ValueError(f"Dialeto '{db_type}' não suportado.")
+
+    _run_ddl(
+        db,
+        ctx=audit_ctx,
+        engine=engine,
+        connection_id=connection_model.id,
+        operation="CREATE SCHEMA",
+        query_type=QueryType.CREATE_TABLE,  # podes criar um CREATE_SCHEMA depois
+        dialect=db_type,
+        table=schema_name,
+        column=None,
+        sql_or_queries=sql,
+        extra={"schema": schema_name},
+    )

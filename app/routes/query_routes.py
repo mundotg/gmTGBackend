@@ -130,7 +130,7 @@ async def update_row_endpoint(
         try:
             engine, connection = ConnectionManager.ensure_connection(db, user_id)
 
-            log_message(f"Atualizando linha para usuário {user_id}", "info")
+            # log_message(f"Atualizando linha para usuário {user_id}", "info")
             result = update_row_service(
                 data,
                 engine,
@@ -140,7 +140,7 @@ async def update_row_endpoint(
                 db,  # pyright: ignore[reportArgumentType]
             )
 
-            log_message("Linha atualizada com sucesso", "success")
+            # log_message("Linha atualizada com sucesso", "success")
             return result
 
         except HTTPException:
@@ -165,12 +165,12 @@ async def insert_row_endpoint(
         try:
             engine, connection = ConnectionManager.ensure_connection(db, user_id)
 
-            log_message(f"Inserindo linha para usuário {user_id}", "info")
+            # log_message(f"Inserindo linha para usuário {user_id}", "info")
             result = insert_row_service(
                 data, engine, user_id, connection.type, connection.id, db  # type: ignore
             )
 
-            log_message("Linha inserida com sucesso", "success")
+            # log_message("Linha inserida com sucesso", "success")
             return result
 
         except HTTPException:
@@ -195,10 +195,10 @@ async def auto_create_endpoint(
         try:
             engine, connection = ConnectionManager.ensure_connection(db, user_id)
 
-            log_message(f"Auto-criando linhas para usuário {user_id}", "info")
+            # log_message(f"Auto-criando linhas para usuário {user_id}", "info")
             result = insert_row_service_auto(data, engine, user_id, connection, db)
 
-            log_message("Auto-criação concluída com sucesso", "success")
+            # log_message("Auto-criação concluída com sucesso", "success")
             return result
 
         except HTTPException:

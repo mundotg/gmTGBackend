@@ -19,7 +19,6 @@ from app.services.query_service import QueryService
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
 
-
 query_service = QueryService()
 CHUNK_SIZE = 150
 
@@ -214,6 +213,7 @@ async def executar_query_e_salvar_stream(
             yield _sse_event("status", {"status": "started"})
 
             engine, connection = await ConnectionManager.get_engine_async(db, user_id)
+            print(f"Engine obtido: {engine.dialect}, Connection: {connection.type}")
 
             needs_chunking = bool(body.limit and body.limit > CHUNK_SIZE)
 

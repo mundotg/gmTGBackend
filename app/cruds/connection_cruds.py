@@ -7,11 +7,16 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import load_only, noload
 
+from app.models.dbstructure_models import DBField, DBStructure
 from app.models.user_model import User
 from app.models.connection_models import ActiveConnection, ConnectionLog, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.users_schemas import PaginationOutput
 from app.ultils.logger import log_message
+from sqlalchemy.exc import SQLAlchemyError
+
+
+from sqlalchemy.orm import load_only, contains_eager
 
 
 def map_status(status: str, id_conn1: Optional[int], id_conn2: Optional[int]) -> str:
@@ -700,3 +705,79 @@ def query_connections_simple(
         "items": results,
         "pages": (total + limit - 1) // limit if limit > 0 else 1,
     }
+
+
+# Importe as suas models aqui (ex: from models import DBConnection, DBStructure, DBField)
+def get_connection_by_id(
+    db: Session,
+    *,
+    user_id: int,
+    connection_id: int,
+):
+    try:
+        connection = (
+            db.query(DBConnection)
+            .filter(
+                DBConnection.id == connection_id,
+                DBConnection.user_id == user_id,
+            )
+            .first()
+        )
+        return connection
+    except SQLAlchemyError as e:
+        print(f"[DB ERROR] get_connection_by_id: {e}")
+        return None
+
+
+# def get_connection_by_id(
+#     db: Session,
+#     *,
+#     user_id: int,
+#     connection_id: int,
+# ):
+#     try:
+#         connection = (
+#             db.query(DBConnection)
+#             # 1. Faz o JOIN filtrando os schemas indesejados direto no banco
+#             .outerjoin(
+#                 DBStructure,
+#                 (DBConnection.id == DBStructure.db_connection_id)
+#                 & (DBStructure.schema_name != "information_schema")
+#                 & (~DBStructure.table_name.startswith("_pg_")),
+#             )
+#             .outerjoin(DBField, DBStructure.id == DBField.structure_id)
+#             # 2. Configura o SELECT para trazer apenas o necessário
+#             .options(
+#                 # Colunas principais da Conexão (exclui password, host, etc)
+#                 load_only(
+#                     DBConnection.id,
+#                     DBConnection.name,
+#                     DBConnection.type,
+#                     DBConnection.status,
+#                     DBConnection.database_name,
+#                 ),
+#                 # Mapeia o JOIN de structures e seleciona colunas
+#                 contains_eager(DBConnection.structures).load_only(
+#                     DBStructure.id, DBStructure.table_name, DBStructure.schema_name
+#                 ),
+#                 # Mapeia o JOIN de fields e seleciona colunas
+#                 contains_eager(DBConnection.structures, DBStructure.fields).load_only(
+#                     DBField.name,
+#                     DBField.type,
+#                     DBField.is_primary_key,
+#                     DBField.is_foreign_key,
+#                     DBField.referenced_table,
+#                 ),
+#             )
+#             .filter(
+#                 DBConnection.id == connection_id,
+#                 DBConnection.user_id == user_id,
+#             )
+#             .first()
+#         )
+
+#         return connection
+
+#     except SQLAlchemyError as e:
+#         print(f"[DB ERROR] get_connection_by_id: {e}")
+#         return None

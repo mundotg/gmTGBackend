@@ -25,7 +25,6 @@ from app.services.field_info import map_column_type
 from app.ultils.Database_error_logger import DDLExecutionError, _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
-
 # ============================================================
 # ✅ CORE HELPERS (poucos métodos)
 # ============================================================
@@ -609,7 +608,7 @@ def execute_alter_column(
             engine=engine,
             connection_id=connection_model.id,
             operation="ALTER COLUMN",
-            query_type=QueryType.ALTERCOLUMN,
+            query_type=QueryType.ALTER_COLUMN,
             dialect=db_type,
             table=table_name,
             column=field.name,
@@ -666,7 +665,7 @@ def execute_alter_column(
             ctx=audit_ctx,
             connection_id=connection_model.id,
             operation="METADATA::UPDATE_FIELD",
-            query_type=QueryType.ALTERCOLUMN,
+            query_type=QueryType.ALTER_COLUMN,
             dialect=db_type,
             table=table_name,
             column=field.name,

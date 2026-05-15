@@ -31,15 +31,25 @@ from sqlalchemy.exc import SQLAlchemyError, NoSuchTableError
 from sqlalchemy.exc import OperationalError
 
 
-def safe_get_columns(engine: Engine, table_name: str, schema: str):
+def safe_get_columns(
+    engine: Engine,
+    table_name: str,
+    schema: Optional[str] = None,
+):
     inspector = inspect(engine)
+
+    kwargs = {}
+    if schema:
+        kwargs["schema"] = schema
+
     try:
-        return inspector.get_columns(table_name, schema=schema), inspector
+        return inspector.get_columns(table_name, **kwargs), inspector
+
     except OperationalError as e:
         if "SSL connection has been closed" in str(e):
-            # 🔄 recria o inspector e tenta de novo
             inspector = inspect(engine)
-            return inspector.get_columns(table_name, schema=schema), inspector
+            return inspector.get_columns(table_name, **kwargs), inspector
+
         raise
 
 
@@ -78,7 +88,7 @@ def sincronizar_metadados_da_tabela(db: Session, table_name: str, user_id: int) 
         # 7. Monta e retorna a resposta final
         return montar_resposta_sincronizacao(
             db_connection_id=connection.id,
-            schema_name=structure.schema_name,
+            schema_name=structure.schema_name or "",
             table_name=table_name,
             resposta_colunas=resposta_colunas,
             total_adicionado=len(resposta_colunas),
@@ -379,7 +389,7 @@ def buscar_ou_criar_campos_tabela(
     insere todos os campos com base nos metadados do banco de dados.
     """
     # Verifica se já existem campos locais
-    campos_existentes = get_fields_by_structure(db, structure.id)
+    campos_existentes = None  # get_fields_by_structure(db, structure.id)
     if campos_existentes:
         return campos_existentes
 

@@ -99,22 +99,27 @@ def _safe_serialize(value: Any) -> Any:
     return f"<obj:{type(value).__name__}>"
 
 
-def _make_key(func_name: str, user_id: Optional[str] = None, *args, **kwargs) -> str:
+def _make_key(func_name: str, cached_user_id: Optional[str] = None, *args, **kwargs) -> str:
     """Gera chave SHA-256 estável excluindo dependências injetadas (db, session)."""
+    
     clean_kwargs = {
         k: _safe_serialize(v)
         for k, v in kwargs.items()
         if not k.startswith("_")
-        and k not in {"self", "cls", "session", "db", "engine", "conn"}
+        # 👇 Adicionado "user_id" na lista de exclusão para não sujar os kwargs
+        and k not in {"self", "cls", "session", "db", "engine", "conn", "user_id"} 
     }
+    
     clean_args = [_safe_serialize(a) for a in args]
 
     key_data = {
         "f": func_name,
-        "user": str(user_id) if user_id is not None else "global",
+        # 👇 Atualizado para usar o novo nome do parâmetro
+        "user": str(cached_user_id) if cached_user_id is not None else "global", 
         "args": clean_args,
         "kwargs": clean_kwargs,
     }
+    
     raw = json.dumps(key_data, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
@@ -124,11 +129,8 @@ def _make_key(func_name: str, user_id: Optional[str] = None, *args, **kwargs) ->
 # ============================================================
 # 🔥 IMPORTS CORRIGIDOS
 
-
 def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
-
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
-
         is_async = asyncio.iscoroutinefunction(func)
 
         # -------------------------
@@ -140,7 +142,11 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
                 return await func(*args, **kwargs)  # type: ignore
 
             actual_user_id = user_id if user_id is not None else kwargs.get("user_id")
-            key = _make_key(func.__name__, actual_user_id, *args, **kwargs)
+            
+            # 👇 Removemos o user_id dos kwargs temporariamente para gerar a chave sem erro
+            kwargs_for_key = kwargs.copy()
+            kwargs_for_key.pop("user_id", None)
+            key = _make_key(func.__name__, actual_user_id, *args, **kwargs_for_key)
 
             # L1
             mem = MEMORY_CACHE.get(key)
@@ -153,13 +159,11 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
 
             # L2
             cache_key = f"{CACHE_PREFIX}{func.__name__}:{key}"
-
             try:
                 redis_data = read_cache(cache_key)
                 if redis_data and "value" in redis_data:
                     if CACHE_LOG_HITS:
                         log_message(f"[L2 HIT] {func.__name__}", "debug")
-
                     MEMORY_CACHE[key] = {
                         "ts": time.time(),
                         "val": redis_data["value"],
@@ -172,7 +176,7 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
             if CACHE_LOG_MISSES:
                 log_message(f"[MISS] {func.__name__}", "debug")
 
-            # execução
+            # execução ASSÍNCRONA
             result = await func(*args, **kwargs)
             cacheable_result = _to_cacheable(result)
 
@@ -197,15 +201,71 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
             return cast(R, result)
 
         # -------------------------
-        # SYNC WRAPPER (🔥 agora funcional)
+        # SYNC WRAPPER (Verdadeiramente síncrono agora)
         # -------------------------
         @functools.wraps(func)
         def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             if not CACHE_ENABLED or CACHE_DISABLE_FLAG:
                 return func(*args, **kwargs)
 
-            loop = asyncio.get_event_loop()
-            return loop.run_until_complete(async_wrapper(*args, **kwargs))
+            actual_user_id = user_id if user_id is not None else kwargs.get("user_id")
+            
+            # 👇 Mesma proteção para a chave
+            kwargs_for_key = kwargs.copy()
+            kwargs_for_key.pop("user_id", None)
+            key = _make_key(func.__name__, actual_user_id, *args, **kwargs_for_key)
+
+            # L1
+            mem = MEMORY_CACHE.get(key)
+            if mem:
+                if mem["ttl"] is None or (time.time() - mem["ts"] < mem["ttl"]):
+                    if CACHE_LOG_HITS:
+                        log_message(f"[L1 HIT] {func.__name__}", "debug")
+                    return mem["val"]
+                MEMORY_CACHE.pop(key, None)
+
+            # L2
+            cache_key = f"{CACHE_PREFIX}{func.__name__}:{key}"
+            try:
+                redis_data = read_cache(cache_key)
+                if redis_data and "value" in redis_data:
+                    if CACHE_LOG_HITS:
+                        log_message(f"[L2 HIT] {func.__name__}", "debug")
+                    MEMORY_CACHE[key] = {
+                        "ts": time.time(),
+                        "val": redis_data["value"],
+                        "ttl": MEMORY_CACHE_TTL,
+                    }
+                    return redis_data["value"]
+            except Exception as e:
+                log_message(f"[REDIS_READ_ERROR] {e}", "error")
+
+            if CACHE_LOG_MISSES:
+                log_message(f"[MISS] {func.__name__}", "debug")
+
+            # 👇 Execução SÍNCRONA da função (evita o RuntimeError do event loop)
+            result = func(*args, **kwargs)
+            cacheable_result = _to_cacheable(result)
+
+            # L1
+            MEMORY_CACHE[key] = {
+                "ts": time.time(),
+                "val": cacheable_result,
+                "ttl": MEMORY_CACHE_TTL,
+            }
+
+            # L2
+            try:
+                entry = {
+                    "timestamp": time.time(),
+                    "value": cacheable_result,
+                    "function": func.__name__,
+                }
+                write_cache(cache_key, entry, ttl)
+            except Exception as e:
+                log_message(f"[REDIS_WRITE_ERROR] {e}", "error")
+
+            return cast(R, result)
 
         return cast(Callable[P, R], async_wrapper if is_async else sync_wrapper)
 

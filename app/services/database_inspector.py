@@ -521,30 +521,101 @@ def get_table_count(
 # ============================================================
 
 
-def collect_statistics(engine: Engine, db_type: str) -> DBStatisticsDict:
+def collect_statistics(engine: Any, db_type: str) -> 'DBStatisticsDict':
     """
-    Coleta estatísticas gerais do banco, compatível com múltiplos SGBDs.
+    Coleta estatísticas gerais do banco, compatível com múltiplos SGBDs (SQL e NoSQL).
     """
-    inspector = inspect(engine)
-    dialect = db_type.lower()
-
-    tables_name = inspector.get_table_names()
-    views_name = inspector.get_view_names()
-
-    stats: DBStatisticsDict = {
+    dialect = (db_type or "").lower()
+    print(f"Coletando estatísticas para {dialect}...")
+    # Dicionário de estatísticas padrão
+    stats = {
         "server_version": "Desconhecida",
-        "table_count": len(tables_name),
-        "view_count": len(views_name),
+        "table_count": 0,
+        "view_count": 0,
         "procedure_count": 0,
         "function_count": 0,
         "trigger_count": 0,
         "index_count": 0,
-        "tables_connected": len(tables_name),
+        "tables_connected": 0,
         "queries_today": 0,
         "records_analyzed": 0,
         "connection_name": "",
         "db_connection_id": 0,
     }
+
+    # ==========================================
+    # 1. TRATAMENTO PARA MONGODB (NoSQL)
+    # ==========================================
+    if dialect == "mongodb":
+        try:
+            # Pega versão do server
+            server_info = engine.server_info()
+            stats["server_version"] = server_info.get("version", "Desconhecida")
+            
+            # Somar coleções e índices apenas de bancos não-sistema
+            total_collections = 0
+            total_indexes = 0
+            
+            for db_name in engine.list_database_names():
+                if db_name not in ['admin', 'config', 'local']:
+                    db_obj = engine[db_name]
+                    collections = db_obj.list_collection_names()
+                    total_collections += len(collections)
+                    
+                    # Contar índices para cada coleção
+                    for coll_name in collections:
+                        total_indexes += len(db_obj[coll_name].index_information())
+            
+            stats["table_count"] = total_collections  # Tratamos 'collections' como 'tables'
+            stats["tables_connected"] = total_collections
+            stats["index_count"] = total_indexes
+            
+        except Exception as e:
+            log_message(f"⚠️ Erro ao coletar estatísticas do MongoDB: {e}", "warning")
+        
+        return stats
+
+    # ==========================================
+    # 2. TRATAMENTO PARA CASSANDRA (NoSQL)
+    # ==========================================
+    elif dialect == "cassandra":
+        try:
+            # Pegar versão do servidor
+            row = engine.execute("SELECT release_version FROM system.local").one()
+            if row:
+                stats["server_version"] = row[0]
+            
+            # Obter keyspace conectado e contar tabelas/views/índices
+            keyspace = engine.keyspace
+            if keyspace and keyspace in engine.cluster.metadata.keyspaces:
+                ks_meta = engine.cluster.metadata.keyspaces[keyspace]
+                
+                stats["table_count"] = len(ks_meta.tables)
+                stats["tables_connected"] = stats["table_count"]
+                
+                if hasattr(ks_meta, 'views'):
+                    stats["view_count"] = len(ks_meta.views)
+                if hasattr(ks_meta, 'indexes'):
+                    stats["index_count"] = len(ks_meta.indexes)
+                    
+        except Exception as e:
+            log_message(f"⚠️ Erro ao coletar estatísticas do Cassandra: {e}", "warning")
+            
+        return stats
+
+    # ==========================================
+    # 3. TRATAMENTO PARA BANCOS RELACIONAIS (SQL)
+    # ==========================================
+    try:
+        inspector = inspect(engine)
+        tables_name = inspector.get_table_names()
+        views_name = inspector.get_view_names()
+
+        stats["table_count"] = len(tables_name)
+        stats["view_count"] = len(views_name)
+        stats["tables_connected"] = len(tables_name)
+    except Exception as e:
+        log_message(f"⚠️ Erro ao inspecionar banco relacional: {e}", "warning")
 
     version_query = {
         "postgresql": "SHOW server_version",
@@ -556,135 +627,49 @@ def collect_statistics(engine: Engine, db_type: str) -> DBStatisticsDict:
         "oracle": "SELECT * FROM v$version WHERE banner LIKE 'Oracle Database%'",
     }.get(dialect)
 
-    with engine.connect() as conn:
-        if version_query:
+    try:
+        with engine.connect() as conn:
+            if version_query:
+                try:
+                    result = conn.execute(text(version_query)).scalar()
+                    stats["server_version"] = result if result else "Desconhecida"
+                except Exception as e:
+                    log_message(f"⚠️ Erro ao obter versão do servidor: {e}", "warning")
+
             try:
-                result = conn.execute(text(version_query)).scalar()
-                stats["server_version"] = result if result else "Desconhecida"
+                if dialect == "postgresql":
+                    stats["procedure_count"] = conn.execute(text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'p'")).scalar() or 0
+                    stats["function_count"] = conn.execute(text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'f'")).scalar() or 0
+                    stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM pg_trigger WHERE NOT tgisinternal")).scalar() or 0
+                    stats["index_count"] = conn.execute(text("SELECT COUNT(*) FROM pg_indexes")).scalar() or 0
+
+                elif dialect == "mysql":
+                    stats["procedure_count"] = conn.execute(text("SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='PROCEDURE'")).scalar() or 0
+                    stats["function_count"] = conn.execute(text("SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='FUNCTION'")).scalar() or 0
+                    stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM information_schema.TRIGGERS")).scalar() or 0
+                    stats["index_count"] = conn.execute(text("SELECT COUNT(*) FROM information_schema.STATISTICS")).scalar() or 0
+
+                elif dialect == "sqlite":
+                    stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger'")).scalar() or 0
+                    stats["index_count"] = conn.execute(text("SELECT COUNT(*) FROM sqlite_master WHERE type='index'")).scalar() or 0
+
+                elif dialect in ("mssql", "sql server", "sqlserver"):
+                    stats["procedure_count"] = conn.execute(text("SELECT COUNT(*) FROM sys.procedures")).scalar() or 0
+                    stats["function_count"] = conn.execute(text("SELECT COUNT(*) FROM sys.objects WHERE type IN ('FN', 'TF', 'IF')")).scalar() or 0
+                    stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM sys.triggers")).scalar() or 0
+                    stats["index_count"] = conn.execute(text("SELECT COUNT(*) FROM sys.indexes WHERE name IS NOT NULL")).scalar() or 0
+
+                elif dialect == "oracle":
+                    stats["procedure_count"] = conn.execute(text("SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'PROCEDURE'")).scalar() or 0
+                    stats["function_count"] = conn.execute(text("SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'FUNCTION'")).scalar() or 0
+                    stats["trigger_count"] = conn.execute(text("SELECT COUNT(*) FROM ALL_TRIGGERS")).scalar() or 0
+                    stats["index_count"] = conn.execute(text("SELECT COUNT(*) FROM ALL_INDEXES")).scalar() or 0
+
             except Exception as e:
-                log_message(f"⚠️ Erro ao obter versão do servidor: {e}", "warning")
+                log_message(f"⚠️ Erro ao coletar estatísticas específicas do banco: {e}", "warning")
 
-        try:
-            if dialect == "postgresql":
-                stats["procedure_count"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'p'")
-                    ).scalar()
-                    or 0
-                )
-                stats["function_count"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM pg_proc WHERE prokind = 'f'")
-                    ).scalar()
-                    or 0
-                )
-                stats["trigger_count"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM pg_trigger WHERE NOT tgisinternal")
-                    ).scalar()
-                    or 0
-                )
-                stats["index_count"] = (
-                    conn.execute(text("SELECT COUNT(*) FROM pg_indexes")).scalar() or 0
-                )
-
-            elif dialect == "mysql":
-                stats["procedure_count"] = (
-                    conn.execute(
-                        text(
-                            "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='PROCEDURE'"
-                        )
-                    ).scalar()
-                    or 0
-                )
-                stats["function_count"] = (
-                    conn.execute(
-                        text(
-                            "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_TYPE='FUNCTION'"
-                        )
-                    ).scalar()
-                    or 0
-                )
-                stats["trigger_count"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM information_schema.TRIGGERS")
-                    ).scalar()
-                    or 0
-                )
-                stats["index_count"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM information_schema.STATISTICS")
-                    ).scalar()
-                    or 0
-                )
-
-            elif dialect == "sqlite":
-                stats["trigger_count"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger'")
-                    ).scalar()
-                    or 0
-                )
-                stats["index_count"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM sqlite_master WHERE type='index'")
-                    ).scalar()
-                    or 0
-                )
-
-            elif dialect in ("mssql", "sql server", "sqlserver"):
-                stats["procedure_count"] = (
-                    conn.execute(text("SELECT COUNT(*) FROM sys.procedures")).scalar()
-                    or 0
-                )
-                stats["function_count"] = (
-                    conn.execute(
-                        text(
-                            "SELECT COUNT(*) FROM sys.objects WHERE type IN ('FN', 'TF', 'IF')"
-                        )
-                    ).scalar()
-                    or 0
-                )
-                stats["trigger_count"] = (
-                    conn.execute(text("SELECT COUNT(*) FROM sys.triggers")).scalar()
-                    or 0
-                )
-                stats["index_count"] = (
-                    conn.execute(
-                        text("SELECT COUNT(*) FROM sys.indexes WHERE name IS NOT NULL")
-                    ).scalar()
-                    or 0
-                )
-
-            elif dialect == "oracle":
-                stats["procedure_count"] = (
-                    conn.execute(
-                        text(
-                            "SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'PROCEDURE'"
-                        )
-                    ).scalar()
-                    or 0
-                )
-                stats["function_count"] = (
-                    conn.execute(
-                        text(
-                            "SELECT COUNT(*) FROM ALL_OBJECTS WHERE OBJECT_TYPE = 'FUNCTION'"
-                        )
-                    ).scalar()
-                    or 0
-                )
-                stats["trigger_count"] = (
-                    conn.execute(text("SELECT COUNT(*) FROM ALL_TRIGGERS")).scalar()
-                    or 0
-                )
-                stats["index_count"] = (
-                    conn.execute(text("SELECT COUNT(*) FROM ALL_INDEXES")).scalar() or 0
-                )
-
-        except Exception as e:
-            log_message(
-                f"⚠️ Erro ao coletar estatísticas específicas do banco: {e}", "warning"
-            )
+    except Exception as e:
+        log_message(f"⚠️ Erro na conexão do banco relacional: {e}", "error")
 
     return stats
 
@@ -745,7 +730,7 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
 
     try:
         engine, connection = ConnectionManager.ensure_connection(db, id_user)
-
+        print(f"Sincronizando estatísticas para usuário ID={id_user} e conexão ID={getattr(connection, 'id', '?')}...")
         # Verificação de segurança
         if not connection or not hasattr(connection, "id"):
             log_message(f"❌ Conexão inválida para usuário ID={id_user}", "error")
@@ -753,7 +738,8 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
 
         id_conn = cast(int, connection.id)
 
-        existing = get_statistics_by_connection(id_conn)
+        existing = None #get_statistics_by_connection(id_conn)
+        print(f"Estatísticas existentes para conexão ID={id_conn}: {existing}")
         if existing:
             # Se for objeto SQLAlchemy, converter para dict
             if hasattr(existing, "__dict__"):

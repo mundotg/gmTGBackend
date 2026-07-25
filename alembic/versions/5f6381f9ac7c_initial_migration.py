@@ -1,8 +1,8 @@
-"""create user table
+"""initial migration
 
-Revision ID: 8f954991ae8e
+Revision ID: 5f6381f9ac7c
 Revises: 
-Create Date: 2026-04-01 11:43:26.688927
+Create Date: 2026-07-22 16:32:18.657426
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '8f954991ae8e'
+revision: str = '5f6381f9ac7c'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -45,6 +45,29 @@ def upgrade() -> None:
     sa.UniqueConstraint('nome')
     )
     op.create_index(op.f('ix_empresas_id'), 'empresas', ['id'], unique=False)
+    op.create_table('knowledge_base',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(length=255), nullable=True),
+    sa.Column('content', sa.Text(), nullable=False),
+    sa.Column('category', sa.String(length=100), nullable=True),
+    sa.Column('source', sa.String(length=255), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_knowledge_category', 'knowledge_base', ['category'], unique=False)
+    op.create_index(op.f('ix_knowledge_base_category'), 'knowledge_base', ['category'], unique=False)
+    op.create_index(op.f('ix_knowledge_base_id'), 'knowledge_base', ['id'], unique=False)
+    op.create_table('logs',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('message', sa.Text(), nullable=False),
+    sa.Column('level', sa.String(length=20), nullable=False),
+    sa.Column('source', sa.String(length=100), nullable=True),
+    sa.Column('user', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_logs_id'), 'logs', ['id'], unique=False)
     op.create_table('permissions',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
@@ -54,6 +77,15 @@ def upgrade() -> None:
     sa.UniqueConstraint('name')
     )
     op.create_index(op.f('ix_permissions_id'), 'permissions', ['id'], unique=False)
+    op.create_table('plans',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=50), nullable=False),
+    sa.Column('max_storage_mb', sa.Integer(), nullable=False),
+    sa.Column('max_requests_per_day', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_plans_id'), 'plans', ['id'], unique=False)
     op.create_table('roles',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=50), nullable=False),
@@ -64,6 +96,17 @@ def upgrade() -> None:
     sa.UniqueConstraint('name')
     )
     op.create_index(op.f('ix_roles_id'), 'roles', ['id'], unique=False)
+    op.create_table('training_data',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('question', sa.Text(), nullable=False),
+    sa.Column('answer', sa.Text(), nullable=False),
+    sa.Column('category', sa.String(length=100), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_training_data_category'), 'training_data', ['category'], unique=False)
+    op.create_index(op.f('ix_training_data_id'), 'training_data', ['id'], unique=False)
     op.create_table('typeprojecto',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=50), nullable=False),
@@ -86,7 +129,6 @@ def upgrade() -> None:
     sa.Column('email', sa.String(length=255), nullable=False),
     sa.Column('telefone', sa.String(length=30), nullable=True),
     sa.Column('avatar_url', sa.String(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('hashed_password', sa.String(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=True),
     sa.Column('email_verified', sa.Boolean(), nullable=True),
@@ -94,9 +136,12 @@ def upgrade() -> None:
     sa.Column('empresa_id', sa.Integer(), nullable=True),
     sa.Column('cargo_id', sa.Integer(), nullable=True),
     sa.Column('role_id', sa.Integer(), nullable=True),
+    sa.Column('plan_id', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['cargo_id'], ['cargos.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['empresa_id'], ['empresas.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['plan_id'], ['plans.id'], ),
     sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -112,6 +157,19 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('chat_sessions',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(length=255), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_chat_user', 'chat_sessions', ['user_id'], unique=False)
+    op.create_index(op.f('ix_chat_sessions_id'), 'chat_sessions', ['id'], unique=False)
+    op.create_index(op.f('ix_chat_sessions_user_id'), 'chat_sessions', ['user_id'], unique=False)
     op.create_table('db_connections',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=True),
@@ -133,6 +191,42 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_db_connections_id'), 'db_connections', ['id'], unique=False)
+    op.create_table('files',
+    sa.Column('id', sa.Uuid(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('filename', sa.String(length=255), nullable=False),
+    sa.Column('path', sa.Text(), nullable=False),
+    sa.Column('size_bytes', sa.BigInteger(), nullable=False),
+    sa.Column('mime_type', sa.String(length=100), nullable=True),
+    sa.Column('is_deleted', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_files_id'), 'files', ['id'], unique=False)
+    op.create_table('logs_clouds',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('action', sa.Enum('UPLOAD', 'DOWNLOAD', 'DELETE', name='logaction'), nullable=False),
+    sa.Column('filename', sa.String(length=255), nullable=True),
+    sa.Column('status', sa.Enum('SUCCESS', 'ERROR', name='logstatus'), nullable=False),
+    sa.Column('message', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_logs_clouds_id'), 'logs_clouds', ['id'], unique=False)
+    op.create_table('network_metrics',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('date', sa.Date(), nullable=False),
+    sa.Column('ingress_bytes', sa.BigInteger(), nullable=False),
+    sa.Column('egress_bytes', sa.BigInteger(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'date', name='uq_user_date_network')
+    )
+    op.create_index(op.f('ix_network_metrics_id'), 'network_metrics', ['id'], unique=False)
     op.create_table('refresh_tokens',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('token', sa.String(), nullable=False),
@@ -149,6 +243,16 @@ def upgrade() -> None:
     op.create_index(op.f('ix_refresh_tokens_id'), 'refresh_tokens', ['id'], unique=False)
     op.create_index(op.f('ix_refresh_tokens_token'), 'refresh_tokens', ['token'], unique=True)
     op.create_index(op.f('ix_refresh_tokens_user_id'), 'refresh_tokens', ['user_id'], unique=False)
+    op.create_table('request_usage',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('date', sa.Date(), nullable=False),
+    sa.Column('request_count', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'date', name='uq_user_date_requests')
+    )
+    op.create_index(op.f('ix_request_usage_id'), 'request_usage', ['id'], unique=False)
     op.create_table('settings',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -166,6 +270,29 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_settings_id'), 'settings', ['id'], unique=False)
     op.create_index(op.f('ix_settings_user_id'), 'settings', ['user_id'], unique=True)
+    op.create_table('storage_usage',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('used_bytes', sa.BigInteger(), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id')
+    )
+    op.create_index(op.f('ix_storage_usage_id'), 'storage_usage', ['id'], unique=False)
+    op.create_table('usage_logs',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.Column('model', sa.String(length=100), nullable=True),
+    sa.Column('tokens_input', sa.Integer(), nullable=True),
+    sa.Column('tokens_output', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_usage_user', 'usage_logs', ['user_id'], unique=False)
+    op.create_index(op.f('ix_usage_logs_id'), 'usage_logs', ['id'], unique=False)
+    op.create_index(op.f('ix_usage_logs_user_id'), 'usage_logs', ['user_id'], unique=False)
     op.create_table('active_connection',
     sa.Column('connection_id', sa.Integer(), nullable=False),
     sa.Column('activated_at', sa.DateTime(), nullable=False),
@@ -235,6 +362,20 @@ def upgrade() -> None:
     )
     op.create_index('ix_db_structures_connection', 'db_structures', ['db_connection_id'], unique=False)
     op.create_index(op.f('ix_db_structures_id'), 'db_structures', ['id'], unique=False)
+    op.create_table('messages',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('session_id', sa.Integer(), nullable=False),
+    sa.Column('role', sa.String(length=20), nullable=False),
+    sa.Column('content', sa.Text(), nullable=False),
+    sa.Column('tokens', sa.Integer(), nullable=True),
+    sa.Column('model_used', sa.String(length=100), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['session_id'], ['chat_sessions.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_message_session', 'messages', ['session_id'], unique=False)
+    op.create_index(op.f('ix_messages_id'), 'messages', ['id'], unique=False)
+    op.create_index(op.f('ix_messages_session_id'), 'messages', ['session_id'], unique=False)
     op.create_table('projects',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
@@ -299,6 +440,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('structure_id', sa.Integer(), nullable=False),
+    sa.Column('is_unsigned', sa.Boolean(), nullable=True),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('type', sa.String(length=100), nullable=False),
     sa.Column('is_nullable', sa.Boolean(), nullable=True),
@@ -326,6 +468,16 @@ def upgrade() -> None:
     op.create_index(op.f('ix_db_fields_id'), 'db_fields', ['id'], unique=False)
     op.create_index(op.f('ix_db_fields_referenced_field_id'), 'db_fields', ['referenced_field_id'], unique=False)
     op.create_index(op.f('ix_db_fields_structure_id'), 'db_fields', ['structure_id'], unique=False)
+    op.create_table('feedback',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('message_id', sa.Integer(), nullable=False),
+    sa.Column('rating', sa.Integer(), nullable=True),
+    sa.Column('comment', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['message_id'], ['messages.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_feedback_id'), 'feedback', ['id'], unique=False)
     op.create_table('project_team_association',
     sa.Column('project_id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -420,6 +572,8 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_sprints_id'), table_name='sprints')
     op.drop_table('sprints')
     op.drop_table('project_team_association')
+    op.drop_index(op.f('ix_feedback_id'), table_name='feedback')
+    op.drop_table('feedback')
     op.drop_index(op.f('ix_db_fields_structure_id'), table_name='db_fields')
     op.drop_index(op.f('ix_db_fields_referenced_field_id'), table_name='db_fields')
     op.drop_index(op.f('ix_db_fields_id'), table_name='db_fields')
@@ -437,6 +591,10 @@ def downgrade() -> None:
     op.drop_table('query_history')
     op.drop_index(op.f('ix_projects_id'), table_name='projects')
     op.drop_table('projects')
+    op.drop_index(op.f('ix_messages_session_id'), table_name='messages')
+    op.drop_index(op.f('ix_messages_id'), table_name='messages')
+    op.drop_index('idx_message_session', table_name='messages')
+    op.drop_table('messages')
     op.drop_index(op.f('ix_db_structures_id'), table_name='db_structures')
     op.drop_index('ix_db_structures_connection', table_name='db_structures')
     op.drop_table('db_structures')
@@ -447,15 +605,33 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_connection_logs_id'), table_name='connection_logs')
     op.drop_table('connection_logs')
     op.drop_table('active_connection')
+    op.drop_index(op.f('ix_usage_logs_user_id'), table_name='usage_logs')
+    op.drop_index(op.f('ix_usage_logs_id'), table_name='usage_logs')
+    op.drop_index('idx_usage_user', table_name='usage_logs')
+    op.drop_table('usage_logs')
+    op.drop_index(op.f('ix_storage_usage_id'), table_name='storage_usage')
+    op.drop_table('storage_usage')
     op.drop_index(op.f('ix_settings_user_id'), table_name='settings')
     op.drop_index(op.f('ix_settings_id'), table_name='settings')
     op.drop_table('settings')
+    op.drop_index(op.f('ix_request_usage_id'), table_name='request_usage')
+    op.drop_table('request_usage')
     op.drop_index(op.f('ix_refresh_tokens_user_id'), table_name='refresh_tokens')
     op.drop_index(op.f('ix_refresh_tokens_token'), table_name='refresh_tokens')
     op.drop_index(op.f('ix_refresh_tokens_id'), table_name='refresh_tokens')
     op.drop_table('refresh_tokens')
+    op.drop_index(op.f('ix_network_metrics_id'), table_name='network_metrics')
+    op.drop_table('network_metrics')
+    op.drop_index(op.f('ix_logs_clouds_id'), table_name='logs_clouds')
+    op.drop_table('logs_clouds')
+    op.drop_index(op.f('ix_files_id'), table_name='files')
+    op.drop_table('files')
     op.drop_index(op.f('ix_db_connections_id'), table_name='db_connections')
     op.drop_table('db_connections')
+    op.drop_index(op.f('ix_chat_sessions_user_id'), table_name='chat_sessions')
+    op.drop_index(op.f('ix_chat_sessions_id'), table_name='chat_sessions')
+    op.drop_index('idx_chat_user', table_name='chat_sessions')
+    op.drop_table('chat_sessions')
     op.drop_table('audit_logs')
     op.drop_index(op.f('ix_users_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
@@ -463,10 +639,21 @@ def downgrade() -> None:
     op.drop_table('roles_permissions')
     op.drop_index(op.f('ix_typeprojecto_id'), table_name='typeprojecto')
     op.drop_table('typeprojecto')
+    op.drop_index(op.f('ix_training_data_id'), table_name='training_data')
+    op.drop_index(op.f('ix_training_data_category'), table_name='training_data')
+    op.drop_table('training_data')
     op.drop_index(op.f('ix_roles_id'), table_name='roles')
     op.drop_table('roles')
+    op.drop_index(op.f('ix_plans_id'), table_name='plans')
+    op.drop_table('plans')
     op.drop_index(op.f('ix_permissions_id'), table_name='permissions')
     op.drop_table('permissions')
+    op.drop_index(op.f('ix_logs_id'), table_name='logs')
+    op.drop_table('logs')
+    op.drop_index(op.f('ix_knowledge_base_id'), table_name='knowledge_base')
+    op.drop_index(op.f('ix_knowledge_base_category'), table_name='knowledge_base')
+    op.drop_index('idx_knowledge_category', table_name='knowledge_base')
+    op.drop_table('knowledge_base')
     op.drop_index(op.f('ix_empresas_id'), table_name='empresas')
     op.drop_table('empresas')
     op.drop_index(op.f('ix_cargos_id'), table_name='cargos')

@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import Session
 
-from app.config.dependencies import defaults, get_session_by_connection
+from app.config.dependencies import DATABASE_TYPES, get_session_by_connection
 from app.config.engine_manager_cache import EngineManager
 from app.models.connection_models import DBConnection
 from app.services.crypto_utils import aes_decrypt

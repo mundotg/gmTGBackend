@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 import logging
 from functools import lru_cache
 from threading import Lock
+import traceback
 
 # Configuração de logging
 logger = logging.getLogger(__name__)
@@ -28,18 +29,20 @@ class GeradorDadosInteligente:
         self.locale = gen_config['default_locale']
         self.max_retries = gen_config['max_retries']
         self.null_probability = gen_config['null_probability']
-        self.faker = Faker(gen_config['default_locale'])
+        
         # Configura Faker com seed se especificado
         try:
             self.faker = Faker(gen_config['default_locale'])
-            # Configura Faker com seed se especificado
+            
             if faker_config['seed'] is not None:
-                self.faker.seed(faker_config['seed'])
+                # Correção: Usar o método de classe Faker.seed() em vez de self.faker.seed()
+                Faker.seed(faker_config['seed'])
             
             self._build_patterns()
             self._build_relational_data()
         except Exception as e:
             logger.error(f"Erro ao inicializar gerador com locale {locale}: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             # Fallback para locale padrão
             self.faker = Faker("pt_PT")
             self._build_patterns()
@@ -50,7 +53,7 @@ class GeradorDadosInteligente:
         self._relational_cache = {}
         self._consistent_data = {}
         self._unique_values_cache = {}
-
+        
     def _build_patterns(self):
         """Constrói padrões regex para identificação inteligente de campos"""
         base_flags = re.IGNORECASE

@@ -348,7 +348,7 @@ async def sync_connection_stats_endpoint(
     user_id: int = Depends(get_current_user_id),
 ):
     try:
-        stats = sync_connection_stats_cached(user_id, db)
+        stats =await sync_connection_stats_cached(user_id, db)
         return ResponseWrapper(success=True, data=stats)
     except HTTPException:
         raise

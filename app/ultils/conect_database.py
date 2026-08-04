@@ -1,4 +1,6 @@
 from typing import Dict, Any, Tuple
+from urllib.parse import quote_plus
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import (
@@ -10,6 +12,29 @@ from pymongo import MongoClient
 from pymongo.errors import PyMongoError, ServerSelectionTimeoutError
 
 from app.ultils.logger import log_message
+
+
+def close_engine(engine: Any) -> None:
+    """
+    Fecha uma conexão, seja ela SQLAlchemy ou MongoDB.
+
+    Existe porque as duas APIs divergem e a confusão é silenciosa e
+    traiçoeira: `MongoClient.dispose()` não rebenta com AttributeError.
+    O pymongo interpreta qualquer atributo desconhecido como o nome de
+    uma base de dados, devolve um objeto `Database` chamado "dispose" e
+    só o `()` final falha, com a mensagem enganadora
+    "'Database' object is not callable".
+
+    MongoClient fecha-se com .close(); Engine do SQLAlchemy com .dispose().
+    """
+    if engine is None:
+        return
+
+    if isinstance(engine, MongoClient):
+        engine.close()
+        return
+
+    engine.dispose()
 
 
 class DatabaseManager:
@@ -89,19 +114,33 @@ class DatabaseManager:
 
             if db_type == "MongoDB":
 
+                # authSource: a base onde o utilizador foi CRIADO, que muitas
+                # vezes não é "admin". Estava fixo em "admin", o que fazia
+                # falhar com code 18 qualquer utilizador criado na própria
+                # base de dados. Reutiliza-se o campo `service`, livre para
+                # MongoDB (só o Oracle lhe dá outro uso), evitando migração.
+                auth_source = (
+                    config.get("authSource") or config.get("service") or "admin"
+                )
+
                 if user and password:
-                    uri = uri_template.format(
-                        user=user,
-                        password=password,
-                        host=host,
-                        port=port,
-                        database=database,
+                    # quote_plus é obrigatório: o pymongo rejeita credenciais
+                    # com caracteres reservados na URI (@ : / ? # % e acentos).
+                    # Sem isto, uma password com um "@" parte a URI e o erro
+                    # devolvido é "Authentication failed", que aponta para o
+                    # lado errado do problema.
+                    uri = (
+                        f"mongodb://{quote_plus(str(user))}:"
+                        f"{quote_plus(str(password))}@{host}:{port}/{database}"
+                        f"?authSource={quote_plus(str(auth_source))}"
                     )
                 else:
+                    # Sem credenciais não faz sentido indicar authSource.
                     uri = f"mongodb://{host}:{port}/{database}"
 
                 log_message(
-                    f"🔌 Criando MongoClient ({host}:{port})",
+                    f"🔌 Criando MongoClient ({host}:{port}) db={database} "
+                    f"authSource={auth_source if (user and password) else 'n/a'}",
                     level="debug",
                 )
 
@@ -303,9 +342,6 @@ class DatabaseManager:
             if engine:
 
                 try:
-                    if db_type == "MongoDB":
-                        engine.close()
-                    else:
-                        engine.dispose()
+                    close_engine(engine)
                 except Exception:
                     pass

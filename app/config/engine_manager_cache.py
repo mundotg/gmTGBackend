@@ -5,6 +5,7 @@ from typing import Dict, Optional
 from sqlalchemy import Engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.ultils.conect_database import close_engine
 from app.ultils.logger import log_message
 
 
@@ -106,7 +107,8 @@ class EngineManager:
 
         if engine:
             try:
-                engine.dispose()
+                # O cache guarda também MongoClient, que não tem .dispose().
+                close_engine(engine)
                 log_message(f"Engine removido e fechado para usuário {id_user}")
             except Exception as e:
                 log_message(f"Erro ao fechar engine {id_user}: {e}", "error")
@@ -166,7 +168,7 @@ class EngineManager:
 
         for engine in cls.__engines.values():
             try:
-                engine.dispose()
+                close_engine(engine)
             except Exception as e:
                 log_message(f"Erro ao fechar engine: {e}", "error")
 

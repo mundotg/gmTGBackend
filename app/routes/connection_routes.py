@@ -56,6 +56,7 @@ from app.services.dataset_service import (
     read_dataset_source,
     save_dataframe_to_sqlite,
 )
+from app.ultils.conect_database import close_engine
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
@@ -170,7 +171,10 @@ def _cleanup_engine(user_id: int) -> None:
     try:
         current_engine = EngineManager.get(user_id)
         if current_engine:
-            current_engine.dispose()
+            # close_engine em vez de .dispose(): num MongoClient o pymongo
+            # resolveria ".dispose" como o nome de uma base de dados e o erro
+            # seria "'Database' object is not callable".
+            close_engine(current_engine)
             EngineManager.remove(user_id)
             log_message(
                 f"🔁 Engine do usuário {user_id} descartado com sucesso.", level="info"
@@ -570,7 +574,9 @@ async def test_connection(
             raise ValueError("Engine não foi criado corretamente.")
 
         try:
-            engine.dispose()
+            # Idem: .dispose() não fecharia um MongoClient, deixando a
+            # ligação pendurada até ao timeout do servidor.
+            close_engine(engine)
         except Exception:
             pass
 

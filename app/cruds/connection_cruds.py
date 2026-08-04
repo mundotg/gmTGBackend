@@ -11,7 +11,32 @@ from app.models.user_model import User
 from app.models.connection_models import ActiveConnection, ConnectionLog, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.users_schemas import PaginationOutput
+from app.services.crypto_utils import reencrypt_at_rest
 from app.ultils.logger import log_message
+
+
+# Campos que chegam ofuscados pelo frontend e têm de ser recifrados
+# com a chave-mestra antes de tocar na base de dados.
+SECRET_FIELDS = ("host", "username", "password")
+
+
+def _secure_secrets(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Converte os campos sensíveis do payload para cifra em repouso.
+
+    O frontend envia estes valores no envelope antigo (que não protege
+    nada — a chave viaja junto). Aqui recifram-se com AES-256-GCM e a
+    chave-mestra em ENCRYPTION_KEY, para que um dump da BD não exponha
+    as credenciais dos clientes.
+
+    É idempotente: valores já em "v2." passam intactos.
+    """
+    for field in SECRET_FIELDS:
+        value = payload.get(field)
+        if value:
+            payload[field] = reencrypt_at_rest(str(value))
+
+    return payload
 
 
 def map_status(status: str, id_conn1: Optional[int], id_conn2: Optional[int]) -> str:
@@ -221,7 +246,11 @@ def create_db_connection(db: Session, user_id: int, conn_data: DBConnectionBase)
             "info",
         )
     else:
-        db_conn = DBConnection(**conn_data.model_dump(), user_id=user_id)
+        db_conn = DBConnection(
+            **_secure_secrets(conn_data.model_dump()),
+            user_id=user_id,
+            is_encrypted=True,
+        )
         db.add(db_conn)
         log_message(
             f"✅ Conexão '{db_conn.name}' criada para o usuário {user_id}", "success"
@@ -258,7 +287,7 @@ def upsert_db_connection(db: Session, user_id: int, conn_data: DBConnectionBase)
         .first()
     )
 
-    payload = conn_data.model_dump(exclude_unset=True)
+    payload = _secure_secrets(conn_data.model_dump(exclude_unset=True))
 
     if db_conn:
         for field, value in payload.items():
@@ -266,11 +295,13 @@ def upsert_db_connection(db: Session, user_id: int, conn_data: DBConnectionBase)
             if hasattr(db_conn, field) and getattr(db_conn, field) != value:
                 setattr(db_conn, field, value)
 
+        db_conn.is_encrypted = True
+
         log_message(
             f"🔄 Conexão '{db_conn.name}' atualizada para o usuário {user_id}", "info"
         )
     else:
-        db_conn = DBConnection(**payload, user_id=user_id)
+        db_conn = DBConnection(**payload, user_id=user_id, is_encrypted=True)
         db.add(db_conn)
         log_message(
             f"✅ Nova conexão '{db_conn.name}' criada para o usuário {user_id}",

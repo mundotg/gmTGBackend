@@ -50,7 +50,7 @@ from app.schemas.connetion_schema import (
     DbConnectionOutput,
     SavedConnectionBase,
 )
-from app.services.crypto_utils import aes_encrypt
+from app.services.crypto_utils import secret_encrypt
 from app.services.dataset_service import (
     read_dataframe,
     read_dataset_source,
@@ -631,7 +631,7 @@ async def open_dataset(
         conn_data = DBConnectionBase(
             name=f"Dataset: {filename}",
             type="SQLite",
-            host=aes_encrypt(db_path),  # caminho absoluto do ficheiro SQLite
+            host=secret_encrypt(db_path),  # caminho absoluto do ficheiro SQLite
             port=0,
             username="",
             password="",

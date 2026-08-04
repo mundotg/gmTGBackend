@@ -14,7 +14,7 @@ from app.cruds.queryhistory_crud import get_ultima_consulta
 from app.models.connection_models import ActiveConnection, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.users_schemas import DbInfoSchema
-from app.services.crypto_utils import aes_decrypt
+from app.services.crypto_utils import secret_decrypt
 from app.ultils.logger import log_message
 from datetime import datetime
 
@@ -40,9 +40,7 @@ def reativar_connection(id_user: int, db: Session) -> dict:
         if not conexao:
             return {"success": False, "config": None}
 
-        host = aes_decrypt(str(conexao.host))
-        # username= aes_decrypt(str(conexao.username))
-        # password =aes_decrypt(str(conexao.password))
+        host = secret_decrypt(str(conexao.host))
         type_db = str(conexao.type)
 
         stats = get_statistics_by_connection_geral(conexao.id)
@@ -84,7 +82,7 @@ def reativar_connection(id_user: int, db: Session) -> dict:
 
             engine = get_session_by_connection(conexao)
             if engine:
-                EngineManager.set(engine, id_user)
+                EngineManager.set(engine, id_user, connection_id=conexao.id)
             else:
                 log_message(
                     f"⚠️ Falha ao criar engine para o usuário {id_user}", "warning"

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.connection_models import DBConnection
-from app.services.crypto_utils import aes_decrypt
+from app.services.crypto_utils import secret_decrypt
 from app.ultils.conect_database import DatabaseManager
 from app.ultils.logger import log_message
 
@@ -36,13 +36,13 @@ def _build_config(connection: DBConnection) -> dict:
     """
 
     return {
-        "user": aes_decrypt(connection.username)
+        "user": secret_decrypt(connection.username)
         if connection.username else "",
 
-        "password": aes_decrypt(connection.password)
+        "password": secret_decrypt(connection.password)
         if connection.password else "",
 
-        "host": aes_decrypt(connection.host)
+        "host": secret_decrypt(connection.host)
         if connection.host else "",
 
         "port": connection.port,
@@ -116,7 +116,7 @@ def get_session_by_connection(connection: DBConnection):
 
         if db_type == "sqlite":
 
-            db_path = aes_decrypt(connection.host)
+            db_path = secret_decrypt(connection.host)
 
             if not db_path:
                 raise HTTPException(

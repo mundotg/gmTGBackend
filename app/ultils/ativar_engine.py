@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config.dependencies import DATABASE_TYPES, get_session_by_connection
 from app.config.engine_manager_cache import EngineManager
 from app.models.connection_models import DBConnection
-from app.services.crypto_utils import aes_decrypt
+from app.services.crypto_utils import secret_decrypt
 from app.ultils.ativar_session_bd import (
     get_connection_by_id, get_connection_current, get_connection_current_async,
     get_connection_id_async, reativar_connection
@@ -43,7 +43,25 @@ class ConnectionManager:
             if user_id <= 0:
                 raise HTTPException(status_code=400, detail="user_id inválido")
 
+            connection, _ = get_connection_current(db, user_id)
+
+            if connection is None:
+                log_message(f"Conexão atual não encontrada | user_id={user_id}", "warning")
+                raise HTTPException(
+                    status_code=400,
+                    detail="ID da conexão não está disponível",
+                )
+
+            cached_connection_id = EngineManager.get_connection_id(user_id)
             engine = EngineManager.get(user_id)
+
+            if engine and cached_connection_id is not None and cached_connection_id != connection.id:
+                log_message(
+                    f"Cache stale detectado | user_id={user_id} | engine_conn_id={cached_connection_id} | current_conn_id={connection.id}",
+                    "warning",
+                )
+                EngineManager.remove(user_id)
+                engine = None
 
             # Se não existir engine ativa tenta reativar
             if not engine:
@@ -65,15 +83,6 @@ class ConnectionManager:
                         status_code=500,
                         detail="Falha ao inicializar engine da conexão",
                     )
-
-            connection, _ = get_connection_current(db, user_id)
-
-            if connection is None:
-                log_message(f"Conexão atual não encontrada | user_id={user_id}", "warning")
-                raise HTTPException(
-                    status_code=400,
-                    detail="ID da conexão não está disponível",
-                )
 
             return engine, connection
 
@@ -107,20 +116,33 @@ class ConnectionManager:
     # =====================================================
     @staticmethod
     async def get_engine_idconn_async(db: AsyncSession, user_id: int, id_connection: int) -> Tuple[AsyncEngine, DBConnection]:
-        
+        """
+        Obtém ou cria uma AsyncEngine reutilizável para a conexão solicitada.
+        Garante que a engine tenha cache por usuário e que pools antigos não
+        permaneçam vivos quando a conexão é trocada.
+        """
         connection = await get_connection_id_async(db, user_id, id_connection)
 
         if not connection:
             raise HTTPException(status_code=400, detail="Conexão não encontrada")
-        
+
+        cached_connection_id = EngineManager.async_get_connection_id(user_id)
         engine = EngineManager.async_get(user_id)
+
+        if engine and cached_connection_id is not None and cached_connection_id != connection.id:
+            log_message(
+                f"Async cache stale detectado | user_id={user_id} | engine_conn_id={cached_connection_id} | current_conn_id={connection.id}",
+                "warning",
+            )
+            await EngineManager.async_remove(user_id)
+            engine = None
+
         if engine:
             return engine, connection
 
         engine = await ConnectionManager._create_async_engine(connection)
-        # 👈 AJUSTE: Opcionalmente, podes querer guardar na cache aqui também.
-        # EngineManager.async_set(user_id, engine) 
-        
+        EngineManager.async_set(user_id, engine, connection_id=connection.id)
+
         return engine, connection
 
     # =====================================================
@@ -137,8 +159,18 @@ class ConnectionManager:
         if connection is None:
             raise HTTPException(status_code=400, detail="Conexão não encontrada")
 
-        # 🔎 verifica se engine já existe na cache
+        cached_connection_id = EngineManager.async_get_connection_id(user_id)
         engine = EngineManager.async_get(user_id)
+
+        if engine and cached_connection_id is not None and cached_connection_id != connection.id:
+            log_message(
+                f"Async cache stale detectado | user_id={user_id} | engine_conn_id={cached_connection_id} | current_conn_id={connection.id}",
+                "warning",
+            )
+            await EngineManager.async_remove(user_id)
+            engine = None
+
+        # 🔎 verifica se engine já existe na cache
         if engine:
             return engine, connection
 
@@ -146,7 +178,7 @@ class ConnectionManager:
         engine = await ConnectionManager._create_async_engine(connection)
 
         # 👈 CORREÇÃO: Guardar a engine na cache (antes estava '(user_id, engine)')
-        EngineManager.async_set(user_id, engine)
+        EngineManager.async_set(user_id, engine, connection_id=connection.id)
 
         return engine, connection
 
@@ -157,14 +189,14 @@ class ConnectionManager:
 
         try:
             if db_type == "sqlite":
-                db_path = aes_decrypt(connection.host)
+                db_path = secret_decrypt(connection.host)
                 uri = f"sqlite+aiosqlite:///{db_path}"
                 engine = create_async_engine(uri, echo=False, pool_pre_ping=True)
             else:
                 config = {
-                    "user": aes_decrypt(connection.username) if connection.username else "",
-                    "password": aes_decrypt(connection.password) if connection.password else "",
-                    "host": aes_decrypt(connection.host),
+                    "user": secret_decrypt(connection.username) if connection.username else "",
+                    "password": secret_decrypt(connection.password) if connection.password else "",
+                    "host": secret_decrypt(connection.host),
                     "port": connection.port,
                     "database": connection.database_name,
                     "service": connection.service or "",
@@ -172,7 +204,7 @@ class ConnectionManager:
                     "trustServerCertificate": connection.trustServerCertificate or "yes",
                 }
 
-                uri_template = engineManager.DB_URIS_ASYNC.get(defaults.get(connection.type))
+                uri_template = engineManager.DB_URIS_ASYNC.get(DATABASE_TYPES.get(connection.type))
 
                 if not uri_template:
                     raise ValueError(f"Banco não suportado: {connection.type}")
@@ -213,7 +245,6 @@ class ConnectionManager:
             # 🔎 teste de conexão (com tratamento para garantir que a ligação devolve à pool)
             async with engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
-                await conn.commit() # Assegura a libertação limpa
 
             log_message(f"✅ Engine criada ({connection.type})", "info")
             return engine

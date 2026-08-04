@@ -333,3 +333,23 @@ def reencrypt_at_rest(value: str | None) -> str:
         return value
 
     return secret_encrypt(aes_decrypt(value))
+
+
+def to_wire(value: str | None) -> str:
+    """
+    Converte um segredo guardado para o formato que o frontend sabe ler.
+
+    O armazenamento passou a usar AES-256-GCM com chave-mestra ("v2."), mas
+    o frontend continua a esperar o envelope antigo, que decifra sozinho.
+    Sem esta conversão, endpoints como /conn/connections/ devolveriam um
+    valor "v2.…" que o cliente não consegue abrir.
+
+    É o inverso de `reencrypt_at_rest`: repouso → transporte.
+
+    ⚠️ O resultado é ofuscado, não protegido — só o deves enviar por um
+    canal já autenticado (TLS + sessão válida), como acontece nestas rotas.
+    """
+    if not value:
+        return ""
+
+    return aes_encrypt(secret_decrypt(value))

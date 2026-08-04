@@ -50,7 +50,7 @@ from app.schemas.connetion_schema import (
     DbConnectionOutput,
     SavedConnectionBase,
 )
-from app.services.crypto_utils import secret_encrypt
+from app.services.crypto_utils import secret_encrypt, to_wire
 from app.services.dataset_service import (
     read_dataframe,
     read_dataset_source,
@@ -67,18 +67,61 @@ router = APIRouter(prefix="/conn", tags=["connections"])
 # =========================================================
 
 
+# ⚠️ Estas funções TÊM de devolver dados simples (dicts, datas em ISO),
+# nunca objetos ORM.
+#
+# O `cache_result` devolve o resultado convertido por `_to_cacheable` nos
+# hits, mas o objeto original nos misses. Uma função que devolva objetos
+# ORM entrega, portanto, formas diferentes conforme haja cache ou não: o
+# primeiro pedido funciona e os seguintes rebentam com
+# "'str' object has no attribute 'id'", porque desempacotar um dict dá as
+# suas chaves. Normalizar aqui torna as duas formas iguais.
+
+
 @cache_result(ttl=300, user_id="user_{user_id}")
 async def get_db_connections_pagination_cached(
     db: Session, user_id: int, page: int, limit: int
-):
-    return get_db_connections_pagination_v1(db, user_id, page, limit)
+) -> dict[str, Any]:
+    dados = get_db_connections_pagination_v1(db, user_id, page, limit)
+
+    return {
+        "page": dados["page"],
+        "limit": dados["limit"],
+        "total": dados["total"],
+        "results": [
+            {
+                "id": conn.id,
+                "name": conn.name,
+                # Repouso → transporte: o valor guardado está cifrado com a
+                # chave-mestra, que o frontend não tem.
+                "host": to_wire(conn.host),
+                "database": conn.database_name,
+                "type": conn.type,
+                "status": conn.status,
+                "last_used": last_used.isoformat() if last_used else None,
+            }
+            for conn, last_used in dados["results"]
+        ],
+    }
 
 
 @cache_result(ttl=1800, user_id="user_{user_id}")
-async def get_db_connection_by_id_cached(
+async def get_db_connection_credentials_cached(
     db: Session, conn_id: int
-) -> DBConnection | None:
-    return get_db_connection_by_id(db, conn_id)
+) -> dict[str, Any] | None:
+    conn = get_db_connection_by_id(db, conn_id)
+
+    if not conn:
+        return None
+
+    return {
+        "id": conn.id,
+        "password": to_wire(conn.password),
+        "username": to_wire(conn.username),
+        "service": conn.service,
+        "sslmode": conn.sslmode,
+        "trustServerCertificate": conn.trustServerCertificate,
+    }
 
 
 # =========================================================
@@ -400,16 +443,15 @@ async def list_connections_paginated(
             results=[
                 SavedConnectionBase.model_validate(
                     {
-                        "id": conn.id,
-                        "name": conn.name,
-                        "host": conn.host,
-                        "database": conn.database_name,
-                        "last_used": last_used,
-                        "type": conn.type,
-                        "status": map_status(conn.status, conn.id, active_conn_id),
+                        **item,
+                        # Depende da conexão ativa do momento, por isso é
+                        # calculado aqui e não dentro do valor em cache.
+                        "status": map_status(
+                            item["status"], item["id"], active_conn_id
+                        ),
                     }
                 )
-                for conn, last_used in connections["results"]
+                for item in connections["results"]
             ],
         )
 
@@ -479,16 +521,20 @@ async def get_credenciais(
     Obtém credenciais de uma conexão específica.
     """
     try:
-        conn = await get_db_connection_by_id_cached(db, conn_id)
-        conn = _validate_connection_owner(conn, conn_id)
+        credenciais = await get_db_connection_credentials_cached(db, conn_id)
 
-        # CORRIGIDO: acessando como atributo, não como dicionário
+        if not credenciais:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Conexão com ID {conn_id} não encontrada.",
+            )
+
         return ConnectionPassUserOut(
-            password=conn.password,
-            username=conn.username,
-            service=conn.service,
-            sslmode=conn.sslmode,
-            trustServerCertificate=conn.trustServerCertificate,
+            password=credenciais["password"],
+            username=credenciais["username"],
+            service=credenciais["service"],
+            sslmode=credenciais["sslmode"],
+            trustServerCertificate=credenciais["trustServerCertificate"],
         )
 
     except HTTPException:

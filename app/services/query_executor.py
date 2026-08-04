@@ -24,6 +24,7 @@ from app.ultils.build_query import (
     get_filter_condition_with_operation,
     get_query_string_advance,
 )
+from app.ultils.conect_database import assert_sql_engine
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
@@ -116,6 +117,8 @@ async def executar_query_e_salvar(
     Executa a query de forma segura, salva histórico e retorna um dicionário com o resultado.
     Evita fetchall() para grandes consultas e trata erros de SQL separadamente.
     """
+    assert_sql_engine(engine, "Execução de consultas")
+
     log_message("🔎 Iniciando execução da query com filtros...", "info")
     start = time.time()
     security_validator = QuerySecurityValidator()

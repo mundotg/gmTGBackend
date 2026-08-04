@@ -4,6 +4,7 @@ from typing import List, Optional, Union, Any, Dict
 from sqlalchemy import inspect, text, Engine
 from app.schemas.query_select_upAndInsert_schema import OrderByOption
 from app.services.editar_linha import _convert_column_type_for_string_one
+from app.ultils.conect_database import is_mongo
 from app.ultils.logger import log_message
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Optional, Dict, Any
@@ -188,6 +189,13 @@ def _get_foreign_keys(engine: Engine, table_name: str) -> Dict[str, Dict[str, st
         Dict[str, Dict[str, str]]: Ex: { "tabela": { "coluna": "tabela_referenciada" } }
     """
     try:
+        # O MongoDB não declara chaves estrangeiras: as referências entre
+        # coleções são convenção da aplicação, não metadados da base.
+        # Devolver vazio é a resposta correta, não uma limitação.
+        if is_mongo(engine):
+            nomes = [table_name] if isinstance(table_name, str) else table_name
+            return {nome: {} for nome in nomes}
+
         inspector = inspect(engine)
         table_names = [table_name] if isinstance(table_name, str) else table_name
 

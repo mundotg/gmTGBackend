@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional, Tuple
 from urllib.parse import quote_plus
 
+from fastapi import HTTPException, status
 from pymongo.database import Database as MongoDatabase
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -54,6 +55,31 @@ def get_mongo_database(engine: MongoClient) -> Optional[MongoDatabase]:
         log_message(f"⚠️ Não foi possível listar bases MongoDB: {e}", "warning")
 
     return None
+
+
+def assert_sql_engine(engine: Any, operacao: str) -> None:
+    """
+    Recusa, com mensagem clara, operações SQL sobre uma ligação MongoDB.
+
+    Sem isto o erro que chega ao utilizador é opaco: `engine.connect()` num
+    MongoClient não falha com AttributeError — o pymongo devolve um objeto
+    Database chamado "connect" e o erro final é
+    "'Database' object is not callable", que não diz nada sobre a causa.
+
+    A introspeção (listar coleções, campos, estatísticas) já funciona em
+    MongoDB. O que ainda não existe é a tradução de SQL para operações
+    Mongo: consultar, inserir, editar e alterar schema continuam a assumir
+    SQL, e é isso que esta função sinaliza.
+    """
+    if is_mongo(engine):
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=(
+                f"{operacao} ainda não está disponível para conexões MongoDB. "
+                "A leitura de estruturas, campos e estatísticas funciona; "
+                "operações sobre dados exigem tradução de SQL para MongoDB."
+            ),
+        )
 
 
 def close_engine(engine: Any) -> None:

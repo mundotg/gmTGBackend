@@ -12,6 +12,7 @@ from app.cruds.dbstructure_crud import get_db_structures_by_conn_id_and_table, g
 from app.services.database_inspector import verificar_ou_atualizar_estrutura
 from app.services.editar_linha import quote_identifier
 from app.ultils.ativar_engine import ConnectionManager
+from app.ultils.conect_database import get_mongo_database, is_mongo
 from app.ultils.logger import log_message
 from sqlalchemy.engine import Engine
 # -----------------------------
@@ -295,13 +296,28 @@ def get_table_count_streams(db: Session, id_user: int) -> StreamingResponse:
             loop = asyncio.get_event_loop()
 
             try:
-                inspector = inspect(engine)
-                default_schema = inspector.default_schema_name
+                if is_mongo(engine):
+                    # MongoDB não tem inspector: as coleções fazem de
+                    # tabelas e o nome da base faz de schema.
+                    database = get_mongo_database(engine)
+                    default_schema = database.name if database is not None else None
 
-                tables = await loop.run_in_executor(
-                    None,
-                    lambda: inspector.get_table_names(schema=default_schema),
-                )
+                    tables = await loop.run_in_executor(
+                        None,
+                        lambda: (
+                            database.list_collection_names()
+                            if database is not None
+                            else []
+                        ),
+                    )
+                else:
+                    inspector = inspect(engine)
+                    default_schema = inspector.default_schema_name
+
+                    tables = await loop.run_in_executor(
+                        None,
+                        lambda: inspector.get_table_names(schema=default_schema),
+                    )
 
                 total = len(tables)
                 done = 0

@@ -102,3 +102,46 @@ class TestFechoDeConexao:
 
     def test_close_engine_ignora_none(self):
         close_engine(None)
+
+
+class TestOperacoesNaoSuportadas:
+    """
+    Operações que ainda assumem SQL devem recusar MongoDB com uma mensagem
+    útil, em vez de deixarem escapar o erro opaco do pymongo
+    ("'Database' object is not callable").
+    """
+
+    def test_sql_passa(self):
+        from sqlalchemy import create_engine
+
+        from app.ultils.conect_database import assert_sql_engine
+
+        assert_sql_engine(create_engine("sqlite:///:memory:"), "Consulta")
+
+    def test_mongo_recebe_501_com_explicacao(self):
+        from fastapi import HTTPException
+
+        from app.ultils.conect_database import assert_sql_engine
+
+        cliente = MongoClient("mongodb://localhost:27017/d", connect=False)
+
+        with pytest.raises(HTTPException) as exc:
+            assert_sql_engine(cliente, "Execução de consultas")
+
+        assert exc.value.status_code == 501
+        # A mensagem tem de dizer o que falha E o que funciona.
+        assert "Execução de consultas" in exc.value.detail
+        assert "MongoDB" in exc.value.detail
+        assert "estruturas" in exc.value.detail
+
+
+class TestChavesEstrangeiras:
+    def test_mongo_devolve_mapa_vazio_sem_tentar_inspect(self):
+        # O MongoDB não declara FKs; as referências são convenção da
+        # aplicação. Vazio é a resposta correta, não uma falha.
+        from app.services.pesquizar_index_linha_in_bd import _get_foreign_keys
+
+        cliente = MongoClient("mongodb://localhost:27017/d", connect=False)
+
+        assert _get_foreign_keys(cliente, "produtos") == {"produtos": {}}
+        assert _get_foreign_keys(cliente, ["a", "b"]) == {"a": {}, "b": {}}

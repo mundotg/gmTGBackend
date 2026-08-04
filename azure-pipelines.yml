@@ -1,37 +1,58 @@
-# Python package
-# Create and test a Python package on multiple Python versions.
-# Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/python
+# Pipeline CI do backend gmTG.
+#
+# Corria antes numa matriz Python 3.8–3.11 e invocava `pytest` sem existirem
+# testes — o que dava sempre verde e não verificava absolutamente nada.
+# O projeto exige >=3.12 (usa `X | None`, `datetime.UTC` e SQLAlchemy 2.x),
+# pelo que a matriz antiga nem sequer conseguiria importar a aplicação.
 
 trigger:
-- main
+  - main
 
 pool:
   vmImage: ubuntu-latest
 
-strategy:
-  matrix:
-    Python38:
-      python.version: '3.8'
-    Python39:
-      python.version: '3.9'
-    Python310:
-      python.version: '3.10'
-    Python311:
-      python.version: '3.11'
+variables:
+  # Versão única: é a que o Dockerfile usa (python:3.12-slim).
+  pythonVersion: "3.12"
 
 steps:
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '$(python.version)'
-  displayName: 'Use Python $(python.version)'
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "$(pythonVersion)"
+    displayName: "Python $(pythonVersion)"
 
-- script: |
-    python -m pip install --upgrade pip
-    pip install -r requirements.txt
-  displayName: 'Install dependencies'
+  - script: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+      pip install ruff pytest pytest-azurepipelines
+    displayName: "Instalar dependências"
 
-- script: |
-    pip install pytest pytest-azurepipelines
-    pytest
-  displayName: 'pytest'
+  - script: ruff check app scripts --output-format=github
+    displayName: "Lint (ruff)"
+    # Ainda há dívida técnica acumulada; o lint reporta mas não trava o build.
+    # Remover esta linha assim que a contagem de avisos chegar a zero.
+    continueOnError: "true"
+
+  - script: ruff format --check app scripts
+    displayName: "Formatação (ruff format)"
+    continueOnError: "true"
+
+  - script: |
+      python -c "from app.main import app; print(f'{len(app.routes)} rotas registadas')"
+    displayName: "Smoke test — a aplicação importa"
+    env:
+      # Valores só para o CI: a app recusa arrancar sem eles.
+      SECRET_KEY: ci-secret-nao-usar-em-producao
+      ALGORITHM: HS256
+      ENCRYPTION_KEY: ci-encryption-key-nao-usar-em-producao
+      DATABASE_URL: sqlite:///./ci_test.db
+      ENV: development
+
+  - script: pytest
+    displayName: "Testes"
+    env:
+      SECRET_KEY: ci-secret-nao-usar-em-producao
+      ALGORITHM: HS256
+      ENCRYPTION_KEY: ci-encryption-key-nao-usar-em-producao
+      DATABASE_URL: sqlite:///./ci_test.db
+      ENV: development

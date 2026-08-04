@@ -5,6 +5,7 @@ from sqlalchemy import Engine, text
 
 from app.cruds.dbstructure_crud import create_enum_field, list_enum_fields_by_field
 from app.models.dbstructure_models import DBEnumField, DBField, DBStructure
+from app.ultils.conect_database import is_mongo
 from app.ultils.logger import log_message
 
 import re
@@ -144,6 +145,13 @@ def _fetch_enum_values(
     Caso contrário, busca diretamente no banco de dados.
     """
     enum_values: Dict[str, List[str]] = {}
+
+    # O MongoDB não tem ENUM: os valores possíveis de um campo só se
+    # saberiam varrendo a coleção inteira, o que não é comparável a ler
+    # a definição de um tipo. Devolve vazio em vez de emitir SQL.
+    if is_mongo(engine):
+        return {col.name: [] for col in columns}
+
     try:
         for col in columns:
             # 1. Busca valores já salvos localmente

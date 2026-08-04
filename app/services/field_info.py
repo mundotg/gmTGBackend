@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import traceback
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -26,6 +26,7 @@ from app.services.fields_estruture import (
 )
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.buscar_enum_bd import _fetch_enum_values
+from app.ultils.conect_database import get_mongo_database, is_mongo
 from app.ultils.logger import log_message
 from sqlalchemy.exc import SQLAlchemyError, NoSuchTableError
 from sqlalchemy.exc import OperationalError
@@ -333,8 +334,14 @@ def buscar_estrutura_tabela(
     structure = get_db_structures_by_conn_id_and_table(db, db_connection_id, table_name)
 
     if not structure:
-        # Usa o schema da conexão, se possível
-        schema_name = obter_schema_do_engine(engine, db_type, table_name)
+        if is_mongo(engine):
+            # obter_schema_do_engine abre uma ligação SQL e emite queries de
+            # catálogo; no MongoDB o equivalente ao schema é o nome da base.
+            database = get_mongo_database(engine)
+            schema_name = database.name if database is not None else None
+        else:
+            # Usa o schema da conexão, se possível
+            schema_name = obter_schema_do_engine(engine, db_type, table_name)
 
         # Opcional: Se 'create_db_structure' já lida com reativação de deletados,
         # essa linha abaixo pode ser redundante, mas mantive conforme seu código original.
@@ -371,6 +378,66 @@ def map_column_type(col_type: str, db_type: str) -> str:
     return col_type.strip('"')
 
 
+def _criar_campos_mongo(
+    db: Session, structure: DBStructure, engine: Any
+) -> List[DBField]:
+    """
+    Cria os campos de uma coleção MongoDB inferindo-os dos documentos.
+
+    Não há metadados de schema para consultar: o formato é derivado de uma
+    amostra. Ver `app.services.mongo_schema` para os limites disso.
+    """
+    from app.services.mongo_schema import infer_collection_fields
+
+    database = get_mongo_database(engine)
+
+    if database is None:
+        raise ValueError(
+            f"Não foi possível identificar a base MongoDB da coleção "
+            f"'{structure.table_name}'."
+        )
+
+    descritores = infer_collection_fields(database, structure.table_name)
+
+    if not descritores:
+        log_message(
+            f"⚠️ Nenhum campo inferido para a coleção '{structure.table_name}'.",
+            "warning",
+        )
+        return []
+
+    campos: List[DBField] = []
+
+    for descritor in descritores:
+        field_in = DBFieldCreate(
+            name=descritor["name"],
+            type=descritor["type"],
+            is_nullable=descritor["is_nullable"],
+            is_primary_key=descritor["is_primary_key"],
+            is_unique=descritor["is_unique"],
+            is_auto_increment=descritor["is_auto_increment"],
+            comment=descritor["comment"],
+            # Conceitos sem equivalente no MongoDB: não há chaves
+            # estrangeiras declaradas nem precisão/escala de coluna.
+            is_foreign_key=False,
+            referenced_table=None,
+            referenced_field=None,
+            default_value=None,
+            length=None,
+            precision=None,
+            scale=None,
+        )
+
+        campos.append(create_db_field(db=db, field_in=field_in, structure_id=structure.id))
+
+    log_message(
+        f"✅ {len(campos)} campos inferidos da coleção '{structure.table_name}'.",
+        "info",
+    )
+
+    return campos
+
+
 def buscar_ou_criar_campos_tabela(
     db: Session, structure: DBStructure, engine: Engine, db_type: Optional[str]
 ) -> List[DBField]:
@@ -382,6 +449,10 @@ def buscar_ou_criar_campos_tabela(
     campos_existentes = get_fields_by_structure(db, structure.id)
     if campos_existentes:
         return campos_existentes
+
+    # MongoDB não tem inspector nem colunas declaradas: caminho próprio.
+    if is_mongo(engine):
+        return _criar_campos_mongo(db, structure, engine)
 
     try:
         columns, inspector = safe_get_columns(

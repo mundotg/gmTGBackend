@@ -4,7 +4,6 @@ import traceback
 from typing import Dict, List, Optional, Any, cast
 
 from pymongo import MongoClient
-from pymongo.database import Database as MongoDatabase
 from sqlalchemy import Engine, inspect, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -28,6 +27,7 @@ from app.services.field_info import (
 )
 from app.ultils.Database_error_logger import _lidar_com_erro_sql
 from app.ultils.ativar_engine import ConnectionManager
+from app.ultils.conect_database import get_mongo_database, is_mongo
 from app.ultils.logger import log_message
 
 
@@ -43,41 +43,6 @@ from app.ultils.logger import log_message
 # SQLAlchemy. Não tem `inspect()`, nem `.dialect`, nem schemas — logo
 # qualquer caminho que assuma SQL rebenta e devolve resultados vazios.
 # As funções abaixo dão-lhe o equivalente: base → schema, coleção → tabela.
-
-
-def is_mongo(engine: Any) -> bool:
-    """True se a ligação for MongoDB em vez de um Engine do SQLAlchemy."""
-    return isinstance(engine, MongoClient)
-
-
-def get_mongo_database(engine: MongoClient) -> MongoDatabase | None:
-    """
-    Devolve a base de dados a inspecionar.
-
-    Usa a que vem na URI da conexão. Só se ela não existir é que recorre a
-    `list_database_names()`, que exige privilégios sobre o cluster inteiro —
-    um utilizador limitado a uma base recebe erro de autorização e ficaria
-    sem qualquer resultado.
-    """
-    try:
-        database = engine.get_default_database()
-        if database is not None and database.name:
-            return database
-    except Exception:  # noqa: S110 - URI sem base é normal; descobre-se abaixo
-        pass
-
-    try:
-        nomes = [
-            n
-            for n in engine.list_database_names()
-            if n not in ("admin", "config", "local")
-        ]
-        if nomes:
-            return engine[nomes[0]]
-    except Exception as e:
-        log_message(f"⚠️ Não foi possível listar bases MongoDB: {e}", "warning")
-
-    return None
 
 
 def _list_mongo_collections(

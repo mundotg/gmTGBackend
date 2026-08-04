@@ -1,6 +1,7 @@
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Optional, Tuple
 from urllib.parse import quote_plus
 
+from pymongo.database import Database as MongoDatabase
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import (
@@ -12,6 +13,47 @@ from pymongo import MongoClient
 from pymongo.errors import PyMongoError, ServerSelectionTimeoutError
 
 from app.ultils.logger import log_message
+
+
+def is_mongo(engine: Any) -> bool:
+    """
+    True se a ligação for MongoDB em vez de um Engine do SQLAlchemy.
+
+    Vive aqui, e não no database_inspector, porque é preciso tanto na
+    introspeção como na leitura de campos — e o inspector já importa o
+    field_info, pelo que o caminho inverso criaria um ciclo.
+    """
+    return isinstance(engine, MongoClient)
+
+
+def get_mongo_database(engine: MongoClient) -> Optional[MongoDatabase]:
+    """
+    Devolve a base de dados a inspecionar.
+
+    Usa a que vem na URI da conexão. Só se ela não existir é que recorre a
+    `list_database_names()`, que exige privilégios sobre o cluster inteiro —
+    um utilizador limitado a uma base recebe erro de autorização e ficaria
+    sem qualquer resultado.
+    """
+    try:
+        database = engine.get_default_database()
+        if database is not None and database.name:
+            return database
+    except Exception:  # noqa: S110 - URI sem base é normal; descobre-se abaixo
+        pass
+
+    try:
+        nomes = [
+            n
+            for n in engine.list_database_names()
+            if n not in ("admin", "config", "local")
+        ]
+        if nomes:
+            return engine[nomes[0]]
+    except Exception as e:
+        log_message(f"⚠️ Não foi possível listar bases MongoDB: {e}", "warning")
+
+    return None
 
 
 def close_engine(engine: Any) -> None:

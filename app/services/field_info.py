@@ -417,11 +417,14 @@ def _criar_campos_mongo(
             is_unique=descritor["is_unique"],
             is_auto_increment=descritor["is_auto_increment"],
             comment=descritor["comment"],
-            # Conceitos sem equivalente no MongoDB: não há chaves
-            # estrangeiras declaradas nem precisão/escala de coluna.
-            is_foreign_key=False,
-            referenced_table=None,
-            referenced_field=None,
+            # Um DBRef declara a coleção de destino, pelo que a relação é
+            # afirmável. O campo de destino é sempre _id, por definição
+            # do próprio DBRef.
+            is_foreign_key=descritor["is_foreign_key"],
+            referenced_table=descritor["referenced_table"],
+            referenced_field="_id" if descritor["is_foreign_key"] else None,
+            # Sem equivalente no MongoDB: não há default declarado nem
+            # precisão/escala de coluna.
             default_value=None,
             length=None,
             precision=None,

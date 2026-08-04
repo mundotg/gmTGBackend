@@ -189,9 +189,11 @@ def _get_foreign_keys(engine: Engine, table_name: str) -> Dict[str, Dict[str, st
         Dict[str, Dict[str, str]]: Ex: { "tabela": { "coluna": "tabela_referenciada" } }
     """
     try:
-        # O MongoDB não declara chaves estrangeiras: as referências entre
-        # coleções são convenção da aplicação, não metadados da base.
-        # Devolver vazio é a resposta correta, não uma limitação.
+        # O MongoDB não tem catálogo de chaves estrangeiras para consultar.
+        # As relações via DBRef são detetáveis, mas só amostrando documentos
+        # — é o que `mongo_schema.infer_collection_fields` faz, e é de lá
+        # que vêm os referenced_table dos campos. Aqui, onde só há o engine
+        # e um nome de tabela, não há catálogo a interrogar.
         if is_mongo(engine):
             nomes = [table_name] if isinstance(table_name, str) else table_name
             return {nome: {} for nome in nomes}

@@ -10,6 +10,7 @@ from datetime import datetime
 
 import pytest
 from bson import ObjectId
+from bson.dbref import DBRef
 
 from app.services.mongo_schema import _bson_type_name, infer_collection_fields
 
@@ -246,3 +247,75 @@ class TestEncaminhamento:
             )
 
         assert chamou.get("sim")
+
+
+class TestReferenciasDBRef:
+    """
+    Um DBRef declara a coleção de destino, pelo que a relação é afirmável
+    — ao contrário das referências por convenção (guardar só o id noutro
+    campo), que não se distinguem de dados normais.
+
+    As formas usadas aqui são as de uma base real (Spring Data): _id como
+    UUID em string nalgumas coleções e ObjectId noutras.
+    """
+
+    def test_dbref_vira_chave_estrangeira(self):
+        campos = inferir(
+            [
+                {
+                    "_id": "e13ff664-0f10-4568-9e9d-f8bc8226a580",
+                    "designacao": "Sala 1",
+                    "ultimaMensagem": DBRef("mensagens", "95be4fef-b31b"),
+                }
+            ]
+        )
+
+        assert campos["ultimaMensagem"]["type"] == "dbRef"
+        assert campos["ultimaMensagem"]["is_foreign_key"]
+        assert campos["ultimaMensagem"]["referenced_table"] == "mensagens"
+
+    def test_nao_e_dbpointer(self):
+        # dbPointer é um tipo BSON distinto e obsoleto (0x0C); um DBRef é
+        # um subdocumento por convenção. Confundi-los aponta o utilizador
+        # para a coisa errada.
+        campos = inferir([{"_id": 1, "ref": DBRef("salas", "x")}])
+
+        assert campos["ref"]["type"] != "dbPointer"
+
+    def test_referencia_polimorfica_nao_afirma_alvo(self):
+        # Aponta para coleções diferentes: não há uma tabela referenciada
+        # única que se possa registar.
+        campos = inferir(
+            [
+                {"_id": 1, "alvo": DBRef("mensagens", "a")},
+                {"_id": 2, "alvo": DBRef("salas", "b")},
+            ]
+        )
+
+        assert campos["alvo"]["referenced_table"] is None
+        assert not campos["alvo"]["is_foreign_key"]
+        # Mas o facto não se perde silenciosamente.
+        assert "mensagens" in campos["alvo"]["comment"]
+        assert "salas" in campos["alvo"]["comment"]
+
+    def test_campo_normal_nao_e_marcado_como_fk(self):
+        # salaId guarda o id como string, sem DBRef: é convenção da
+        # aplicação e indistinguível de dados normais.
+        campos = inferir([{"_id": 1, "salaId": "c341973f-4c9e"}])
+
+        assert not campos["salaId"]["is_foreign_key"]
+        assert campos["salaId"]["referenced_table"] is None
+
+    def test_id_string_nao_e_auto_gerado(self):
+        # UUID gerado pela aplicação, ao contrário do ObjectId do Mongo.
+        campos = inferir([{"_id": "95be4fef-b31b-4e49-b57d-87d117458035"}])
+
+        assert campos["_id"]["is_primary_key"]
+        assert not campos["_id"]["is_auto_increment"]
+        assert "aplicação" in campos["_id"]["comment"]
+
+    def test_id_objectid_e_auto_gerado(self):
+        campos = inferir([{"_id": ObjectId()}])
+
+        assert campos["_id"]["is_auto_increment"]
+        assert "MongoDB" in campos["_id"]["comment"]

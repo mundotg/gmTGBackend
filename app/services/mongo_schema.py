@@ -24,6 +24,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from bson.dbref import DBRef
+
 from app.ultils.logger import log_message
 
 # Documentos lidos por coleção. Suficiente para estabilizar os campos
@@ -77,7 +79,11 @@ def _bson_type_name(value: Any) -> str:
         "Regex": "regex",
         "Timestamp": "timestamp",
         "Code": "javascript",
-        "DBRef": "dbPointer",
+        # "dbRef", não "dbPointer": dbPointer é um tipo BSON distinto e
+        # obsoleto (0x0C). Um DBRef não é sequer um tipo — é um
+        # subdocumento com $ref/$id, por convenção. Chamar-lhe dbPointer
+        # apontaria o utilizador para a coisa errada.
+        "DBRef": "dbRef",
     }.get(nome, nome)
 
 
@@ -145,6 +151,7 @@ def infer_collection_fields(
     ocorrencias: dict[str, int] = {}
     tipos: dict[str, set[str]] = {}
     tem_nulo: dict[str, bool] = {}
+    referencias: dict[str, set[str]] = {}
     ordem: list[str] = []
 
     for documento in documentos:
@@ -153,9 +160,17 @@ def infer_collection_fields(
                 ocorrencias[nome] = 0
                 tipos[nome] = set()
                 tem_nulo[nome] = False
+                referencias[nome] = set()
                 ordem.append(nome)
 
             ocorrencias[nome] += 1
+
+            # Um DBRef diz explicitamente para que coleção aponta. É a
+            # única forma de relação que o MongoDB torna legível por
+            # máquina — as referências por convenção (guardar só o id
+            # noutro campo) não são distinguíveis de dados normais.
+            if isinstance(valor, DBRef):
+                referencias[nome].add(valor.collection)
 
             tipo = _bson_type_name(valor)
 
@@ -188,6 +203,12 @@ def infer_collection_fields(
             campos.append(_campo_id(tipo=tipo))
             continue
 
+        alvos = referencias[nome]
+
+        # Só se aponta sempre para a mesma coleção é que a referência é
+        # afirmável. Um campo polimórfico não tem tabela referenciada única.
+        referenced_table = next(iter(alvos)) if len(alvos) == 1 else None
+
         campos.append(
             {
                 "name": nome,
@@ -196,7 +217,11 @@ def infer_collection_fields(
                 "is_primary_key": False,
                 "is_unique": nome in unicos,
                 "is_auto_increment": False,
-                "comment": _descrever_cobertura(ocorrencias[nome], total, tipos_vistos),
+                "is_foreign_key": referenced_table is not None,
+                "referenced_table": referenced_table,
+                "comment": _descrever_cobertura(
+                    ocorrencias[nome], total, tipos_vistos, alvos
+                ),
             }
         )
 
@@ -213,12 +238,21 @@ def _campo_id(tipo: str = "objectId") -> dict[str, Any]:
         "is_unique": True,
         # O Mongo gera o ObjectId quando o cliente não o fornece.
         "is_auto_increment": tipo == "objectId",
-        "comment": "Chave primária gerada pelo MongoDB",
+        "is_foreign_key": False,
+        "referenced_table": None,
+        "comment": (
+            "Chave primária gerada pelo MongoDB"
+            if tipo == "objectId"
+            else "Chave primária definida pela aplicação"
+        ),
     }
 
 
 def _descrever_cobertura(
-    presencas: int, total: int, tipos_vistos: set[str]
+    presencas: int,
+    total: int,
+    tipos_vistos: set[str],
+    alvos: set[str] | None = None,
 ) -> str:
     """
     Comentário que torna explícito o que a amostra suporta.
@@ -230,5 +264,10 @@ def _descrever_cobertura(
 
     if len(tipos_vistos) > 1:
         partes.append(f"tipos observados: {', '.join(sorted(tipos_vistos))}")
+
+    # Referência polimórfica: há alvo, mas não um único, por isso não pode
+    # ser registado em referenced_table. Fica pelo menos visível aqui.
+    if alvos and len(alvos) > 1:
+        partes.append(f"aponta para várias coleções: {', '.join(sorted(alvos))}")
 
     return "; ".join(partes)

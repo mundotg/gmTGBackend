@@ -200,7 +200,7 @@ async def validar_task(
             db=db,
             task_id=task_id,
             assigned_to=user,
-            aprovado=aprovado is "aprovado",
+            aprovado=aprovado,
             comentario=comentario,
         )
 

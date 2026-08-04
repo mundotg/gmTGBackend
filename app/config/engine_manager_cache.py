@@ -76,32 +76,33 @@ def _verify_sqlite_connection(
 
 class EngineManager:
     __engines: Dict[int, Engine] = {}
+    __engine_connections: Dict[int, int] = {}
     _async_engines: Dict[int, AsyncEngine] = {}
+    _async_engine_connections: Dict[int, int] = {}
 
     # -------------------------
     # SYNC ENGINE
     # -------------------------
 
     @classmethod
-    def set(cls, engine: Engine, id_user: int):
+    def set(cls, engine: Engine, id_user: int, connection_id: Optional[int] = None):
         cls.__engines[id_user] = engine
+        if connection_id is not None:
+            cls.__engine_connections[id_user] = connection_id
+
+    @classmethod
+    def get_connection_id(cls, id_user: int) -> Optional[int]:
+        return cls.__engine_connections.get(id_user)
 
     @classmethod
     def get(cls, id_user: int) -> Optional[Engine]:
-        engine = cls.__engines.get(id_user)
-
-        if not engine:
-            log_message(
-                f"Nenhum engine ativo para o usuário ID {id_user}",
-                "error",
-            )
-
-        return engine
+        return cls.__engines.get(id_user)
 
     @classmethod
     def remove(cls, id_user: int):
         """Remove engine do usuário e fecha conexão."""
         engine = cls.__engines.pop(id_user, None)
+        cls.__engine_connections.pop(id_user, None)
 
         if engine:
             try:
@@ -124,13 +125,20 @@ class EngineManager:
         return cls._async_engines.get(id_user)
 
     @classmethod
-    def async_set(cls, id_user: int, engine: AsyncEngine) -> None:
+    def async_get_connection_id(cls, id_user: int) -> Optional[int]:
+        return cls._async_engine_connections.get(id_user)
+
+    @classmethod
+    def async_set(cls, id_user: int, engine: AsyncEngine, connection_id: Optional[int] = None) -> None:
         cls._async_engines[id_user] = engine
+        if connection_id is not None:
+            cls._async_engine_connections[id_user] = connection_id
 
     @classmethod
     async def async_remove(cls, id_user: int):
         """Remove async engine do usuário e fecha pool."""
         engine = cls._async_engines.pop(id_user, None)
+        cls._async_engine_connections.pop(id_user, None)
 
         if engine:
             try:
@@ -154,6 +162,7 @@ class EngineManager:
                 log_message(f"Erro ao fechar async engine: {e}", "error")
 
         cls._async_engines.clear()
+        cls._async_engine_connections.clear()
 
         for engine in cls.__engines.values():
             try:
@@ -162,3 +171,4 @@ class EngineManager:
                 log_message(f"Erro ao fechar engine: {e}", "error")
 
         cls.__engines.clear()
+        cls.__engine_connections.clear()

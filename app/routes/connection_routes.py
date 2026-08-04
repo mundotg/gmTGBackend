@@ -249,7 +249,7 @@ async def test_and_connect(
 
         # 4. Ativação da Conexão
         # Definimos no Cache de memória (EngineManager) e no Banco de Dados
-        EngineManager.set(engine, user_id)
+        EngineManager.set(engine, user_id, connection_id=db_conn.id)
         desactivate_all_connections(db, user_id)
         set_active_connection(db, user_id, db_conn.id)
 

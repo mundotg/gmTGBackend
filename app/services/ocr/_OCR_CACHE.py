@@ -41,8 +41,9 @@ def _evict_lru_if_needed(new_size: int):
         oldest_key = next(iter(MEMORY_CACHE))
         oldest_item = MEMORY_CACHE.pop(oldest_key)
         current_ram_usage -= oldest_item["size"]
-        print(
-            f"🧹 [CACHE EVICTION] Limite de 10GB atingido. Removendo da RAM: {oldest_key} ({oldest_item['size']} bytes libertados)."
+        log_message(
+            f"🧹 [CACHE EVICTION] Limite de 10GB atingido. Removendo da RAM: {oldest_key} ({oldest_item['size']} bytes libertados).",
+            "warning",
         )
 
 

@@ -41,6 +41,7 @@ from app.routes import (
 from app.schemas import project_analytics_routes
 from app.seed_new import seed_data
 from app.ultils.logger import log_message
+from app.version import get_version_info
 
 # ------------------------------------------------------------
 # 🔧 Correção de PATH (importante pro PyInstaller)
@@ -63,7 +64,16 @@ os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 🔥 2. Tudo que vem ANTES do yield é o "Startup"
-    print(" Inicializando aplicação...")
+    info = get_version_info()
+
+    # Identifica o código carregado. Como o servidor corre sem --reload
+    # (start.bat usa --workers 4), um processo antigo continua a servir
+    # código antigo e os tracebacks apontam para linhas que já mudaram.
+    print(
+        f" Inicializando aplicação... commit={info['commit']} "
+        f"python={info['python']}"
+    )
+
     init_on_startup()
 
     db = SessionLocal()
@@ -183,7 +193,7 @@ app.include_router(storage_routes.router)
 @app.get("/health/live", tags=["Health"])
 async def liveness():
     """O processo está vivo e a responder. Usar como livenessProbe."""
-    return {"status": "ok"}
+    return {"status": "ok", **get_version_info()}
 
 
 @app.get("/health/ready", tags=["Health"])
@@ -201,6 +211,7 @@ async def readiness(response: Response):
         "status": "ok" if db_ok else "degraded",
         "database": {"reachable": db_ok, "detail": detail},
         "env": ENV,
+        **get_version_info(),
     }
 
 

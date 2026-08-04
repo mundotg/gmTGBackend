@@ -67,9 +67,10 @@ def assert_sql_engine(engine: Any, operacao: str) -> None:
     "'Database' object is not callable", que não diz nada sobre a causa.
 
     A introspeção (listar coleções, campos, estatísticas) já funciona em
-    MongoDB. O que ainda não existe é a tradução de SQL para operações
-    Mongo: consultar, inserir, editar e alterar schema continuam a assumir
-    SQL, e é isso que esta função sinaliza.
+    MongoDB. O que ainda não tem equivalente implementado são as operações
+    que dependem de sintaxe SQL (consultar, inserir, editar, alterar
+    schema) ou de ferramentas próprias do SGBD (pg_dump, mysqldump), e é
+    isso que esta função sinaliza.
     """
     if is_mongo(engine):
         raise HTTPException(
@@ -77,7 +78,8 @@ def assert_sql_engine(engine: Any, operacao: str) -> None:
             detail=(
                 f"{operacao} ainda não está disponível para conexões MongoDB. "
                 "A leitura de estruturas, campos e estatísticas funciona; "
-                "operações sobre dados exigem tradução de SQL para MongoDB."
+                "esta operação depende de SQL ou de ferramentas específicas "
+                "do SGBD e precisa de um equivalente MongoDB."
             ),
         )
 
@@ -123,6 +125,10 @@ class DatabaseManager:
             "TrustServerCertificate={trustServerCertificate};"
         ),
         "Oracle": "oracle+cx_oracle://{user}:{password}@{host}:{port}/?service_name={service}",
+        # ⚠️ Não usar: não existe dialecto SQLAlchemy para MongoDB, e entregar
+        # esta URI ao create_async_engine dá NoSuchModuleError. O caminho
+        # async trata MongoDB antes de chegar aqui (ver
+        # ConnectionManager._create_async_engine), devolvendo um MongoClient.
         "MongoDB": "mongodb://{user}:{password}@{host}:{port}/{database}?authSource=admin",
     }
 

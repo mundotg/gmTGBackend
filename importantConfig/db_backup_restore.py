@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Ajuste os imports conforme a estrutura do seu projeto
 from app.models.connection_models import DBConnection
 from app.ultils.ativar_engine import ConnectionManager
+from app.ultils.conect_database import assert_sql_engine
 from app.ultils.logger import log_message
 
 BACKUP_DIR = "backups"
@@ -323,6 +324,12 @@ async def backup_database(
     await asyncio.to_thread(_fix_windows_permissions, BACKUP_DIR)
 
     engine, _conn = await ConnectionManager.get_engine_idconn_async(db, user_id, connection_id)
+
+    # O backup assenta em pg_dump/mysqldump e em engine.url; o MongoDB não
+    # tem nenhum dos dois (precisaria de mongodump). Recusa explicitamente
+    # em vez de falhar ao ler atributos que não existem.
+    assert_sql_engine(engine, "Backup da base de dados")
+
     parts = _conn_parts_from_engine(engine, _conn)
     _validate_conn_parts(parts)
 
@@ -429,6 +436,9 @@ async def restore_backup(
         final_restore_path = extracted_path
 
     engine, _conn = await ConnectionManager.get_engine_idconn_async(db, user_id, connection_id)
+
+    assert_sql_engine(engine, "Restauro da base de dados")
+
     parts = _conn_parts_from_engine(engine, _conn)
     env = _build_env(parts.password)
 

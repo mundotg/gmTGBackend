@@ -145,3 +145,58 @@ class TestChavesEstrangeiras:
 
         assert _get_foreign_keys(cliente, "produtos") == {"produtos": {}}
         assert _get_foreign_keys(cliente, ["a", "b"]) == {"a": {}, "b": {}}
+
+
+class _AdminFalso:
+    def command(self, *_a, **_k):
+        return {"ok": 1}
+
+
+class _ClienteFalso:
+    """MongoClient suficiente para o teste: só precisa responder ao ping."""
+
+    admin = _AdminFalso()
+
+
+class TestEngineAsync:
+    """
+    Não existe dialecto SQLAlchemy para MongoDB. O caminho async tem de
+    devolver um cliente Mongo antes de tocar no create_async_engine, senão:
+
+        NoSuchModuleError: Can't load plugin: sqlalchemy.dialects:mongodb
+    """
+
+    class ConexaoFalsa:
+        id = 1
+        type = "MongoDB"
+        username = "u"
+        password = "p"
+        host = "h"
+        port = 27017
+        database_name = "notificacoes"
+        service = None
+        sslmode = None
+        trustServerCertificate = None
+
+    def test_mongo_devolve_cliente_e_nao_toca_no_sqlalchemy(self, monkeypatch):
+        import asyncio
+
+        from app.ultils import ativar_engine
+
+        cliente = _ClienteFalso()
+
+        monkeypatch.setattr(ativar_engine, "secret_decrypt", lambda v: v)
+        monkeypatch.setattr(
+            ativar_engine.DatabaseManager, "get_engine", lambda *_a, **_k: cliente
+        )
+
+        def _explode(*_a, **_k):
+            raise AssertionError("create_async_engine não devia ser chamado")
+
+        monkeypatch.setattr(ativar_engine, "create_async_engine", _explode)
+
+        resultado = asyncio.run(
+            ativar_engine.ConnectionManager._create_async_engine(self.ConexaoFalsa())
+        )
+
+        assert resultado is cliente

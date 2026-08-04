@@ -5,7 +5,7 @@ from typing import Dict, Optional
 from sqlalchemy import Engine, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.ultils.conect_database import close_engine
+from app.ultils.conect_database import close_engine, is_mongo
 from app.ultils.logger import log_message
 
 
@@ -144,7 +144,14 @@ class EngineManager:
 
         if engine:
             try:
-                await engine.dispose()
+                # O cache async também guarda MongoClient (não há engine
+                # async do SQLAlchemy para MongoDB): `await .dispose()`
+                # resolveria ".dispose" como o nome de uma base de dados.
+                if is_mongo(engine):
+                    close_engine(engine)
+                else:
+                    await engine.dispose()
+
                 log_message(f"Async engine removido e fechado para usuário {id_user}")
             except Exception as e:
                 log_message(f"Erro ao fechar async engine {id_user}: {e}", "error")
@@ -159,7 +166,10 @@ class EngineManager:
 
         for engine in cls._async_engines.values():
             try:
-                await engine.dispose()
+                if is_mongo(engine):
+                    close_engine(engine)
+                else:
+                    await engine.dispose()
             except Exception as e:
                 log_message(f"Erro ao fechar async engine: {e}", "error")
 

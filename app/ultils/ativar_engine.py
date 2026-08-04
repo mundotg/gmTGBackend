@@ -3,6 +3,8 @@ import traceback
 from typing import Tuple
 
 from fastapi import HTTPException
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
@@ -183,11 +185,46 @@ class ConnectionManager:
         return engine, connection
 
     @staticmethod
-    async def _create_async_engine(connection: DBConnection) -> AsyncEngine:
+    async def _create_async_engine(connection: DBConnection) -> AsyncEngine | MongoClient:
         db_type = (connection.type or "").lower()
         engineManager = DatabaseManager()
 
         try:
+            # ------------------------------------------------------------
+            # MongoDB
+            # ------------------------------------------------------------
+            # Não existe dialecto SQLAlchemy para MongoDB: entregar a URI
+            # "mongodb://…" ao create_async_engine dá
+            # NoSuchModuleError: Can't load plugin: sqlalchemy.dialects:mongodb
+            #
+            # Devolve-se o mesmo MongoClient síncrono usado no resto do
+            # código, e não um AsyncMongoClient, de propósito: manter um só
+            # tipo de objeto é o que faz `is_mongo`, `close_engine` e toda a
+            # introspeção continuarem a funcionar sobre este engine.
+            # As operações SQL que o receberem são recusadas por
+            # `assert_sql_engine`, não por um erro de driver.
+            if db_type == "mongodb":
+                config = {
+                    "user": secret_decrypt(connection.username)
+                    if connection.username
+                    else "",
+                    "password": secret_decrypt(connection.password)
+                    if connection.password
+                    else "",
+                    "host": secret_decrypt(connection.host),
+                    "port": connection.port,
+                    "database": connection.database_name,
+                    "service": connection.service or "",
+                }
+
+                client = engineManager.get_engine("MongoDB", config)
+
+                # Equivalente ao "SELECT 1" das ligações SQL.
+                client.admin.command("ping")
+
+                log_message("✅ MongoClient criado (MongoDB)", "info")
+                return client
+
             if db_type == "sqlite":
                 db_path = secret_decrypt(connection.host)
                 uri = f"sqlite+aiosqlite:///{db_path}"
@@ -252,3 +289,13 @@ class ConnectionManager:
         except SQLAlchemyError as e:
             log_message(f"❌ erro criando engine: {e}\n{traceback.format_exc()}", "error")
             raise HTTPException(status_code=500, detail="Erro ao conectar ao banco")
+
+        except PyMongoError as e:
+            # Só SQLAlchemyError era apanhado: uma falha do pymongo (auth,
+            # servidor inacessível) escapava em cru para o cliente.
+            log_message(
+                f"❌ erro criando MongoClient: {e}\n{traceback.format_exc()}", "error"
+            )
+            raise HTTPException(
+                status_code=503, detail="Não foi possível ligar ao MongoDB"
+            )

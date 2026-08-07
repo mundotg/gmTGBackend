@@ -1,17 +1,23 @@
 # app/api/logs/logs_routes.py
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.log_models import Log
 from app.routes.connection_routes import get_current_user_id
 from app.schemas.responsehttp_schema import ResponseWrapper
-from app.ultils.logger import log_message
+from app.ultils.log_file_reader import ler_do_fim, normalizar_nivel
+from app.ultils.logger import get_log_file_path, log_message
 
 
-router = APIRouter()
+router = APIRouter(tags=["AuditLog"])
 
 
 @router.get("/logs", response_model=ResponseWrapper[list])
@@ -77,6 +83,94 @@ async def get_logs_stats(
         raise HTTPException(
             status_code=500, detail="Erro ao gerar estatísticas de logs."
         )
+
+
+# ------------------------------------------------------------
+# Ficheiro de log (database_connector.log)
+# ------------------------------------------------------------
+# Os endpoints acima leem a tabela `logs`. Este lê o ficheiro em disco, que é
+# onde ficam os erros anteriores à ligação à base de dados — precisamente os
+# que a tabela nunca chega a registar.
+#
+# O caminho vem de `get_log_file_path()`, que pergunta ao handler activo do
+# `logging` em vez de assumir a working directory. Ver `app/ultils/logger.py`.
+
+
+def _ficheiro_ou_404() -> Path:
+    caminho = get_log_file_path()
+    if caminho is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Ficheiro de log não encontrado. Ainda pode não ter sido "
+                "criado, ou está fora dos caminhos conhecidos — define a "
+                "variável de ambiente DATABASE_CONNECTOR_LOG_FILE com o "
+                "caminho completo."
+            ),
+        )
+    return caminho
+
+
+@router.get("/logs/file", response_model=ResponseWrapper[dict])
+async def get_log_file(
+    limit: int = Query(200, ge=1, le=5000, description="Últimas N linhas"),
+    level: Optional[str] = Query(
+        None, description="Filtrar por nível (debug, info, warning, error, critical)"
+    ),
+    search: Optional[str] = Query(
+        None, min_length=1, description="Texto a procurar na linha"
+    ),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    📄 Lê o ficheiro `database_connector.log`, esteja ele onde estiver.
+    """
+    try:
+        nivel = normalizar_nivel(level)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    caminho = _ficheiro_ou_404()
+
+    try:
+        # Leitura de disco é bloqueante: fora do event loop, senão trava os
+        # restantes pedidos enquanto percorre o ficheiro.
+        resultado = await run_in_threadpool(ler_do_fim, caminho, limit, nivel, search)
+        modificado_em = datetime.fromtimestamp(
+            caminho.stat().st_mtime, tz=timezone.utc
+        ).isoformat()
+    except OSError as e:
+        log_message(
+            f"❌ Erro ao ler ficheiro de log: {e}",
+            level="error",
+            source="get_log_file",
+            user=user_id,
+        )
+        raise HTTPException(status_code=500, detail="Erro ao ler o ficheiro de log.")
+
+    return ResponseWrapper(
+        success=True,
+        data={
+            "caminho": str(caminho),
+            "modificado_em": modificado_em,
+            "filtros": {"limit": limit, "level": level, "search": search},
+            **resultado,
+        },
+    )
+
+
+@router.get("/logs/file/download")
+async def download_log_file(user_id: int = Depends(get_current_user_id)):
+    """
+    ⬇️ Descarrega o ficheiro `database_connector.log` completo.
+    """
+    caminho = _ficheiro_ou_404()
+
+    return FileResponse(
+        path=str(caminho),
+        media_type="text/plain; charset=utf-8",
+        filename=caminho.name,
+    )
 
 
 @router.get("/logs/{log_id}", response_model=ResponseWrapper[dict])

@@ -369,15 +369,26 @@ class GenericReportGenerator:
     # 📄 GERAÇÃO DO RELATÓRIO
     # ========================================
     
-    def generate_report(self, filename: str, structure: list, orientation="portrait"):
+    def generate_report(self, filename: str, structure: list, orientation="portrait", context: dict | None = None):
         """
-        Gera relatório PDF baseado na estrutura declarativa
-        
+        Gera relatório PDF baseado na estrutura declarativa.
+
         Args:
             filename (str): Nome do arquivo de saída
             structure (list): Lista de dicionários com elementos do relatório
             orientation (str): "portrait" ou "landscape"
+            context (dict|None): Dados para preencher as VARIÁVEIS `{{...}}` do
+                template (títulos, textos, células, e binding de tabelas). Se
+                None, a estrutura é usada tal como está.
         """
+        # 🔤 Substitui variáveis e expande tabelas ligadas a listas.
+        if context:
+            try:
+                from app.relatorio.template_variaveis import preparar_estrutura
+
+                structure = preparar_estrutura(structure, context)
+            except Exception as e:  # noqa: BLE001 - nunca deve impedir a geração
+                log_message(f"⚠️ Falha ao aplicar variáveis do template: {e}", "warning")
         # Define orientação
         pagesize = landscape(A4) if orientation == "landscape" else A4
         

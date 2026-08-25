@@ -713,17 +713,29 @@ def gerar_relatorio_tarefas(
     project: Optional[dict],
     sprint: Optional[dict],
     tasks: Optional[List[dict]],
-    logo_path: str
-):
-    """Função legada para compatibilidade - usa AdvancedTaskReportBuilder internamente"""
+    logo_path: str,
+    output_path: Optional[str] = None,
+) -> str:
+    """
+    Gera o PDF do relatório de tarefas e devolve o caminho do ficheiro.
+
+    `output_path` escreve diretamente no destino. Sem ele, o ficheiro ia parar
+    à pasta de trabalho e alguém tinha de o mover — o que rebentava com
+    "Invalid cross-device link" quando o destino é um volume Docker, e era
+    uma corrida entre pedidos simultâneos (o ficheiro era localizado por
+    `glob` do nome, não por identidade).
+    """
     builder = AdvancedTaskReportBuilder(stats=stats, project=project, sprint=sprint, tasks=tasks or [])
     estrutura = builder.build()
-    
-    # Gera o PDF usando o gerador existente
-    filename = f"relatorio_tarefas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+    filename = output_path or (
+        f"relatorio_tarefas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    )
+
     from app.relatorio.gerarpdf import GenericReportGenerator
     generator = GenericReportGenerator(logo_path=logo_path)
     generator.generate_report(filename, estrutura)
-    
-    log_message(f"✅ PDF legado gerado: {filename}")
+
+    log_message(f"✅ PDF de tarefas gerado: {filename}")
+    return filename
 

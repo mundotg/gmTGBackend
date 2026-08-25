@@ -378,12 +378,18 @@ def get_strutures_names(
     connection_id: int,
     id_user: int,
     db: Session,
+    force_sync: bool = False,
 ) -> list[DBStructureOut]:
     """
     Retorna tabelas e views como estruturas, sincronizando metadados.
+
+    Com `force_sync=True` volta a **listar as tabelas na base de dados** em vez
+    de reaproveitar as já registadas. Sem isso, assim que existisse uma
+    estrutura guardada o caminho rápido abaixo tomava conta e uma tabela criada
+    depois nunca era descoberta — o diagrama ficava preso ao primeiro snapshot.
     """
     structures = get_db_structures(db, connection_id)
-    if structures:
+    if structures and not force_sync:
         for item in structures:
             sincronizar_metadados_da_tabela_simple(
                 db=db,

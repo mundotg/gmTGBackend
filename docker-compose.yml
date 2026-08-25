@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   app:
     build:
@@ -14,8 +12,25 @@ services:
       - .:/app
       - /app/node_modules # evita sobrescrever deps (caso uses Node misturado)
 
-    env_file:
-      - .env
+    # ⚠️ Aqui NÃO se usa `env_file: .env` — isso corromperia a SECRET_KEY e a
+    # ENCRYPTION_KEY.
+    #
+    # O Compose interpola `$` nos valores do env_file. Ambas as chaves contêm
+    # `$O`, que é expandido para a variável `O` (inexistente) e substituído por
+    # vazio — sem erro, apenas um aviso "The 'O' variable is not set":
+    #
+    #   .env          wjwjwPk^Fb9X_La$O%3XzRCUmd*...
+    #   no contentor  wjwjwPk^Fb9X_La%3XzRCUmd*...
+    #
+    # Consequência: os JWT assinados dentro do Docker não são aceites fora, e
+    # as credenciais das ligações guardadas na base não podem ser
+    # desencriptadas.
+    #
+    # Não é preciso substituto: o bind mount `.:/app` acima já traz o .env, e a
+    # app lê-o com python-dotenv (app/config/dotenv.py), que não toca em `$O`.
+    #
+    # Para subir back e front juntos, usar o docker-compose.yml da raiz do
+    # repositório.
 
     environment:
       - PYTHONPATH=/app

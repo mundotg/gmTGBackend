@@ -156,6 +156,88 @@ async def get_audit_logs(
         )
 
 # =========================
+# CONSULTAS RECENTES (para reutilizar no construtor + sugestões)
+# =========================
+def _fetch_recent_queries(db: Session, conn_id: Optional[int], limit: int):
+    """
+    Consultas SELECT recentes de uma conexão, DEDUPLICADAS pela string SQL
+    (mantém a mais recente e conta as repetições) — serve para "usar novamente"
+    e para gerar sugestões dinâmicas. Inclui o `payload` estruturado do
+    `meta_info`, que permite recarregar a consulta no construtor.
+    """
+    q = db.query(QueryHistory).filter(
+        QueryHistory.query_type.in_([QueryType.SELECT.value, QueryType.COUNT.value])
+    )
+    if conn_id is not None:
+        q = q.filter(QueryHistory.db_connection_id == conn_id)
+
+    # janela recente para deduplicar em memória (barato e suficiente)
+    rows = q.order_by(desc(QueryHistory.executed_at)).limit(400).all()
+
+    out: list[dict] = []
+    seen: dict[str, dict] = {}
+    for r in rows:
+        sql = (r.query or "").strip()
+        if not sql:
+            continue
+        meta = r.meta_info if isinstance(r.meta_info, dict) else {}
+        key = sql
+        if key in seen:
+            seen[key]["count"] += 1
+            continue
+        item = {
+            "id": r.id,
+            "query": sql,
+            "payload": meta.get("payload"),
+            "base_table": meta.get("base_table"),
+            "tables_involved": meta.get("tables_involved"),
+            "executed_at": r.executed_at.isoformat() if r.executed_at else None,
+            "duration_ms": r.duration_ms,
+            "row_count": meta.get("row_count"),
+            "is_favorite": r.is_favorite,
+            "db_connection_id": r.db_connection_id,
+            "count": 1,
+        }
+        seen[key] = item
+        out.append(item)
+        if len(out) >= limit:
+            break
+    return out
+
+
+@router.get("/recent-queries")
+async def get_recent_queries(
+    conn_id: Optional[int] = Query(default=None),
+    limit: int = Query(default=15, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Consultas recentes (deduplicadas) para reutilizar/sugerir no construtor.
+
+    Sem cache de propósito: o painel precisa de mostrar a consulta acabada de
+    executar (tempo real). A query é leve (janela de 400 linhas).
+    """
+    try:
+        items = _fetch_recent_queries(db, conn_id, limit)
+        # Sugestões dinâmicas: tabelas mais usadas nas consultas recentes.
+        table_freq: dict[str, int] = {}
+        for it in items:
+            for tbl in (it.get("tables_involved") or []):
+                table_freq[tbl] = table_freq.get(tbl, 0) + it.get("count", 1)
+        top_tables = [
+            {"table": t, "uses": c}
+            for t, c in sorted(table_freq.items(), key=lambda kv: kv[1], reverse=True)[:8]
+        ]
+        return {"success": True, "data": {"recent": items, "topTables": top_tables}}
+    except Exception as e:
+        log_message(
+            f"[HISTORY][RECENT] user={user_id} error={e}\n{traceback.format_exc()}",
+            "error",
+        )
+        raise HTTPException(status_code=500, detail="Erro ao carregar consultas recentes")
+
+
+# =========================
 # DETALHE
 # =========================
 @router.get("/{history_id}")

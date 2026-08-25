@@ -32,7 +32,7 @@ from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.ativar_session_bd import reativar_connection
 from app.ultils.logger import log_message
 
-router = APIRouter()
+router = APIRouter(tags=["Consulta de Banco de Dados"])
 
 # -------------------------------
 # Funções Auxiliares Reutilizáveis

@@ -5,18 +5,35 @@ from datetime import datetime
 # ==========================================
 # TYPES E ENUMS GERAIS
 # ==========================================
-# Tipo que define os modelos auditáveis ou rastreáveis no sistema
+# Entidades que `GET /geral/paginate` aceita no parâmetro `tipo`.
+#
+# ⚠️ Tem de acompanhar `MODEL_MAP` em app/services/geral_services.py: um nome
+# aqui que lá não exista dá 403, e um nome só lá é rejeitado com 422 antes de
+# chegar ao serviço. Removido "project_team_association" — era uma Table de
+# associação, não um modelo mapeado, e a paginação rebentava com ela.
 OptionTipoModel = Literal[
-    "user", 
-    "project", 
-    "task", 
-    "sprint", 
-    "type_project", 
-    "Role", 
-    "project_team_association", 
-    "AuditLog", 
-    "TaskStats", 
-    "DBConnection"
+    # 👥 Pessoas e organização
+    "user",
+    "Role",
+    "Empresa",
+    "Cargo",
+    "RefreshToken",
+    # 📋 Gestão de projetos
+    "project",
+    "task",
+    "sprint",
+    "type_project",
+    "TaskStats",
+    "AuditLog",
+    # 🔌 Conexões e base de dados
+    "DBConnection",
+    "ActiveConnection",
+    "ConnectionLog",
+    "DBHealthCheck",
+    "QueryHistory",
+    "DBStructure",
+    "DBField",
+    "DBEnumField",
 ]
 
 

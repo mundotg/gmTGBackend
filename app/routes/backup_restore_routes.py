@@ -8,17 +8,32 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import AsyncGenerator, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import decode_token
 from app.database import get_db_async
+from app.services import backup_jobs
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
 # NOTA: A correção do ProactorEventLoop deve ficar no main.py, não aqui.
 
 BACKUP_DIR = "backups"
+
+# Extensões aceites no upload de restore (SQL + Mongo/NoSQL).
+RESTORE_ALLOWED_EXT = (".sql", ".backup", ".dump", ".gz", ".archive", ".bson", ".db", ".bak")
 
 router = APIRouter(prefix="/database", tags=["Backup & Restore (SSE)"])
 
@@ -253,50 +268,217 @@ async def restore_stream(
 # ============================================================
 # 📊 STATUS & HEALTH
 # ============================================================
+#
+# GET /database/channel/{channel_id}/status
+# GET /database/channels/cleanup
+# GET /database/health
+#
+# Estas três rotas viviam aqui em duplicado. Como database_intro_routes é
+# registado primeiro em main.py, as versões deste ficheiro nunca chegavam a
+# ser atingidas — só produziam "Duplicate Operation ID" no arranque e entradas
+# repetidas no Swagger. A implementação válida (idêntica, sobre o mesmo
+# channel_manager) está em app/routes/database_intro_routes.py.
 
-@router.get("/channel/{channel_id}/status")
-async def channel_status(
-    channel_id: str,
+# ============================================================
+# 🧰 Upload de ficheiro de restore  (o endpoint que faltava)
+# ============================================================
+def _safe_join_backup(filename: str) -> str:
+    """Junta ao BACKUP_DIR de forma segura (bloqueia path traversal)."""
+    base = os.path.abspath(BACKUP_DIR)
+    # Só o nome-base, sem componentes de caminho.
+    name = os.path.basename(filename or "")
+    target = os.path.abspath(os.path.join(base, name))
+    if os.path.commonpath([base, target]) != base:
+        raise HTTPException(status_code=400, detail="Nome de ficheiro inválido.")
+    return target
+
+
+@router.post("/restore/{connection_id}/upload")
+async def upload_restore_file(
+    connection_id: int,
+    file: UploadFile = File(...),
     user_id: int = Depends(get_current_user_id),
 ):
+    """
+    Recebe o ficheiro de backup para restauro e grava-o em `backups/`.
+    Devolve `{filepath, filename}` para depois iniciar o job de restore.
+    """
+    _ensure_backup_dir()
+
+    name = (file.filename or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Ficheiro sem nome.")
+
+    if not name.lower().endswith(RESTORE_ALLOWED_EXT):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Extensão não permitida. Aceites: {', '.join(RESTORE_ALLOWED_EXT)}",
+        )
+
+    # Prefixo único para não colidir com uploads anteriores.
+    unique = f"{uuid.uuid4().hex[:8]}_{os.path.basename(name)}"
+    dest = _safe_join_backup(unique)
+
     try:
-        uuid.UUID(channel_id)
-    except ValueError:
-        raise _http_error(400, "UUID inválido")
+        size = 0
+        with open(dest, "wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)  # 1 MB
+                if not chunk:
+                    break
+                size += len(chunk)
+                out.write(chunk)
+    except Exception as e:
+        log_message(f"[UPLOAD] user={user_id} erro={e}", level="error")
+        if os.path.exists(dest):
+            try:
+                os.remove(dest)
+            except OSError:
+                pass
+        raise HTTPException(status_code=500, detail="Falha ao gravar o ficheiro.")
+    finally:
+        await file.close()
 
-    channel = channel_manager.get_channel(channel_id, user_id)
-    if not channel:
-        return {"exists": False, "status": "expired_or_not_found"}
-
-    created = channel.created_at
-    expires = created + timedelta(minutes=channel_manager.ttl_minutes)
-    remaining = expires - datetime.utcnow()
-
-    return {
-        "exists": True,
-        "status": channel.status,
-        "lastMessage": channel.last_message,
-        "createdAt": created.isoformat(),
-        "expiresAt": expires.isoformat(),
-        "remainingTime": str(remaining),
-    }
-
-
-@router.get("/channels/cleanup")
-async def cleanup_channels():
-    cleaned = channel_manager.cleanup_expired_channels()
-    return {
-        "cleaned": cleaned,
-        "remaining": len(channel_manager.channels),
-        "message": f"{cleaned} canais inativos foram expurgados da memória.",
-    }
+    log_message(
+        f"[UPLOAD] user={user_id} conn={connection_id} -> {unique} "
+        f"({round(size / (1024*1024), 2)} MB)",
+        level="info",
+    )
+    return {"filepath": dest, "filename": unique}
 
 
-@router.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "active_channels": len(channel_manager.channels),
-        "service": "OrionForgeNexus_DB_Operations",
-    }
+# ============================================================
+# 🚀 Iniciar jobs (backup / restore) — corre em background
+# ============================================================
+@router.post("/jobs/backup")
+async def start_backup_job(
+    connection_id: int = Body(..., embed=True),
+    compress: bool = Body(True, embed=True),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Cria um job de backup e devolve o `job_id` para seguir por WebSocket."""
+    _ensure_backup_dir()
+    job = backup_jobs.create_job(kind="backup", user_id=user_id, connection_id=connection_id)
+    asyncio.create_task(
+        backup_jobs.run_backup_job(job["id"], user_id, connection_id, compress)
+    )
+    return {"job_id": job["id"], "status": job["status"]}
+
+
+@router.post("/jobs/restore")
+async def start_restore_job(
+    connection_id: int = Body(..., embed=True),
+    filepath: str = Body(..., embed=True),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Cria um job de restore a partir de um ficheiro já carregado."""
+    safe_path = _normalize_backup_path(filepath)
+    if not os.path.exists(safe_path):
+        raise HTTPException(status_code=404, detail="Ficheiro de backup não encontrado.")
+
+    job = backup_jobs.create_job(kind="restore", user_id=user_id, connection_id=connection_id)
+    asyncio.create_task(
+        backup_jobs.run_restore_job(job["id"], user_id, connection_id, safe_path)
+    )
+    return {"job_id": job["id"], "status": job["status"]}
+
+
+@router.get("/jobs/{job_id}")
+async def get_job_status(
+    job_id: str,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Estado do job por REST (fallback quando o WebSocket não está disponível)."""
+    job = backup_jobs.get_job(job_id)
+    if not backup_jobs.owns_job(job, user_id):
+        raise HTTPException(status_code=404, detail="Job não encontrado.")
+    return job
+
+
+# ============================================================
+# 📥 Download de um backup concluído
+# ============================================================
+@router.get("/backups/{filename}/download")
+async def download_backup(
+    filename: str,
+    user_id: int = Depends(get_current_user_id),
+):
+    path = _safe_join_backup(filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Backup não encontrado.")
+    return FileResponse(
+        path,
+        media_type="application/octet-stream",
+        filename=os.path.basename(path),
+    )
+
+
+# ============================================================
+# 🔌 WebSocket de progresso do job
+# ============================================================
+def _ws_user_id(websocket: WebSocket) -> Optional[int]:
+    """
+    Autentica a WebSocket pelo cookie `access_token` (as WS enviam cookies do
+    mesmo site automaticamente). Devolve o user_id ou None.
+    """
+    token = websocket.cookies.get("access_token")
+    if not token:
+        # Fallback: ?token=... na query string (útil fora do browser).
+        token = websocket.query_params.get("token")
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        sub = payload.get("sub") if isinstance(payload, dict) else None
+        return int(sub) if sub is not None else None
+    except Exception:
+        return None
+
+
+@router.websocket("/ws/jobs/{job_id}")
+async def job_progress_ws(websocket: WebSocket, job_id: str):
+    """
+    Segue um job de backup/restore em tempo real. Envia o estado atual ao ligar
+    e depois cada alteração (deteta pela `version`). Fecha quando o job termina.
+    """
+    await websocket.accept()
+
+    user_id = _ws_user_id(websocket)
+    if user_id is None:
+        await websocket.send_json({"event": "error", "message": "Não autenticado."})
+        await websocket.close(code=4401)
+        return
+
+    job = backup_jobs.get_job(job_id)
+    if not backup_jobs.owns_job(job, user_id):
+        await websocket.send_json({"event": "error", "message": "Job não encontrado."})
+        await websocket.close(code=4404)
+        return
+
+    last_version = -1
+    try:
+        while True:
+            job = backup_jobs.get_job(job_id)
+            if not job:
+                await websocket.send_json({"event": "error", "message": "Job expirou."})
+                break
+
+            version = int(job.get("version", 0))
+            if version != last_version:
+                last_version = version
+                await websocket.send_json({"event": "update", "job": job})
+
+                if job.get("status") in ("done", "error"):
+                    await websocket.send_json({"event": "final", "status": job["status"]})
+                    break
+
+            await asyncio.sleep(0.5)
+    except WebSocketDisconnect:
+        return
+    except Exception as e:  # noqa: BLE001
+        log_message(f"[WS_JOB {job_id}] erro: {e}", level="warning")
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass

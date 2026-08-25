@@ -14,15 +14,17 @@ from fastapi import (
     Form,
     HTTPException,
     Query,
+    Response,
     UploadFile,
     status,
 )
 from sqlalchemy.orm import Session
 
-from app.config.cache_manager import cache_result
+from app.config.cache_manager import CACHE_PREFIX, cache_result, clear_cache
 from app.config.dependencies import get_session_by_connection
 from app.config.engine_manager_cache import EngineManager
 from app.cruds.connection_cruds import (
+    assert_connection_access,
     create_connection_log,
     create_db_connection,
     delete_connection,
@@ -32,20 +34,30 @@ from app.cruds.connection_cruds import (
     get_active_connection_by_userid,
     get_connection_logs,
     get_connection_logs_pagination,
+    get_connection_or_404,
     get_db_connection_by_id,
     get_db_connections,
     get_db_connections_pagination_v1,
+    list_connection_shares,
     map_status,
     query_connections_simple,
+    revoke_connection_share,
     set_active_connection,
+    share_connection,
     upsert_db_connection,
 )
 from app.database import get_db
 from app.models.connection_models import DBConnection
+from app.models.user_model import User
 from app.schemas.connetion_schema import (
+    ConnectionAccessLevel,
+    ConnectionAccessOut,
     ConnectionPaginationOutput,
     ConnectionPassUserOut,
     ConnectionRequest,
+    ConnectionShareCreate,
+    ConnectionShareOut,
+    ConnectionShareUpdate,
     DBConnectionBase,
     DbConnectionOutput,
     SavedConnectionBase,
@@ -59,6 +71,7 @@ from app.services.dataset_service import (
 from app.ultils.conect_database import close_engine
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
+from app.ultils.permissions import get_current_user, is_superadmin
 
 router = APIRouter(prefix="/conn", tags=["connections"])
 
@@ -122,6 +135,9 @@ async def get_db_connection_credentials_cached(
         "service": conn.service,
         "sslmode": conn.sslmode,
         "trustServerCertificate": conn.trustServerCertificate,
+        # Vazio nas conexões por campos separados; é o que diz ao formulário
+        # se deve abrir no modo URL.
+        "url": to_wire(conn.url) if conn.url else "",
     }
 
 
@@ -199,6 +215,23 @@ def _validate_connection_owner(
             detail=f"Conexão com ID {conn_id} não encontrada.",
         )
     return conn
+
+
+def _invalidate_connections_cache() -> None:
+    """
+    Descarta o cache da listagem de conexões.
+
+    Sem isto, quem acabou de receber acesso a uma conexão só a via aparecer
+    até 5 minutos depois (TTL de `get_db_connections_pagination_cached`) — e
+    isso lê-se como "a partilha não funcionou".
+
+    O padrão inclui o nome da função, por isso em Redis só esta entrada cai;
+    o cache em memória é curto e reconstrói-se ao primeiro pedido.
+    """
+    try:
+        clear_cache(f"{CACHE_PREFIX}get_db_connections_pagination_cached:*")
+    except Exception as e:  # o cache nunca deve derrubar a operação principal
+        log_message(f"⚠️ Falha ao invalidar cache de conexões: {e}", level="warning")
 
 
 def _build_connection_output(
@@ -301,22 +334,27 @@ async def test_and_connect(
         set_active_connection(db, user_id, db_conn.id)
 
         # 5. Log de Auditoria
+        # No modo "por URL" os campos separados chegam vazios (o host e a base
+        # ficam derivados no registo), por isso usa-se o que ficou guardado.
         create_connection_log(
             db,
             connection_id=db_conn.id,
             action="Conexão testada e ativada",
             status="success",
             details={
-                "database": conn_data.database_name,
+                "database": conn_data.database_name or db_conn.database_name,
                 "type": conn_data.type,
-                "host": conn_data.host,
+                "host": conn_data.host or db_conn.host,
+                "por_url": bool(conn_data.url),
             },
             user_id=user_id,
         )
 
+        alvo = conn_data.database_name or db_conn.database_name or conn_data.name
+
         return _build_connection_output(
             connection_id=db_conn.id,
-            message=f"✅ Conexão com {conn_data.database_name} estabelecida e salva.",
+            message=f"✅ Conexão com {alvo} estabelecida e salva.",
             connected=True,
         )
 
@@ -474,21 +512,37 @@ async def list_connections_paginated(
 async def delete_connection_save(
     conn_id: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    actor: User = Depends(get_current_user),
 ):
     """
-    Deleta uma conexão salva.
+    Deleta uma conexão salva. Só o dono (ou um super admin) pode apagar —
+    quem recebeu a conexão por partilha, mesmo com nível 'gestão', não pode.
     """
+    user_id = actor.id
+
+    alvo = get_connection_or_404(db, conn_id)
+    acesso = assert_connection_access(db, alvo, actor, ConnectionAccessLevel.read)
+
+    if not acesso.can_delete:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Só o dono da conexão (ou um super admin) a pode apagar.",
+        )
+
     try:
         conn = delete_connection(db, conn_id)
         if conn:
-            # CORRIGIDO: aspas simples para evitar problemas com string interpolation
+            # A FK connection_logs.connection_id é ON DELETE CASCADE: a conexão
+            # (e os seus logs) já não existe, por isso NÃO se pode referenciar
+            # `conn_id` aqui — dava ForeignKeyViolation e a auditoria da própria
+            # eliminação nunca era gravada. Guarda-se o id nos `details`.
             create_connection_log(
                 db,
-                connection_id=conn_id,
+                connection_id=None,
                 action=f"Conexão deletada: {conn.name}",
                 status="success",
                 details={
+                    "deleted_connection_id": conn_id,
                     "database": conn.database_name,
                     "type": conn.type,
                 },
@@ -519,11 +573,18 @@ async def delete_connection_save(
 async def get_credenciais(
     conn_id: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    actor: User = Depends(get_current_user),
 ):
     """
     Obtém credenciais de uma conexão específica.
+
+    Exige acesso de leitura: dono, super admin, ou alguém com partilha ativa.
     """
+    user_id = actor.id
+
+    alvo = get_connection_or_404(db, conn_id)
+    assert_connection_access(db, alvo, actor, ConnectionAccessLevel.read)
+
     try:
         credenciais = await get_db_connection_credentials_cached(db, conn_id)
 
@@ -539,6 +600,7 @@ async def get_credenciais(
             service=credenciais["service"],
             sslmode=credenciais["sslmode"],
             trustServerCertificate=credenciais["trustServerCertificate"],
+            url=credenciais.get("url") or "",
         )
 
     except HTTPException:
@@ -553,6 +615,104 @@ async def get_credenciais(
             connection_id=conn_id,
             details={"error": str(e)},
         )
+
+
+@router.get("/db_full/{conn_id}")
+async def get_db_full(
+    conn_id: int,
+    refresh: bool = Query(False, description="Ignora a cache Redis e recarrega"),
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """
+    Conexão + estruturas (tabelas/coleções, campos e FKs) para o diagrama ER
+    (página `mll`). Cacheado em **Redis** por (utilizador, conexão) para
+    desempenho — a introspeção é cara e o schema muda raramente.
+
+    Suporta **NoSQL**: para MongoDB (onde a introspeção SQL não se aplica) usa
+    as estruturas já guardadas na BD; sem relações (o Mongo não tem FKs).
+    """
+    from sqlalchemy.orm import selectinload
+    from app.config.redis import read_cache, write_cache
+    from app.ultils.db_full_cache import DB_FULL_TTL, db_full_cache_key
+    from app.services.crypto_utils import secret_decrypt
+    from app.services.database_inspector import get_strutures_names
+    from app.models.dbstructure_models import DBStructure
+    from app.schemas.dbstructure_schema import DBStructureOut
+
+    user_id = actor.id
+    alvo = get_connection_or_404(db, conn_id)
+    assert_connection_access(db, alvo, actor, ConnectionAccessLevel.read)
+
+    cache_key = db_full_cache_key(conn_id)
+    if not refresh:
+        cached = read_cache(cache_key)
+        if cached:
+            return cached
+
+    if refresh:
+        # `refresh` tem de voltar a INTROSPECIONAR. Saltar só a cache Redis
+        # devolvia exactamente as mesmas linhas guardadas, por isso tabelas
+        # novas nunca apareciam no diagrama por muito que se recarregasse.
+        try:
+            get_strutures_names(conn_id, user_id, db, force_sync=True)
+        except Exception as e:  # noqa: BLE001
+            log_message(
+                f"⚠️ db_full: falha ao re-sincronizar o schema (conn {conn_id}): {e}",
+                "warning",
+            )
+
+    # DESEMPENHO: lê as estruturas JÁ GUARDADAS numa só query, carregando os
+    # campos com `selectinload` (rápido: 2 queries, sem N+1) — em vez de
+    # sincronizar todas as tabelas a cada pedido (dezenas de segundos). Com o
+    # Redis por cima, os loads seguintes são instantâneos.
+    structures_ser: list = []
+    try:
+        structs = (
+            db.query(DBStructure)
+            .options(selectinload(DBStructure.fields))
+            .filter(
+                DBStructure.db_connection_id == conn_id,
+                DBStructure.is_deleted == False,  # noqa: E712
+            )
+            .all()
+        )
+        if structs:
+            structures_ser = [
+                DBStructureOut.model_validate(s).model_dump(mode="json") for s in structs
+            ]
+        else:
+            # Nada guardado → bootstrap via introspeção (uma vez). Para MongoDB
+            # (introspeção SQL não se aplica) fica vazio até navegar as coleções.
+            bootstrapped = get_strutures_names(conn_id, user_id, db) or []
+            structures_ser = [
+                s.model_dump(mode="json") if hasattr(s, "model_dump") else s
+                for s in bootstrapped
+            ]
+    except Exception as e:  # noqa: BLE001
+        log_message(f"⚠️ db_full: falha a obter estruturas (conn {conn_id}): {e}", "warning")
+        structures_ser = []
+
+    def _dec(v):
+        try:
+            return secret_decrypt(v) if v else v
+        except Exception:  # noqa: BLE001
+            return v
+
+    result = {
+        "id": alvo.id,
+        "name": alvo.name,
+        "type": alvo.type,
+        "host": _dec(alvo.host),
+        "port": alvo.port,
+        "database_name": alvo.database_name,
+        "structures": structures_ser,
+    }
+
+    # Schema muda pouco; as rotas de DDL invalidam esta chave, e ?refresh=true
+    # força uma re-introspeção completa.
+    write_cache(cache_key, result, ttl=DB_FULL_TTL)
+    return result
 
 
 @router.post("/testconnections/", response_model=DbConnectionOutput)
@@ -801,3 +961,111 @@ async def open_dataset(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno ao processar o dataset.",
         )
+
+
+# =========================================================
+# 🤝 Partilha de conexões
+#
+# Quem criou a conexão decide quem mais lhe acede. O super admin (`admin:*`)
+# passa por cima de tudo. Não é preciso nenhuma permissão RBAC global aqui:
+# a autoridade vem de ser dono da conexão.
+# =========================================================
+
+
+@router.get("/connections/{conn_id}/access", response_model=ConnectionAccessOut)
+async def get_connection_access_info(
+    conn_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """
+    O que o utilizador atual pode fazer nesta conexão + lista de acessos
+    concedidos (esta última só para quem pode gerir partilhas).
+    """
+    return list_connection_shares(db, conn_id, actor)
+
+
+@router.get("/connections/{conn_id}/shareable-users", response_model=list[dict])
+async def list_shareable_users(
+    conn_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """
+    Colegas a quem esta conexão pode ser partilhada: membros ativos da mesma
+    empresa do dono, sem contar com o próprio dono nem com quem já tem acesso.
+    """
+    conn = get_connection_or_404(db, conn_id)
+    acesso = assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
+
+    ja_com_acesso = {s.user_id for s in acesso.shares}
+    ja_com_acesso.add(conn.user_id)
+
+    query = db.query(User).filter(User.is_active.is_(True))
+
+    dono = conn.owner
+    if dono is not None and dono.empresa_id is not None:
+        query = query.filter(User.empresa_id == dono.empresa_id)
+    elif not is_superadmin(actor):
+        query = query.filter(User.empresa_id == actor.empresa_id)
+
+    candidatos = query.order_by(User.nome).all()
+
+    return [
+        {
+            "id": u.id,
+            "nome": u.nome,
+            "apelido": u.apelido,
+            "email": u.email,
+        }
+        for u in candidatos
+        if u.id not in ja_com_acesso
+    ]
+
+
+@router.post(
+    "/connections/{conn_id}/shares",
+    response_model=ConnectionShareOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_connection_share(
+    conn_id: int,
+    data: ConnectionShareCreate,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Dá acesso a outro utilizador (ou atualiza o nível, se já tiver)."""
+    resultado = share_connection(db, conn_id, actor, data.user_id, data.access_level)
+    _invalidate_connections_cache()
+    return resultado
+
+
+@router.patch(
+    "/connections/{conn_id}/shares/{target_user_id}",
+    response_model=ConnectionShareOut,
+)
+async def update_connection_share(
+    conn_id: int,
+    target_user_id: int,
+    data: ConnectionShareUpdate,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Altera o nível de acesso de quem já tem partilha."""
+    return share_connection(db, conn_id, actor, target_user_id, data.access_level)
+
+
+@router.delete(
+    "/connections/{conn_id}/shares/{target_user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_connection_share(
+    conn_id: int,
+    target_user_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Retira o acesso de um utilizador a esta conexão."""
+    revoke_connection_share(db, conn_id, actor, target_user_id)
+    _invalidate_connections_cache()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

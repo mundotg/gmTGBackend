@@ -2,10 +2,11 @@ import traceback
 from datetime import timedelta
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Security
 from sqlalchemy.orm import Session
 
 from app import database, auth
+from app.config.api_security import cookie_scheme, refresh_cookie_scheme
 from app.cruds import user_crud
 from app.models import user_model
 from app.request_fingerprint import build_fingerprint
@@ -300,7 +301,7 @@ async def login_user(
 async def refresh_access_token(
     request: Request,
     response: Response,
-    refresh_token: str | None = Cookie(None, alias="refresh_token"),
+    refresh_token: str | None = Security(refresh_cookie_scheme),
     db: Session = Depends(database.get_db),
 ):
     try:
@@ -377,7 +378,7 @@ async def refresh_access_token(
 @router.get("/me", response_model=users_schemas.UserOut2)
 async def get_current_user(
     request: Request,
-    access_token: str | None = Cookie(None, alias="access_token"),
+    access_token: str | None = Security(cookie_scheme),
     db: Session = Depends(database.get_db),
 ):
     if not access_token:
@@ -411,7 +412,7 @@ async def get_current_user(
 async def logout_user(
     request: Request,
     response: Response,
-    refresh_token: str | None = Cookie(None, alias="refresh_token"),
+    refresh_token: str | None = Security(refresh_cookie_scheme),
     db: Session = Depends(database.get_db),
 ):
     try:

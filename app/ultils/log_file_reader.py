@@ -48,6 +48,26 @@ def linha_corresponde(
     return True
 
 
+def ler_por_blocos(caminho: Path, ate: int, bloco: int = 64 * 1024):
+    """
+    Conteúdo do ficheiro do início até `ate` bytes, em blocos.
+
+    O limite não é uma optimização, é uma exigência de correcção: o ficheiro
+    cresce enquanto está a ser servido — a própria resposta ao pedido de
+    download gera uma linha de log — e ler até EOF devolveria mais bytes do
+    que os anunciados. Fixar o tamanho no início entrega um instantâneo
+    coerente do ficheiro no momento do pedido.
+    """
+    lidos = 0
+    with caminho.open("rb") as ficheiro:
+        while lidos < ate:
+            pedaco = ficheiro.read(min(bloco, ate - lidos))
+            if not pedaco:  # ficheiro truncado ou rodado a meio da leitura
+                break
+            lidos += len(pedaco)
+            yield pedaco
+
+
 def ler_do_fim(
     caminho: Path,
     limite: int,

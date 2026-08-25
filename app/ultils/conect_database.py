@@ -13,6 +13,7 @@ from sqlalchemy.exc import (
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError, ServerSelectionTimeoutError
 
+from app.ultils.db_url import engine_from_url
 from app.ultils.logger import log_message
 
 
@@ -167,7 +168,20 @@ class DatabaseManager:
     def get_engine(db_type: str, config: Dict[str, Any]):
         """
         Cria o Engine SQLAlchemy ou MongoClient.
+
+        Se `config["url"]` vier preenchido, é essa a ligação: a URL do
+        fornecedor é usada tal como foi colada, sem ser remontada a partir dos
+        campos (ver app/ultils/db_url.py). É o modo "ligar por URL" do
+        formulário.
         """
+
+        url = (config.get("url") or "").strip()
+        if url:
+            return engine_from_url(
+                url,
+                echo=config.get("debug_sql", False),
+                pool_recycle=config.get("pool_recycle", 1800),
+            )
 
         uri_template = DatabaseManager.DB_URIS.get(db_type)
 
@@ -229,9 +243,20 @@ class DatabaseManager:
             # SQL
             # ------------------------
 
+            # URL-encode user/password nas URIs de "userinfo"
+            # (postgres://user:pass@host). Sem isto, uma password com um
+            # caractere reservado (@ : / ? # %) parte a URI e o driver
+            # autentica com credenciais erradas — o servidor devolve
+            # "password authentication failed", que aponta para o lado
+            # errado do problema. SQL Server (ODBC) e SQLite não usam
+            # userinfo, por isso ficam com os valores em cru.
+            uses_userinfo = db_type not in ("SQL Server", "SQLite", "MongoDB")
+            uri_user = quote_plus(str(user)) if (uses_userinfo and user) else (user or "")
+            uri_pw = quote_plus(str(password)) if (uses_userinfo and password) else (password or "")
+
             uri = uri_template.format(
-                user=user,
-                password=password,
+                user=uri_user,
+                password=uri_pw,
                 host=host,
                 port=port,
                 database=database,
@@ -290,7 +315,9 @@ class DatabaseManager:
             # Mongo
             # ------------------------
 
-            if db_type == "MongoDB":
+            # `is_mongo(engine)` em vez de `db_type == "MongoDB"`: no modo
+            # "ligar por URL" o tipo vem do esquema da URL, não do argumento.
+            if is_mongo(engine):
 
                 engine.admin.command("ping")
 
@@ -366,26 +393,34 @@ class DatabaseManager:
 
     @staticmethod
     def test_connection(db_type: str, config: Dict[str, Any]) -> bool:
-        """
-        Apenas testa a conectividade.
-        """
+        """Apenas testa a conectividade (compatibilidade — devolve só bool)."""
+        ok, _ = DatabaseManager.test_connection_detailed(db_type, config)
+        return ok
 
+    @staticmethod
+    def test_connection_detailed(
+        db_type: str, config: Dict[str, Any]
+    ) -> "tuple[bool, Optional[str]]":
+        """
+        Testa a conectividade e devolve `(ok, motivo)`.
+
+        Ao contrário de `test_connection` (que devolvia só um bool e perdia o
+        erro), aqui traduz-se a exceção do driver numa mensagem acionável —
+        conexão recusada, host desconhecido, autenticação falhada, timeout —
+        para o utilizador saber o que corrigir em vez de um genérico
+        "Falha ao testar conexão".
+        """
         engine = None
         session = None
 
         try:
-
             engine = DatabaseManager.get_engine(db_type, config)
 
-            if db_type == "MongoDB":
-
+            if is_mongo(engine):
                 engine.admin.command("ping")
-
             else:
-
                 SessionLocal = sessionmaker(bind=engine)
                 session = SessionLocal()
-
                 with engine.connect() as conn:
                     conn.execute(text("SELECT 1"))
 
@@ -393,29 +428,58 @@ class DatabaseManager:
                 f"✅ Teste de conexão com {db_type} executado com sucesso.",
                 level="info",
             )
-
-            return True
+            return True, None
 
         except Exception as e:
-
+            motivo = DatabaseManager._explain_connection_error(db_type, config, e)
             log_message(
-                f"❌ Teste de conexão falhou ({db_type}): {e}",
-                level="error",
+                f"❌ Teste de conexão falhou ({db_type}): {e}", level="error"
             )
-
-            return False
+            return False, motivo
 
         finally:
-
             if session:
                 try:
                     session.close()
                 except Exception:
                     pass
-
             if engine:
-
                 try:
                     close_engine(engine)
                 except Exception:
                     pass
+
+    @staticmethod
+    def _explain_connection_error(
+        db_type: str, config: Dict[str, Any], error: Exception
+    ) -> str:
+        """Traduz a exceção do driver numa mensagem legível e acionável."""
+        host = config.get("host", "?")
+        port = config.get("port", "?")
+        alvo = f"{host}:{port}"
+        raw = str(error).lower()
+
+        if any(t in raw for t in ("could not translate host", "name or service not known",
+                                  "getaddrinfo", "nodename nor servname", "unknown host")):
+            return f"Host desconhecido: não foi possível resolver '{host}'."
+        if any(t in raw for t in ("connection refused", "actively refused", "connect call failed",
+                                  "econnrefused")):
+            return (
+                f"Ligação recusada a {alvo}. O servidor pode estar desligado, a porta "
+                f"errada, ou inacessível a partir do backend (em Docker, 'localhost' é o "
+                f"próprio contentor — use o host real ou 'host.docker.internal')."
+            )
+        if any(t in raw for t in ("timeout", "timed out")):
+            return f"Tempo esgotado a ligar a {alvo}. Verifique firewall/rede."
+        if any(t in raw for t in ("password authentication failed", "authentication failed",
+                                  "auth failed", "access denied", "role \"", "login failed")):
+            return "Autenticação falhou: utilizador ou password incorretos."
+        if any(t in raw for t in ("database", "does not exist", "unknown database")):
+            if "does not exist" in raw or "unknown database" in raw:
+                return f"A base de dados '{config.get('database')}' não existe no servidor."
+        if "ssl" in raw:
+            return f"Erro de SSL ao ligar a {alvo}. Reveja o modo SSL."
+
+        # Fallback: primeira linha da exceção, já sem stack.
+        primeira = str(error).strip().splitlines()[0]
+        return f"Falha ao ligar a {alvo}: {primeira[:200]}"

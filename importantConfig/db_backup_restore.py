@@ -13,12 +13,16 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from importantConfig.db_backup_restore_pymongo import _conn_parts_from_engine, _mongo_backup, _mongo_restore, _mssql_backup_target_path, _validate_conn_parts
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pymongo import MongoClient, IndexModel
+from bson import BSON
 # Ajuste os imports conforme a estrutura do seu projeto
+from app.config.dependencies import _maybe_remap_host
 from app.models.connection_models import DBConnection
-from app.ultils.ativar_engine import ConnectionManager
-from app.ultils.conect_database import assert_sql_engine
+from app.services.crypto_utils import secret_decrypt
+from app.ultils.ativar_session_bd import get_connection_id_async
 from app.ultils.logger import log_message
 
 BACKUP_DIR = "backups"
@@ -91,29 +95,50 @@ def _resolve_binary(bin_name: str, *, explicit_path: Optional[str] = None) -> st
                             return candidate
                 except Exception: pass
 
-    raise RuntimeError(f"Executável '{bin_name}' não encontrado. Instale-o ou adicione ao PATH.")
+    # Diz QUAL a variável a definir: sem isto, quem tem o binário instalado
+    # fora do PATH não descobre a saída sem ler o código.
+    env_vars = {
+        "mongodump": "MONGODUMP_PATH",
+        "mongorestore": "MONGORESTORE_PATH",
+        "pg_dump": "PG_DUMP_PATH",
+        "pg_restore": "PG_RESTORE_PATH",
+        "mysqldump": "MYSQLDUMP_PATH",
+        "mysql": "MYSQL_PATH",
+        "sqlcmd": "SQLCMD_PATH",
+    }
+    var = env_vars.get(bin_name.replace(".exe", "").lower())
+    alternativa = (
+        f" Em alternativa, define {var} no .env com o caminho completo do executável."
+        if var
+        else ""
+    )
 
-def _mssql_backup_target_path(parts: _ConnParts, local_filepath: str) -> str:
-    """
-    Define onde o SQL Server vai salvar o arquivo.
-    - Se LOCAL: usa o caminho absoluto do disco local.
-    - Se REMOTO: exige uma UNC path (compartilhamento de rede), pois o servidor não vê o disco C: do python.
-    """
-    abs_local = os.path.abspath(local_filepath)
+    raise RuntimeError(
+        f"Executável '{bin_name}' não encontrado. Instale-o ou adicione ao PATH."
+        f"{alternativa}"
+    )
 
-    if _is_local_host(parts.host):
-        return abs_local
+# def _mssql_backup_target_path(parts: _ConnParts, local_filepath: str) -> str:
+#     """
+#     Define onde o SQL Server vai salvar o arquivo.
+#     - Se LOCAL: usa o caminho absoluto do disco local.
+#     - Se REMOTO: exige uma UNC path (compartilhamento de rede), pois o servidor não vê o disco C: do python.
+#     """
+#     abs_local = os.path.abspath(local_filepath)
+
+#     if _is_local_host(parts.host):
+#         return abs_local
     
-    # Lógica para servidor remoto (opcional, requer configuração extra)
-    # Se você tiver uma pasta compartilhada, pode configurar via ENV
-    unc_base = os.environ.get("MSSQL_BACKUP_UNC", "").strip()
-    if unc_base:
-        filename = os.path.basename(abs_local)
-        return os.path.join(unc_base, filename)
+#     # Lógica para servidor remoto (opcional, requer configuração extra)
+#     # Se você tiver uma pasta compartilhada, pode configurar via ENV
+#     unc_base = os.environ.get("MSSQL_BACKUP_UNC", "").strip()
+#     if unc_base:
+#         filename = os.path.basename(abs_local)
+#         return os.path.join(unc_base, filename)
         
-    # Se for remoto e não tiver UNC configurado, vai falhar, mas tentamos o local como fallback
-    log_message("⚠️ SQL Server remoto detectado. Se o backup falhar, verifique se o servidor tem acesso a este caminho.", level="warning")
-    return abs_local
+#     # Se for remoto e não tiver UNC configurado, vai falhar, mas tentamos o local como fallback
+#     log_message("⚠️ SQL Server remoto detectado. Se o backup falhar, verifique se o servidor tem acesso a este caminho.", level="warning")
+#     return abs_local
 
 # ... (Funções auxiliares _now_stamp, _driver_name, _safe_filename_part mantidas iguais) ...
 def _now_stamp() -> str:
@@ -275,15 +300,56 @@ class _ConnParts:
     password: str
 
 
-def _conn_parts_from_engine(engine: Any, _conn: DBConnection) -> _ConnParts:
-    driver = _driver_name(engine.url)
-    db_name = _conn.database_name or "default"
-    user = _conn.username or ""
-    host = _conn.host or "localhost"
-    port = str(_conn.port) if _conn.port else ""
-    password = _conn.password or ""
-    return _ConnParts(driver, db_name, user, host, port, password)
+def _dec(value: Any) -> str:
+    """Decifra um campo cifrado em repouso; devolve string vazia se vazio."""
+    if not value:
+        return ""
+    try:
+        return secret_decrypt(value)
+    except Exception:
+        # Já em claro (ex.: dados antigos) — devolve como está.
+        return str(value)
 
+
+def _driver_from_conn(_conn: DBConnection, engine: Any = None) -> str:
+    """
+    Deriva o driver a partir do tipo da conexão. Usa `_conn.type` (que existe
+    para todos, incluindo MongoDB) em vez de `engine.url`, que rebenta num
+    MongoClient. `engine` é opcional (fallback só para tipos desconhecidos).
+    """
+    t = (_conn.type or "").lower()
+    aliases = {
+        "postgres": "postgresql",
+        "postgresql": "postgresql",
+        "mysql": "mysql",
+        "mariadb": "mysql",
+        "sqlite": "sqlite",
+        "oracle": "oracle",
+        "sqlserver": "mssql",
+        "mssql": "mssql",
+        "mongodb": "mongodb",
+        "mongo": "mongodb",
+    }
+    if t in aliases:
+        return aliases[t]
+    # Fallback para o driver do SQLAlchemy quando o tipo é desconhecido.
+    try:
+        return _driver_name(engine.url)
+    except Exception:
+        return t or "unknown"
+
+
+# def _conn_parts_from_engine(engine: Any, _conn: DBConnection) -> _ConnParts:
+#     # ⚠️ Os campos vêm cifrados em repouso — decifrar antes de os passar às
+#     # ferramentas de linha de comando. E remapear localhost→host.docker.internal
+#     # quando o backend corre em contentor (ver dependencies._maybe_remap_host).
+#     driver = _driver_from_conn(_conn, engine)
+#     db_name = _conn.database_name or "default"
+#     user = _dec(_conn.username)
+#     host = _maybe_remap_host(_dec(_conn.host) or "localhost")
+#     port = str(_conn.port) if _conn.port else ""
+#     password = _dec(_conn.password)
+#     return _ConnParts(driver, db_name, user, host, port, password)
 
 def _build_env(password: str) -> Dict[str, str]:
     env = os.environ.copy()
@@ -298,12 +364,12 @@ def _backup_ext_for_driver(driver: str) -> str:
     return mapping.get(driver, "bin")
 
 
-def _validate_conn_parts(parts: _ConnParts) -> None:
-    requires_host = ("postgresql", "mysql", "mssql", "oracle")
-    if parts.driver in requires_host and not parts.host:
-        raise ValueError("Host é obrigatório.")
-    if not parts.db_name:
-        raise ValueError("Nome do banco de dados é obrigatório.")
+# def _validate_conn_parts(parts: _ConnParts) -> None:
+#     requires_host = ("postgresql", "mysql", "mssql", "oracle")
+#     if parts.driver in requires_host and not parts.host:
+#         raise ValueError("Host é obrigatório.")
+#     if not parts.db_name:
+#         raise ValueError("Nome do banco de dados é obrigatório.")
 
 
 # ===============================================================
@@ -323,14 +389,37 @@ async def backup_database(
     await asyncio.to_thread(_ensure_dir, BACKUP_DIR)
     await asyncio.to_thread(_fix_windows_permissions, BACKUP_DIR)
 
-    engine, _conn = await ConnectionManager.get_engine_idconn_async(db, user_id, connection_id)
+    # ⚠️ Só precisamos dos metadados da conexão — NÃO de um motor ligado.
+    # pg_dump/mongodump ligam-se sozinhos. Construir o motor async aqui só
+    # trazia problemas (ex.: asyncpg a rejeitar SSL) que não têm nada a ver
+    # com o backup.
+    _conn = await get_connection_id_async(db, user_id, connection_id)
+    if not _conn:
+        raise ValueError("Conexão não encontrada.")
 
-    # O backup assenta em pg_dump/mysqldump e em engine.url; o MongoDB não
-    # tem nenhum dos dois (precisaria de mongodump). Recusa explicitamente
-    # em vez de falhar ao ler atributos que não existem.
-    assert_sql_engine(engine, "Backup da base de dados")
+    parts = _conn_parts_from_engine(None, _conn)
 
-    parts = _conn_parts_from_engine(engine, _conn)
+    # 🍃 MongoDB tem um caminho próprio (mongodump), sem SQL.
+    if parts.driver == "mongodb":
+        _validate_conn_parts(parts)
+        filename = _build_backup_filename(parts.db_name, "archive.gz")
+        filepath = os.path.join(BACKUP_DIR, filename)
+        log_message(f"💾 Backup Mongo iniciado: {parts.db_name}", level="info")
+        try:
+            await _mongo_backup(parts, filepath)
+            _file_exists_and_nonempty(filepath)
+            # O formato próprio já é `.gz`; não passa pela compressão genérica.
+            return filepath
+        except Exception as e:
+            log_message(f"🔥 Erro no backup Mongo: {e}\n{traceback.format_exc()}", level="error")
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except Exception:
+                    pass
+            raise
+
+    # SQL: dispatch por driver (o driver vem de _conn.type, não de um motor).
     _validate_conn_parts(parts)
 
     ext = _backup_ext_for_driver(parts.driver)
@@ -361,7 +450,8 @@ async def backup_database(
             await asyncio.to_thread(_write_text_file, filepath, dump_content)
 
         elif parts.driver == "sqlite":
-            db_path = engine.url.database
+            # No SQLite o "host" guarda o caminho do ficheiro .db.
+            db_path = parts.host
             if not db_path or not os.path.exists(db_path):
                 raise FileNotFoundError(f"SQLite não encontrado: {db_path}")
             await asyncio.to_thread(shutil.copy2, db_path, filepath)
@@ -427,6 +517,19 @@ async def restore_backup(
     if _file_size_mb(filepath) > MAX_RESTORE_FILE_MB:
         raise ValueError(f"Arquivo muito grande (> {MAX_RESTORE_FILE_MB}MB).")
 
+    _conn = await get_connection_id_async(db, user_id, connection_id)
+    if not _conn:
+        raise ValueError("Conexão não encontrada.")
+    parts = _conn_parts_from_engine(None, _conn)
+
+    # 🍃 MongoDB: mongorestore lê o `.archive.gz` diretamente (--gzip), sem a
+    # descompressão genérica (que corromperia o arquivo).
+    if parts.driver == "mongodb":
+        log_message(f"♻️ Restaurando Mongo em: {parts.db_name}", level="info")
+        await _mongo_restore(parts, filepath)
+        log_message("✅ Restauração Mongo concluída.", level="success")
+        return
+
     extracted_path: Optional[str] = None
     final_restore_path = filepath
 
@@ -435,11 +538,6 @@ async def restore_backup(
         extracted_path = await _extract_file_async(filepath)
         final_restore_path = extracted_path
 
-    engine, _conn = await ConnectionManager.get_engine_idconn_async(db, user_id, connection_id)
-
-    assert_sql_engine(engine, "Restauro da base de dados")
-
-    parts = _conn_parts_from_engine(engine, _conn)
     env = _build_env(parts.password)
 
     log_message(f"♻️ Restaurando em: {parts.db_name} [{parts.driver}]", level="info")
@@ -461,7 +559,7 @@ async def restore_backup(
                 await _run_command_async(cmd, env, "restore mysql", stdin_file=f_stream)
 
         elif parts.driver == "sqlite":
-            db_path = engine.url.database
+            db_path = parts.host  # o "host" guarda o caminho do ficheiro .db
             if not db_path: raise RuntimeError("Path SQLite inválido.")
             await asyncio.to_thread(shutil.copy2, final_restore_path, db_path)
 

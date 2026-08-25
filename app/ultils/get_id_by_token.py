@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import Cookie, Header, HTTPException, status
+from fastapi import HTTPException, Security, status
+from fastapi.security import HTTPAuthorizationCredentials
 
 from app.auth import decode_token
+from app.config.api_security import bearer_scheme, cookie_scheme
 
 
 def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
@@ -69,31 +71,32 @@ def _get_sub_from_payload(payload: Any) -> Optional[str]:
 #             detail="Token inválido: 'sub' não é numérico.",
 #         )
 def get_current_user_id(
-    access_token: Optional[str] = Cookie(None),
-    authorization: Optional[str] = Header(None),
+    access_token: Optional[str] = Security(cookie_scheme),
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
 ) -> int:
-    token = None
+    # O cookie mantém prioridade sobre o header, como antes. O HTTPBearer já
+    # valida o formato "Bearer <token>" e devolve None quando está malformado.
+    token = access_token or (credentials.credentials if credentials else None)
 
-    if access_token:
-        token = access_token
-    elif authorization and authorization.startswith("Bearer "):
-        parts = authorization.split(" ")
-        if len(parts) != 2 or not parts[1]:
-            raise HTTPException(status_code=401, detail="Authorization Bearer inválido")
-        token = parts[1]
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token não fornecido (cookie access_token ou Authorization Bearer).",
+        )
 
-    payload = decode_tokenInit(token)  # agora deve devolver dict
-    if not payload or not isinstance(payload, dict):
-        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+    payload = decode_token(token)
+    sub = _get_sub_from_payload(payload)
 
-    sub = payload.get("sub")
     if not sub:
-        raise HTTPException(status_code=401, detail="Token inválido: sub ausente")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido ou expirado.",
+        )
 
-    return int(sub)
-
-
-def decode_tokenInit(token: str):
-    if token == "meu_token_valido":
-        return {"sub": "1"}   # ✅ devolve dict
-    return decode_token(token)
+    try:
+        return int(sub)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido: 'sub' não é numérico.",
+        )

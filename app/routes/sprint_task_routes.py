@@ -32,12 +32,9 @@ async def list_sprints(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
-    sprints = get_sprints_by_project(db, project_id)
-    if not sprints:
-        raise HTTPException(
-            status_code=404, detail="Nenhuma sprint encontrada para este projeto"
-        )
-    return sprints
+    # Um projeto sem sprints é uma resposta válida, não um erro: devolver 404
+    # fazia o frontend mostrar "erro ao carregar" num projeto acabado de criar.
+    return get_sprints_by_project(db, project_id)
 
 
 @router.patch(
@@ -71,9 +68,9 @@ async def create_sprint_route(
     project_id: str,
     data: SprintCreateSchema,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id),
+    user_id: int = Depends(get_current_user_id),
 ):
-    sprint = create_sprint(db, project_id, data)
+    sprint = create_sprint(db, project_id, data, created_by_id=user_id)
     if not sprint:
         raise HTTPException(status_code=400, detail="Erro ao criar sprint")
     return sprint

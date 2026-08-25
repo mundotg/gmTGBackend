@@ -3,21 +3,27 @@ Rotas para execução de queries e operações no banco de dados.
 Versão melhorada com melhor estrutura, segurança e tratamento de erros.
 """
 
+import hashlib
+import json
 import traceback
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config.redis import read_cache, write_cache
 from app.database import get_db, get_db_async
 from app.routes.connection_routes import get_current_user_id
 from app.schemas.query_select_upAndInsert_schema import (
     AutoCreateRequest,
+    CondicaoFiltro,
     InsertRequest,
+    OrderByOption,
     QueryPayload,
     UpdateRequest,
 )
@@ -229,6 +235,147 @@ async def execute_query_scroll_endpoint(
     """Executa uma query com scroll (paginação)."""
     query_service = QueryExecutionService()
     return await query_service.execute_query(body, db, user_id)
+
+
+# ============================================================
+# 🚀 Paginação por CURSOR (keyset) + cache Redis
+# ============================================================
+class QueryMoreRequest(BaseModel):
+    payload: QueryPayload
+    cursor: Optional[str] = None            # último valor da coluna de ordem
+    order_column: Optional[str] = None      # coluna de ordem (o cliente indica)
+    direction: Optional[str] = "ASC"
+    limit: int = 50
+
+
+def _infer_value_type(v: Optional[str]) -> str:
+    if v is None:
+        return "string"
+    s = str(v).strip()
+    try:
+        float(s)
+        return "number"
+    except (TypeError, ValueError):
+        pass
+    if s.lower() in ("true", "false"):
+        return "boolean"
+    return "string"
+
+
+def _derive_order(payload: QueryPayload, order_column: Optional[str]) -> tuple[Optional[str], str]:
+    """Coluna + direção de ordem. Prioriza a indicada pelo cliente, senão o
+    orderBy do payload, senão a 1ª coluna do select/aliases."""
+    if order_column:
+        return order_column, "ASC"
+    ob = getattr(payload, "orderBy", None) or []
+    if ob:
+        return ob[0].column, (ob[0].direction or "ASC").upper()
+    if payload.select:
+        return payload.select[0], "ASC"
+    if payload.aliaisTables:
+        return next(iter(payload.aliaisTables.keys())), "ASC"
+    return None, "ASC"
+
+
+def _extract_col_value(row: Dict[str, Any], col: str) -> Any:
+    """Valor da coluna de ordem numa linha (chaves podem ser qualificadas)."""
+    if col in row:
+        return row[col]
+    leaf = col.split(".")[-1]
+    if leaf in row:
+        return row[leaf]
+    for k in row:
+        if str(k).split(".")[-1] == leaf:
+            return row[k]
+    return None
+
+
+@router.post("/query-more")
+async def query_more_endpoint(
+    body: QueryMoreRequest,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Carrega a PÁGINA SEGUINTE por CURSOR (keyset): em vez de `OFFSET n` (que
+    re-varre a tabela e fica caro sob carga), aplica `WHERE ordem > cursor`
+    (usa índice, custo ~constante). Reutiliza o motor de query (SQL e MongoDB).
+    Cacheado em Redis por página → sob muita carga, pedidos idênticos não
+    voltam à BD.
+    """
+    payload = body.payload
+    limit = max(1, min(body.limit or 50, 500))
+    direction = (body.direction or "ASC").upper()
+    order_col, derived_dir = _derive_order(payload, body.order_column)
+    if not body.order_column and not body.direction:
+        direction = derived_dir
+
+    # 🔑 Cache Redis (página) — chave por payload + cursor + ordem + limite.
+    cache_key = None
+    try:
+        h = hashlib.sha1(
+            json.dumps(payload.model_dump(exclude_none=True), sort_keys=True, default=str).encode()
+        ).hexdigest()[:16]
+        cache_key = f"qmore:{user_id}:{h}:{order_col}:{direction}:{body.cursor}:{limit}"
+        cached = read_cache(cache_key)
+        if cached:
+            return cached
+    except Exception:  # noqa: BLE001
+        cache_key = None
+
+    # Prepara o payload da página seguinte (sem offset).
+    payload.limit = limit
+    payload.offset = None
+    payload.isCountQuery = False
+
+    # Filtro keyset: só a partir do cursor (a 1ª página não leva cursor).
+    if order_col and body.cursor is not None and str(body.cursor) != "":
+        op = ">" if direction == "ASC" else "<"
+        parts = order_col.split(".")
+        table_ref = ".".join(parts[:-1]) if len(parts) >= 2 else (payload.baseTable or "")
+        vt = _infer_value_type(body.cursor)
+        payload.where = [
+            *(payload.where or []),
+            CondicaoFiltro(
+                table_name_fil=table_ref,
+                column=order_col,
+                operator=op,
+                value=str(body.cursor),
+                column_type="number" if vt == "number" else "string",
+                value_type=vt,  # type: ignore[arg-type]
+                logicalOperator="AND",
+            ),
+        ]
+
+    # Garante ordenação determinística pela coluna de cursor.
+    if order_col and not (getattr(payload, "orderBy", None) or []):
+        payload.orderBy = [OrderByOption(column=order_col, direction=direction)]
+
+    result = await QueryExecutionService().execute_query(payload, db, user_id)
+    preview: List[Dict[str, Any]] = result.get("preview", []) if isinstance(result, dict) else []
+
+    next_cursor = None
+    if preview and order_col:
+        val = _extract_col_value(preview[-1], order_col)
+        next_cursor = None if val is None else str(val)
+
+    resp = {
+        "success": True,
+        "preview": preview,
+        "columns": result.get("columns", []) if isinstance(result, dict) else [],
+        "next_cursor": next_cursor,
+        "has_more": len(preview) >= limit,
+        "order_column": order_col,
+        "direction": direction,
+    }
+
+    if cache_key:
+        try:
+            write_cache(cache_key, resp, ttl=45)  # curto: dados podem mudar
+        except Exception:  # noqa: BLE001
+            pass
+
+    return resp
 
 
 @router.post("/start-query")

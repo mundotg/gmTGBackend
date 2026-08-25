@@ -2,8 +2,10 @@
 # app/schemas/sprint_schemas.py
 # -----------------------------
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import List, Optional
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+
+from app.schemas.userTask_schemas import OptStrId, StrId
 
 
 
@@ -45,7 +47,11 @@ class BaseSprintSchema(BaseModel):
 class SprintCreateSchema(BaseSprintSchema):
     """Schema para criação de sprint."""
 
-    project_id: str = Field(..., alias="projectId", description="ID do projeto associado")
+    # Opcional: o `project_id` verdadeiro vem do caminho da rota
+    # (`POST /sprints/{project_id}`) e sobrepõe-se ao que vier no corpo.
+    project_id: OptStrId = Field(
+        None, alias="projectId", description="ID do projeto associado"
+    )
 
 
 # -----------------------------
@@ -63,7 +69,7 @@ class SprintUpdateSchema(BaseModel):
     motivo_cancelamento: Optional[str] = Field(
         None, description="Motivo do cancelamento (caso tenha sido cancelada)"
     )
-    project_id: Optional[str] = Field(None, alias="projectId")
+    project_id: OptStrId = Field(None, alias="projectId")
 
     @field_validator("end_date")
     @classmethod
@@ -90,34 +96,51 @@ from app.schemas.userTask_schemas import UsuarioMiniSchema,ProjectMiniSchema, Ta
 class SprintSchema(BaseSprintSchema):
     """Schema completo de uma sprint (para responses)."""
 
-    id: str = Field(..., description="Identificador único da sprint (UUID)")
+    id: StrId = Field(..., description="Identificador único da sprint")
     is_active: bool = Field(default=True, description="Indica se a sprint está ativa")
     cancelled: bool = Field(default=False, description="Indica se a sprint foi cancelada")
     motivo_cancelamento: Optional[str] = Field(
         default=None, description="Motivo do cancelamento (se aplicável)"
     )
-    project_id: str = Field(..., alias="projectId")
-    created_by_id: Optional[str] = Field(None, alias="createdById", description="ID do criador da sprint")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    # AliasChoices para aceitar `projectId` na entrada e continuar a encontrar
+    # `project_id` no objeto ORM na saída — com um `alias` simples, o Pydantic
+    # procurava `sprint.projectId` e devolvia sempre None.
+    project_id: OptStrId = Field(
+        None, validation_alias=AliasChoices("projectId", "project_id")
+    )
+    created_by_id: OptStrId = Field(
+        None,
+        validation_alias=AliasChoices("createdById", "created_by_id"),
+        description="ID do criador da sprint",
+    )
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     # 🔗 RELAÇÕES BÁSICAS (apenas IDs para evitar recursão)
     project: Optional[ProjectMiniSchema] = Field(
         default=None, description="Nome do projeto (apenas para display)"
     )
-    created_by_name: Optional[UsuarioMiniSchema] = Field(
-        default=None, description="Nome do criador (apenas para display)"
+    created_by: Optional[UsuarioMiniSchema] = Field(
+        default=None, description="Criador da sprint"
     )
-    tasks: Optional[TaskMiniSchema]= Field(
-        default=None, description="tarefas na sprint"
+    # `tasks` é uma coleção no ORM: declarar um único TaskMiniSchema fazia a
+    # validação falhar assim que a sprint tivesse tarefas.
+    tasks: List[TaskMiniSchema] = Field(
+        default_factory=list, description="Tarefas na sprint"
     )
-    task_stats: Optional[TaskStatsSchema] = None
+    # Também é uma coleção no ORM (uma linha por agregação guardada).
+    task_stats: List[TaskStatsSchema] = Field(default_factory=list)
     tasks_count: int = Field(
         default=0, description="Número de tarefas na sprint"
     )
     completed_tasks_count: int = Field(
         default=0, description="Número de tarefas concluídas"
     )
+
+    @field_validator("tasks_count", mode="before")
+    @classmethod
+    def default_zero(cls, v):
+        return v or 0
 
     model_config = ConfigDict(
         from_attributes=True,

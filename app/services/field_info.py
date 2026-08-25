@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import traceback
 from typing import Any, Dict, List, Optional
+from fastapi import HTTPException
 from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -84,6 +85,15 @@ def sincronizar_metadados_da_tabela(db: Session, table_name: str, user_id: int) 
             resposta_colunas=resposta_colunas,
             total_adicionado=len(resposta_colunas),
         )
+
+    except HTTPException:
+        # Erros já "traduzidos" (ex.: 400 "Conexão do banco de dados não
+        # encontrada" do ensure_connection) devem propagar TAL COMO estão.
+        # Se caíssem no `except Exception` abaixo, viravam RuntimeError e o
+        # route respondia 500 "Não foi possível ler as colunas" — enganador:
+        # o problema real é não haver conexão ativa (o cliente deve ligar-se
+        # a uma base primeiro), não uma falha do servidor.
+        raise
 
     except SQLAlchemyError as e:
         db.rollback()

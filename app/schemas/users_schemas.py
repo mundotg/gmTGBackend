@@ -28,6 +28,27 @@ class EmpresaSchema(BaseModel):
     )
 
 
+class EmpresaUpdateSchema(BaseModel):
+    """Campos editáveis da empresa (todos opcionais → atualização parcial)."""
+
+    nome: Optional[Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=150)]] = Field(
+        None, alias="company"
+    )
+    tamanho: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)]] = Field(
+        None, alias="companySize"
+    )
+    nif: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)]] = None
+    endereco: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)]] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class EmpresaComPermissoesSchema(EmpresaSchema):
+    """Empresa + o que este utilizador pode fazer sobre ela (para a UI)."""
+
+    can_manage: bool = False
+
+
 # -----------------------------
 # 🛡️ Permission Schema
 # -----------------------------
@@ -35,6 +56,9 @@ class PermissionSchema(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
+    # Derivada do prefixo do nome ("db_connection:read" → "Conexões de BD").
+    # Serve só para a UI agrupar as permissões.
+    category: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -48,7 +72,80 @@ class RoleSchema(BaseModel):
     description: Optional[str] = None
     permissions: list[PermissionSchema] = []
 
+    # Roles criadas pelo seed: não podem ser apagadas nem renomeadas.
+    is_system: bool = False
+    # Role de super admin: nem as permissões podem ser alteradas.
+    is_locked: bool = False
+    is_active: bool = True
+    users_count: int = 0
+
     model_config = ConfigDict(from_attributes=True)
+
+
+# -----------------------------
+# 🔑 Role — escrita (RBAC admin)
+# -----------------------------
+class RoleCreateSchema(BaseModel):
+    name: str = Field(..., min_length=2, max_length=50)
+    description: Optional[str] = Field(None, max_length=200)
+    permission_ids: List[int] = []
+
+    @field_validator("name")
+    @classmethod
+    def normalize_role_name(cls, v: str) -> str:
+        normalized = " ".join((v or "").split()).lower()
+        if not normalized:
+            raise ValueError("O nome da função é obrigatório.")
+        return normalized
+
+
+class RoleUpdateSchema(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=50)
+    description: Optional[str] = Field(None, max_length=200)
+    is_active: Optional[bool] = None
+
+    @field_validator("name")
+    @classmethod
+    def normalize_role_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        normalized = " ".join(v.split()).lower()
+        if not normalized:
+            raise ValueError("O nome da função é obrigatório.")
+        return normalized
+
+
+class RolePermissionsUpdateSchema(BaseModel):
+    """Substitui integralmente o conjunto de permissões da role."""
+
+    permission_ids: List[int]
+
+
+# -----------------------------
+# 👥 Membros da equipa (RBAC)
+# -----------------------------
+class MemberSchema(BaseModel):
+    id: int
+    nome: str
+    apelido: Optional[str] = None
+    email: str
+    is_active: bool = True
+
+    role_id: Optional[int] = None
+    role_name: Optional[str] = None
+    is_superadmin: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MemberRoleUpdateSchema(BaseModel):
+    """`role_id = None` retira a função ao membro (fica sem permissões)."""
+
+    role_id: Optional[int] = None
+
+
+class MemberStatusUpdateSchema(BaseModel):
+    is_active: bool
 
 
 # -----------------------------

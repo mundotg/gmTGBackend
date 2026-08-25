@@ -2,7 +2,9 @@
 from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('.env', '.')]
+# app/static leva o swagger-ui e o redoc empacotados. Sem isto, o .exe cai no
+# CDN e o /docs fica em branco numa máquina sem internet.
+datas = [('.env', '.'), ('app/static', 'app/static')]
 binaries = []
 hiddenimports = ['fastapi', 'uvicorn', 'starlette', 'pydantic', 'pyodbc', 'app.routes', 'app.config', 'paddlex', 'paddleocr']
 hiddenimports += collect_submodules('app')

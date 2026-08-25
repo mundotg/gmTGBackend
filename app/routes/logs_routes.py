@@ -6,21 +6,22 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.log_models import Log
 from app.routes.connection_routes import get_current_user_id
+from app.schemas.logs_schema import LogOut
 from app.schemas.responsehttp_schema import ResponseWrapper
-from app.ultils.log_file_reader import ler_do_fim, normalizar_nivel
+from app.ultils.log_file_reader import ler_do_fim, ler_por_blocos, normalizar_nivel
 from app.ultils.logger import get_log_file_path, log_message
 
 
 router = APIRouter(tags=["AuditLog"])
 
 
-@router.get("/logs", response_model=ResponseWrapper[list])
+@router.get("/logs", response_model=ResponseWrapper[list[LogOut]])
 async def get_logs(
     level: Optional[str] = Query(
         None, description="Filtrar por nível (info, error, warning, success)"
@@ -166,14 +167,33 @@ async def download_log_file(user_id: int = Depends(get_current_user_id)):
     """
     caminho = _ficheiro_ou_404()
 
-    return FileResponse(
-        path=str(caminho),
+    try:
+        tamanho = caminho.stat().st_size
+    except OSError:
+        raise HTTPException(status_code=500, detail="Erro ao ler o ficheiro de log.")
+
+    # Não se usa FileResponse aqui. O FileResponse anuncia Content-Length a
+    # partir do stat() e depois lê até EOF — e este ficheiro cresce entre as
+    # duas coisas: o RequestContextMiddleware regista uma linha por cada
+    # pedido, incluindo este. O corpo saía maior do que o anunciado e o
+    # uvicorn rebentava com "Response content longer than Content-Length",
+    # sem falhar nenhum outro endpoint (é o único cujo corpo é o ficheiro que
+    # o middleware escreve).
+    #
+    # Streaming sem Content-Length (chunked), limitado ao tamanho lido no
+    # início: o cliente recebe o ficheiro tal como estava no momento do
+    # pedido. O tamanho vai no header para quem quiser mostrar progresso.
+    return StreamingResponse(
+        ler_por_blocos(caminho, tamanho),
         media_type="text/plain; charset=utf-8",
-        filename=caminho.name,
+        headers={
+            "Content-Disposition": f'attachment; filename="{caminho.name}"',
+            "X-Log-Size": str(tamanho),
+        },
     )
 
 
-@router.get("/logs/{log_id}", response_model=ResponseWrapper[dict])
+@router.get("/logs/{log_id}", response_model=ResponseWrapper[LogOut])
 async def get_log_by_id(
     log_id: int,
     db: Session = Depends(get_db),

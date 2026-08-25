@@ -2,22 +2,35 @@ from datetime import datetime, timezone
 import traceback
 from typing import Any, Dict, Optional
 
-from fastapi import HTTPException
-from sqlalchemy import func, or_, select, update
+from fastapi import HTTPException, status
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
-from sqlalchemy.orm import load_only, noload
+from sqlalchemy.orm import joinedload, load_only, noload
 
 from app.models.user_model import User
-from app.models.connection_models import ActiveConnection, ConnectionLog, DBConnection
-from app.schemas.connetion_schema import DBConnectionBase
+from app.models.connection_models import (
+    ActiveConnection,
+    ConnectionLog,
+    DBConnection,
+    DBConnectionShare,
+)
+from app.schemas.connetion_schema import (
+    ConnectionAccessLevel,
+    ConnectionAccessOut,
+    ConnectionShareOut,
+    DBConnectionBase,
+)
 from app.schemas.users_schemas import PaginationOutput
-from app.services.crypto_utils import reencrypt_at_rest
+from app.services.crypto_utils import reencrypt_at_rest, secret_decrypt, secret_encrypt
+from app.ultils.db_url import InvalidDatabaseUrl, parse_db_url
 from app.ultils.logger import log_message
+from app.ultils.permissions import is_superadmin
 
 
 # Campos que chegam ofuscados pelo frontend e têm de ser recifrados
 # com a chave-mestra antes de tocar na base de dados.
-SECRET_FIELDS = ("host", "username", "password")
+# A `url` entra aqui porque leva as credenciais todas dentro dela.
+SECRET_FIELDS = ("host", "username", "password", "url")
 
 
 def _secure_secrets(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -35,6 +48,48 @@ def _secure_secrets(payload: Dict[str, Any]) -> Dict[str, Any]:
         value = payload.get(field)
         if value:
             payload[field] = reencrypt_at_rest(str(value))
+
+    return payload
+
+
+def _fill_from_url(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    No modo "ligar por URL", deriva host/porta/base/utilizador da própria URL.
+
+    A ligação usa sempre a URL como está (ver app/ultils/db_url.py) — isto
+    serve só para as colunas: `host`, `port` e `database_name` são NOT NULL e a
+    listagem de conexões mostra host e base de dados. Sem isto, uma conexão
+    criada por URL aparecia na lista sem qualquer identificação.
+
+    Corre DEPOIS de `_secure_secrets`, portanto a URL já está em repouso (v2) e
+    os valores derivados são cifrados com `secret_encrypt` directamente.
+    """
+    cifrada = payload.get("url")
+    if not cifrada:
+        return payload
+
+    try:
+        dados = parse_db_url(secret_decrypt(str(cifrada)))
+    except (InvalidDatabaseUrl, ValueError) as e:
+        # Não deve acontecer (a ligação já foi testada antes de persistir), mas
+        # é preferível gravar sem os derivados do que perder a conexão.
+        log_message(f"⚠️ Não foi possível derivar campos da URL: {e}", "warning")
+        return payload
+
+    if not payload.get("host"):
+        payload["host"] = secret_encrypt(dados["host"])
+    if not payload.get("port"):
+        payload["port"] = dados["port"]
+    if not payload.get("database_name"):
+        payload["database_name"] = dados["database"]
+    if not payload.get("username") and dados["username"]:
+        payload["username"] = secret_encrypt(dados["username"])
+    if not payload.get("password") and dados["password"]:
+        payload["password"] = secret_encrypt(dados["password"])
+    if not payload.get("service") and dados["service"]:
+        payload["service"] = dados["service"]
+    if not payload.get("sslmode") and dados["sslmode"]:
+        payload["sslmode"] = dados["sslmode"]
 
     return payload
 
@@ -247,7 +302,7 @@ def create_db_connection(db: Session, user_id: int, conn_data: DBConnectionBase)
         )
     else:
         db_conn = DBConnection(
-            **_secure_secrets(conn_data.model_dump()),
+            **_fill_from_url(_secure_secrets(conn_data.model_dump())),
             user_id=user_id,
             is_encrypted=True,
         )
@@ -287,7 +342,7 @@ def upsert_db_connection(db: Session, user_id: int, conn_data: DBConnectionBase)
         .first()
     )
 
-    payload = _secure_secrets(conn_data.model_dump(exclude_unset=True))
+    payload = _fill_from_url(_secure_secrets(conn_data.model_dump(exclude_unset=True)))
 
     if db_conn:
         for field, value in payload.items():
@@ -390,6 +445,10 @@ def get_db_connections_pagination_v1(
     # Vou manter a lógica original com fallback seguro:
     user_obj = db.query(User).filter(User.id == user_id).first()
     is_admin = bool(getattr(getattr(user_obj, "role", None), "name", "") == "admin")
+    superadmin = bool(user_obj and is_superadmin(user_obj))
+
+    # Conexões de outros que foram partilhadas com este utilizador.
+    shared_ids = get_shared_connection_ids(db, user_row.id)
 
     # 🔹 Subquery: último uso da conexão
     sub_last_used = (
@@ -427,13 +486,21 @@ def get_db_connections_pagination_v1(
         .join(User, DBConnection.user_id == User.id)
     )
 
-    # 🔐 Regra de permissão (mesma regra, só mais limpa)
-    if is_admin:
+    # 🔐 Regra de visibilidade:
+    #   super admin → todas as conexões
+    #   admin       → todas as da sua empresa
+    #   restantes   → as suas + as que lhe foram partilhadas
+    if superadmin:
+        pass
+    elif is_admin:
         query = query.filter(User.empresa_id == user_row.empresa_id)
     else:
-        query = query.filter(
+        proprias = and_(
             DBConnection.user_id == user_row.id,
             User.empresa_id == user_row.empresa_id,
+        )
+        query = query.filter(
+            or_(proprias, DBConnection.id.in_(shared_ids)) if shared_ids else proprias
         )
 
     total = _count_fast(query)
@@ -623,6 +690,7 @@ def create_connection_log(
     try:
         log_entry = ConnectionLog(
             connection_id=connection_id,
+            user_id=user_id,
             action=action,
             status=status,
             timestamp=timestamp,
@@ -731,3 +799,288 @@ def query_connections_simple(
         "items": results,
         "pages": (total + limit - 1) // limit if limit > 0 else 1,
     }
+
+
+# =========================================================
+# 🤝 Partilha de conexões
+# =========================================================
+
+# Ordem de força dos níveis. Serve para comparar ("write chega para ler?").
+ACCESS_ORDER = {
+    ConnectionAccessLevel.read: 1,
+    ConnectionAccessLevel.write: 2,
+    ConnectionAccessLevel.manage: 3,
+}
+
+
+def _share_out(share: DBConnectionShare) -> ConnectionShareOut:
+    return ConnectionShareOut(
+        id=share.id,
+        connection_id=share.connection_id,
+        user_id=share.user_id,
+        user_nome=share.user.nome if share.user else None,
+        user_email=share.user.email if share.user else None,
+        access_level=ConnectionAccessLevel(share.access_level),
+        granted_by_id=share.granted_by_id,
+        granted_by_nome=share.granted_by.nome if share.granted_by else None,
+        created_at=share.created_at,
+    )
+
+
+def get_connection_or_404(db: Session, connection_id: int) -> DBConnection:
+    conn = (
+        db.query(DBConnection)
+        .options(joinedload(DBConnection.owner))
+        .filter(DBConnection.id == connection_id)
+        .first()
+    )
+    if not conn:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conexão com ID {connection_id} não encontrada.",
+        )
+    return conn
+
+
+def get_share(
+    db: Session, connection_id: int, user_id: int
+) -> Optional[DBConnectionShare]:
+    return (
+        db.query(DBConnectionShare)
+        .filter(
+            DBConnectionShare.connection_id == connection_id,
+            DBConnectionShare.user_id == user_id,
+        )
+        .first()
+    )
+
+
+def get_connection_access(
+    db: Session, conn: DBConnection, user: User
+) -> ConnectionAccessOut:
+    """
+    Resolve o que `user` pode fazer em `conn`, juntando as três origens de
+    acesso: ser dono, ser super admin, ou ter uma partilha.
+    """
+    is_owner = conn.user_id == user.id
+    superadmin = is_superadmin(user)
+
+    nivel: Optional[ConnectionAccessLevel] = None
+    if is_owner or superadmin:
+        nivel = ConnectionAccessLevel.manage
+    else:
+        share = get_share(db, conn.id, user.id)
+        if share:
+            nivel = ConnectionAccessLevel(share.access_level)
+
+    forca = ACCESS_ORDER.get(nivel, 0) if nivel else 0
+
+    # Quem tem "manage" pode repartilhar; apagar continua reservado ao dono
+    # e ao super admin.
+    pode_partilhar = forca >= ACCESS_ORDER[ConnectionAccessLevel.manage]
+
+    shares: list[ConnectionShareOut] = []
+    if pode_partilhar:
+        registos = (
+            db.query(DBConnectionShare)
+            .options(
+                joinedload(DBConnectionShare.user),
+                joinedload(DBConnectionShare.granted_by),
+            )
+            .filter(DBConnectionShare.connection_id == conn.id)
+            .order_by(DBConnectionShare.created_at.desc())
+            .all()
+        )
+        shares = [_share_out(s) for s in registos]
+
+    return ConnectionAccessOut(
+        connection_id=conn.id,
+        connection_name=conn.name,
+        owner_id=conn.user_id,
+        owner_nome=conn.owner.nome if conn.owner else None,
+        is_owner=is_owner,
+        access_level=nivel,
+        can_read=forca >= ACCESS_ORDER[ConnectionAccessLevel.read],
+        can_write=forca >= ACCESS_ORDER[ConnectionAccessLevel.write],
+        can_share=pode_partilhar,
+        can_delete=is_owner or superadmin,
+        shares=shares,
+    )
+
+
+def assert_connection_access(
+    db: Session,
+    conn: DBConnection,
+    user: User,
+    required: ConnectionAccessLevel = ConnectionAccessLevel.read,
+) -> ConnectionAccessOut:
+    """Levanta 403 se `user` não tiver pelo menos o nível `required` em `conn`."""
+    acesso = get_connection_access(db, conn, user)
+    forca = ACCESS_ORDER.get(acesso.access_level, 0) if acesso.access_level else 0
+
+    if forca < ACCESS_ORDER[required]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Sem acesso de nível '{required.value}' à conexão '{conn.name}'. "
+                "Peça ao dono da conexão para lhe conceder acesso."
+            ),
+        )
+
+    return acesso
+
+
+def list_connection_shares(
+    db: Session, connection_id: int, actor: User
+) -> ConnectionAccessOut:
+    conn = get_connection_or_404(db, connection_id)
+    acesso = assert_connection_access(db, conn, actor, ConnectionAccessLevel.read)
+
+    # Quem só tem read/write vê o seu próprio acesso, não a lista de quem mais
+    # tem acesso — `get_connection_access` já devolve `shares` vazio nesse caso.
+    return acesso
+
+
+def share_connection(
+    db: Session,
+    connection_id: int,
+    actor: User,
+    target_user_id: int,
+    access_level: ConnectionAccessLevel,
+) -> ConnectionShareOut:
+    """Concede (ou atualiza) o acesso de outro utilizador a uma conexão."""
+    conn = get_connection_or_404(db, connection_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
+
+    if target_user_id == conn.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O dono da conexão já tem acesso total.",
+        )
+
+    alvo = db.get(User, target_user_id)
+    if not alvo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Utilizador não encontrado.",
+        )
+
+    if not alvo.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A conta de {alvo.email} está desativada.",
+        )
+
+    # Isolamento entre empresas: não se partilha para fora da organização.
+    dono = conn.owner
+    if (
+        dono is not None
+        and dono.empresa_id is not None
+        and alvo.empresa_id != dono.empresa_id
+        and not is_superadmin(actor)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Só é possível partilhar com membros da mesma empresa.",
+        )
+
+    share = get_share(db, conn.id, target_user_id)
+    criou = share is None
+
+    if share:
+        share.access_level = access_level.value
+    else:
+        share = DBConnectionShare(
+            connection_id=conn.id,
+            user_id=target_user_id,
+            access_level=access_level.value,
+            granted_by_id=actor.id,
+        )
+        db.add(share)
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        log_message(f"❌ Erro ao partilhar conexão {conn.id}: {e}", "error")
+        raise HTTPException(status_code=500, detail="Erro ao guardar a partilha.")
+
+    db.refresh(share)
+
+    create_connection_log(
+        db,
+        connection_id=conn.id,
+        action="share_granted" if criou else "share_updated",
+        status="success",
+        details={
+            "target_user_id": target_user_id,
+            "target_email": alvo.email,
+            "access_level": access_level.value,
+        },
+        user_id=actor.id,
+    )
+
+    log_message(
+        f"🤝 Conexão '{conn.name}' partilhada com {alvo.email} "
+        f"(nível={access_level.value}) por {actor.email}",
+        "success",
+    )
+
+    # Recarrega as relações para preencher os nomes no output.
+    share = (
+        db.query(DBConnectionShare)
+        .options(
+            joinedload(DBConnectionShare.user),
+            joinedload(DBConnectionShare.granted_by),
+        )
+        .filter(DBConnectionShare.id == share.id)
+        .first()
+    )
+    return _share_out(share)
+
+
+def revoke_connection_share(
+    db: Session,
+    connection_id: int,
+    actor: User,
+    target_user_id: int,
+) -> None:
+    """Retira o acesso de um utilizador a uma conexão."""
+    conn = get_connection_or_404(db, connection_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
+
+    share = get_share(db, conn.id, target_user_id)
+    if not share:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Este utilizador não tem acesso partilhado a esta conexão.",
+        )
+
+    email_alvo = share.user.email if share.user else str(target_user_id)
+
+    db.delete(share)
+    db.commit()
+
+    create_connection_log(
+        db,
+        connection_id=conn.id,
+        action="share_revoked",
+        status="success",
+        details={"target_user_id": target_user_id, "target_email": email_alvo},
+        user_id=actor.id,
+    )
+
+    log_message(
+        f"🚫 Acesso de {email_alvo} à conexão '{conn.name}' revogado por {actor.email}",
+        "success",
+    )
+
+
+def get_shared_connection_ids(db: Session, user_id: int) -> list[int]:
+    """IDs das conexões partilhadas com este utilizador (não as que ele possui)."""
+    rows = (
+        db.query(DBConnectionShare.connection_id)
+        .filter(DBConnectionShare.user_id == user_id)
+        .all()
+    )
+    return [row[0] for row in rows]

@@ -1,18 +1,36 @@
-import json
 import traceback
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.config.cache_manager import cache_result
-from app.schemas.task_schema import TaskSchema, TaskStatsSchema
+from app.config.cache_manager import CACHE_PREFIX, cache_result, clear_cache
+from app.schemas.task_schema import (
+    TaskCreateSchema,
+    TaskSchema,
+    TaskStatsSchema,
+    TaskUpdateSchema,
+)
 from app.database import get_db
 from app.services import task_service
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
 router = APIRouter(tags=["Tasks"])
+
+
+def _invalidate_task_cache() -> None:
+    """
+    Descarta o cache das listagens de tarefas depois de uma escrita.
+
+    `list_tasks_cached` guarda 5 minutos; sem isto, criar ou editar uma tarefa
+    parecia não ter efeito até o cache expirar.
+    """
+    try:
+        for fn in ("list_tasks_cached", "retrieve_task_cached"):
+            clear_cache(f"{CACHE_PREFIX}{fn}:*")
+    except Exception as e:  # o cache nunca deve derrubar a operação
+        log_message(f"⚠️ Falha ao invalidar cache de tarefas: {e}", level="warning")
 
 
 # -----------------------------
@@ -78,13 +96,14 @@ async def list_project_tasks(
 )
 async def add_new_task(
     project_id: str,
-    task: TaskSchema,
+    task: TaskCreateSchema,
     db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id),
+    user: int = Depends(get_current_user_id),
 ):
     """Adiciona uma nova tarefa ao projeto."""
     try:
-        result = task_service.add_task_service(db, project_id, task)
+        result = task_service.add_task_service(db, project_id, task, created_by_id=user)
+        _invalidate_task_cache()
         log_message(f"✅ Tarefa adicionada ao projeto {project_id}", level="info")
         return result
     except Exception as e:
@@ -95,13 +114,14 @@ async def add_new_task(
 async def update_existing_task(
     project_id: str,
     task_id: str,
-    task: TaskSchema,
+    task: TaskUpdateSchema,
     db: Session = Depends(get_db),
     user: str = Depends(get_current_user_id),
 ):
-    """Atualiza uma tarefa existente."""
+    """Atualiza uma tarefa existente (parcial: só os campos enviados)."""
     try:
         result = task_service.update_task_service(db, project_id, task_id, task)
+        _invalidate_task_cache()
         log_message(
             f"✅ Tarefa {task_id} atualizada no projeto {project_id}", level="info"
         )
@@ -122,6 +142,7 @@ async def delete_existing_task(
     """Deleta uma tarefa existente."""
     try:
         task_service.delete_task_service(db, project_id, task_id)
+        _invalidate_task_cache()
         log_message(
             f"✅ Tarefa {task_id} deletada do projeto {project_id}", level="info"
         )
@@ -214,35 +235,11 @@ async def validar_task(
 # -----------------------------
 # 🔍 Paginação Geral
 # -----------------------------
-@router.get("/geral/paginate")
-async def listar_elementos(
-    tipo: str = Query(
-        "user", description="Tipo de entidade: user, project, task ou sprint"
-    ),
-    search: str | None = Query(None, description="Texto para pesquisa"),
-    filtro: str | None = Query(None, description="Filtro opcional em formato JSON"),
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1, le=100),
-    db: Session = Depends(get_db),
-    user: str = Depends(get_current_user_id),
-):
-    """Paginação genérica de entidades."""
-    filters = None
-    if filtro:
-        try:
-            filters = json.loads(filtro)
-        except json.JSONDecodeError:
-            raise HTTPException(
-                status_code=400, detail="Formato inválido de filtro JSON."
-            )
-
-    return task_service.get_paginacao_service(
-        db,
-        search=search,
-        page=page,
-        limit=limit,
-        options=tipo,
-        user_id=user,
-        filters=filters,
-        load_relations=True,
-    )
+#
+# GET /geral/paginate vive em app/routes/geral_routes.py.
+#
+# Havia aqui um segundo handler com o mesmo método e path. Como geral_routes é
+# registado antes de task_routes em main.py, esta versão nunca respondia — o
+# único efeito era o aviso "Duplicate Operation ID listar_elementos" no
+# arranque e a rota duplicada no Swagger. A versão de geral_routes é a mais
+# completa (valida `tipo` contra OptionTipoModel em vez de aceitar str livre).

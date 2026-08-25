@@ -1,15 +1,26 @@
 import traceback
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Type
 from sqlalchemy import Numeric, and_, case, cast, func, select
-from typing_extensions import Literal
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from app.cruds.task_cruds import delegate_task, get_paginated_query, get_tasks, add_task,  update_task, delete_task, validate_task
-from app.models.connection_models import DBConnection
-from app.models.task_models import AuditLog, Project, Sprint, Task, TaskStats, TypeProjecto, project_team_association
-from app.models.user_model import Role, User
-from app.schemas.task_schema import  TaskSchema, TaskStatsSchema
+from app.cruds.task_cruds import (
+    _to_int_id,
+    add_task,
+    delegate_task,
+    delete_task,
+    get_tasks,
+    update_task,
+    validate_task,
+)
+from app.models.task_models import Task, TaskStats
+from app.schemas.task_schema import (
+    TaskCreateSchema,
+    TaskSchema,
+    TaskStatsSchema,
+    TaskUpdateSchema,
+)
 from app.ultils.logger import log_message
 
 
@@ -48,9 +59,17 @@ def list_tasks_service(db: Session, project_id: Optional[str]) -> List[TaskSchem
         raise HTTPException(status_code=500, detail="Erro interno ao listar tarefas")
 
 
-def add_task_service(db: Session, project_id: Optional[str], task: TaskSchema) -> TaskSchema:
+def add_task_service(
+    db: Session,
+    project_id: Optional[str],
+    task: TaskCreateSchema,
+    created_by_id: Optional[int] = None,
+) -> TaskSchema:
     """
     Adiciona uma nova tarefa ao projeto especificado.
+
+    `created_by_id` vem da sessão autenticada — o criador não é aceite do
+    corpo do pedido.
     """
     try:
         if not project_id:
@@ -61,7 +80,7 @@ def add_task_service(db: Session, project_id: Optional[str], task: TaskSchema) -
             log_message("Tentativa de adicionar tarefa inválida (campos obrigatórios ausentes)", level="warning")
             raise HTTPException(status_code=400, detail="Dados da tarefa inválidos")
 
-        new_task = add_task(db, project_id, task)
+        new_task = add_task(db, project_id, task, created_by_id=created_by_id)
 
         if not new_task:
             log_message(f"Projeto {project_id} não encontrado ao adicionar tarefa", level="warning")
@@ -160,22 +179,44 @@ def delete_task_service(db: Session, project_id: Optional[str], task_id: Optiona
 # -----------------------------------------------------
 # 🧭 DELEGAR TAREFA - SERVICE
 # -----------------------------------------------------
-def delegate_task_service(db: Session, task_id: str, new_user_id: str,assigned_to:Optional[str]=None) -> TaskSchema:
+def delegate_task_service(
+    db: Session,
+    task_id: str,
+    assigned_to: Optional[str] = None,
+    user_id: Optional[str] = None,
+) -> TaskSchema:
     """
-    Serviço para delegar uma tarefa para outro usuário.
+    Serviço para delegar uma tarefa a outro utilizador.
+
+    ⚠️ A assinatura antiga era `(db, task_id, new_user_id, assigned_to=None)`,
+    mas a rota chamava `(db=, task_id=, assigned_to=, user_id=)`: faltava o
+    argumento obrigatório `new_user_id` e `user_id` não existia. Qualquer
+    tentativa de delegar rebentava com TypeError antes de tocar na base.
+
+    `user_id` é quem está a delegar (fica registado no log).
     """
     try:
-        if not task_id or not new_user_id:
+        if not task_id or not assigned_to:
             log_message("Tentativa de delegar tarefa com parâmetros ausentes", level="warning")
-            raise HTTPException(status_code=400, detail="O ID da tarefa e do novo usuário são obrigatórios")
+            raise HTTPException(
+                status_code=400,
+                detail="O ID da tarefa e do utilizador de destino são obrigatórios",
+            )
 
-        delegated_task = delegate_task(db, task_id, new_user_id)
+        delegated_task = delegate_task(db, task_id, assigned_to)
 
         if not delegated_task:
             log_message(f"Falha ao delegar tarefa {task_id}", level="warning")
-            raise HTTPException(status_code=404, detail="Tarefa não encontrada para delegação")
+            raise HTTPException(
+                status_code=404,
+                detail="Tarefa não encontrada, ou utilizador de destino inexistente",
+            )
 
-        log_message(f"Tarefa {task_id} delegada com sucesso para o usuário {new_user_id}", level="info")
+        log_message(
+            f"Tarefa {task_id} delegada para o utilizador {assigned_to}"
+            f"{f' por {user_id}' if user_id else ''}",
+            level="info",
+        )
         return delegated_task
 
     except HTTPException:
@@ -183,14 +224,14 @@ def delegate_task_service(db: Session, task_id: str, new_user_id: str,assigned_t
     except SQLAlchemyError as e:
         db.rollback()
         log_message(
-            f"Erro de banco de dados ao delegar tarefa {task_id} para usuário {new_user_id}: {str(e)}\n{traceback.format_exc()}",
+            f"Erro de banco de dados ao delegar tarefa {task_id} para usuário {assigned_to}: {str(e)}\n{traceback.format_exc()}",
             level="error"
         )
         raise HTTPException(status_code=500, detail="Erro ao delegar tarefa no banco de dados")
     except Exception as e:
         db.rollback()
         log_message(
-            f"Erro inesperado ao delegar tarefa {task_id} para {new_user_id}: {str(e)}\n{traceback.format_exc()}",
+            f"Erro inesperado ao delegar tarefa {task_id} para {assigned_to}: {str(e)}\n{traceback.format_exc()}",
             level="critical"
         )
         raise HTTPException(status_code=500, detail="Erro interno ao delegar tarefa")
@@ -201,21 +242,39 @@ def delegate_task_service(db: Session, task_id: str, new_user_id: str,assigned_t
 # 💾 SALVAR / ATUALIZAR ESTATÍSTICAS
 # -------------------------------------------
 def save_task_stats(db: Session, project_id: Optional[str], sprint_id: Optional[str], stats_data: dict):
-    """Cria ou atualiza o registro de estatísticas."""
+    """
+    Cria ou atualiza o registo de estatísticas de um projeto/sprint.
+
+    Sem filtro nenhum (project_id e sprint_id ambos a None) não há nada para
+    guardar: seria uma linha órfã com o total global, e era isso que acontecia
+    antes — `TaskStats(**stats_data)` era criado sem project_id nem sprint_id,
+    acumulando linhas anónimas a cada chamada de /stats/task.
+    """
+    pid = _to_int_id(project_id)
+    sid = _to_int_id(sprint_id)
+
+    if pid is None and sid is None:
+        return
+
+    # Só as colunas que a tabela tem (o schema traz priority_counts, que não é
+    # coluna).
+    colunas = {c.name for c in TaskStats.__table__.columns}
+    dados = {k: v for k, v in stats_data.items() if k in colunas}
+    dados.pop("id", None)
+
     try:
         existing = db.query(TaskStats).filter(
-            TaskStats.project_id == project_id,
-            TaskStats.sprint_id == sprint_id
+            TaskStats.project_id == pid,
+            TaskStats.sprint_id == sid,
         ).first()
 
         if existing:
-            for key, value in stats_data.items():
+            for key, value in dados.items():
                 setattr(existing, key, value)
-            log_message(f"🔄 Estatísticas atualizadas para projeto={project_id} sprint={sprint_id}", "info")
+            log_message(f"🔄 Estatísticas atualizadas para projeto={pid} sprint={sid}", "info")
         else:
-            new_stats = TaskStats(**stats_data)
-            db.add(new_stats)
-            log_message(f"✅ Estatísticas criadas para projeto={project_id} sprint={sprint_id}", "success")
+            db.add(TaskStats(project_id=pid, sprint_id=sid, **dados))
+            log_message(f"✅ Estatísticas criadas para projeto={pid} sprint={sid}", "success")
 
         db.commit()
 
@@ -236,33 +295,49 @@ def get_task_stats(
     Compatível com SQLAlchemy 2.x e otimizado.
     """
 
+    pid = _to_int_id(project_id)
+    sid = _to_int_id(sprint_id)
+
     filters = []
-    if project_id:
-        filters.append(Task.project_id == project_id)
-    if sprint_id:
-        filters.append(Task.sprint_id == sprint_id)
+    if pid is not None:
+        filters.append(Task.project_id == pid)
+    if sid is not None:
+        filters.append(Task.sprint_id == sid)
 
-    # Expressões CASE (forma correta para SQLAlchemy 2.x)
-    completed_case = func.sum(case((Task.status == "concluida", 1), else_=0))
-    in_progress_case = func.sum(case((Task.status == "em_andamento", 1), else_=0))
-    pending_case = func.sum(case((Task.status == "pendente", 1), else_=0))
-    in_review_case = func.sum(case((Task.status == "em_revisao", 1), else_=0))
-    blocked_case = func.sum(case((Task.status == "bloqueada", 1), else_=0))
-    cancelled_case = func.sum(case((Task.status == "cancelada", 1), else_=0))
+    def conta_status(valor: str):
+        return func.sum(case((Task.status == valor, 1), else_=0))
 
-    # COUNT total e soma de horas estimadas (com tipo correto)
+    agora = datetime.utcnow()
+
+    # COUNT total e soma de horas estimadas
     total_count = func.count(Task.id)
     total_hours = func.coalesce(func.sum(cast(Task.estimated_hours, Numeric)), 0)
 
-    # Query principal
+    # Atrasadas: prazo passado e ainda não concluídas/canceladas.
+    overdue_case = func.sum(
+        case(
+            (
+                and_(
+                    Task.end_date < agora,
+                    Task.status.notin_(["concluida", "cancelada"]),
+                ),
+                1,
+            ),
+            else_=0,
+        )
+    )
+    validated_case = func.sum(case((Task.is_validated.is_(True), 1), else_=0))
+
     stmt = select(
         total_count.label("total"),
-        completed_case.label("completed"),
-        in_progress_case.label("in_progress"),
-        pending_case.label("pending"),
-        in_review_case.label("in_review"),
-        blocked_case.label("blocked"),
-        cancelled_case.label("cancelled"),
+        conta_status("concluida").label("completed"),
+        conta_status("em_andamento").label("in_progress"),
+        conta_status("pendente").label("pending"),
+        conta_status("em_revisao").label("in_review"),
+        conta_status("bloqueada").label("blocked"),
+        conta_status("cancelada").label("cancelled"),
+        validated_case.label("validated"),
+        overdue_case.label("overdue_tasks"),
         total_hours.label("total_estimated_hours"),
     )
 
@@ -275,6 +350,17 @@ def get_task_stats(
         completed = int(row["completed"] or 0)
         progress = int((completed / total) * 100) if total > 0 else 0
 
+        # Contagem por prioridade, numa query agrupada.
+        prio_stmt = select(Task.priority, func.count(Task.id)).group_by(Task.priority)
+        if filters:
+            prio_stmt = prio_stmt.where(and_(*filters))
+
+        priority_counts = {
+            p: 0 for p in ("baixa", "media", "alta", "urgente", "critica")
+        }
+        for prioridade, quantos in db.execute(prio_stmt).all():
+            priority_counts[prioridade or "media"] = int(quantos or 0)
+
         return TaskStatsSchema(
             total=total,
             completed=completed,
@@ -283,8 +369,11 @@ def get_task_stats(
             in_review=int(row["in_review"] or 0),
             blocked=int(row["blocked"] or 0),
             cancelled=int(row["cancelled"] or 0),
+            validated=int(row["validated"] or 0),
+            overdue_tasks=int(row["overdue_tasks"] or 0),
             total_estimated_hours=float(row["total_estimated_hours"] or 0),
             progress_percent=progress,
+            priority_counts=priority_counts,
         )
 
     except Exception as e:
@@ -297,14 +386,28 @@ def get_task_stats(
 # -----------------------------------------------------
 def validate_task_service(db: Session, task_id: str, aprovado: bool=True,comentario:str= "",assigned_to:Optional[str]=None) -> TaskSchema:
     """
-    Serviço para validar (aprovar/concluir) uma tarefa.
+    Serviço para validar (aprovar/reprovar) uma tarefa.
+
+    `assigned_to` é quem está a validar — fica registado em `validated_by_id`.
     """
     try:
         if not task_id:
             log_message("Tentativa de validar tarefa sem ID", level="warning")
             raise HTTPException(status_code=400, detail="O ID da tarefa é obrigatório")
 
-        validated_task = validate_task(db, task_id,aprovado=aprovado, validator_id=assigned_to)
+        if not aprovado and not (comentario or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Ao reprovar uma tarefa, o comentário é obrigatório.",
+            )
+
+        validated_task = validate_task(
+            db,
+            task_id,
+            aprovado=aprovado,
+            validator_id=assigned_to,
+            comentario=comentario,
+        )
 
         if not validated_task:
             log_message(f"Falha ao validar tarefa {task_id}", level="warning")
@@ -330,78 +433,12 @@ def validate_task_service(db: Session, task_id: str, aprovado: bool=True,comenta
         )
         raise HTTPException(status_code=500, detail="Erro interno ao validar tarefa")
 
-def get_paginacao_service(
-    db: Session,
-    search: Optional[str] = None,
-    page: int = 1,
-    limit: int = 10,
-    options: Literal["user", "project", "task", "sprint", "type_project", "Role", "project_team_association", "AuditLog", "TaskStats", "DBConnection"] = "user",
-    filters: Optional[Dict[str, Any]] = None,
-    user_id: Optional[str] = None,
-    load_relations: bool = False,
-):
-    """
-    Serviço genérico para retornar dados paginados com suporte a busca, filtros e relações.
-
-    Args:
-        db (Session): Sessão do banco de dados.
-        search (str, opcional): Texto para pesquisa nas colunas string.
-        page (int, opcional): Página atual. Padrão é 1.
-        limit (int, opcional): Quantidade de itens por página. Padrão é 10.
-        options (Literal): Define qual modelo será consultado.
-        filters (dict, opcional): Filtros adicionais, ex: {"status": "ativo"}
-        user_id (str, opcional): ID do usuário para filtros específicos
-        load_relations (bool, opcional): Se deve carregar relações automaticamente
-
-    Returns:
-        dict: Resultado contendo items, total, página e total de páginas.
-    """
-
-    model_map: Dict[str, Type] = {
-        "user": User,
-        "project": Project,
-        "task": Task,
-        "sprint": Sprint,
-        "type_project": TypeProjecto,
-        "Role": Role,
-        "project_team_association": project_team_association,
-        "AuditLog": AuditLog,
-        "TaskStats": TaskStats,
-        "DBConnection": DBConnection
-    }
-
-    # ✅ Verificação de tipo válido
-    if options not in model_map:
-        raise ValueError(f"Opção inválida: '{options}'. Use: {', '.join(model_map.keys())}")
-
-    model = model_map[options]
-
-    # 🔗 Definir relações para cada modelo
-    relation_map = {
-        "user": ["role_ref", "created_projects", "assigned_tasks", "projects_participating"],
-        "project": ["owner_user", "team_members",  "task_stats", "type_project", "db_connection"],
-        "task": ["assigned_user", "delegated_user", "creator_user", "project", "sprint"],
-        "sprint": ["created_by", "project", "task_stats"],
-        "type_project": [],  # Sem relações
-        "Role": ["users"],
-        "AuditLog": ["user"],
-        # "TaskStats": ["project", "sprint"],
-        "DBConnection": ["projects"],
-        "project_team_association": []  # Tabela de associação, sem relações
-    }
-
-    # Preparar relações para carregamento
-    relationships = []
-    if load_relations and options in relation_map:
-        relationships = relation_map[options]
-
-    # 🔍 Chama o método genérico de paginação e busca
-    return get_paginated_query(
-        db=db,
-        model=model,
-        search=search,
-        filters=filters,
-        page=page,
-        limit=limit,
-        relationships=relationships if load_relations else None,
-    )
+# ⚠️ `get_paginacao_service` vivia aqui, com um mapa de modelos próprio.
+#
+# A rota `/geral/paginate` chama a versão de `app/services/geral_services.py`,
+# e os dois mapas divergiram: este tinha project/task/sprint, o outro não. O
+# resultado era 403 "Opção inválida" em todo o módulo de gestão de projetos.
+# Ficou uma só implementação, em geral_services, com a união dos dois mapas.
+#
+# Se precisares de paginação aqui, importa-a de lá:
+#     from app.services.geral_services import get_paginacao_service

@@ -160,8 +160,14 @@ def get_env_list_cors(
         except json.JSONDecodeError:
             pass
 
-    # Separar por vírgula
-    return [item.strip() for item in value.split(separator) if item.strip()]
+    # Separar por vírgula. As aspas são retiradas item a item para que
+    # BACKEND_CORS_ORIGINS='*' (ou "*") valha o mesmo que * — caso contrário o
+    # valor chegaria como a string literal «'*'» e nunca casaria com o wildcard.
+    return [
+        stripped
+        for item in value.split(separator)
+        if (stripped := item.strip().strip("\"'").strip())
+    ]
 
 
 def set_env(name: str, value: str) -> None:

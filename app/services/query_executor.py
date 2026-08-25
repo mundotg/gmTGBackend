@@ -24,7 +24,8 @@ from app.ultils.build_query import (
     get_filter_condition_with_operation,
     get_query_string_advance,
 )
-from app.ultils.conect_database import assert_sql_engine
+from app.ultils.conect_database import assert_sql_engine, is_mongo
+from app.services.mongo_query_executor import describe_mongo_query, run_mongo_query
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
@@ -105,6 +106,74 @@ def montar_filter_com_parametros(
     return f"WHERE {where_sql}", params
 
 
+async def _executar_mongo_e_salvar(
+    db: Session,
+    user_id: int,
+    connection: DBConnection,
+    engine: Any,
+    queryrequest: QueryPayload,
+) -> Dict[str, Any]:
+    """
+    Equivalente NoSQL de `executar_query_e_salvar`: corre o mesmo `QueryPayload`
+    como find/count no MongoDB e devolve o MESMO formato de dicionário, para o
+    gerador de relatórios (e outros consumidores) funcionar sem alterações.
+    """
+    start = time.time()
+    newq = QuerySecurityValidator().ensure_base_table_in_query(queryrequest)
+    query_desc = describe_mongo_query(connection, newq)
+
+    result_data, columns = await run_mongo_query(engine, connection, newq)
+    duration_ms = int((time.time() - start) * 1000)
+
+    is_count = queryrequest.isCountQuery
+    # Histórico (best-effort — não deve derrubar a query se falhar).
+    try:
+        historico = QueryHistoryCreate(
+            user_id=user_id,
+            db_connection_id=connection.id,
+            query=query_desc,
+            query_type="SELECT",
+            executed_at=datetime.now(timezone.utc),
+            duration_ms=duration_ms,
+            result_preview=(
+                str(result_data) if is_count else json.dumps(result_data, default=str)
+            ),
+            error_message=None,
+            is_favorite=False,
+            tags="count" if is_count else "select",
+            app_source="API",
+            executed_by=f"user_{user_id}",
+            modified_by=None,
+            meta_info={
+                "base_table": queryrequest.baseTable,
+                "connection_type": connection.type,
+                "engine": "mongodb",
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+        create_query_history(db=db, user_id=user_id, data=historico)
+    except Exception as hist_err:  # noqa: BLE001
+        log_message(f"⚠️ Falha ao salvar histórico (mongo): {hist_err}", "warning")
+
+    if is_count:
+        return {
+            "success": True,
+            "count": int(result_data or 0),
+            "query": query_desc,
+            "duration_ms": duration_ms,
+        }
+
+    return {
+        "success": True,
+        "query": query_desc,
+        "params": {},
+        "duration_ms": duration_ms,
+        "columns": columns,
+        "preview": result_data,
+        "cached": False,
+    }
+
+
 async def executar_query_e_salvar(
     db: Session,
     user_id: int,
@@ -117,6 +186,13 @@ async def executar_query_e_salvar(
     Executa a query de forma segura, salva histórico e retorna um dicionário com o resultado.
     Evita fetchall() para grandes consultas e trata erros de SQL separadamente.
     """
+    # NoSQL: o MongoDB não passa pelo caminho SQL (assert_sql_engine dava 501).
+    # Reencaminha para o executor Mongo, devolvendo o mesmo formato.
+    if is_mongo(engine):
+        return await _executar_mongo_e_salvar(
+            db, user_id, connection, engine, queryrequest
+        )
+
     assert_sql_engine(engine, "Execução de consultas")
 
     log_message("🔎 Iniciando execução da query com filtros...", "info")
@@ -142,6 +218,7 @@ async def executar_query_e_salvar(
             filters=filters,
             distinct=queryrequest.distinct,
             db_type=connection.type,
+            params=params,
         )
     else:
         query_string = get_query_string_advance(
@@ -156,6 +233,7 @@ async def executar_query_e_salvar(
             offset=queryrequest.offset,
             db_type=connection.type,
             distinct=queryrequest.distinct,
+            params=params,
         )
         """ get_query_string(
             base_table=queryrequest.baseTable,

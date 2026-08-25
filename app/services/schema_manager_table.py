@@ -16,6 +16,7 @@ from app.schemas.dbstructure_schema import TableDDLRequest
 from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryType
 from app.cruds.queryhistory_crud import create_query_history
 from app.services.editar_linha import quote_identifier
+from app.ultils.conect_database import is_mongo, get_mongo_database
 from app.ultils.logger import log_message
 
 from app.cruds.dbstructure_crud import (
@@ -411,6 +412,181 @@ def _apply_table_description(
 # ============================================================
 
 
+def _create_mongo_collection(
+    db: Session,
+    engine,
+    connection_model: DBConnection,
+    full_table_name: str,
+    payload: TableDDLRequest,
+    *,
+    audit_ctx: AuditContext,
+) -> None:
+    """
+    Equivalente NoSQL de CREATE TABLE: cria uma COLEÇÃO no MongoDB.
+
+    `schema_name` do modal = base de dados; `table_name` = coleção. Regista o
+    metadata (para a coleção aparecer na app) e audita, tal como o caminho SQL.
+    """
+    started = _utcnow()
+    schema, collection = _split_schema_table(full_table_name)
+    if_not_exists = getattr(payload, "if_not_exists", True)
+
+    database = engine[schema] if schema else get_mongo_database(engine)
+    if database is None:
+        raise ValueError("Base MongoDB não encontrada para criar a coleção.")
+
+    try:
+        existing = collection in database.list_collection_names()
+    except Exception:  # noqa: BLE001 - sem permissão de listar → assume que não existe
+        existing = False
+
+    created = False
+    if existing:
+        if not if_not_exists:
+            raise ValueError(f"A coleção '{collection}' já existe.")
+        # if_not_exists → no-op idempotente
+    else:
+        database.create_collection(collection)
+        created = True
+
+    # Metadata (para aparecer nas estruturas da app).
+    try:
+        create_db_structure(
+            db,
+            db_connection_id=connection_model.id,
+            table_name=collection,
+            schema_name=_normalize_schema(schema),
+            description=_normalize_description(payload),
+            engine=None,
+            charset=None,
+            collation=None,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log_message(f"⚠️ Metadata da coleção '{collection}' falhou: {exc}", "warning")
+
+    _audit_write(
+        db,
+        ctx=audit_ctx,
+        connection_id=connection_model.id,
+        operation="CREATE COLLECTION",
+        query_type=QueryType.CREATE_TABLE,
+        dialect="mongodb",
+        table=full_table_name,
+        column=None,
+        sql=f"db.createCollection('{collection}')",
+        status="success",
+        started_at=started,
+        extra={"created": created, "already_existed": existing},
+    )
+
+
+def _is_mongo_connection(engine, connection_model: DBConnection) -> bool:
+    """Mongo detetado pelo engine ou pelo tipo guardado na conexão."""
+    return is_mongo(engine) or (connection_model.type or "").lower() == "mongodb"
+
+
+def _mongo_database(engine, schema: Optional[str]):
+    database = engine[schema] if schema else get_mongo_database(engine)
+    if database is None:
+        raise ValueError("Base MongoDB não encontrada para esta operação.")
+    return database
+
+
+def _mongo_collection_exists(database, collection: str, *, default: bool) -> bool:
+    try:
+        return collection in database.list_collection_names()
+    except Exception:  # noqa: BLE001 — sem permissão de listar
+        return default
+
+
+def _drop_mongo_collection(
+    db: Session,
+    engine,
+    connection_model: DBConnection,
+    full_table_name: str,
+    *,
+    if_exists: bool,
+    audit_ctx: AuditContext,
+) -> None:
+    """Equivalente NoSQL de DROP TABLE: apaga uma COLEÇÃO."""
+    started = _utcnow()
+    schema, collection = _split_schema_table(full_table_name)
+    database = _mongo_database(engine, schema)
+
+    # Sem permissão de listar, assume-se que existe e deixa-se o servidor
+    # decidir — o `drop_collection` é idempotente no Mongo.
+    existing = _mongo_collection_exists(database, collection, default=True)
+
+    if not existing and not if_exists:
+        raise ValueError(f"A coleção '{collection}' não existe.")
+
+    dropped = False
+    if existing:
+        database.drop_collection(collection)
+        dropped = True
+
+    _audit_write(
+        db,
+        ctx=audit_ctx,
+        connection_id=connection_model.id,
+        operation="DROP COLLECTION",
+        query_type=QueryType.DROP_TABLE,
+        dialect="mongodb",
+        table=full_table_name,
+        column=None,
+        sql=f"db.{collection}.drop()",
+        status="success",
+        started_at=started,
+        extra={"dropped": dropped, "existed": existing},
+    )
+
+
+def _rename_mongo_collection(
+    db: Session,
+    engine,
+    connection_model: DBConnection,
+    old_full_table_name: str,
+    new_full_table_name: str,
+    *,
+    audit_ctx: AuditContext,
+) -> None:
+    """Equivalente NoSQL de ALTER TABLE ... RENAME."""
+    started = _utcnow()
+    old_schema, old_collection = _split_schema_table(old_full_table_name)
+    new_schema, new_collection = _split_schema_table(new_full_table_name)
+
+    # `renameCollection` do pymongo não atravessa bases de dados.
+    if (old_schema or None) != (new_schema or None):
+        raise ValueError(
+            "MongoDB: mover uma coleção entre bases de dados não é suportado."
+        )
+
+    if old_collection == new_collection:
+        return  # nada a fazer
+
+    database = _mongo_database(engine, old_schema)
+
+    if _mongo_collection_exists(database, new_collection, default=False):
+        raise ValueError(f"Já existe uma coleção '{new_collection}'.")
+
+    database[old_collection].rename(new_collection)
+
+    _audit_write(
+        db,
+        ctx=audit_ctx,
+        connection_id=connection_model.id,
+        operation="RENAME COLLECTION",
+        query_type=QueryType.ALTER_TABLE,
+        dialect="mongodb",
+        table=old_full_table_name,
+        column=None,
+        sql=f"db.{old_collection}.renameCollection('{new_collection}')",
+        status="success",
+        started_at=started,
+        extra={"old_full": old_full_table_name, "new_full": new_full_table_name},
+    )
+
+
 def execute_create_table(
     db: Session,
     engine: Engine,
@@ -420,6 +596,18 @@ def execute_create_table(
     *,
     audit_ctx: AuditContext,
 ) -> None:
+    # NoSQL: "criar tabela" = criar coleção (não há DDL SQL nem dialeto).
+    if is_mongo(engine) or (connection_model.type or "").lower() == "mongodb":
+        _create_mongo_collection(
+            db,
+            engine,
+            connection_model,
+            full_table_name,
+            payload,
+            audit_ctx=audit_ctx,
+        )
+        return
+
     db_type = _validate_dialect(connection_model.type)  # type: ignore
     schema, table = _split_schema_table(full_table_name)
     safe_table = _q_table(db_type, schema, table)
@@ -543,9 +731,36 @@ def execute_alter_table(
     *,
     audit_ctx: AuditContext,
 ) -> None:
-    db_type = _validate_dialect(connection_model.type)  # type: ignore
     old_schema, old_table = _split_schema_table(old_full_table_name)
     new_schema, new_table = _split_schema_table(new_full_table_name)
+
+    # NoSQL: renomear coleção. Não há descrição de tabela no Mongo, por isso
+    # salta-se o `_apply_table_description` e vai-se direto ao metadata.
+    if _is_mongo_connection(engine, connection_model):
+        _rename_mongo_collection(
+            db,
+            engine,
+            connection_model,
+            old_full_table_name,
+            new_full_table_name,
+            audit_ctx=audit_ctx,
+        )
+        return _update_table_metadata(
+            db,
+            connection_model=connection_model,
+            audit_ctx=audit_ctx,
+            db_type="mongodb",
+            payload=payload,
+            description=_normalize_description(payload),
+            old_schema=old_schema,
+            old_table=old_table,
+            new_schema=new_schema,
+            new_table=new_table,
+            old_full_table_name=old_full_table_name,
+            new_full_table_name=new_full_table_name,
+        )
+
+    db_type = _validate_dialect(connection_model.type)  # type: ignore
 
     queries: List[str] = []
     rename_needed = (old_schema != new_schema) or (old_table != new_table)
@@ -637,7 +852,38 @@ def execute_alter_table(
             description=description,
         )
 
-    # ✅ metadata com tratamento de erro + auditoria
+    _update_table_metadata(
+        db,
+        connection_model=connection_model,
+        audit_ctx=audit_ctx,
+        db_type=db_type,
+        payload=payload,
+        description=description,
+        old_schema=old_schema,
+        old_table=old_table,
+        new_schema=new_schema,
+        new_table=new_table,
+        old_full_table_name=old_full_table_name,
+        new_full_table_name=new_full_table_name,
+    )
+
+
+def _update_table_metadata(
+    db: Session,
+    *,
+    connection_model: DBConnection,
+    audit_ctx: AuditContext,
+    db_type: str,
+    payload: TableDDLRequest,
+    description: Optional[str],
+    old_schema: Optional[str],
+    old_table: str,
+    new_schema: Optional[str],
+    new_table: str,
+    old_full_table_name: str,
+    new_full_table_name: str,
+) -> None:
+    """Reflete o rename nas estruturas guardadas. Comum a SQL e a MongoDB."""
     try:
         update_db_structure_by_name(
             db,
@@ -692,8 +938,31 @@ def execute_drop_table(
     cascade: bool = False,
     audit_ctx: AuditContext,
 ) -> None:
-    db_type = _validate_dialect(connection_model.type)  # type: ignore
     schema, table = _split_schema_table(full_table_name)
+
+    # NoSQL: "apagar tabela" = apagar coleção. Segue para o bloco de metadata
+    # em baixo, que é comum aos dois caminhos.
+    if _is_mongo_connection(engine, connection_model):
+        _drop_mongo_collection(
+            db,
+            engine,
+            connection_model,
+            full_table_name,
+            if_exists=if_exists,
+            audit_ctx=audit_ctx,
+        )
+        db_type = "mongodb"
+        return _soft_delete_table_metadata(
+            db,
+            connection_model=connection_model,
+            audit_ctx=audit_ctx,
+            db_type=db_type,
+            schema=schema,
+            table=table,
+            full_table_name=full_table_name,
+        )
+
+    db_type = _validate_dialect(connection_model.type)  # type: ignore
     safe_table = _q_table(db_type, schema, table)
 
     if db_type in ["postgresql", "postgres"]:
@@ -731,7 +1000,28 @@ def execute_drop_table(
         extra={"if_exists": if_exists, "cascade": cascade},
     )
 
-    # ✅ metadata com tratamento de erro + auditoria
+    _soft_delete_table_metadata(
+        db,
+        connection_model=connection_model,
+        audit_ctx=audit_ctx,
+        db_type=db_type,
+        schema=schema,
+        table=table,
+        full_table_name=full_table_name,
+    )
+
+
+def _soft_delete_table_metadata(
+    db: Session,
+    *,
+    connection_model: DBConnection,
+    audit_ctx: AuditContext,
+    db_type: str,
+    schema: Optional[str],
+    table: str,
+    full_table_name: str,
+) -> None:
+    """Marca a estrutura como apagada. Comum a SQL e a MongoDB."""
     try:
         soft_delete_db_structure_by_name(
             db,

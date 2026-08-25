@@ -1,7 +1,8 @@
+import json
 import time
 import traceback
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
@@ -11,7 +12,7 @@ from app.cruds.queryhistory_crud import create_query_history
 from app.schemas.query_select_upAndInsert_schema import InsertRequest
 from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryType
 from app.services.editar_linha import _convert_column_type_for_string_one, quote_identifier
-from app.ultils.conect_database import assert_sql_engine
+from app.ultils.conect_database import assert_sql_engine, is_mongo, get_mongo_database
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
@@ -49,6 +50,162 @@ def build_insert_query(table_name, db_type, insert_values):
     # print(f"DEBUG: Final query: {query}")  # DEBUG
     return query
 
+# ============================================================
+#  MongoDB (NoSQL) — inserção de documentos
+# ============================================================
+def _coerce_mongo_value(col: str, value: Any, type_column: Optional[str]) -> Any:
+    """Converte o valor (que chega como string) para o tipo adequado no Mongo."""
+    if value is None:
+        return None
+    s = str(value)
+    t = (type_column or "").lower()
+
+    # _id em formato ObjectId (24 hex) → ObjectId; caso contrário fica como está.
+    if col == "_id":
+        try:
+            from bson import ObjectId
+
+            if isinstance(value, str) and len(value) == 24:
+                return ObjectId(value)
+        except Exception:  # noqa: BLE001 - valor pode não ser ObjectId
+            return value
+        return value
+
+    if any(k in t for k in ("int", "serial")) and "point" not in t:
+        try:
+            f = float(s)
+            return int(f) if f.is_integer() else f
+        except (TypeError, ValueError):
+            return value
+    if any(k in t for k in ("float", "double", "decimal", "numeric", "real", "money", "number")):
+        try:
+            return float(s)
+        except (TypeError, ValueError):
+            return value
+    if "bool" in t or t == "bit":
+        return s.strip().lower() in ("true", "1", "yes", "sim", "t")
+    if any(k in t for k in ("json", "jsonb", "object", "array")):
+        try:
+            return json.loads(s)
+        except Exception:  # noqa: BLE001
+            return value
+    return value  # texto / data / uuid ficam como estão
+
+
+def _insert_mongo_service(
+    data: InsertRequest,
+    engine: Any,
+    user_id: int,
+    connection_id: str,
+    db: Session,
+    *,
+    client_ip: Optional[str],
+    app_source: str,
+    executed_by: str,
+    modified_by: Optional[str],
+) -> dict:
+    """
+    Equivalente NoSQL do INSERT: cada "tabela" de `createdRow` é uma COLEÇÃO e
+    cada conjunto de campos vira um DOCUMENTO (`insert_one`). Devolve o mesmo
+    formato do caminho SQL. Campos vazios são omitidos (o Mongo aplica default
+    / gera o `_id`).
+    """
+    start_time = time.time()
+    total_inseridos = 0
+    total_tabelas = 0
+    resposta = ""
+    inserted_ids: dict = {}
+    error_msg = None
+    sucesso = False
+
+    try:
+        for table_name, raw_values in data.createdRow.items():
+            doc: dict = {}
+            for col, field in raw_values.items():
+                value = field["value"] if isinstance(field, dict) else getattr(field, "value", None)
+                tcol = (
+                    field.get("type_column", "text")
+                    if isinstance(field, dict)
+                    else getattr(field, "type_column", "text")
+                )
+                if value is None or str(value).strip() == "":
+                    continue  # omite vazios → default/_id automático
+                doc[col] = _coerce_mongo_value(col, value, tcol)
+
+            if not doc:
+                log_message(f"Aviso: coleção '{table_name}' ignorada (sem campos).", "warning")
+                continue
+
+            # Resolve base + coleção.
+            if "." in table_name:
+                db_name, coll_name = table_name.split(".", 1)
+                database = engine[db_name]
+            else:
+                database = get_mongo_database(engine)
+                coll_name = table_name
+            if database is None:
+                raise ValueError("Não foi possível determinar a base MongoDB.")
+
+            res = database[coll_name].insert_one(doc)
+            total_tabelas += 1
+            total_inseridos += 1
+            inserted_ids[table_name] = str(res.inserted_id)
+            resposta += f"{coll_name}: 1 documento inserido (_id={res.inserted_id}).\n"
+
+        sucesso = True
+        log_message(f"✅ Documento(s) inserido(s) no MongoDB:\n{resposta}", "success")
+
+    except Exception as e:  # noqa: BLE001
+        error_msg = str(e)
+        log_message(f"❌ Erro no INSERT MongoDB: {error_msg}\n{traceback.format_exc()}", "error")
+
+    duration_ms = int((time.time() - start_time) * 1000)
+
+    # Histórico (best-effort).
+    try:
+        create_query_history(
+            db=db,
+            user_id=user_id,
+            data=QueryHistoryCreate(
+                user_id=user_id,
+                db_connection_id=connection_id,  # type: ignore
+                query=f"db.insertOne(...) → {', '.join(inserted_ids.keys()) or 'n/a'}",
+                query_type=QueryType.INSERT,
+                executed_at=datetime.now(timezone.utc),
+                duration_ms=duration_ms,
+                result_preview=resposta.strip() if sucesso else "Falha na inserção.",
+                error_message=error_msg,
+                is_favorite=False,
+                tags="insert" if sucesso else "insert_error",
+                app_source=app_source,
+                client_ip=client_ip,
+                executed_by=executed_by or f"user_{user_id}",
+                modified_by=modified_by,
+                meta_info={
+                    "engine": "mongodb",
+                    "colecoes_afetadas": list(data.createdRow.keys()),
+                    "total_inseridos": total_inseridos,
+                    "inserted_ids": inserted_ids,
+                    "status": "success" if sucesso else "failed",
+                },
+            ),
+        )
+    except Exception as hist_err:  # noqa: BLE001
+        log_message(f"⚠️ Falha ao salvar histórico (mongo insert): {hist_err}", "warning")
+
+    if not sucesso:
+        raise ValueError(error_msg)
+
+    return {
+        "status": "sucesso",
+        "inserted": data.createdRow,
+        "inserted_ids": inserted_ids,
+        "response": resposta.strip(),
+        "tempo_ms": duration_ms,
+        "linhas_inseridas": total_inseridos,
+    }
+
+
 def insert_row_service(
     data: InsertRequest,
     engine: Engine,
@@ -65,6 +222,20 @@ def insert_row_service(
     Insere novos registros em uma ou mais tabelas com base em `data.createdRow`.
     Garante transação ACID: Se uma tabela falhar, todas as inserções são revertidas.
     """
+    # NoSQL: MongoDB não usa SQL/engine.begin() → insere documentos.
+    if is_mongo(engine):
+        return _insert_mongo_service(
+            data,
+            engine,
+            user_id,
+            connection_id,
+            db,
+            client_ip=client_ip,
+            app_source=app_source,
+            executed_by=executed_by,
+            modified_by=modified_by,
+        )
+
     assert_sql_engine(engine, "Inserção de registos")
 
     resposta_query = ""

@@ -11,7 +11,7 @@ from app.ultils.get_id_by_token import get_current_user_id
 from app.services import project_service
 from app.ultils.logger import log_message
 
-router = APIRouter()
+router = APIRouter(tags=["Projects"])
 
 # ----------------------------- #
 # Endpoints de Projetos         #

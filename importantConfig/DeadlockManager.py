@@ -270,9 +270,16 @@ import asyncio
 import traceback
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
+from app.ultils.conect_database import is_mongo
 from app.ultils.logger import log_message
-from typing import List, Dict
+from typing import Any, List, Dict, Optional
 from datetime import datetime
+
+# Comandos do currentOp podem ser enormes (bulk writes, pipelines); truncar
+# evita rebentar o payload do SSE.
+MONGO_MAX_QUERY_CHARS = 2000
 
 
 class DeadlockManager:
@@ -281,13 +288,17 @@ class DeadlockManager:
     SUPPORTED_MYSQL = ("mysql", "mysql+pymysql", "mariadb")
     SUPPORTED_ORACLE = ("oracle", "oracle+cx_oracle")
 
-    
+
 
     # ---------------------------------------------------------
 
-    def __init__(self, engine: AsyncEngine):
+    def __init__(self, engine: AsyncEngine | MongoClient):
         self.engine = engine
-        self.driver = self.engine.dialect.name.lower()
+        # MongoClient.__getattr__ devolve uma Database para qualquer atributo
+        # desconhecido, portanto `engine.dialect.name` daria a string
+        # "dialect" em vez de rebentar. Detetar o Mongo primeiro.
+        self.is_mongo = is_mongo(engine)
+        self.driver = "mongodb" if self.is_mongo else engine.dialect.name.lower()
         self._deadlock_history = []
         self.POSTGRESQUERY = POSTGRESQUERY
         self.MYSQLQUERY = MYSQLQUERY
@@ -308,8 +319,102 @@ class DeadlockManager:
 
         raise ValueError(f"Banco não suportado: {self.driver}")
 
+    # ---------------------------------------------------------
+    # 🍃 MongoDB
+    # ---------------------------------------------------------
+
+    def _mongo_current_ops(self) -> List[Dict]:
+        """Snapshot das operações em curso no servidor."""
+        try:
+            return list(self.engine.admin.aggregate([
+                {"$currentOp": {"allUsers": True, "idleConnections": False}}
+            ]))
+        except PyMongoError:
+            # $currentOp exige MongoDB 3.6+. O comando legado ainda responde
+            # em servidores antigos, e sem "$all" numa conta sem privilégio
+            # `inprog` devolve pelo menos as operações do próprio utilizador.
+            resultado = self.engine.admin.command("currentOp", 1, **{"$all": True})
+            return list(resultado.get("inprog", []))
+
+    @staticmethod
+    def _mongo_resumir_comando(comando: Any) -> Optional[str]:
+        """Comando da operação como texto — o BSON cru não é serializável."""
+        if not comando:
+            return None
+        texto = str(comando)
+        if len(texto) > MONGO_MAX_QUERY_CHARS:
+            return f"{texto[:MONGO_MAX_QUERY_CHARS]}… (truncado)"
+        return texto
+
+    @staticmethod
+    def _mongo_utilizador(op: Dict) -> Optional[str]:
+        utilizadores = op.get("effectiveUsers") or op.get("runBy") or []
+        if utilizadores:
+            primeiro = utilizadores[0]
+            if isinstance(primeiro, dict):
+                return primeiro.get("user")
+            return str(primeiro)
+        return None
+
+    @staticmethod
+    def _mongo_candidato_bloqueador(bloqueado: Dict, ops: List[Dict]) -> Optional[Dict]:
+        """
+        O Mongo não identifica quem detém o lock. A melhor aproximação é a
+        operação ativa mais antiga no mesmo namespace que não esteja, ela
+        própria, à espera — é tipicamente essa que está a segurar o lock.
+        """
+        ns = bloqueado.get("ns")
+        candidatos = [
+            op for op in ops
+            if op is not bloqueado
+            and op.get("active")
+            and not op.get("waitingForLock")
+            and (ns is None or op.get("ns") == ns)
+        ]
+        if not candidatos:
+            return None
+        return max(candidatos, key=lambda op: op.get("secs_running") or 0)
+
+    def _mongo_formatar_bloqueio(self, bloqueado: Dict, ops: List[Dict]) -> Dict:
+        """Alinha o currentOp com o formato devolvido pelas queries SQL."""
+        bloqueador = self._mongo_candidato_bloqueador(bloqueado, ops) or {}
+        ns = bloqueado.get("ns") or ""
+
+        return {
+            "blocked_pid": bloqueado.get("opid"),
+            "blocked_user": self._mongo_utilizador(bloqueado),
+            "blocked_application": bloqueado.get("appName"),
+            "blocked_host": bloqueado.get("client") or bloqueado.get("client_s"),
+            "blocked_database": ns.split(".")[0] or None,
+            "blocked_query": self._mongo_resumir_comando(bloqueado.get("command")),
+            "blocked_state": bloqueado.get("op"),
+            "namespace": ns or None,
+            "wait_type": bloqueado.get("lockType") or "lock",
+            "query_duration": bloqueado.get("secs_running"),
+            "blocking_pid": bloqueador.get("opid"),
+            "blocking_user": self._mongo_utilizador(bloqueador),
+            "blocking_application": bloqueador.get("appName"),
+            "blocking_query": self._mongo_resumir_comando(bloqueador.get("command")),
+            "blocking_state": bloqueador.get("op"),
+            "blocking_inferido": bool(bloqueador),
+        }
+
+    def _mongo_listar_bloqueios(self) -> List[Dict]:
+        ops = self._mongo_current_ops()
+        bloqueados = [op for op in ops if op.get("waitingForLock")]
+        return [self._mongo_formatar_bloqueio(op, ops) for op in bloqueados]
+
+    # ---------------------------------------------------------
+
     async def listar_processos_em_deadlock(self) -> List[Dict]:
         try:
+            if self.is_mongo:
+                # pymongo é síncrono: sair do event loop para não o bloquear.
+                processos = await asyncio.to_thread(self._mongo_listar_bloqueios)
+                if processos:
+                    self._registrar_historico_deadlock(processos)
+                return processos
+
             query = self._query_deadlocks()
             if query is None:
                 return [{"info": "SQLite não possui deadlocks."}]
@@ -342,16 +447,38 @@ class DeadlockManager:
         return self._deadlock_history
 
     def _get_kill_query(self, pid: int):
-        if self.driver in (*self.SUPPORTED_POSTGRES, *self.SUPPORTED_MYSQL, *self.SUPPORTED_MSSQL):
-            return text("KILL :pid"), {"pid": pid}
+        # KILL não aceita parâmetros ligados em MySQL nem em SQL Server, por
+        # isso o PID vai interpolado — já validado como inteiro acima.
+        if self.driver in self.SUPPORTED_POSTGRES:
+            return text("SELECT pg_terminate_backend(:pid)"), {"pid": pid}
+
+        if self.driver in self.SUPPORTED_MYSQL:
+            return text(f"KILL {pid}"), {}
+
+        if self.driver in self.SUPPORTED_MSSQL:
+            return text(f"KILL {pid}"), {}
 
         if self.driver == "sqlite":
             raise ValueError("SQLite não possui processos para finalizar.")
 
         raise ValueError(f"KILL não suportado no driver {self.driver}")
 
-    async def matar_processo(self, pid: int) -> Dict:
+    def _mongo_matar_operacao(self, opid: Any) -> None:
+        self.engine.admin.command("killOp", 1, op=opid)
+
+    async def matar_processo(self, pid: Any) -> Dict:
         try:
+            if self.is_mongo:
+                # Num cluster com shards o opid é uma string ("shard0:123"),
+                # logo não se força int aqui.
+                await asyncio.to_thread(self._mongo_matar_operacao, pid)
+                return {"status": "ok", "mensagem": f"Operação {pid} terminada"}
+
+            try:
+                pid = int(pid)
+            except (TypeError, ValueError):
+                raise ValueError(f"PID inválido: {pid!r}")
+
             query, params = self._get_kill_query(pid)
 
             async with self.engine.begin() as conn:

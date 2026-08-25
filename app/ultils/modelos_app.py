@@ -1,4 +1,9 @@
-from app.models.connection_models import ActiveConnection, ConnectionLog, DBConnection
+from app.models.connection_models import (
+    ActiveConnection,
+    ConnectionLog,
+    DBConnection,
+    DBConnectionShare,
+)
 from app.models.dbstatistics_models import DBStatistics
 from app.models.geral_model import Settings
 from app.models.queryhistory_models import QueryHistory
@@ -24,3 +29,8 @@ from app.models.task_models import (
     AuditLog,
 )
 from app.models.ai_models import ChatSession, Message, UsageLog, Feedback, chat_sessions
+from app.models.pentest_models import (
+    ApiTesterConfig,
+    SecurityTestRun,
+    SecurityTestAttempt,
+)

@@ -1,13 +1,21 @@
 import asyncio
+import json
 import traceback
 from datetime import datetime
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db_async
+from app.auth import decode_token
+from app.database import AsyncSessionLocal, get_db_async
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 from importantConfig.convert_string_to_dict import PayloadError, converter_tables_origen
@@ -18,6 +26,19 @@ router = APIRouter(prefix="/transfer", tags=["Database Operations"])
 def sse(event: str, data: str) -> str:
     lines = str(data).splitlines() or [""]
     return f"event: {event}\n" + "\n".join([f"data: {ln}" for ln in lines]) + "\n\n"
+
+
+def _ws_user_id(websocket: WebSocket) -> Optional[int]:
+    """Autentica a WS pelo cookie `access_token` (mesmo padrão do backup)."""
+    token = websocket.cookies.get("access_token") or websocket.query_params.get("token")
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        sub = payload.get("sub") if isinstance(payload, dict) else None
+        return int(sub) if sub is not None else None
+    except Exception:
+        return None
 
 
 @router.get("/stream")
@@ -161,3 +182,140 @@ async def transfer_stream(
     return StreamingResponse(
         event_stream(), media_type="text/event-stream", headers=headers
     )
+
+
+# ============================================================
+# 🔌 WebSocket de transferência
+#
+# Vantagens sobre o SSE (/stream):
+#   - O payload (tables_origen) vai NA MENSAGEM, não no URL — deixa de haver
+#     limite de tamanho (mapeamentos grandes rebentavam o query string).
+#   - Bidirecional: o cliente pode enviar {"action":"cancel"} para parar.
+#
+# Protocolo:
+#   cliente → servidor (1ª msg): {id_connectio_origen, id_connectio_distino, tables_origen}
+#   servidor → cliente: {"event": "status|log|warning|error|done|final", "data": "..."}
+#   cliente → servidor (opcional): {"action": "cancel"}
+# ============================================================
+@router.websocket("/ws")
+async def transfer_ws(websocket: WebSocket):
+    await websocket.accept()
+
+    user_id = _ws_user_id(websocket)
+    if user_id is None:
+        await websocket.send_json({"event": "error", "data": "Não autenticado."})
+        await websocket.close(code=4401)
+        return
+
+    async def send(event: str, data: str) -> None:
+        try:
+            await websocket.send_json({"event": event, "data": data})
+        except Exception:
+            pass
+
+    start_time = datetime.now()
+
+    try:
+        # 1) Recebe a configuração da transferência.
+        raw = await websocket.receive_text()
+        try:
+            cfg = json.loads(raw)
+        except json.JSONDecodeError:
+            await send("error", "Payload inicial inválido (não é JSON).")
+            await websocket.close(code=4400)
+            return
+
+        id_origen = int(cfg.get("id_connectio_origen") or 0)
+        id_distino = int(cfg.get("id_connectio_distino") or 0)
+        tables_origen = cfg.get("tables_origen") or ""
+
+        if not id_origen or not id_distino:
+            await send("error", "Conexões de origem/destino são obrigatórias.")
+            await websocket.close(code=4400)
+            return
+
+        log_message(
+            f"[User {user_id}] Transfer WS iniciado | origem={id_origen} | destino={id_distino}",
+            "info",
+        )
+
+        await send("status", "Iniciando transferência...")
+        await send("status", "Validando conexões origem/destino...")
+
+        # 2) Parse do payload.
+        try:
+            tables_dict, warnings = converter_tables_origen(tables_origen, strict=False)
+            for w in warnings:
+                await send("warning", f"⚠️ {w}")
+            if not tables_dict:
+                raise PayloadError("Nenhuma tabela válida para transferir.")
+        except PayloadError as e:
+            await send("error", f"Configuração inválida: {e}")
+            return
+        except Exception as e:  # noqa: BLE001
+            log_message(f"[User {user_id}] Erro no payload: {e}\n{traceback.format_exc()}", "error")
+            await send("error", f"Erro ao processar configuração: {e}")
+            return
+
+        await send(
+            "status",
+            f"Executando... (origem={id_origen}, destino={id_distino}, tabelas={len(tables_dict)})",
+        )
+
+        # 3) Corre a transferência numa task para poder cancelar.
+        from importantConfig.db_transfer import transfer_data
+
+        async def run_transfer() -> None:
+            # Sessão própria: a WS vive para além do escopo do pedido.
+            async with AsyncSessionLocal() as db:
+                async for progress_msg in transfer_data(
+                    id_user=user_id,
+                    db=db,
+                    id_connectio_origen=id_origen,
+                    id_connectio_distino=id_distino,
+                    tables_origen=tables_dict,
+                ):
+                    await send("log", progress_msg)
+
+        transfer_task = asyncio.create_task(run_transfer())
+
+        # 4) Em paralelo, ouve o cliente para um pedido de cancelamento.
+        async def listen_cancel() -> None:
+            try:
+                while True:
+                    msg = await websocket.receive_text()
+                    try:
+                        data = json.loads(msg)
+                    except json.JSONDecodeError:
+                        continue
+                    if data.get("action") == "cancel":
+                        transfer_task.cancel()
+                        return
+            except WebSocketDisconnect:
+                transfer_task.cancel()
+
+        cancel_task = asyncio.create_task(listen_cancel())
+
+        try:
+            await transfer_task
+            await send("done", "✅ Transferência concluída!")
+            log_message(f"[User {user_id}] Transferência concluída com sucesso", "success")
+        except asyncio.CancelledError:
+            await send("warning", "⏹️ Transferência cancelada pelo utilizador.")
+            log_message(f"[User {user_id}] Transferência cancelada", "warning")
+        finally:
+            cancel_task.cancel()
+
+    except WebSocketDisconnect:
+        log_message(f"[User {user_id}] Transfer WS desligado pelo cliente.", "warning")
+        return
+    except Exception as e:  # noqa: BLE001
+        log_message(f"[User {user_id}] Erro no transfer WS: {e}\n{traceback.format_exc()}", "error")
+        await send("error", f"Erro: {e}")
+    finally:
+        duration = (datetime.now() - start_time).total_seconds()
+        await send("final", f"⏱️ Finalizado em {duration:.2f}s")
+        try:
+            await websocket.close()
+        except Exception:
+            pass

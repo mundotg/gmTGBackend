@@ -154,6 +154,51 @@ class Plan(Base):
     users = relationship("User", back_populates="plan")
 
 
+class StorageFolder(Base):
+    """Pasta do storage, em árvore, com senha opcional.
+
+    A senha é **controlo de acesso**, não cifragem: guarda-se o hash bcrypt e o
+    conteúdo fica legível no bucket. Protege tudo o que está abaixo — para
+    chegar a um ficheiro é preciso ter desbloqueado todas as pastas com senha
+    no caminho até à raiz (ver `storage_folder_service`).
+
+    As pastas são apenas metadados: a chave do objeto continua a ser
+    `{user_id}/{uuid}.ext`, portanto renomear ou mover uma pasta não mexe em
+    nada no bucket.
+    """
+
+    __tablename__ = "storage_folders"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, default=uuid.uuid4, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("storage_folders.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(255))
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    user = relationship("User")
+    parent = relationship("StorageFolder", remote_side=[id], backref="children")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "parent_id", "name", name="uq_folder_user_parent_name"
+        ),
+    )
+
+    @property
+    def is_locked(self) -> bool:
+        return bool(self.password_hash)
+
+
 class FileModel(Base):
     __tablename__ = "files"
 
@@ -163,6 +208,11 @@ class FileModel(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE")
     )
+    folder_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("storage_folders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     filename: Mapped[str] = mapped_column(String(255))
     path: Mapped[str] = mapped_column(Text)
     size_bytes: Mapped[int] = mapped_column(BigInteger)
@@ -171,6 +221,7 @@ class FileModel(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     user = relationship("User", back_populates="files")
+    folder = relationship("StorageFolder")
 
 
 class StorageUsage(Base):

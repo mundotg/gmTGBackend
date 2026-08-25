@@ -15,7 +15,12 @@ from app.services.cloudeAi_execute_query import QueryFilterBuilder
 from app.services.editar_linha import quote_identifier
 from app.services.query_executor import is_safe_identifier
 from app.ultils.ativar_engine import ConnectionManager
-from app.ultils.build_query import get_query_string_advance
+from app.ultils.conect_database import is_mongo, get_mongo_database
+from app.ultils.build_query import (
+    _sanitize_table_list,
+    format_order_by,
+    get_query_string_advance,
+)
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
@@ -41,6 +46,48 @@ class DeleteOperationService:
         if not identifier:
             return False
         return all(is_safe_identifier(part) for part in str(identifier).split("."))
+
+    def _bare_name(self, identifier: Optional[str]) -> str:
+        """Última parte do identificador, sem schema nem aspas.
+
+        `public."User"` → `user`; `EmailVerificationToken.token` → `token`.
+        """
+        if not identifier:
+            return ""
+        segs = [p.strip('"`[]') for p in str(identifier).split(".") if p.strip('"`[]')]
+        return segs[-1].lower() if segs else ""
+
+    def _column_qualifier(self, col: str) -> Optional[str]:
+        """Tabela que qualifica a coluna, ou None se vier sem qualificador."""
+        segs = [p.strip('"`[]') for p in str(col).split(".") if p.strip('"`[]')]
+        return segs[-2].lower() if len(segs) > 1 else None
+
+    def _query_has_joins(self, payload: QueryPayload) -> bool:
+        if getattr(payload, "joins", None):
+            return True
+        return bool(
+            _sanitize_table_list(
+                payload.baseTable, getattr(payload, "table_list", None)
+            )
+        )
+
+    def _qualify_column(
+        self,
+        payload: QueryPayload,
+        tabela_name: Optional[str],
+        coluna: str,
+    ) -> str:
+        """Prefixa a coluna com a tabela quando a query tem JOINs.
+
+        Sem isto, `SELECT "id" FROM public."User" INNER JOIN
+        "EmailVerificationToken" ...` quebra no Postgres com
+        `column reference "id" is ambiguous`, abortando a transação inteira.
+        """
+        if not coluna or "." in str(coluna):
+            return coluna
+        if not self._query_has_joins(payload):
+            return coluna
+        return f"{tabela_name or payload.baseTable}.{coluna}"
 
     def _cast_value(self, value: Any, key_type: Optional[str]) -> Any:
         if value is None:
@@ -123,9 +170,11 @@ class DeleteOperationService:
     ) -> Any:
         filters, params = await self._build_where_clause(payload, connection_type)
 
+        pk_select = self._qualify_column(payload, tabela_name, pk_coluna)
+
         query_select = get_query_string_advance(
             base_table=payload.baseTable,
-            select=[pk_coluna],
+            select=[pk_select],
             joins=payload.joins,
             aliases=payload.aliaisTables,
             filters=filters,
@@ -135,6 +184,7 @@ class DeleteOperationService:
             offset=index,
             db_type=connection_type,
             distinct=payload.distinct,
+            params=params,
         )
 
         log_message(f"SELECT PK BY INDEX => {query_select} | params={params}", "debug")
@@ -144,7 +194,17 @@ class DeleteOperationService:
             return None
 
         row_data = result._mapping
-        return row_data.get(pk_coluna) or row_data.get(f"{tabela_name}.{pk_coluna}")
+
+        for key in (pk_coluna, f"{tabela_name}.{pk_coluna}", pk_select):
+            if key in row_data:
+                return row_data[key]
+
+        # último recurso: a coluna veio rotulada de outra forma (ex.: alias)
+        for col, value in row_data.items():
+            if self._bare_name(col) == self._bare_name(pk_coluna):
+                return value
+
+        return result[0] if len(row_data) == 1 else None
 
     async def _delete_by_index_direct(
         self,
@@ -190,15 +250,18 @@ class DeleteOperationService:
         params: dict,
     ) -> int:
         """Deleção otimizada usando PK ou Unique Key"""
+        pk_qualified = self._qualify_column(payload, tabela_name, primaryKey)
+
         pk_select_options = [
             primaryKey,
             f"{tabela_name}.{primaryKey}",
             f'{tabela_name.split(".")[-1]}.{primaryKey}',
+            pk_qualified,
         ]
 
         query_select = get_query_string_advance(
             base_table=payload.baseTable,
-            select=[primaryKey],
+            select=[pk_qualified],
             joins=payload.joins,
             aliases=payload.aliaisTables,
             filters=filters,
@@ -208,6 +271,7 @@ class DeleteOperationService:
             offset=index,
             db_type=connection_type,
             distinct=payload.distinct,
+            params=params,
         )
 
         log_message(
@@ -282,6 +346,7 @@ class DeleteOperationService:
             offset=index,
             db_type=connection_type,
             distinct=payload.distinct,
+            params=params,
         )
 
         log_message(
@@ -294,50 +359,51 @@ class DeleteOperationService:
             return 0
 
         row_data = result._mapping
-        
-        # Tenta usar rowid se disponível (SQLite/PostgreSQL)
-        if connection_type.lower() in ['sqlite', 'postgresql']:
-            # Para SQLite, tenta rowid
-            if connection_type.lower() == 'sqlite':
-                # Busca o rowid da linha
-                query_rowid = f"""
-                    SELECT rowid FROM {quote_identifier(connection_type, tabela_name)}
-                    WHERE rowid IN (
-                        SELECT rowid FROM {quote_identifier(connection_type, tabela_name)}
-                        {filters}
-                        ORDER BY {payload.orderBy or '1'}
-                        LIMIT 1 OFFSET {index}
-                    )
+
+        # rowid só é confiável no SQLite e sem JOIN — com JOIN o OFFSET não
+        # corresponde à posição da linha na tabela base.
+        if connection_type.lower() == "sqlite" and not self._query_has_joins(payload):
+            query_rowid = f"""
+                SELECT rowid FROM {quote_identifier(connection_type, tabela_name)}
+                {filters}
+                {format_order_by(connection_type, payload.orderBy)}
+                LIMIT 1 OFFSET {index}
+            """
+
+            rowid_result = conn.execute(text(query_rowid), params).fetchone()
+            if rowid_result and rowid_result[0] is not None:
+                # Deleta por rowid
+                sql = f"""
+                    DELETE FROM {quote_identifier(connection_type, tabela_name)}
+                    WHERE rowid = :rowid_value
                 """
-                
-                rowid_result = conn.execute(text(query_rowid), params).fetchone()
-                if rowid_result and rowid_result[0] is not None:
-                    # Deleta por rowid
-                    sql = f"""
-                        DELETE FROM {quote_identifier(connection_type, tabela_name)}
-                        WHERE rowid = :rowid_value
-                    """
-                    delete_params = {"rowid_value": rowid_result[0]}
-                    
-                    log_message(
-                        f"DELETE BY ROWID => {sql} | params={delete_params}",
-                        "debug",
-                    )
-                    
-                    result = conn.execute(text(sql), delete_params)
-                    return result.rowcount or 0
-        
-        # Se não conseguir usar rowid, constrói WHERE clause com todas as colunas
+                delete_params = {"rowid_value": rowid_result[0]}
+
+                log_message(
+                    f"DELETE BY ROWID => {sql} | params={delete_params}",
+                    "debug",
+                )
+
+                result = conn.execute(text(sql), delete_params)
+                return result.rowcount or 0
+
+        # Sem rowid, o WHERE é montado com as colunas da linha. Numa query com
+        # JOIN o SELECT devolve colunas de outras tabelas (ex.:
+        # "EmailVerificationToken.token") — usá-las aqui geraria um DELETE
+        # inválido contra a tabela base, por isso ficam de fora.
+        tabela_bare = self._bare_name(tabela_name)
         where_conditions = []
         delete_params = {}
-        
+        colunas_ignoradas = []
+
         for i, (col, value) in enumerate(row_data.items()):
-            # Ignora colunas com alias (que tenham ponto)
-            if '.' in col:
-                col_name = col.split('.')[-1]
-            else:
-                col_name = col
-                
+            qualifier = self._column_qualifier(col)
+            if qualifier is not None and qualifier != tabela_bare:
+                colunas_ignoradas.append(col)
+                continue
+
+            col_name = str(col).split(".")[-1].strip('"`[]')
+
             # Para valores None, usa IS NULL
             if value is None:
                 where_conditions.append(
@@ -349,11 +415,21 @@ class DeleteOperationService:
                     f"{quote_identifier(connection_type, col_name)} = :{param_name}"
                 )
                 delete_params[param_name] = value
-        
+
+        if colunas_ignoradas:
+            log_message(
+                f"⚠️ Colunas fora de {tabela_name} ignoradas no WHERE do delete: "
+                f"{', '.join(colunas_ignoradas)}",
+                "warning",
+            )
+
         if not where_conditions:
-            log_message("⚠️ Nenhuma condição WHERE gerada para deleção", "warning")
-            return 0
-        
+            raise ValueError(
+                f"Não foi possível identificar a linha em {tabela_name}: a query "
+                "só devolve colunas de tabelas associadas. Inclua a chave "
+                "primária da tabela na seleção."
+            )
+
         sql = f"""
             DELETE FROM {quote_identifier(connection_type, tabela_name)}
             WHERE {' AND '.join(where_conditions)}
@@ -393,6 +469,151 @@ class DeleteOperationService:
         result = conn.execute(sql, {"pks": list(valores)})
         return result.rowcount or 0
 
+    # ══════════════════════ MongoDB (NoSQL) ══════════════════════
+    def _split_db_collection(self, connection, table_name: str) -> Tuple[Optional[str], str]:
+        if table_name and "." in table_name:
+            db_name, collection = table_name.split(".", 1)
+            return db_name, collection
+        return getattr(connection, "database_name", None), table_name
+
+    def _mongo_id_value(self, value: Any, key_type: Optional[str]) -> Any:
+        """`_id` costuma ser ObjectId; se o valor não for um ObjectId válido
+        (ex.: um UUID em string), mantém-se o valor tal como está."""
+        try:
+            from bson import ObjectId
+            from bson.errors import InvalidId
+        except Exception:  # pragma: no cover
+            return self._cast_value(value, key_type)
+        if isinstance(value, str):
+            try:
+                return ObjectId(value)
+            except (InvalidId, Exception):  # noqa: BLE001
+                return value
+        return value
+
+    async def _execute_mongo_delete(
+        self,
+        engine,
+        connection,
+        registros: List[PayloadDeleteRow],
+        payloadQuery: Optional[QueryPayload],
+        db: Session,
+        current_user_id: int,
+        delete_all: bool,
+        app_source: str,
+        executed_by: str,
+        modified_by: Optional[str],
+        client_ip: Optional[str],
+    ) -> DeleteResponse:
+        """
+        Equivalente NoSQL do delete: `delete_one` por chave, ou `delete_many`
+        por filtro (delete_all). Devolve o MESMO `DeleteResponse` do caminho SQL.
+        """
+        start = datetime.now(timezone.utc)
+        itens: List[Dict[str, Any]] = []
+        erros: List[str] = []
+        total = 0
+
+        def _coll(table_name: str):
+            db_name, collection = self._split_db_collection(connection, table_name)
+            database = engine[db_name] if db_name else get_mongo_database(engine)
+            if database is None:
+                raise ValueError(f"Base MongoDB não encontrada para '{table_name}'.")
+            return database[collection]
+
+        if delete_all:
+            # Exclusão em massa por filtro (segurança: exige filtro).
+            from app.services.mongo_query_executor import _build_mongo_filter
+
+            if not payloadQuery or not payloadQuery.where:
+                raise ValueError("Exclusão total bloqueada: payload sem filtros.")
+            mongo_filter = _build_mongo_filter(payloadQuery.where)
+            if not mongo_filter:
+                raise ValueError("Exclusão total bloqueada: filtro vazio.")
+            res = _coll(payloadQuery.baseTable).delete_many(mongo_filter)
+            total = int(res.deleted_count)
+            itens.append({"tabela": payloadQuery.baseTable, "chave": "filter",
+                          "valor": "delete_all", "afetados": total})
+        else:
+            for registro in registros:
+                row_deletes = self._read_value(registro, "rowDeletes", {}) or {}
+                tabelas = self._read_value(registro, "tableForDelete", None) or (
+                    list(row_deletes.keys()) if isinstance(row_deletes, dict) else []
+                )
+                for table_name in tabelas:
+                    dados = row_deletes.get(table_name) if isinstance(row_deletes, dict) else None
+                    if dados is None:
+                        erros.append(f"Sem dados de exclusão para '{table_name}'.")
+                        continue
+                    nd = self._normalize_row_delete(dados)
+                    pk = str(nd.get("primaryKey") or "_id").split(".")[-1]
+                    pk_val = nd.get("primaryKeyValue")
+                    if pk_val is None:
+                        erros.append(
+                            f"'{table_name}': sem primaryKeyValue (delete por índice não suportado em Mongo)."
+                        )
+                        itens.append({"tabela": table_name, "chave": pk, "valor": None, "afetados": 0})
+                        continue
+                    filtro_val = (
+                        self._mongo_id_value(pk_val, nd.get("keyType"))
+                        if pk == "_id"
+                        else self._cast_value(pk_val, nd.get("keyType"))
+                    )
+                    try:
+                        res = _coll(table_name).delete_one({pk: filtro_val})
+                        afetados = int(res.deleted_count)
+                    except Exception as exc:  # noqa: BLE001
+                        erros.append(f"'{table_name}': {exc}")
+                        afetados = 0
+                    total += afetados
+                    itens.append({"tabela": table_name, "chave": pk, "valor": str(pk_val), "afetados": afetados})
+
+        # Histórico (best-effort).
+        duration_ms = int((datetime.now(timezone.utc) - start).total_seconds() * 1000)
+        connection_id = getattr(connection, "id", None)
+        if connection_id is not None:
+            try:
+                create_query_history(
+                    db=db,
+                    user_id=current_user_id,
+                    data=QueryHistoryCreate(
+                        user_id=current_user_id,
+                        db_connection_id=connection_id,
+                        query="DELETE mongo",
+                        query_type=QueryType.DELETE,
+                        executed_at=start,
+                        updated_at=datetime.now(timezone.utc),
+                        duration_ms=duration_ms,
+                        result_preview=json.dumps(itens, default=str, ensure_ascii=False),
+                        error_message=json.dumps(erros, ensure_ascii=False) if erros else None,
+                        is_favorite=False,
+                        tags="delete_mongo",
+                        app_source=app_source,
+                        client_ip=client_ip,
+                        executed_by=executed_by,
+                        modified_by=modified_by or executed_by,
+                        meta_info={"engine": "mongodb", "total_deletados": total, "erros": erros},
+                    ),
+                )
+            except Exception as h:  # noqa: BLE001
+                log_message(f"⚠️ Falha ao salvar histórico (mongo delete): {h}", "warning")
+
+        mensagem = (
+            f"{total} registro(s) excluído(s) com sucesso."
+            if total > 0
+            else "Nenhum registro foi excluído."
+        )
+        erros_unicos = self._unique_preserve_order(erros)
+        if erros_unicos:
+            mensagem += f" Avisos: {', '.join(erros_unicos)}."
+
+        return DeleteResponse(
+            success=total > 0,
+            mensagem=mensagem,
+            itens_afetados=itens,
+            executado_em=datetime.now(timezone.utc),
+        )
+
     async def execute_delete(
         self,
         registros: List[PayloadDeleteRow],
@@ -413,6 +634,23 @@ class DeleteOperationService:
         )
         connection_type = str(connection.type)
         connection_id = getattr(connection, "id", None)
+
+        # NoSQL: o MongoDB não usa engine.begin()/SQL. Reencaminha para o
+        # executor Mongo, devolvendo o mesmo DeleteResponse.
+        if is_mongo(engine):
+            return await self._execute_mongo_delete(
+                engine=engine,
+                connection=connection,
+                registros=registros,
+                payloadQuery=payloadQuery,
+                db=db,
+                current_user_id=current_user_id,
+                delete_all=delete_all,
+                app_source=app_source,
+                executed_by=executed_by,
+                modified_by=modified_by,
+                client_ip=client_ip,
+            )
 
         start = datetime.now(timezone.utc)
 
@@ -492,15 +730,24 @@ class DeleteOperationService:
                             and self._is_safe_with_dots(pk_coluna)
                         ):
                             try:
-                                pk_valor = await self._get_pk_by_index(
-                                    conn=conn,
-                                    payload=payload,
-                                    tabela_name=tabela_name,
-                                    pk_coluna=pk_coluna,
-                                    index=index,
-                                    connection_type=connection_type,
-                                )
+                                # SAVEPOINT: no Postgres, um SELECT que falha
+                                # aborta a transação inteira e todos os comandos
+                                # seguintes morrem com InFailedSqlTransaction.
+                                with conn.begin_nested():
+                                    pk_valor = await self._get_pk_by_index(
+                                        conn=conn,
+                                        payload=payload,
+                                        tabela_name=tabela_name,
+                                        pk_coluna=pk_coluna,
+                                        index=index,
+                                        connection_type=connection_type,
+                                    )
                             except Exception as exc:
+                                log_message(
+                                    f"⚠️ Falha ao obter PK por índice em "
+                                    f"{tabela_name}.{pk_coluna} [index={index}]: {exc}",
+                                    "warning",
+                                )
                                 erros.append(
                                     f"Erro ao obter PK por índice em {tabela_name}.{pk_coluna} [index={index}]: {exc}"
                                 )
@@ -575,16 +822,30 @@ class DeleteOperationService:
                             )
                             continue
 
-                        afetados = await self._delete_by_index_direct(
-                            conn=conn,
-                            payload=payload,
-                            primaryKey=pk_coluna,
-                            keyType=key_type or "",
-                            is_pk_or_unique=False,
-                            tabela_name=tabela_name,
-                            index=index,
-                            connection_type=connection_type,
-                        )
+                        try:
+                            # SAVEPOINT por registro: uma linha que não pode ser
+                            # identificada não invalida as exclusões anteriores.
+                            with conn.begin_nested():
+                                afetados = await self._delete_by_index_direct(
+                                    conn=conn,
+                                    payload=payload,
+                                    primaryKey=pk_coluna,
+                                    keyType=key_type or "",
+                                    is_pk_or_unique=False,
+                                    tabela_name=tabela_name,
+                                    index=index,
+                                    connection_type=connection_type,
+                                )
+                        except Exception as exc:
+                            log_message(
+                                f"⚠️ Falha no delete por índice em {tabela_name} "
+                                f"[index={index}]: {exc}",
+                                "warning",
+                            )
+                            erros.append(
+                                f"Não foi possível excluir a linha {index} de {tabela_name}: {exc}"
+                            )
+                            afetados = 0
 
                         itens_afetados.append(
                             {

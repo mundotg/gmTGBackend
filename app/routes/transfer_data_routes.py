@@ -20,7 +20,13 @@ from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 from importantConfig.convert_string_to_dict import PayloadError, converter_tables_origen
 
-router = APIRouter(prefix="/transfer", tags=["Database Operations"])
+from app.ultils.permissions import require_permission
+
+# Copiar dados entre bases: escreve no destino.
+router = APIRouter(
+    prefix="/transfer", tags=["Database Operations"],
+    dependencies=[Depends(require_permission("data:transfer"))],
+)
 
 
 def sse(event: str, data: str) -> str:

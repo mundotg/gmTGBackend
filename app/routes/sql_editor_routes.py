@@ -36,6 +36,7 @@ from app.auth import decode_token
 from app.config.redis import read_cache, write_cache
 from app.database import get_db_async
 from app.routes.connection_routes import get_current_user_id
+from app.models.user_model import User
 from app.schemas.connetion_schema import ConnectionAccessLevel
 from app.schemas.query_select_upAndInsert_schema import QueryPayload
 from app.services.mongo_query_executor import run_mongo_query
@@ -43,8 +44,16 @@ from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.conect_database import is_mongo, get_mongo_database
 from app.ultils.connection_access import assert_user_connection_level_async
 from app.ultils.logger import log_message
+from app.ultils.permissions import get_current_user, require_permission, user_has_permission
 
-router = APIRouter(prefix="/sql-editor", tags=["SQL Editor"])
+# Baseline: quem pode executar consultas. Alterar dados exige ainda
+# `data:write`, verificado por instrucao dentro de /execute e /explain,
+# porque aqui o mesmo endpoint tanto le como escreve.
+router = APIRouter(
+    prefix="/sql-editor",
+    tags=["SQL Editor"],
+    dependencies=[Depends(require_permission("query:execute"))],
+)
 
 MAX_ROWS = 2000
 FETCH_BATCH = 200
@@ -169,6 +178,20 @@ _RE_ESCRITA = re.compile(
 # Strings e comentários são removidos antes da análise para que um dado
 # (`WHERE estado = 'DELETED'`) não seja confundido com um comando.
 _RE_LITERAIS = re.compile(r"'(?:[^']|'')*'|\"[^\"]*\"|--[^\n]*|/\*.*?\*/", re.DOTALL)
+
+
+def exigir_permissao_de_escrita(actor: User) -> None:
+    """
+    403 se o utilizador nao pode alterar dados em lado nenhum.
+
+    Complementa a verificacao de nivel na conexao: esta diz o que a PESSOA
+    pode fazer (RBAC), a outra diz o que ela pode fazer NAQUELA conexao.
+    """
+    if not user_has_permission(actor.permissions, ("data:write",)):
+        raise HTTPException(
+            status_code=403,
+            detail="Permissao insuficiente para alterar dados. E necessaria: data:write.",
+        )
 
 
 def requires_write(sql: str) -> bool:
@@ -596,6 +619,7 @@ async def execute(
     body: ExecuteBody,
     db: AsyncSession = Depends(get_db_async),
     user_id: int = Depends(get_current_user_id),
+    actor: User = Depends(get_current_user),
 ):
     query = (body.query or "").strip()
     query_id = str(uuid.uuid4())
@@ -614,6 +638,7 @@ async def execute(
             # O shell Mongo aqui só aceita find/aggregate/count (`_MONGO_RE`),
             # portanto é leitura por construção e dispensa a análise de SQL.
             if not is_mongo(engine) and requires_write(query):
+                exigir_permissao_de_escrita(actor)
                 await assert_user_connection_level_async(
                     db, connection, user_id, ConnectionAccessLevel.write
                 )
@@ -668,6 +693,7 @@ async def explain(
     body: AnalyzeBody,
     db: AsyncSession = Depends(get_db_async),
     user_id: int = Depends(get_current_user_id),
+    actor: User = Depends(get_current_user),
 ):
     engine, connection = await ConnectionManager.get_engine_async(db, user_id)
     if is_mongo(engine):
@@ -681,6 +707,7 @@ async def explain(
     # em PostgreSQL executa mesmo o DELETE. O plano de uma escrita exige, por
     # isso, o mesmo nível que a escrita.
     if requires_write(stmt[0]):
+        exigir_permissao_de_escrita(actor)
         await assert_user_connection_level_async(
             db, connection, user_id, ConnectionAccessLevel.write
         )

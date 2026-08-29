@@ -36,6 +36,7 @@ from app.services.insert_service_auto import insert_row_service_auto
 from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
+from app.ultils.permissions import require_permission
 from app.ultils.update_line_build_exe import update_row_service
 
 
@@ -103,7 +104,15 @@ class QueryChannelManager:
 channel_manager = QueryChannelManager()
 
 # Router configuration
-router = APIRouter(prefix="/exe", tags=["executeQuery"])
+# Baseline: executar consultas. As rotas que ALTERAM dados exigem, alem
+# disto, `data:write` — ver os decoradores abaixo. Sem essa separacao o
+# gate seria decorativo: `query:execute` e dado a todos os papeis, incluindo
+# o "user" basico.
+router = APIRouter(
+    prefix="/exe",
+    tags=["executeQuery"],
+    dependencies=[Depends(require_permission("query:execute"))],
+)
 
 
 def cleanup_expired_channels():
@@ -123,7 +132,7 @@ async def handle_db_transaction(db: Session):
         raise
 
 
-@router.post("/update_row")
+@router.post("/update_row", dependencies=[Depends(require_permission("data:write"))])
 async def update_row_endpoint(
     data: UpdateRequest,
     background_tasks: BackgroundTasks,
@@ -160,7 +169,7 @@ async def update_row_endpoint(
             raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/insert_row")
+@router.post("/insert_row", dependencies=[Depends(require_permission("data:write"))])
 async def insert_row_endpoint(
     data: InsertRequest,
     background_tasks: BackgroundTasks,
@@ -192,7 +201,7 @@ async def insert_row_endpoint(
             raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/auto-create")
+@router.post("/auto-create", dependencies=[Depends(require_permission("data:write"))])
 async def auto_create_endpoint(
     data: AutoCreateRequest,
     background_tasks: BackgroundTasks,

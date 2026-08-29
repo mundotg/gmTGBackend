@@ -18,7 +18,13 @@ from app.ultils.log_file_reader import ler_do_fim, ler_por_blocos, normalizar_ni
 from app.ultils.logger import get_log_file_path, log_message
 
 
-router = APIRouter(tags=["AuditLog"])
+from app.ultils.permissions import require_permission
+
+# Logs da aplicacao, incluindo download do ficheiro.
+router = APIRouter(
+    tags=["AuditLog"],
+    dependencies=[Depends(require_permission("logs:view", "logs:read"))],
+)
 
 
 @router.get("/logs", response_model=ResponseWrapper[list[LogOut]])

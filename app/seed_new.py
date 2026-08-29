@@ -100,6 +100,17 @@ ROLES_PERMISSIONS = {
             "query:read_history",
             "query:delete_history",
             "query:export",
+            # ESCRITA NOS DADOS DO CLIENTE
+            #
+            # `query:execute` não serve para isto: toda a gente o tem, incluindo
+            # o papel "user". Enquanto era a única permissão de execução, exigi-la
+            # numa rota que apaga dados não filtrava ninguém. Estas separam o que
+            # lê do que altera.
+            "data:write",  # inserir e atualizar linhas
+            "data:delete",  # apagar linhas
+            "schema:manage",  # DDL: criar, alterar e apagar tabelas e colunas
+            "data:transfer",  # copiar dados entre bases
+            "entity:list",  # paginação genérica de entidades (/geral/paginate)
             # TABLES
             "table:read",
             "table:describe",
@@ -160,6 +171,8 @@ ROLES_PERMISSIONS = {
             "db_connection:read_company",
             "query:execute",
             "query:read_history",
+            "data:write",
+            "entity:list",
             "project:create",
             "project:read",
             "project:update",
@@ -175,6 +188,11 @@ ROLES_PERMISSIONS = {
             "db_connection:read_own",
             "query:execute",
             "query:read_history",
+            "data:write",
+            "data:delete",
+            "schema:manage",
+            "data:transfer",
+            "entity:list",
             "table:read",
             "table:describe",
             "project:view",
@@ -186,6 +204,7 @@ ROLES_PERMISSIONS = {
         "permissions": [
             "db_connection:read_own",
             "query:execute",
+            "entity:list",
             "project:view",
             "settings:user",
         ],

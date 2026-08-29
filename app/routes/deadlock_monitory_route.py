@@ -11,7 +11,13 @@ from app.ultils.logger import log_message
 from importantConfig.DeadlockManager import DeadlockManager
 
 
-router = APIRouter(prefix="/database", tags=["Database Operations"])
+from app.ultils.permissions import require_permission
+
+# Monitorizacao de deadlocks: leitura de metadados do motor.
+router = APIRouter(
+    prefix="/database", tags=["Database Operations"],
+    dependencies=[Depends(require_permission("table:stats", "table:read"))],
+)
 
 
 def response_success(data: dict):

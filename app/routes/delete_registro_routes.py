@@ -13,7 +13,13 @@ from app.schemas.query_select_upAndInsert_schema import QueryPayload
 from app.services.executar_delete_e_salvar import DeleteOperationService
 from app.ultils.logger import log_message
 
-router = APIRouter(prefix="/delete", tags=["Data Deletion"])
+from app.ultils.permissions import require_permission
+
+# Apagar registos, incluindo o /delete_all.
+router = APIRouter(
+    prefix="/delete", tags=["Data Deletion"],
+    dependencies=[Depends(require_permission("data:delete"))],
+)
 
 
 def _sum_total_afetados(itens_afetados) -> int:

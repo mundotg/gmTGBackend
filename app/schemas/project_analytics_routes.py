@@ -12,7 +12,15 @@ from app.routes.connection_routes import get_current_user_id
 from app.schemas.project_analytics_schema import ProjectAnalyticsResponse
 from app.ultils.logger import log_message
 
-router = APIRouter(prefix="/analytics/projects", tags=["ProjectAnalytics"])
+# O frontend ja escondia estes dados por `analytics:project:view`
+# (TaskProject.tsx); faltava o backend recusar o pedido direto.
+from app.ultils.permissions import require_permission
+
+router = APIRouter(
+    prefix="/analytics/projects",
+    tags=["ProjectAnalytics"],
+    dependencies=[Depends(require_permission("analytics:project:view"))],
+)
 
 # Estado "concluída" tal como está gravado nas tarefas (ver TaskStatusEnum).
 STATUS_CONCLUIDA = "concluida"

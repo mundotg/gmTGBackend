@@ -32,7 +32,13 @@ from app.services.database_inspector import (
 )
 from app.ultils.logger import log_message
 
-router = APIRouter(prefix="/consu", tags=["Consulta de Banco de Dados"])
+from app.ultils.permissions import require_permission
+
+# Estatisticas e contagens das tabelas.
+router = APIRouter(
+    prefix="/consu", tags=["Consulta de Banco de Dados"],
+    dependencies=[Depends(require_permission("table:stats", "table:read"))],
+)
 
 
 # --------------------------------------------------

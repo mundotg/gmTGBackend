@@ -39,7 +39,13 @@ try:
 except Exception:
     DDLExecutionError = None
 
-router = APIRouter(prefix="/database", tags=["Database Schema (DDL)"])
+from app.ultils.permissions import require_permission
+
+# Todos os endpoints deste router sao DDL sobre a base do cliente.
+router = APIRouter(
+    prefix="/database", tags=["Database Schema (DDL)"],
+    dependencies=[Depends(require_permission("schema:manage"))],
+)
 
 # ============================================================
 # 🔧 HELPERS

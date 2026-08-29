@@ -18,7 +18,13 @@ from app.routes.connection_routes import get_current_user_id
 from app.schemas.queryhistory_schemas import QueryType
 from app.ultils.logger import log_message
 
-router = APIRouter(prefix="/history", tags=["AuditLog"])
+from app.ultils.permissions import require_permission
+
+# Historico de queries: quem consultou o que.
+router = APIRouter(
+    prefix="/history", tags=["AuditLog"],
+    dependencies=[Depends(require_permission("query:read_history"))],
+)
 
 
 # =========================

@@ -35,6 +35,8 @@ BACKUP_DIR = "backups"
 # Extensões aceites no upload de restore (SQL + Mongo/NoSQL).
 RESTORE_ALLOWED_EXT = (".sql", ".backup", ".dump", ".gz", ".archive", ".bson", ".db", ".bak")
 
+from app.ultils.permissions import require_permission
+
 router = APIRouter(prefix="/database", tags=["Backup & Restore (SSE)"])
 
 
@@ -150,7 +152,7 @@ channel_manager = ChannelManager(ttl_minutes=30)
 # 💾 BACKUP STREAM
 # ============================================================
 
-@router.get("/backup/{connection_id}/stream")
+@router.get("/backup/{connection_id}/stream", dependencies=[Depends(require_permission("backup:execute"))])
 async def backup_stream(
     connection_id: int,
     compress: bool = Query(True),
@@ -208,7 +210,7 @@ async def backup_stream(
 # 🔁 RESTORE STREAM
 # ============================================================
 
-@router.get("/restore/{connection_id}/stream")
+@router.get("/restore/{connection_id}/stream", dependencies=[Depends(require_permission("backup:restore"))])
 async def restore_stream(
     connection_id: int,
     filepath: str = Query(...),
@@ -293,7 +295,7 @@ def _safe_join_backup(filename: str) -> str:
     return target
 
 
-@router.post("/restore/{connection_id}/upload")
+@router.post("/restore/{connection_id}/upload", dependencies=[Depends(require_permission("backup:restore"))])
 async def upload_restore_file(
     connection_id: int,
     file: UploadFile = File(...),
@@ -350,7 +352,7 @@ async def upload_restore_file(
 # ============================================================
 # 🚀 Iniciar jobs (backup / restore) — corre em background
 # ============================================================
-@router.post("/jobs/backup")
+@router.post("/jobs/backup", dependencies=[Depends(require_permission("backup:execute"))])
 async def start_backup_job(
     connection_id: int = Body(..., embed=True),
     compress: bool = Body(True, embed=True),
@@ -365,7 +367,7 @@ async def start_backup_job(
     return {"job_id": job["id"], "status": job["status"]}
 
 
-@router.post("/jobs/restore")
+@router.post("/jobs/restore", dependencies=[Depends(require_permission("backup:restore"))])
 async def start_restore_job(
     connection_id: int = Body(..., embed=True),
     filepath: str = Body(..., embed=True),
@@ -383,7 +385,7 @@ async def start_restore_job(
     return {"job_id": job["id"], "status": job["status"]}
 
 
-@router.get("/jobs/{job_id}")
+@router.get("/jobs/{job_id}", dependencies=[Depends(require_permission("backup:read"))])
 async def get_job_status(
     job_id: str,
     user_id: int = Depends(get_current_user_id),
@@ -398,7 +400,7 @@ async def get_job_status(
 # ============================================================
 # 📥 Download de um backup concluído
 # ============================================================
-@router.get("/backups/{filename}/download")
+@router.get("/backups/{filename}/download", dependencies=[Depends(require_permission("backup:read"))])
 async def download_backup(
     filename: str,
     user_id: int = Depends(get_current_user_id),

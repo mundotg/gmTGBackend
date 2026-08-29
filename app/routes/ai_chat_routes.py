@@ -41,7 +41,15 @@ def get_current_user_id():
     return 1
 
 
-router = APIRouter(prefix="/chat", tags=["Chat"])
+from app.ultils.permissions import require_permission
+
+# O chat gera e executa queries contra a base ligada: vale o mesmo que
+# executar uma consulta a mao.
+router = APIRouter(
+    prefix="/chat",
+    tags=["Chat"],
+    dependencies=[Depends(require_permission("query:execute"))],
+)
 
 
 # ============================================================

@@ -29,7 +29,14 @@ from app.services.data_science_service import analisar, analisar_stream
 from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.logger import log_message
 
-router = APIRouter(prefix="/datascience", tags=["Data Science"])
+# Analise sobre os dados da base ligada: e leitura de tabelas.
+from app.ultils.permissions import require_permission
+
+router = APIRouter(
+    prefix="/datascience",
+    tags=["Data Science"],
+    dependencies=[Depends(require_permission("table:read", "query:execute"))],
+)
 
 MAX_ANALYZE_ROWS = 5000  # cap de linhas a analisar (memória/tempo)
 

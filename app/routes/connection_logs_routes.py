@@ -16,7 +16,13 @@ from app.schemas.connetion_schema import (
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
-router = APIRouter(prefix="/log", tags=["connections_log"])
+from app.ultils.permissions import require_permission
+
+# Registos de ligacao.
+router = APIRouter(
+    prefix="/log", tags=["connections_log"],
+    dependencies=[Depends(require_permission("logs:view", "logs:read"))],
+)
 
 # -----------------------------
 # Funções com Cache

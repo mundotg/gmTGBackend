@@ -18,10 +18,15 @@ from app.config.dependencies import (
 )
 from app.config.engine_manager_cache import EngineManager
 from app.models.connection_models import DBConnection
+from app.schemas.connetion_schema import ConnectionAccessLevel
 from app.services.crypto_utils import secret_decrypt
 from app.ultils.ativar_session_bd import (
     get_connection_by_id, get_connection_current, get_connection_current_async,
     get_connection_id_async, reativar_connection
+)
+from app.ultils.connection_access import (
+    assert_user_connection_level,
+    assert_user_connection_level_async,
 )
 from app.ultils.conect_database import DatabaseManager
 from app.ultils.db_url import async_url, engine_from_url, is_mongo_url, remap_url_host
@@ -42,9 +47,20 @@ class ConnectionManager:
     """Gerenciador de conexões com o banco de dados."""
 
     @staticmethod
-    def ensure_connection(db: Session, user_id: int):
+    def ensure_connection(
+        db: Session,
+        user_id: int,
+        required: ConnectionAccessLevel = ConnectionAccessLevel.read,
+    ):
         """
-        Garante que existe uma conexão ativa para o usuário.
+        Garante que existe uma conexão ativa para o usuário **e** que ele tem
+        nível suficiente nela.
+
+        `required` é o nível mínimo exigido para o que o chamador vai fazer:
+        `read` para consultar, `write` para alterar dados ou estrutura. O
+        default é `read` porque a esmagadora maioria dos chamadores só lê —
+        quem escreve tem de o dizer explicitamente.
+
         Retorna: (engine, connection)
         """
         try:
@@ -59,6 +75,10 @@ class ConnectionManager:
                     status_code=400,
                     detail="ID da conexão não está disponível",
                 )
+
+            # Antes de criar ou reativar seja o que for: sem nível suficiente,
+            # o utilizador nunca chega a ter uma engine na mão.
+            assert_user_connection_level(db, connection, user_id, required)
 
             cached_connection_id = EngineManager.get_connection_id(user_id)
             engine = EngineManager.get(user_id)
@@ -108,11 +128,24 @@ class ConnectionManager:
             )
 
     @staticmethod
-    def ensure_idConn_connection(db: Session, user_id: int, id_connection: int):
-        """Garante que existe uma conexão válida por ID."""
+    def ensure_idConn_connection(
+        db: Session,
+        user_id: int,
+        id_connection: int,
+        required: ConnectionAccessLevel = ConnectionAccessLevel.read,
+    ):
+        """Garante que existe uma conexão válida por ID e que o utilizador tem nível nela."""
         connection = get_connection_by_id(db, user_id, id_connection)
+
+        # `get_connection_by_id` filtra por dono, portanto devolve None a quem
+        # só tem a conexão por partilha. Sem esta guarda, a verificação de nível
+        # rebentava com AttributeError em vez de dar o 400 de sempre.
+        if connection is None:
+            raise HTTPException(status_code=400, detail="Conexão do banco de dados não encontrada")
+
+        assert_user_connection_level(db, connection, user_id, required)
         engine = get_session_by_connection(connection)
-        
+
         if not engine:
             log_message(f"Reativando conexão para usuário {user_id}", "error")
             raise HTTPException(status_code=400, detail="Conexão do banco de dados não encontrada")
@@ -123,7 +156,12 @@ class ConnectionManager:
     # 🔄 MÉTODO ASSÍNCRONO POR ID
     # =====================================================
     @staticmethod
-    async def get_engine_idconn_async(db: AsyncSession, user_id: int, id_connection: int) -> Tuple[AsyncEngine, DBConnection]:
+    async def get_engine_idconn_async(
+        db: AsyncSession,
+        user_id: int,
+        id_connection: int,
+        required: ConnectionAccessLevel = ConnectionAccessLevel.read,
+    ) -> Tuple[AsyncEngine, DBConnection]:
         """
         Obtém ou cria uma AsyncEngine reutilizável para a conexão solicitada.
         Garante que a engine tenha cache por usuário e que pools antigos não
@@ -133,6 +171,8 @@ class ConnectionManager:
 
         if not connection:
             raise HTTPException(status_code=400, detail="Conexão não encontrada")
+
+        await assert_user_connection_level_async(db, connection, user_id, required)
 
         cached_connection_id = EngineManager.async_get_connection_id(user_id)
         engine = EngineManager.async_get(user_id)
@@ -159,13 +199,17 @@ class ConnectionManager:
     @staticmethod
     async def get_engine_async(
         db: AsyncSession,
-        user_id: int
+        user_id: int,
+        required: ConnectionAccessLevel = ConnectionAccessLevel.read,
     ) -> Tuple[AsyncEngine, DBConnection]:
+        """Versão assíncrona de `ensure_connection` — mesmo contrato de `required`."""
 
         connection, _ = await get_connection_current_async(db, user_id)
 
         if connection is None:
             raise HTTPException(status_code=400, detail="Conexão não encontrada")
+
+        await assert_user_connection_level_async(db, connection, user_id, required)
 
         cached_connection_id = EngineManager.async_get_connection_id(user_id)
         engine = EngineManager.async_get(user_id)

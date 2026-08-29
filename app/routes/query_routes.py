@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.redis import read_cache, write_cache
 from app.database import get_db, get_db_async
 from app.routes.connection_routes import get_current_user_id
+from app.schemas.connetion_schema import ConnectionAccessLevel
 from app.schemas.query_select_upAndInsert_schema import (
     AutoCreateRequest,
     CondicaoFiltro,
@@ -134,7 +135,9 @@ async def update_row_endpoint(
 
     async with handle_db_transaction(db):
         try:
-            engine, connection = ConnectionManager.ensure_connection(db, user_id)
+            engine, connection = ConnectionManager.ensure_connection(
+                db, user_id, ConnectionAccessLevel.write
+            )
 
             log_message(f"Atualizando linha para usuário {user_id}", "info")
             result = update_row_service(
@@ -169,7 +172,9 @@ async def insert_row_endpoint(
 
     async with handle_db_transaction(db):
         try:
-            engine, connection = ConnectionManager.ensure_connection(db, user_id)
+            engine, connection = ConnectionManager.ensure_connection(
+                db, user_id, ConnectionAccessLevel.write
+            )
 
             log_message(f"Inserindo linha para usuário {user_id}", "info")
             result = insert_row_service(
@@ -199,7 +204,9 @@ async def auto_create_endpoint(
 
     async with handle_db_transaction(db):
         try:
-            engine, connection = ConnectionManager.ensure_connection(db, user_id)
+            engine, connection = ConnectionManager.ensure_connection(
+                db, user_id, ConnectionAccessLevel.write
+            )
 
             log_message(f"Auto-criando linhas para usuário {user_id}", "info")
             result = insert_row_service_auto(data, engine, user_id, connection, db)

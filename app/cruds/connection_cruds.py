@@ -22,6 +22,12 @@ from app.schemas.connetion_schema import (
 )
 from app.schemas.users_schemas import PaginationOutput
 from app.services.crypto_utils import reencrypt_at_rest, secret_decrypt, secret_encrypt
+from app.ultils.connection_access import (
+    ACCESS_ORDER,
+    forca_do_nivel,
+    negar_acesso,
+    resolve_access_level,
+)
 from app.ultils.db_url import InvalidDatabaseUrl, parse_db_url
 from app.ultils.logger import log_message
 from app.ultils.permissions import is_superadmin
@@ -111,7 +117,6 @@ def get_active_connection_by_userid(db: Session, user_id: int):
 
     return (
         db.query(ActiveConnection)
-        .join(DBConnection, DBConnection.id == ActiveConnection.connection_id)
         .options(
             load_only(
                 ActiveConnection.connection_id,
@@ -122,7 +127,10 @@ def get_active_connection_by_userid(db: Session, user_id: int):
             noload(ActiveConnection.connection),
         )
         .filter(
-            DBConnection.user_id == user_id,
+            # O estado de ligação já é do utilizador (chave composta), portanto
+            # não se filtra mais por dono da conexão: quem tem a conexão só por
+            # partilha também tem direito ao seu próprio estado de ligação.
+            ActiveConnection.user_id == user_id,
             ActiveConnection.status.is_(True),
         )
         .first()
@@ -130,12 +138,17 @@ def get_active_connection_by_userid(db: Session, user_id: int):
 
 
 def get_active_connection_by_connid(
-    db: Session, conn_id: int
+    db: Session, conn_id: int, user_id: int
 ) -> Optional[ActiveConnection]:
     """
-    Busca conexão ativa por connection_id SEM relações.
+    Busca a ligação ativa de UM utilizador a uma conexão, sem relações.
+
+    `user_id` passou a ser obrigatório: sem ele, desligar devolvia a linha de
+    outra pessoa que estivesse ligada à mesma conexão partilhada.
     """
-    log_message(f"📡 Verificando conexão ativa do conexão {conn_id}", "info")
+    log_message(
+        f"📡 Verificando conexão ativa | conn={conn_id} | user={user_id}", "info"
+    )
 
     return (
         db.query(ActiveConnection)
@@ -149,27 +162,28 @@ def get_active_connection_by_connid(
         )
         .filter(
             ActiveConnection.connection_id == conn_id,
+            ActiveConnection.user_id == user_id,
             ActiveConnection.status.is_(True),
         )
         .first()
     )
 
 
-def delete_active_connection(db: Session, conn_id: int):
+def delete_active_connection(db: Session, conn_id: int, user_id: int):
     """
     BUG FIX + performance:
     Antes chamava get_active_connection_by_userid(db, conn_id) (errado).
     Agora busca por conn_id como o nome sugere.
     """
-    active = get_active_connection_by_connid(db, conn_id)
+    active = get_active_connection_by_connid(db, conn_id, user_id)
     if active:
         db.delete(active)
         db.commit()
     return active
 
 
-def disconnect_active_connection(db: Session, conn_id: int):
-    active = get_active_connection_by_connid(db, conn_id)
+def disconnect_active_connection(db: Session, conn_id: int, user_id: int):
+    active = get_active_connection_by_connid(db, conn_id, user_id)
     if active:
         active.status = False
         db.add(active)
@@ -183,25 +197,17 @@ def disconnect_active_connection(db: Session, conn_id: int):
     return active
 
 
-def connect_active_connection(db: Session, conn_id: int):
+def connect_active_connection(db: Session, conn_id: int, user_id: int):
     """
-    Mantém a mesma assinatura e comportamento:
-    - encontra ActiveConnection
-    - desativa todas do usuário
+    - encontra a ligação do utilizador àquela conexão
+    - desativa todas as ligações dele
     - reativa a conexão escolhida
+
+    O `user_id` era antes deduzido do dono da conexão, o que dava a pessoa
+    errada assim que a conexão fosse partilhada. Agora vem de quem pede.
     """
-    active = get_active_connection_by_connid(db, conn_id)
+    active = get_active_connection_by_connid(db, conn_id, user_id)
     if not active:
-        return None
-
-    # Precisamos do user_id: pega via join com DBConnection (1 query leve)
-    user_id = (
-        db.query(DBConnection.user_id)
-        .filter(DBConnection.id == active.connection_id)
-        .scalar()
-    )
-
-    if user_id is None:
         return None
 
     desactivate_all_connections(db, user_id)
@@ -222,9 +228,13 @@ def set_active_connection(db: Session, user_id: int, id_conn: int):
     - em vez de delete + insert sempre, você pode manter como está (sem mudar regra).
     - mas vamos evitar carregar relação e manter o fluxo.
     """
-    db.query(ActiveConnection).filter(ActiveConnection.connection_id == id_conn).delete(
-        synchronize_session=False
-    )
+    # Apaga só a linha DESTE utilizador para esta conexão. Antes apagava as de
+    # toda a gente, o que expulsava quem mais estivesse ligado à mesma conexão
+    # partilhada.
+    db.query(ActiveConnection).filter(
+        ActiveConnection.connection_id == id_conn,
+        ActiveConnection.user_id == user_id,
+    ).delete(synchronize_session=False)
     db.commit()
 
     log_message(
@@ -233,6 +243,7 @@ def set_active_connection(db: Session, user_id: int, id_conn: int):
     )
 
     active = ActiveConnection(
+        user_id=user_id,
         connection_id=id_conn,
         status=True,
         activated_at=datetime.now(timezone.utc),
@@ -245,13 +256,13 @@ def set_active_connection(db: Session, user_id: int, id_conn: int):
 
 
 def desactivate_all_connections(db: Session, user_id: int):
-    # subquery: pega ids de conexões do usuário
-    conn_ids_subq = select(DBConnection.id).where(DBConnection.user_id == user_id)
-
+    # Direto pelo `user_id` da própria linha. A subquery pelas conexões que o
+    # utilizador possui deixava de fora as que ele tem por partilha — essas
+    # ficavam ativas para sempre, mesmo depois de ele ligar a outra.
     stmt = (
         update(ActiveConnection)
         .where(
-            ActiveConnection.connection_id.in_(conn_ids_subq),
+            ActiveConnection.user_id == user_id,
             ActiveConnection.status.is_(True),
         )
         .values(status=False)
@@ -805,12 +816,9 @@ def query_connections_simple(
 # 🤝 Partilha de conexões
 # =========================================================
 
-# Ordem de força dos níveis. Serve para comparar ("write chega para ler?").
-ACCESS_ORDER = {
-    ConnectionAccessLevel.read: 1,
-    ConnectionAccessLevel.write: 2,
-    ConnectionAccessLevel.manage: 3,
-}
+# `ACCESS_ORDER` e a resolução do nível vivem em `app.ultils.connection_access`:
+# são as mesmas regras usadas no caminho de execução, e ter duas cópias era o
+# caminho mais curto para elas divergirem.
 
 
 def _share_out(share: DBConnectionShare) -> ConnectionShareOut:
@@ -865,15 +873,8 @@ def get_connection_access(
     is_owner = conn.user_id == user.id
     superadmin = is_superadmin(user)
 
-    nivel: Optional[ConnectionAccessLevel] = None
-    if is_owner or superadmin:
-        nivel = ConnectionAccessLevel.manage
-    else:
-        share = get_share(db, conn.id, user.id)
-        if share:
-            nivel = ConnectionAccessLevel(share.access_level)
-
-    forca = ACCESS_ORDER.get(nivel, 0) if nivel else 0
+    nivel = resolve_access_level(db, conn, user)
+    forca = forca_do_nivel(nivel)
 
     # Quem tem "manage" pode repartilhar; apagar continua reservado ao dono
     # e ao super admin.
@@ -914,18 +915,17 @@ def assert_connection_access(
     user: User,
     required: ConnectionAccessLevel = ConnectionAccessLevel.read,
 ) -> ConnectionAccessOut:
-    """Levanta 403 se `user` não tiver pelo menos o nível `required` em `conn`."""
-    acesso = get_connection_access(db, conn, user)
-    forca = ACCESS_ORDER.get(acesso.access_level, 0) if acesso.access_level else 0
+    """
+    Levanta 403 se `user` não tiver pelo menos o nível `required` em `conn`.
 
-    if forca < ACCESS_ORDER[required]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                f"Sem acesso de nível '{required.value}' à conexão '{conn.name}'. "
-                "Peça ao dono da conexão para lhe conceder acesso."
-            ),
-        )
+    Devolve o `ConnectionAccessOut` completo porque as rotas de gestão precisam
+    dos flags (`can_delete`) e da lista de partilhas. No caminho de execução usa-se
+    antes `assert_connection_level`, que resolve o nível sem montar essa lista.
+    """
+    acesso = get_connection_access(db, conn, user)
+
+    if forca_do_nivel(acesso.access_level) < ACCESS_ORDER[required]:
+        negar_acesso(conn, user.id, required)
 
     return acesso
 

@@ -69,6 +69,7 @@ from app.services.dataset_service import (
     save_dataframe_to_sqlite,
 )
 from app.ultils.conect_database import close_engine
+from app.ultils.connection_access import assert_user_connection_level
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 from app.ultils.permissions import get_current_user, is_superadmin
@@ -203,11 +204,16 @@ def _cleanup_engine(user_id: int) -> None:
         )
 
 
-def _validate_connection_owner(
+def _ensure_connection_exists(
     conn: Optional[DBConnection], conn_id: int
 ) -> DBConnection:
     """
-    Garante que a conexão existe.
+    Garante que a conexão existe. NÃO verifica quem a pode usar.
+
+    Chamava-se `_validate_connection_owner`, o que sugeria uma verificação de
+    dono que nunca existiu: `get_db_connection_by_id` procura só por id, sem
+    filtrar por utilizador. Quem chama isto tem de fazer o controlo de acesso
+    à parte, com `assert_user_connection_level`.
     """
     if not conn:
         raise HTTPException(
@@ -383,16 +389,26 @@ async def connect_or_disconnect(
     Alterna entre conectar e desconectar uma conexão salva sem travar o asyncio.
     """
     try:
-        active_conn = get_active_connection_by_connid(db, conn_id)
+        # Antes de tudo: esta conexão é sequer do utilizador, ou partilhada com
+        # ele? Sem esta verificação, `conn_id` era aceite em cru — qualquer
+        # utilizador autenticado ativava a conexão de outro (o helper por baixo
+        # procura só por id) e ficava com a engine dessa base em cache no seu
+        # próprio `user_id`, que rotas como `dbInfo` e `database_inspector`
+        # depois usam sem reconfirmar de quem é.
+        assert_user_connection_level(
+            db, get_connection_or_404(db, conn_id), user_id, ConnectionAccessLevel.read
+        )
+
+        active_conn = get_active_connection_by_connid(db, conn_id, user_id)
 
         # 1. LÓGICA DE DESCONEXÃO
         if active_conn and active_conn.status:
             _cleanup_engine(user_id)
 
             # CORRIGIDO: Acesso via ponto (objeto) em vez de colchetes
-            disconnect_active_connection(db, active_conn.connection_id)
+            disconnect_active_connection(db, active_conn.connection_id, user_id)
 
-            conn_data = _validate_connection_owner(
+            conn_data = _ensure_connection_exists(
                 get_db_connection_by_id(db, active_conn.connection_id),
                 active_conn.connection_id,
             )
@@ -413,7 +429,7 @@ async def connect_or_disconnect(
             )
 
         # 2. LÓGICA DE CONEXÃO (ATIVAÇÃO)
-        conn_data = _validate_connection_owner(
+        conn_data = _ensure_connection_exists(
             get_db_connection_by_id(db, conn_id), conn_id
         )
 

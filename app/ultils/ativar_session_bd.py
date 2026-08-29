@@ -118,7 +118,7 @@ def desativar_connection(id_user: int, conn: int, db: Session) -> dict:
         }
     """
     try:
-        conexao_ativa = disconnect_active_connection(db, conn)
+        conexao_ativa = disconnect_active_connection(db, conn, id_user)
         conn_data: DBConnectionBase = get_db_connection_by_id(db, conn)
         conn_data.status = "disconnected"
         create_db_connection(db, id_user, conn_data)
@@ -128,7 +128,7 @@ def desativar_connection(id_user: int, conn: int, db: Session) -> dict:
                 "success": False,
                 "message": "Nenhuma conexão ativa encontrada para o usuário.",
             }
-        disconnect_active_connection(db, conexao_ativa.connection_id)
+        disconnect_active_connection(db, conexao_ativa.connection_id, id_user)
         if EngineManager.get(id_user):
             EngineManager.remove(id_user)
             log_message(f"🔌 Conexão desativada para o usuário {id_user}", "info")
@@ -160,7 +160,12 @@ def get_connection_current(
     connection = (
         db.query(DBConnection, ActiveConnection.activated_at)
         .join(ActiveConnection, ActiveConnection.connection_id == DBConnection.id)
-        .filter(DBConnection.user_id == id_user, ActiveConnection.status == True)
+        # Filtra pelo dono do ESTADO DE LIGAÇÃO, não pelo dono da conexão.
+        # Com `DBConnection.user_id` uma conexão partilhada nunca chegava a ser
+        # a conexão atual de quem a recebeu, e a partilha não servia para nada.
+        # Quem pode fazer o quê é decidido em `ensure_connection`, que exige o
+        # nível (read/write) antes de devolver a engine.
+        .filter(ActiveConnection.user_id == id_user, ActiveConnection.status == True)
         .first()
     )
 
@@ -197,7 +202,12 @@ async def get_connection_current_async(
     stmt = (
         select(DBConnection, ActiveConnection.activated_at)
         .join(ActiveConnection, ActiveConnection.connection_id == DBConnection.id)
-        .filter(DBConnection.user_id == id_user, ActiveConnection.status == True)
+        # Filtra pelo dono do ESTADO DE LIGAÇÃO, não pelo dono da conexão.
+        # Com `DBConnection.user_id` uma conexão partilhada nunca chegava a ser
+        # a conexão atual de quem a recebeu, e a partilha não servia para nada.
+        # Quem pode fazer o quê é decidido em `ensure_connection`, que exige o
+        # nível (read/write) antes de devolver a engine.
+        .filter(ActiveConnection.user_id == id_user, ActiveConnection.status == True)
     )
 
     result = await db.execute(stmt)

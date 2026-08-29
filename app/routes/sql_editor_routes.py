@@ -26,7 +26,7 @@ import time
 import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -36,10 +36,12 @@ from app.auth import decode_token
 from app.config.redis import read_cache, write_cache
 from app.database import get_db_async
 from app.routes.connection_routes import get_current_user_id
+from app.schemas.connetion_schema import ConnectionAccessLevel
 from app.schemas.query_select_upAndInsert_schema import QueryPayload
 from app.services.mongo_query_executor import run_mongo_query
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.conect_database import is_mongo, get_mongo_database
+from app.ultils.connection_access import assert_user_connection_level_async
 from app.ultils.logger import log_message
 
 router = APIRouter(prefix="/sql-editor", tags=["SQL Editor"])
@@ -149,6 +151,44 @@ def split_statements(sql: str) -> List[str]:
 def statement_type(stmt: str) -> str:
     m = re.match(r"\s*(\w+)", stmt)
     return m.group(1).upper() if m else "UNKNOWN"
+
+
+# ── nível de acesso exigido pelo lote de SQL ──────────────────────────────
+# Verbos iniciais que não alteram nada. Tudo o resto conta como escrita.
+_TIPOS_LEITURA = {"SELECT", "WITH", "SHOW", "EXPLAIN", "DESCRIBE", "DESC", "PRAGMA"}
+
+# Palavras que denunciam escrita mesmo num statement que começa por verbo de
+# leitura: CTEs que escrevem (`WITH x AS (DELETE ... RETURNING ...)`) e
+# `SELECT ... INTO nova_tabela`.
+_RE_ESCRITA = re.compile(
+    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|REPLACE|MERGE"
+    r"|GRANT|REVOKE|INTO|CALL|EXEC|EXECUTE)\b",
+    re.IGNORECASE,
+)
+
+# Strings e comentários são removidos antes da análise para que um dado
+# (`WHERE estado = 'DELETED'`) não seja confundido com um comando.
+_RE_LITERAIS = re.compile(r"'(?:[^']|'')*'|\"[^\"]*\"|--[^\n]*|/\*.*?\*/", re.DOTALL)
+
+
+def requires_write(sql: str) -> bool:
+    """
+    True se alguma instrução do lote altera dados ou estrutura.
+
+    Serve para pedir `write` na conexão só quando é mesmo preciso — um
+    utilizador com nível `read` tem de continuar a poder correr SELECTs, que é
+    exatamente o que a partilha de leitura lhe promete.
+
+    Na dúvida devolve True: recusar uma leitura por excesso de zelo é um
+    incómodo, deixar passar uma escrita é a falha que isto vem fechar.
+    """
+    for stmt in split_statements(sql):
+        limpo = _RE_LITERAIS.sub(" ", stmt)
+        if statement_type(limpo) not in _TIPOS_LEITURA:
+            return True
+        if _RE_ESCRITA.search(limpo):
+            return True
+    return False
 
 
 def extract_tables(stmt: str) -> List[str]:
@@ -566,7 +606,22 @@ async def execute(
             yield _sse("error", {"message": "Query vazia."})
             return
         try:
+            # Obtém-se com `read` (o mínimo para executar seja o que for) e só
+            # depois se exige `write`, se o SQL escrito o justificar. Fazer o
+            # contrário obrigaria a adivinhar o dialecto antes de ter a engine.
             engine, connection = await ConnectionManager.get_engine_async(db, user_id)
+
+            # O shell Mongo aqui só aceita find/aggregate/count (`_MONGO_RE`),
+            # portanto é leitura por construção e dispensa a análise de SQL.
+            if not is_mongo(engine) and requires_write(query):
+                await assert_user_connection_level_async(
+                    db, connection, user_id, ConnectionAccessLevel.write
+                )
+        except HTTPException as e:
+            # 403 de nível insuficiente (e 400 de conexão em falta) têm de
+            # chegar ao editor como erro legível, não como "Sem conexão ativa".
+            yield _sse("error", {"message": e.detail})
+            return
         except Exception as e:  # noqa: BLE001
             yield _sse("error", {"message": f"Sem conexão ativa: {e}"})
             return
@@ -620,6 +675,16 @@ async def explain(
     stmt = split_statements(body.query or "")
     if not stmt:
         return _ok({"plan": []})
+
+    # `EXPLAIN` simples só planeia, mas o prefixo é colado a texto do utilizador:
+    # mandar `ANALYZE DELETE FROM x` produz `EXPLAIN ANALYZE DELETE FROM x`, que
+    # em PostgreSQL executa mesmo o DELETE. O plano de uma escrita exige, por
+    # isso, o mesmo nível que a escrita.
+    if requires_write(stmt[0]):
+        await assert_user_connection_level_async(
+            db, connection, user_id, ConnectionAccessLevel.write
+        )
+
     try:
         async with engine.connect() as conn:
             res = await conn.execute(text(f"EXPLAIN {stmt[0]}"))

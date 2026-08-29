@@ -7,6 +7,7 @@ from sqlalchemy import text, bindparam
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.schemas.connetion_schema import ConnectionAccessLevel
 from app.schemas.query_delete_schema import PayloadDeleteRow, DeleteResponse
 from app.schemas.query_select_upAndInsert_schema import QueryPayload
 from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryType
@@ -629,8 +630,9 @@ class DeleteOperationService:
         itens_afetados: List[Dict[str, Any]] = []
         erros: List[str] = []
 
+        # Apagar registos é escrita: exige nível `write` na conexão.
         engine, connection = self.connection_manager.ensure_connection(
-            db, current_user_id
+            db, current_user_id, ConnectionAccessLevel.write
         )
         connection_type = str(connection.type)
         connection_id = getattr(connection, "id", None)

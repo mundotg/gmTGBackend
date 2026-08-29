@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.connection_models import DBConnection
+from app.schemas.connetion_schema import ConnectionAccessLevel
 from app.schemas.dbstructure_schema import (
     BulkDropTablesRequest,
     FieldDDLRequest,
@@ -103,8 +104,12 @@ def _map_ddl_error_to_http(e: Exception) -> HTTPException:
 
 
 async def _get_engine(db: Session, user_id: int):
+    # Todos os endpoints deste router são DDL (criar, alterar e apagar colunas e
+    # tabelas), logo exigem sempre nível de escrita. Pelo modelo de partilha
+    # atual, `write` é o nível mais forte aplicável a dados — `manage` é sobre
+    # repartilhar a conexão, não sobre mexer no schema.
     engine, connectionModel = await asyncio.to_thread(
-        ConnectionManager.ensure_connection, db, user_id
+        ConnectionManager.ensure_connection, db, user_id, ConnectionAccessLevel.write
     )
     if not engine:
         raise _http_error(503, "Não foi possível conectar ao motor do banco de dados.")

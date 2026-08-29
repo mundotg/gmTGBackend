@@ -124,8 +124,28 @@ class DBConnectionShare(Base):
 
 
 class ActiveConnection(Base):
+    """
+    🔌 Qual é, para cada utilizador, a conexão atualmente ligada.
+
+    A chave inclui `user_id` de propósito. Enquanto a chave era só
+    `connection_id`, "estar ativa" era uma propriedade da conexão e não de quem
+    a usa: dois utilizadores com acesso à mesma conexão partilhada escreviam na
+    mesma linha, e ligar de um lado desligava o outro sem aviso. Só o dono
+    conseguia trabalhar, porque as consultas filtravam por `DBConnection.user_id`.
+
+    Com a chave composta, cada utilizador tem o seu próprio estado de ligação
+    sobre a mesma conexão. Quem pode ligar-se a quê é decidido à parte, por
+    `app.ultils.connection_access` — aqui só se regista o que está ligado.
+    """
+
     __tablename__ = "active_connection"
 
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    )
     connection_id = Column(Integer, ForeignKey("db_connections.id", ondelete="CASCADE"), primary_key=True)
     activated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     status = Column(Boolean, default=False, nullable=False)

@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from app.models.geral_model import Settings
 from app.schemas.geral_schema import SettingsUpdate, UpdateAppearancePayload, UpdateLanguagePayload
+from app.config.user_cache_policy import definir_dados_locais, sincronizar_das_settings
 from app.ultils.logger import log_message
 
 # TypeVar para permitir que o get_paginated_query saiba qual modelo está a retornar
@@ -146,7 +147,15 @@ def update_settings(db: Session, user_id: int, settings_data: SettingsUpdate) ->
         # 5. Grava na base de dados
         db.commit()
         db.refresh(db_settings)
-        
+
+        # 6. O cache consulta esta preferência em Redis a cada leitura, para
+        # não fazer uma query por acesso. Sem espelhar aqui, desligar os dados
+        # locais nas preferências não teria efeito nenhum.
+        if "usar_dados_locais" in update_data:
+            definir_dados_locais(user_id, bool(db_settings.usar_dados_locais))
+        else:
+            sincronizar_das_settings(user_id, db_settings.usar_dados_locais)
+
         return db_settings
 
     except IntegrityError as e:

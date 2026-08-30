@@ -4,6 +4,7 @@ import time
 import hashlib
 import traceback
 import functools
+import inspect
 from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
@@ -11,6 +12,7 @@ from typing import Callable, Optional, Any, Dict, TypeVar, ParamSpec, cast
 
 
 from app.config.redis import write_cache, read_cache, redis_client
+from app.config.user_cache_policy import obter_geracao, usa_dados_locais
 
 # <-- Certifica-te de importar o cliente Redis aqui para o clear_cache!
 from app.ultils.logger import log_message
@@ -99,8 +101,20 @@ def _safe_serialize(value: Any) -> Any:
     return f"<obj:{type(value).__name__}>"
 
 
-def _make_key(func_name: str, cached_user_id: Optional[str] = None, *args, **kwargs) -> str:
-    """Gera chave SHA-256 estável excluindo dependências injetadas (db, session)."""
+def _make_key(
+    func_name: str,
+    cached_user_id: Optional[str] = None,
+    *args,
+    _dono: Optional[int] = None,
+    **kwargs,
+) -> str:
+    """
+    Gera chave SHA-256 estável excluindo dependências injetadas (db, session).
+
+    `_dono` é o id real do utilizador, resolvido pela assinatura da função
+    decorada. Serve só para ir buscar a geração de cache dele — não confundir
+    com `cached_user_id`, que é o rótulo fixo passado ao decorador.
+    """
     
     clean_kwargs = {
         k: _safe_serialize(v)
@@ -118,6 +132,11 @@ def _make_key(func_name: str, cached_user_id: Optional[str] = None, *args, **kwa
         "user": str(cached_user_id) if cached_user_id is not None else "global", 
         "args": clean_args,
         "kwargs": clean_kwargs,
+        # Versão do cache deste utilizador. Incrementá-la (ver
+        # `user_cache_policy`) muda todas as chaves dele de uma vez, que é a
+        # única forma de limpar o cache de uma pessoa só: o utilizador vai
+        # dentro do hash, não há prefixo por onde varrer.
+        "gen": obter_geracao(_dono),
     }
     
     raw = json.dumps(key_data, sort_keys=True, default=str)
@@ -133,6 +152,24 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         is_async = asyncio.iscoroutinefunction(func)
 
+        # Onde está o `user_id` na assinatura. Resolvido aqui, uma vez por
+        # função, e não por chamada. Procurar "o primeiro inteiro nos args"
+        # apanharia o `connection_id` em `f(connection_id, user_id, db)` e
+        # atribuiria o cache à pessoa errada.
+        try:
+            _params = list(inspect.signature(func).parameters)
+            _idx_user = _params.index("user_id") if "user_id" in _params else None
+        except (TypeError, ValueError):  # pragma: no cover
+            _idx_user = None
+
+        def _dono_de(args, kwargs):
+            """Id real do utilizador desta chamada, ou None se a função não o recebe."""
+            if "user_id" in kwargs:
+                return kwargs["user_id"]
+            if _idx_user is not None and _idx_user < len(args):
+                return args[_idx_user]
+            return None
+
         # -------------------------
         # ASYNC WRAPPER
         # -------------------------
@@ -141,12 +178,24 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
             if not CACHE_ENABLED or CACHE_DISABLE_FLAG:
                 return await func(*args, **kwargs)  # type: ignore
 
+            # Este utilizador pediu para não consultar dados locais: vai direto
+            # à origem e também não guarda nada, senão a resposta de agora
+            # ficaria a servir de fotografia ao próximo pedido.
+            if not usa_dados_locais(_dono_de(args, kwargs)):
+                return await func(*args, **kwargs)  # type: ignore
+
             actual_user_id = user_id if user_id is not None else kwargs.get("user_id")
             
             # 👇 Removemos o user_id dos kwargs temporariamente para gerar a chave sem erro
             kwargs_for_key = kwargs.copy()
             kwargs_for_key.pop("user_id", None)
-            key = _make_key(func.__name__, actual_user_id, *args, **kwargs_for_key)
+            key = _make_key(
+                func.__name__,
+                actual_user_id,
+                *args,
+                _dono=_dono_de(args, kwargs),
+                **kwargs_for_key,
+            )
 
             # L1
             mem = MEMORY_CACHE.get(key)
@@ -208,12 +257,22 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
             if not CACHE_ENABLED or CACHE_DISABLE_FLAG:
                 return func(*args, **kwargs)
 
+            # Ver a nota no wrapper assíncrono.
+            if not usa_dados_locais(_dono_de(args, kwargs)):
+                return func(*args, **kwargs)
+
             actual_user_id = user_id if user_id is not None else kwargs.get("user_id")
             
             # 👇 Mesma proteção para a chave
             kwargs_for_key = kwargs.copy()
             kwargs_for_key.pop("user_id", None)
-            key = _make_key(func.__name__, actual_user_id, *args, **kwargs_for_key)
+            key = _make_key(
+                func.__name__,
+                actual_user_id,
+                *args,
+                _dono=_dono_de(args, kwargs),
+                **kwargs_for_key,
+            )
 
             # L1
             mem = MEMORY_CACHE.get(key)
@@ -277,7 +336,8 @@ def clear_cache(pattern: str = f"{CACHE_PREFIX}*") -> int:
     redis_removed = 0
 
     try:
-        if redis_client:
+        #if redis_client:
+        if None:
             cursor = 0
             while True:
                 cursor, keys = redis_client.scan(

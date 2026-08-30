@@ -31,6 +31,7 @@ from app.routes import (
     deadlock_monitory_route,
     delete_registro_routes,
     empresa_routes,
+    cache_admin_routes,
     geral_routes,
     gerar_relatorio_routes,
     logs_routes,
@@ -288,6 +289,7 @@ app.include_router(auth_routes.router)
 app.include_router(user_routes.router)
 app.include_router(empresa_routes.router)
 app.include_router(geral_routes.router)
+app.include_router(cache_admin_routes.router)
 app.include_router(connection_routes.router)
 app.include_router(dbInfo_routes.router)
 app.include_router(query_routes.router)

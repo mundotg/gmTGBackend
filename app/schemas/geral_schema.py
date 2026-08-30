@@ -53,6 +53,10 @@ class SettingsBase(BaseModel):
     email_notifications: bool = Field(default=True)
     app_notifications: bool = Field(default=True)
     timezone: str = Field(default="UTC")
+    usar_dados_locais: bool = Field(
+        default=True,
+        description="A False, ignora metadados em cache (tabelas, colunas, enums) e lê sempre da origem.",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -86,6 +90,7 @@ class SettingsUpdate(BaseModel):
     sidebar_collapsed: Optional[bool] = None
     preferred_db_type: Optional[str] = None
     email_notifications: Optional[bool] = None
+    usar_dados_locais: Optional[bool] = None
     app_notifications: Optional[bool] = None
     timezone: Optional[str] = None
 

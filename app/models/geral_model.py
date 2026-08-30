@@ -37,6 +37,18 @@ class Settings(Base):
     # 🌍 Regionalização (Opcional, mas útil para uma plataforma de dados)
     timezone = Column(String(50), default="UTC", nullable=False)
 
+    # 🗄️ Dados locais
+    #
+    # Há metadados que a aplicação consulta uma vez e reutiliza: nomes de
+    # tabelas, colunas, enums, contagens. Isso é rápido, mas fica desatualizado
+    # assim que alguém altera o schema por fora — e quem está a trabalhar na
+    # estrutura da base quer ver o estado real, não uma fotografia.
+    #
+    # A False, este utilizador passa a ler sempre da origem: o cache é ignorado
+    # na leitura e não é escrito. É por utilizador de propósito, para que um
+    # programador possa desligá-lo sem penalizar o desempenho de toda a gente.
+    usar_dados_locais = Column(Boolean, default=True, nullable=False)
+
     # 🕒 Auditoria
     created_at = Column(
         DateTime(timezone=True),

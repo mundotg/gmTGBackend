@@ -5,9 +5,11 @@ from app.middleware.request_context import (
     RequestContextMiddleware,
     get_request_id,
 )
+from app.middleware.system_guard import SystemGuardMiddleware
 
 __all__ = [
     "RequestContextMiddleware",
+    "SystemGuardMiddleware",
     "get_request_id",
     "register_exception_handlers",
 ]

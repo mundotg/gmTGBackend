@@ -29,6 +29,7 @@ from app.models.task_models import (
     AuditLog,
 )
 from app.models.operation_models import Operation
+from app.models.system_settings_models import SystemSetting
 from app.models.ai_models import ChatSession, Message, UsageLog, Feedback, chat_sessions
 from app.models.pentest_models import (
     ApiTesterConfig,

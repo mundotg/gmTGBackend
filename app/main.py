@@ -15,7 +15,11 @@ from app.config.cache_scheduler import schedule_cache_cleanup
 from app.config.dotenv import get_env, get_env_list_cors
 from app.config.startup_reset import init_on_startup
 from app.database import SessionLocal, check_database_health
-from app.middleware import RequestContextMiddleware, register_exception_handlers
+from app.middleware import (
+    RequestContextMiddleware,
+    SystemGuardMiddleware,
+    register_exception_handlers,
+)
 from app.routes import (
     ai_chat_routes,
     analytics_db_routes,
@@ -32,6 +36,7 @@ from app.routes import (
     delete_registro_routes,
     empresa_routes,
     cache_admin_routes,
+    system_routes,
     geral_routes,
     gerar_relatorio_routes,
     logs_routes,
@@ -183,6 +188,10 @@ app = FastAPI(
 # as respostas de erro e os preflight OPTIONS levem sempre os headers de CORS.
 app.add_middleware(RequestContextMiddleware)
 
+# Depois do RequestContext, para que um pedido recusado por manutencao ja
+# tenha ID de correlacao no log.
+app.add_middleware(SystemGuardMiddleware)
+
 # ------------------------------------------------------------
 # CORS
 # ------------------------------------------------------------
@@ -290,6 +299,7 @@ app.include_router(user_routes.router)
 app.include_router(empresa_routes.router)
 app.include_router(geral_routes.router)
 app.include_router(cache_admin_routes.router)
+app.include_router(system_routes.router)
 app.include_router(connection_routes.router)
 app.include_router(dbInfo_routes.router)
 app.include_router(query_routes.router)

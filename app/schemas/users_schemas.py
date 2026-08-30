@@ -298,6 +298,11 @@ class UserOut2(BaseModel):
     email: str
     telefone: Optional[str] = None
 
+    # A aba "A Minha Conta" mostrava "Membro desde" e o avatar, mas `/auth/me`
+    # nunca os enviou: apareciam sempre como "N/A" e a inicial do nome.
+    avatar_url: Optional[str] = None
+    created_at: Optional[datetime] = None
+
     empresa: Optional[EmpresaSchema] = None
     cargo: Optional[CargoSchema] = None
 

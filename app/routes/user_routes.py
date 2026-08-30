@@ -34,11 +34,18 @@ async def list_all_users(
 @router.put("/update", response_model=users_schemas.UserOut)
 async def update_user_name(
     full_name: str,
-    current_user: user_model.User = Depends(get_current_user_id),
+    current_user: user_model.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
     """
     Atualiza o nome completo do usuário logado.
+
+    A dependência era `get_current_user_id`, que devolve um `int`: a linha
+    seguinte fazia `current_user.id` sobre esse inteiro e a rota rebentava
+    sempre com AttributeError. `get_current_user` devolve o `User`.
+
+    Para editar o perfil completo (apelido, telefone, avatar) usa-se antes
+    `PUT /user/profile`; esta continua a existir para quem só muda o nome.
     """
     return user_crud.update_user(db, current_user.id, full_name)
 

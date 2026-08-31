@@ -2,6 +2,7 @@ import redis
 import pickle
 import gzip
 from typing import Optional, Any, List
+from urllib.parse import quote
 
 from app.config.dotenv import get_env, get_env_int, get_env_bool
 from app.services.ocr._OCR_CACHE import CACHE_USE_GZIP
@@ -11,12 +12,47 @@ from app.ultils.logger import log_message
 # CONFIG
 # -------------------------
 REDIS_PREFIX = get_env("REDIS_CACHE_PREFIX", "cache:")
-host = (get_env("REDIS_HOST", "localhost"),)
-port = (get_env_int("REDIS_PORT", 6379),)
-db = (get_env_int("REDIS_DB", 0),)
-password = (get_env("REDIS_PASSWORD") or None,)
+
+# ⚠️ Sem os parênteses e a vírgula final.
+#
+# Estas quatro linhas eram `host = (get_env(...),)` — uma vírgula final dentro
+# de parênteses cria um TUPLO, não um valor. A URL de reserva ficava
+# `redis://('localhost',):(6379,)/(0,)` e nunca teria ligado a nada. Só
+# funcionava porque `app_cache_REDIS_URL` está definida no .env e ganha; bastava
+# alguém apagá-la para o cache deixar de subir, sem explicação óbvia.
+REDIS_HOST = get_env("REDIS_HOST", "localhost")
+REDIS_PORT = get_env_int("REDIS_PORT", 6379)
+REDIS_DB = get_env_int("REDIS_DB", 0)
+REDIS_PASSWORD = get_env("REDIS_PASSWORD") or None
+REDIS_USERNAME = get_env("REDIS_USERNAME") or None
+
+
+def _build_url() -> str:
+    """
+    URL de ligação, com credenciais quando existem.
+
+    A password era lida do ambiente e nunca chegava ao cliente: não ia na URL
+    nem em `password=`. Um Redis protegido respondia NOAUTH e o cache ficava
+    em baixo com a configuração aparentemente correta.
+
+    `app_cache_REDIS_URL` continua a ganhar, para quem já tem a ligação inteira
+    numa variável (Redis Cloud, Upstash).
+    """
+    completa = get_env("app_cache_REDIS_URL")
+    if completa:
+        return completa
+
+    if REDIS_PASSWORD:
+        # `quote` porque uma password com @ / : partia a URL.
+        credenciais = f"{quote(REDIS_USERNAME or '', safe='')}:{quote(REDIS_PASSWORD, safe='')}@"
+    else:
+        credenciais = ""
+
+    return f"redis://{credenciais}{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+
+
 r = redis.Redis.from_url(
-    get_env("app_cache_REDIS_URL") or f"redis://{host}:{port}/{db}",
+    _build_url(),
     socket_timeout=get_env_int("REDIS_SOCKET_TIMEOUT", 5),
     socket_connect_timeout=get_env_int("REDIS_CONNECT_TIMEOUT", 5),
     retry_on_timeout=get_env_bool("REDIS_RETRY_ON_TIMEOUT", True),

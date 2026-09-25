@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config.cache_scheduler import schedule_cache_cleanup
 from app.config.dotenv import get_env, get_env_list_cors
 from app.config.startup_reset import init_on_startup
-from app.database import SessionLocal, check_database_health
+from app.database import SessionLocal, check_database_health, sync_engine
 from app.middleware import (
     RequestContextMiddleware,
     SystemGuardMiddleware,
@@ -74,6 +74,27 @@ os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
 
 
 # ------------------------------------------------------------
+# Verificação do esquema antes do seed
+# ------------------------------------------------------------
+# Tabelas sem as quais o seed_data não tem como correr. Não é a lista completa
+# do modelo — é o mínimo que prova que as migrações já passaram por aqui.
+_TABELAS_NUCLEO = ("empresas", "users", "roles", "permissions", "plans")
+
+
+def _tabelas_nucleo_em_falta() -> list[str]:
+    """
+    Tabelas do núcleo que faltam no banco. Lista vazia = esquema pronto.
+
+    Levanta se não conseguir inspecionar o banco — nesse caso o problema é a
+    ligação, não o esquema, e quem chama distingue os dois casos.
+    """
+    from sqlalchemy import inspect
+
+    existentes = set(inspect(sync_engine).get_table_names())
+    return [t for t in _TABELAS_NUCLEO if t not in existentes]
+
+
+# ------------------------------------------------------------
 # Lifespan (Substitui o @app.on_event("startup" / "shutdown"))
 # ------------------------------------------------------------
 @asynccontextmanager
@@ -91,9 +112,36 @@ async def lifespan(app: FastAPI):
 
     init_on_startup()
 
+    # Fora de dev o init_on_startup() não cria nem migra nada
+    # (startup_reset.should_run_initialization() devolve False quando ENV!=dev).
+    # Num banco novo o seed rebentava aqui com «relation "empresas" does not
+    # exist» — um traceback de 60 linhas que não dizia o que fazer. As migrações
+    # passaram a correr no arranque do contentor (docker-entrypoint.sh); isto é
+    # a rede de segurança para quando não correram.
+    try:
+        em_falta = _tabelas_nucleo_em_falta()
+    except Exception as e:  # noqa: BLE001 — qualquer falha aqui é de ligação
+        raise RuntimeError(
+            f"Não foi possível ler o esquema do banco de dados: {e}\n"
+            "Confirma DATABASE_URL e se o servidor está acessível."
+        ) from e
+
+    if em_falta:
+        raise RuntimeError(
+            "Esquema do banco de dados incompleto — faltam as tabelas: "
+            f"{', '.join(em_falta)}.\n"
+            "As migrações não foram aplicadas a este banco. Corre:\n"
+            "    alembic upgrade head\n"
+            "(com DATABASE_URL_ALEMBIC a apontar para este banco) e arranca de "
+            "novo. Em Docker, o docker-entrypoint.sh já o faz — verifica se o "
+            "deploy não substituiu o ENTRYPOINT da imagem."
+        )
+
     db = SessionLocal()
-    seed_data(db)
-    db.close()
+    try:
+        seed_data(db)
+    finally:
+        db.close()
 
     schedule_cache_cleanup()
 

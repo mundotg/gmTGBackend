@@ -1,0 +1,7 @@
+# Ficheiros executados dentro de contentores Linux: nunca CRLF.
+#
+# Esta maquina tem core.autocrlf=true, por isso sem esta regra um checkout no
+# Windows converteria o docker-entrypoint.sh e o `#!/bin/sh` ficava com um \r
+# no fim — o contentor respondia "bad interpreter" e nao arrancava.
+*.sh text eol=lf
+Dockerfile text eol=lf

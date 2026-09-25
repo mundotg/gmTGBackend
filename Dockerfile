@@ -61,10 +61,15 @@ RUN pip install --upgrade pip setuptools wheel \
 COPY . .
 
 # -------- Segurança (APENAS NO FINAL) --------
-RUN useradd -m appuser && chown -R appuser /app
+RUN chmod +x /app/docker-entrypoint.sh \
+    && useradd -m appuser && chown -R appuser /app
 USER appuser
 
 EXPOSE 8000
 
 # -------- Run --------
+# ENTRYPOINT + CMD (e não só CMD): o entrypoint corre `alembic upgrade head`
+# antes do servidor e sobrevive a plataformas de deploy que substituem o
+# comando. Para saltar as migrações numa emergência: RUN_MIGRATIONS=false.
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

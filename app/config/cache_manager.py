@@ -336,8 +336,8 @@ def clear_cache(pattern: str = f"{CACHE_PREFIX}*") -> int:
     redis_removed = 0
 
     try:
-        #if redis_client:
-        if None:
+        if redis_client:
+        # if None:
             cursor = 0
             while True:
                 cursor, keys = redis_client.scan(

@@ -29,7 +29,12 @@ def get_sprints_by_project(db: Session, project_id: str) -> List[SprintORM]:
 # -----------------------------
 # ➕ Criar sprint
 # -----------------------------
-def create_sprint(db: Session, project_id: str, sprint_data: SprintCreateSchema) -> Optional[SprintORM]:
+def create_sprint(
+    db: Session,
+    project_id: str,
+    sprint_data: SprintCreateSchema,
+    created_by_id: Optional[int] = None,
+) -> Optional[SprintORM]:
     try:
         project = db.query(ProjectORM).filter(ProjectORM.id == project_id).first()
         if not project:
@@ -37,9 +42,13 @@ def create_sprint(db: Session, project_id: str, sprint_data: SprintCreateSchema)
             return None
 
         sprint_dict = sprint_data.model_dump(by_alias=False, exclude_unset=True)
-        sprint_dict.setdefault("id", str(uuid4()))
-        sprint_dict["project_id"] = project_id
+        # ⚠️ Não gerar `id`: a chave primária é Integer com autoincremento.
+        sprint_dict.pop("id", None)
+        sprint_dict["project_id"] = int(project_id)
         sprint_dict.setdefault("cancelled", False)
+        sprint_dict.setdefault("is_active", True)
+        if created_by_id:
+            sprint_dict["created_by_id"] = int(created_by_id)
 
         sprint = SprintORM(**sprint_dict)
         db.add(sprint)

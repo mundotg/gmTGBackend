@@ -1,0 +1,35 @@
+# Instalar uma vez:  pip install pre-commit && pre-commit install
+# Correr em tudo:    pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # 🔒 Trava o erro que já aconteceu neste repo: .env commitado por engano.
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-toml
+      # Recusa Python que nem sequer faz parse.
+      - id: check-ast
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.6
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      # 🚨 O .gitignore cobre .env, mas um "git add -f" contorna-o.
+      #    Este hook é a rede de segurança.
+      - id: bloquear-env
+        name: bloquear ficheiros .env
+        entry: bash -c 'if git diff --cached --name-only | grep -E "(^|/)\.env($|\.)" | grep -qv "\.env\.example$"; then echo "❌ Não commites ficheiros .env (só .env.example)"; exit 1; fi'
+        language: system
+        pass_filenames: false

@@ -22,7 +22,9 @@ from app.schemas.queryhistory_schemas import (
 from app.services.query_cache_manager import QueryCacheManager
 from app.services.query_executor_sse import QueryExecutor, QueryFilterBuilder
 from app.services.query_security_validator import QuerySecurityValidator
+from app.services.mongo_query_executor import describe_mongo_query, run_mongo_query
 from app.ultils.build_query import get_count_query, get_query_string_advance
+from app.ultils.conect_database import is_mongo
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
 
@@ -54,16 +56,26 @@ class QueryService:
         try:
             sanitized_payload = self._validate_and_prepare_payload(query_payload)
 
-            filters, params = await self._build_filters(
-                payload=sanitized_payload,
-                db_type=str(connection.type),
-            )
+            # ── MongoDB (NoSQL): não há SQL para construir/executar. ──
+            # Converte o mesmo payload num find/count e reutiliza cache e
+            # histórico com uma "query_string" descritiva (JSON do find).
+            mongo = is_mongo(engine)
 
-            query_string = self._build_query_string(
-                payload=sanitized_payload,
-                filters=filters,
-                db_type=str(connection.type),
-            )
+            if mongo:
+                params = {}
+                query_string = describe_mongo_query(connection, sanitized_payload)
+            else:
+                filters, params = await self._build_filters(
+                    payload=sanitized_payload,
+                    db_type=str(connection.type),
+                )
+
+                query_string = self._build_query_string(
+                    payload=sanitized_payload,
+                    filters=filters,
+                    db_type=str(connection.type),
+                    params=params,
+                )
 
             # print("Query construída:", "\n\ncom parâmetros:", params)
             if use_cache:
@@ -77,13 +89,20 @@ class QueryService:
                 if cached_result:
                     return cached_result
 
-            result_data, columns = await self._execute_query(
-                engine=engine,
-                connection_type=connection.type,
-                query_string=query_string,
-                params=params,
-                payload=sanitized_payload,
-            )
+            if mongo:
+                result_data, columns = await run_mongo_query(
+                    engine=engine,
+                    connection=connection,
+                    payload=sanitized_payload,
+                )
+            else:
+                result_data, columns = await self._execute_query(
+                    engine=engine,
+                    connection_type=connection.type,
+                    query_string=query_string,
+                    params=params,
+                    payload=sanitized_payload,
+                )
 
             duration_ms = self._get_duration_ms(start_time)
 
@@ -182,9 +201,14 @@ class QueryService:
         payload: QueryPayload,
         filters: str,
         db_type: str,
+        params: dict[str, Any],
     ) -> str:
         """
         Constrói a SQL final da query.
+
+        `params` é o mesmo dicionário dos filtros e segue para o JOIN: as
+        condições de JOIN com LIKE registam lá o valor em vez de o embutirem
+        no SQL.
         """
         if payload.isCountQuery:
             return get_count_query(
@@ -193,6 +217,7 @@ class QueryService:
                 filters=filters,
                 distinct=payload.distinct,
                 db_type=db_type,
+                params=params,
             )
 
         return get_query_string_advance(
@@ -207,6 +232,7 @@ class QueryService:
             offset=payload.offset,
             db_type=db_type,
             distinct=payload.distinct,
+            params=params,
         )
 
     def _build_execution_result(
@@ -454,6 +480,14 @@ class QueryService:
             for item in where_items
         ]
 
+        # 🔁 Payload ESTRUTURADO completo — permite "usar novamente" a consulta
+        # no construtor (recarregar select/where/joins/orderBy/...). Sem isto só
+        # se guardava a string SQL, que não dá para reeditar no builder.
+        try:
+            reusable_payload = query_payload.model_dump(mode="json", exclude_none=True)
+        except Exception:  # noqa: BLE001 - nunca deve derrubar o save do histórico
+            reusable_payload = None
+
         return {
             "executed_at_utc": executed_at.isoformat(),
             "execution_time_ms": duration_ms,
@@ -469,6 +503,7 @@ class QueryService:
             "offset": getattr(query_payload, "offset", None),
             "distinct": getattr(query_payload, "distinct", None),
             "params_used": (meta_info or {}).get("params"),
+            "payload": reusable_payload,
             "app_source": app_source or "API",
             "client_ip": client_ip,
             "executed_by": executed_by or "system",

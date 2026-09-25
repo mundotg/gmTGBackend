@@ -26,6 +26,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+# -------- Ferramentas de backup/restore (opcional, download pesado) --------
+# pg_dump/mysqldump/mongodump só são precisos para executar backups reais.
+# Ativa com `--build-arg INSTALL_DUMP_TOOLS=true` quando houver rede/dados.
+ARG INSTALL_DUMP_TOOLS=false
+RUN if [ "$INSTALL_DUMP_TOOLS" = "true" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates gzip postgresql-client default-mysql-client \
+      && curl -fsSL https://pgp.mongodb.com/server-7.0.asc \
+        | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg \
+      && echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" \
+        > /etc/apt/sources.list.d/mongodb-org-7.0.list \
+      && apt-get update \
+      && apt-get install -y --no-install-recommends mongodb-database-tools \
+      && rm -rf /var/lib/apt/lists/* ; \
+    fi
+
 # -------- Microsoft SQL (FIX moderno) --------
 RUN curl https://packages.microsoft.com/keys/microsoft.asc \
     | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg \
@@ -45,10 +61,15 @@ RUN pip install --upgrade pip setuptools wheel \
 COPY . .
 
 # -------- Segurança (APENAS NO FINAL) --------
-RUN useradd -m appuser && chown -R appuser /app
+RUN chmod +x /app/docker-entrypoint.sh \
+    && useradd -m appuser && chown -R appuser /app
 USER appuser
 
 EXPOSE 8000
 
 # -------- Run --------
+# ENTRYPOINT + CMD (e não só CMD): o entrypoint corre `alembic upgrade head`
+# antes do servidor e sobrevive a plataformas de deploy que substituem o
+# comando. Para saltar as migrações numa emergência: RUN_MIGRATIONS=false.
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

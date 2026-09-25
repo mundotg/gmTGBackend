@@ -12,6 +12,7 @@ from app.services.editar_linha import (
     _map_column_type,
     quote_identifier,
 )
+from app.ultils.logger import log_message
 
 
 def build_contains_condition(
@@ -143,9 +144,30 @@ def _unique_extra_tables(
     return result
 
 
-def _build_condition_sql(db_type: str, cond: JoinCondition) -> str:
+def _sql_literal(value: str) -> str:
+    """
+    Literal SQL entre plicas, com as plicas internas duplicadas.
+
+    Só usado quando o chamador não tem onde guardar parâmetros (`params=None`).
+    O caminho normal usa bind params — ver `_build_condition_sql`.
+    """
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _build_condition_sql(
+    db_type: str,
+    cond: JoinCondition,
+    params: Optional[dict] = None,
+    param_name: str = "join_cond",
+) -> str:
     """
     Monta uma condição SQL individual.
+
+    `params` é o mesmo dicionário que vai para o `conn.execute(text(sql), params)`.
+    Quando existe, as condições LIKE entram como bind param (`:nome`); sem ele,
+    entram como literal com plicas. O que NÃO pode acontecer é o valor entrar em
+    cru: `... LIKE %francy%` é erro de sintaxe no Postgres e, com um valor
+    escolhido pelo utilizador, é injeção de SQL.
     """
     left = quote_identifier(db_type, cond.leftColumn)
 
@@ -173,22 +195,32 @@ def _build_condition_sql(db_type: str, cond: JoinCondition) -> str:
                 cond.operator in ["Contém", "Não Contém", "LIKE", "NOT LIKE"]
                 and cond.pattern
             ):
-                params = {}
+                # Dicionário local só quando o chamador não trouxe o dele: aí o
+                # valor tem de ficar embutido no SQL, já com plicas.
+                destino = params if params is not None else {}
+
                 script = build_contains_condition(
                     field_escaped=cond.leftColumn,
                     operation=cond.operator,
                     value=cond.rightValue or "",
                     col_type=value_column_type,
                     db_type=db_type,
-                    param_name="left0_cond",
-                    params=params,
+                    param_name=param_name,
+                    params=destino,
                     pattern=cond.pattern,
                 )
-                print(f"Condição com pattern construída: {script} com params {params}")
-                return script.replace(
-                    ":left0_cond",
-                    params["left0_cond"],
+
+                if params is None:
+                    return script.replace(
+                        f":{param_name}",
+                        _sql_literal(destino[param_name]),
+                    )
+
+                log_message(
+                    f"🔗 Condição de JOIN com pattern: {script}",
+                    "debug",
                 )
+                return script
             else:
                 right_value = _map_column_type(value_column_type)(cond.rightValue or "")
                 right = _convert_column_type_for_string_one(
@@ -201,14 +233,30 @@ def _build_condition_sql(db_type: str, cond: JoinCondition) -> str:
     return f"{left} {cond.operator} {right}"
 
 
+def _join_param_name(table_name: str, idx: int) -> str:
+    """
+    Nome único para o bind param de uma condição de JOIN.
+
+    Antes era sempre "left0_cond": duas condições LIKE no mesmo JOIN escreviam
+    uma por cima da outra, e o nome podia ainda colidir com os do WHERE.
+    """
+    limpo = "".join(c if c.isalnum() else "_" for c in table_name).strip("_").lower()
+    return f"join_{limpo}_{idx}_cond"
+
+
 def build_join_clause(
     db_type: str,
     base_table: str,
     joins: Optional[dict[str, AdvancedJoinOption]] = None,
     table_list: Optional[list[str]] = None,
+    params: Optional[dict] = None,
 ) -> str:
     """
     Monta a cláusula JOIN ou tabelas adicionais.
+
+    `params`: dicionário de bind params da query (o mesmo do WHERE). Se vier,
+    os valores das condições LIKE são passados por parâmetro em vez de
+    embutidos no SQL.
     """
     if joins:
         join_parts: list[str] = []
@@ -217,7 +265,12 @@ def build_join_clause(
             conds: list[str] = []
 
             for idx, cond in enumerate(join.conditions):
-                cond_sql = _build_condition_sql(db_type, cond)
+                cond_sql = _build_condition_sql(
+                    db_type,
+                    cond,
+                    params=params,
+                    param_name=_join_param_name(table_name, idx),
+                )
 
                 if join.groupStart:
                     for group in join.groupStart:
@@ -258,9 +311,12 @@ def build_join_clause_for_delete(
     joins: Optional[dict[str, AdvancedJoinOption]] = None,
     table_list: Optional[list[str]] = None,
     is_delete: bool = False,
+    params: Optional[dict] = None,
 ) -> str:
     """
     Monta a cláusula de JOIN/USING compatível com múltiplos bancos.
+
+    `params`: ver `build_join_clause`.
     """
     db_type = db_type.lower()
 
@@ -271,8 +327,13 @@ def build_join_clause_for_delete(
         for table_name, join in joins.items():
             conds: list[str] = []
 
-            for cond in join.conditions:
-                cond_sql = _build_condition_sql(db_type, cond)
+            for idx, cond in enumerate(join.conditions):
+                cond_sql = _build_condition_sql(
+                    db_type,
+                    cond,
+                    params=params,
+                    param_name=_join_param_name(table_name, idx),
+                )
                 conds.append(cond_sql)
 
             where_sql = " AND ".join(conds)
@@ -316,7 +377,15 @@ def build_join_clause_for_delete(
         join_parts: list[str] = []
 
         for table_name, join in joins.items():
-            conds = [_build_condition_sql(db_type, cond) for cond in join.conditions]
+            conds = [
+                _build_condition_sql(
+                    db_type,
+                    cond,
+                    params=params,
+                    param_name=_join_param_name(table_name, idx),
+                )
+                for idx, cond in enumerate(join.conditions)
+            ]
             on_clause = " AND ".join(conds)
 
             table_ref = quote_identifier(db_type, table_name)

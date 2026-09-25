@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.connection_models import DBConnection
+from app.schemas.connetion_schema import ConnectionAccessLevel
 from app.schemas.dbstructure_schema import (
     BulkDropTablesRequest,
     FieldDDLRequest,
@@ -27,6 +28,8 @@ from app.services.schema_manager_table import (
     execute_drop_table,
 )
 from app.ultils.ativar_engine import ConnectionManager
+from app.ultils.conect_database import close_engine
+from app.ultils.db_full_cache import invalidate_db_full_cache
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
@@ -36,7 +39,13 @@ try:
 except Exception:
     DDLExecutionError = None
 
-router = APIRouter(prefix="/database", tags=["Database Schema (DDL)"])
+from app.ultils.permissions import require_permission
+
+# Todos os endpoints deste router sao DDL sobre a base do cliente.
+router = APIRouter(
+    prefix="/database", tags=["Database Schema (DDL)"],
+    dependencies=[Depends(require_permission("schema:manage"))],
+)
 
 # ============================================================
 # 🔧 HELPERS
@@ -101,8 +110,12 @@ def _map_ddl_error_to_http(e: Exception) -> HTTPException:
 
 
 async def _get_engine(db: Session, user_id: int):
+    # Todos os endpoints deste router são DDL (criar, alterar e apagar colunas e
+    # tabelas), logo exigem sempre nível de escrita. Pelo modelo de partilha
+    # atual, `write` é o nível mais forte aplicável a dados — `manage` é sobre
+    # repartilhar a conexão, não sobre mexer no schema.
     engine, connectionModel = await asyncio.to_thread(
-        ConnectionManager.ensure_connection, db, user_id
+        ConnectionManager.ensure_connection, db, user_id, ConnectionAccessLevel.write
     )
     if not engine:
         raise _http_error(503, "Não foi possível conectar ao motor do banco de dados.")
@@ -145,6 +158,12 @@ async def _handle_endpoint(
     try:
         await runner()
         cm = connectionModel_ref_getter()
+
+        # O schema mudou: o diagrama ER em cache (página `mll`) ficaria a
+        # mostrar o estado anterior até expirar o TTL. Invalida para todos os
+        # utilizadores com acesso a esta conexão.
+        invalidate_db_full_cache(getattr(cm, "id", None) if cm else None)
+
         dialect_name = getattr(cm, "type", "unknown") if cm else "unknown"
         log_message(
             f"✅ {action_name}: {log_context} (dialect={dialect_name}, user={user_id})",
@@ -166,15 +185,18 @@ async def _handle_endpoint(
         engine = engine_ref_getter()
         if engine:
             try:
-                if hasattr(engine, "dispose"):
-                    # Verifica se é uma AsyncEngine (SQLAlchemy 2.0+)
-                    if (
-                        asyncio.iscoroutinefunction(engine.dispose)
-                        or type(engine).__name__ == "AsyncEngine"
-                    ):
-                        await engine.dispose()
-                    else:
-                        await asyncio.to_thread(engine.dispose)
+                # AsyncEngine → await dispose(); Engine sync / MongoClient →
+                # close_engine trata cada caso (o MongoClient fecha-se com
+                # .close(); `engine.dispose()` num MongoClient dava
+                # "'Database' object is not callable" porque o pymongo devolve
+                # um Database para qualquer atributo desconhecido).
+                if (
+                    asyncio.iscoroutinefunction(getattr(engine, "dispose", None))
+                    or type(engine).__name__ == "AsyncEngine"
+                ):
+                    await engine.dispose()
+                else:
+                    await asyncio.to_thread(close_engine, engine)
             except Exception as ex:
                 log_message(f"⚠️ Erro ao fazer dispose da engine: {ex}", "warning")
 

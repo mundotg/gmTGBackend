@@ -1,11 +1,16 @@
-from sqlalchemy import JSON, Boolean, Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.database import Base
-
-from sqlalchemy import (
-    Column, String, Integer, ForeignKey, DateTime, Boolean
-)
 
 
 class DBConnection(Base):
@@ -20,6 +25,10 @@ class DBConnection(Base):
     username = Column(String, nullable=False)
     password = Column(String, nullable=False)  # armazenar criptografado!
     database_name = Column(String, nullable=False)
+    # Connection string completa, cifrada em repouso. Quando está preenchida é
+    # ela que liga (modo "por URL"); host/port/database_name continuam a ser
+    # guardados, derivados da URL, porque são NOT NULL e a listagem mostra-os.
+    url = Column(String, nullable=True)
     sslmode = Column(String, default="disable")
     service = Column(String, nullable=True)
     trustServerCertificate = Column(String, nullable=True)
@@ -40,13 +49,103 @@ class DBConnection(Base):
     # 🧩 Novo relacionamento com projetos
     projects = relationship("Project", back_populates="db_connection", cascade="all, delete-orphan")
 
+    # 🤝 Partilhas: quem mais, além do dono, pode usar esta conexão
+    shares = relationship(
+        "DBConnectionShare",
+        back_populates="connection",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="[DBConnectionShare.connection_id]",
+    )
+
     def __repr__(self):
         return f"<DBConnection(id={self.id}, name='{self.name}', type='{self.type}')>"
 
 
+class DBConnectionShare(Base):
+    """
+    🤝 Acesso concedido pelo dono de uma conexão a outro utilizador.
+
+    Níveis (`access_level`), do mais fraco para o mais forte:
+      - read   → ver a conexão e consultar dados
+      - write  → o anterior + alterar dados (insert/update/delete)
+      - manage → o anterior + partilhar a conexão com outros
+
+    Apagar a conexão e retirar o acesso ao dono continuam reservados ao dono
+    e ao super admin.
+    """
+
+    __tablename__ = "db_connection_shares"
+
+    id = Column(Integer, primary_key=True, index=True)
+    connection_id = Column(
+        Integer,
+        ForeignKey("db_connections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    access_level = Column(String(20), nullable=False, default="read")
+
+    # Quem concedeu o acesso (para auditoria). SET NULL: se essa conta for
+    # apagada, a partilha mantém-se válida.
+    granted_by_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("connection_id", "user_id", name="uq_connection_share"),
+    )
+
+    connection = relationship(
+        "DBConnection", back_populates="shares", foreign_keys=[connection_id]
+    )
+    user = relationship("User", foreign_keys=[user_id])
+    granted_by = relationship("User", foreign_keys=[granted_by_id])
+
+    def __repr__(self):
+        return (
+            f"<DBConnectionShare(connection_id={self.connection_id}, "
+            f"user_id={self.user_id}, level='{self.access_level}')>"
+        )
+
+
 class ActiveConnection(Base):
+    """
+    🔌 Qual é, para cada utilizador, a conexão atualmente ligada.
+
+    A chave inclui `user_id` de propósito. Enquanto a chave era só
+    `connection_id`, "estar ativa" era uma propriedade da conexão e não de quem
+    a usa: dois utilizadores com acesso à mesma conexão partilhada escreviam na
+    mesma linha, e ligar de um lado desligava o outro sem aviso. Só o dono
+    conseguia trabalhar, porque as consultas filtravam por `DBConnection.user_id`.
+
+    Com a chave composta, cada utilizador tem o seu próprio estado de ligação
+    sobre a mesma conexão. Quem pode ligar-se a quê é decidido à parte, por
+    `app.ultils.connection_access` — aqui só se regista o que está ligado.
+    """
+
     __tablename__ = "active_connection"
 
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    )
     connection_id = Column(Integer, ForeignKey("db_connections.id", ondelete="CASCADE"), primary_key=True)
     activated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     status = Column(Boolean, default=False, nullable=False)

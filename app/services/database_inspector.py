@@ -3,6 +3,7 @@ from __future__ import annotations
 import traceback
 from typing import Dict, List, Optional, Any, cast
 
+from pymongo import MongoClient
 from sqlalchemy import Engine, inspect, text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -26,12 +27,66 @@ from app.services.field_info import (
 )
 from app.ultils.Database_error_logger import _lidar_com_erro_sql
 from app.ultils.ativar_engine import ConnectionManager
+from app.ultils.conect_database import get_mongo_database, is_mongo
 from app.ultils.logger import log_message
 
 
 # ============================================================
 # Helpers
 # ============================================================
+
+
+# ------------------------------------------------------------
+# MongoDB
+# ------------------------------------------------------------
+# O MongoDB entra aqui como um MongoClient, não como um Engine do
+# SQLAlchemy. Não tem `inspect()`, nem `.dialect`, nem schemas — logo
+# qualquer caminho que assuma SQL rebenta e devolve resultados vazios.
+# As funções abaixo dão-lhe o equivalente: base → schema, coleção → tabela.
+
+
+def _list_mongo_collections(
+    engine: MongoClient,
+) -> list[tuple[str, Optional[str], str]]:
+    """
+    Lista coleções e views do MongoDB no mesmo formato que o caminho SQL:
+    (nome, schema, tipo). O nome da base faz de schema.
+    """
+    database = get_mongo_database(engine)
+
+    if database is None:
+        log_message("⚠️ Nenhuma base de dados MongoDB identificada.", "warning")
+        return []
+
+    try:
+        return [
+            (
+                info["name"],
+                database.name,
+                "view" if info.get("type") == "view" else "table",
+            )
+            for info in database.list_collections()
+        ]
+
+    except Exception as e:
+        log_message(
+            f"⚠️ Erro ao listar coleções de '{database.name}': {e}", "warning"
+        )
+        return []
+
+
+def safe_inspect(engine: Any) -> Any:
+    """
+    `inspect()` para engines SQLAlchemy, None para MongoDB.
+
+    Evita que cada chamador tenha de saber com que tipo de ligação lida —
+    era assim que o Mongo acabava a levantar exceção antes sequer de
+    chegar à listagem.
+    """
+    if is_mongo(engine):
+        return None
+
+    return inspect(engine)
 
 
 def _get_engine(connection_id: int, user_id: int, db: Session) -> Engine:
@@ -94,6 +149,10 @@ def _list_tables_and_views(
     engine: Engine,
     inspector: Any,
 ) -> list[tuple[str, Optional[str], str]]:
+
+    # MongoDB não tem inspector nem dialect: trata-se antes de tocar neles.
+    if is_mongo(engine):
+        return _list_mongo_collections(engine)
 
     results: list[tuple[str, Optional[str], str]] = []
     seen: set[tuple[str, Optional[str], str]] = set()
@@ -224,7 +283,7 @@ def get_table_names(
 
         engine = _get_engine(connection_id, id_user, db)
 
-        inspector: Any = inspect(engine)
+        inspector: Any = safe_inspect(engine)
 
         items = _list_tables_and_views(engine, inspector)
 
@@ -319,12 +378,18 @@ def get_strutures_names(
     connection_id: int,
     id_user: int,
     db: Session,
+    force_sync: bool = False,
 ) -> list[DBStructureOut]:
     """
     Retorna tabelas e views como estruturas, sincronizando metadados.
+
+    Com `force_sync=True` volta a **listar as tabelas na base de dados** em vez
+    de reaproveitar as já registadas. Sem isso, assim que existisse uma
+    estrutura guardada o caminho rápido abaixo tomava conta e uma tabela criada
+    depois nunca era descoberta — o diagrama ficava preso ao primeiro snapshot.
     """
     structures = get_db_structures(db, connection_id)
-    if structures:
+    if structures and not force_sync:
         for item in structures:
             sincronizar_metadados_da_tabela_simple(
                 db=db,
@@ -336,7 +401,7 @@ def get_strutures_names(
 
     try:
         engine = _get_engine(connection_id, id_user, db)
-        inspector = inspect(engine)
+        inspector = safe_inspect(engine)
 
         items = _list_tables_and_views(engine, inspector)
         all_structures: list[DBStructureOut] = []
@@ -388,7 +453,7 @@ def get_strutures_names_only(
 
     try:
         engine = _get_engine(connection_id, id_user, db)
-        inspector = inspect(engine)
+        inspector = safe_inspect(engine)
 
         items = _list_tables_and_views(engine, inspector)
         all_structures: list[DBStructureOut] = []
@@ -475,7 +540,17 @@ def get_table_count(
     """
     try:
         engine = _get_engine(connection_id, id_user, db)
-        inspector = inspect(engine)
+
+        # MongoDB não fala SQL: conta documentos da coleção.
+        if is_mongo(engine):
+            database = get_mongo_database(engine)
+
+            if database is None:
+                return -1
+
+            return database[table_name].count_documents({})
+
+        inspector = safe_inspect(engine)
 
         view_names = set()
         try:
@@ -548,31 +623,58 @@ def collect_statistics(engine: Any, db_type: str) -> 'DBStatisticsDict':
     # ==========================================
     if dialect == "mongodb":
         try:
-            # Pega versão do server
             server_info = engine.server_info()
             stats["server_version"] = server_info.get("version", "Desconhecida")
-            
-            # Somar coleções e índices apenas de bancos não-sistema
-            total_collections = 0
-            total_indexes = 0
-            
-            for db_name in engine.list_database_names():
-                if db_name not in ['admin', 'config', 'local']:
-                    db_obj = engine[db_name]
-                    collections = db_obj.list_collection_names()
-                    total_collections += len(collections)
-                    
-                    # Contar índices para cada coleção
-                    for coll_name in collections:
-                        total_indexes += len(db_obj[coll_name].index_information())
-            
-            stats["table_count"] = total_collections  # Tratamos 'collections' como 'tables'
-            stats["tables_connected"] = total_collections
-            stats["index_count"] = total_indexes
-            
         except Exception as e:
-            log_message(f"⚠️ Erro ao coletar estatísticas do MongoDB: {e}", "warning")
-        
+            log_message(f"⚠️ Erro ao obter versão do MongoDB: {e}", "warning")
+
+        # Conta só a base da conexão, não o cluster inteiro. Além de ser o
+        # que o utilizador espera ver, `list_database_names()` exige
+        # privilégios globais: um utilizador limitado a uma base recebia
+        # erro de autorização e as estatísticas vinham todas a zero.
+        database = get_mongo_database(engine)
+
+        if database is None:
+            log_message(
+                "⚠️ Nenhuma base MongoDB identificada para estatísticas.",
+                "warning",
+            )
+            return stats
+
+        try:
+            colecoes = 0
+            views = 0
+            indices = 0
+
+            for info in database.list_collections():
+                nome = info["name"]
+
+                if info.get("type") == "view":
+                    views += 1
+                    continue  # views não têm índices próprios
+
+                colecoes += 1
+
+                try:
+                    indices += len(database[nome].index_information())
+                except Exception as e:
+                    # Falta de permissão numa coleção não deve zerar o resto.
+                    log_message(
+                        f"⚠️ Sem acesso aos índices de '{nome}': {e}", "warning"
+                    )
+
+            # Coleções fazem de tabelas no vocabulário da aplicação.
+            stats["table_count"] = colecoes
+            stats["tables_connected"] = colecoes
+            stats["view_count"] = views
+            stats["index_count"] = indices
+
+        except Exception as e:
+            log_message(
+                f"⚠️ Erro ao coletar estatísticas de '{database.name}': {e}",
+                "warning",
+            )
+
         return stats
 
     # ==========================================
@@ -607,7 +709,7 @@ def collect_statistics(engine: Any, db_type: str) -> 'DBStatisticsDict':
     # 3. TRATAMENTO PARA BANCOS RELACIONAIS (SQL)
     # ==========================================
     try:
-        inspector = inspect(engine)
+        inspector = safe_inspect(engine)
         tables_name = inspector.get_table_names()
         views_name = inspector.get_view_names()
 
@@ -748,7 +850,11 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
                 }
             return existing
 
-        stats = collect_statistics(engine, str(id_conn))
+        # ⚠️ collect_statistics espera o TIPO do banco ("MongoDB", "PostgreSQL"…),
+        # não o id da conexão. Passar o id fazia `dialect` valer "1", pelo que
+        # os ramos NoSQL nunca eram escolhidos e um MongoClient acabava no
+        # caminho SQL, onde inspect() rebenta — devolvendo tudo a zero.
+        stats = collect_statistics(engine, str(connection.type or ""))
         if not stats:
             log_message(
                 f"⚠️ Nenhuma estatística coletada para a conexão {connection.id}.",

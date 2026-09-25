@@ -16,3 +16,6 @@ deactivate
 
 para memorizar execução e não demorara:
 pyinstaller app\main.py --hidden-import=fastapi --hidden-import=uvicorn --hidden-import=starlette --hidden-import=pydantic --hidden-import=pyodbc --paths=.  --collect-submodules app --hidden-import=app.routes --hidden-import=app.config  --hidden-import=paddlex --hidden-import=paddleocr --collect-all paddlex --collect-all paddleocr --add-data ".env;."
+
+
+pip list

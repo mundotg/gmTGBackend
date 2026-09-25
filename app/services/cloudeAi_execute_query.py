@@ -446,7 +446,7 @@ class QueryService:
 
             # 3. Construção da query
             query_string = await self._build_query_string(
-                query_payload, filters, connection.type
+                query_payload, filters, connection.type, params
             )
 
             if use_cache:
@@ -549,9 +549,18 @@ class QueryService:
             )
 
     async def _build_query_string(
-        self, payload: QueryPayload, filters: str, db_type: str
+        self,
+        payload: QueryPayload,
+        filters: str,
+        db_type: str,
+        params: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Constrói a string SQL da query."""
+        """
+        Constrói a string SQL da query.
+
+        `params`: o mesmo dicionário dos filtros, para as condições de JOIN com
+        LIKE entrarem por bind param.
+        """
         if payload.isCountQuery:
             return get_count_query(
                 base_table=payload.baseTable,
@@ -559,6 +568,7 @@ class QueryService:
                 filters=filters,
                 distinct=payload.distinct,
                 db_type=db_type,
+                params=params,
             )
         else:
             return get_query_string_advance(
@@ -573,6 +583,7 @@ class QueryService:
                 offset=payload.offset,
                 db_type=db_type,
                 distinct=payload.distinct,
+                params=params,
             )
 
     async def _save_query_history(

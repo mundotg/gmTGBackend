@@ -5,13 +5,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config.cache_manager import cache_result
+from app.config.user_cache_policy import limpar_cache_do_utilizador
 from app.schemas.project_schemas import ProjectResponseSchema, ProjectSchema
 from app.database import get_db
 from app.ultils.get_id_by_token import get_current_user_id
 from app.services import project_service
 from app.ultils.logger import log_message
 
-router = APIRouter()
+router = APIRouter(tags=["Projects"])
 
 # ----------------------------- #
 # Endpoints de Projetos         #
@@ -31,6 +32,31 @@ def handle_service_error(context: str, error: Exception, status_code: int = 500)
         raise HTTPException(
             status_code=status_code, detail=f"Erro interno em {context}"
         )
+
+
+def invalidar_cache_de_projetos(user_id) -> None:
+    """
+    Descarta a lista de projetos em cache deste utilizador.
+
+    As chamadas a `_clear_projects_cache` estavam comentadas nas rotas e a
+    funcao nunca chegou a existir: criar ou apagar um projeto nao mexia no
+    cache, e a lista ficava desatualizada ate o TTL de 5 minutos expirar.
+
+    Invalida so quem fez a alteracao. Outros utilizadores continuam a ver a
+    versao em cache ate ao TTL — e a troca normal de um cache, e limitada no
+    tempo, ao contrario do que acontecia a quem acabou de criar o projeto e
+    nao o via aparecer.
+    """
+    if user_id is None:
+        return
+    try:
+        limpar_cache_do_utilizador(int(user_id))
+    except (TypeError, ValueError):
+        log_message(f"[projects] user_id invalido ao invalidar cache: {user_id!r}", "warning")
+    except Exception as e:  # noqa: BLE001
+        # Nao ver a lista atualizada e mau; falhar a criacao do projeto
+        # porque o Redis esta em baixo seria pior.
+        log_message(f"[projects] falha a invalidar cache: {e}", "warning")
 
 
 @cache_result(ttl=300, user_id="user_projects_{user_id}")
@@ -80,7 +106,7 @@ async def create_new_project(
     """Cria um novo projeto e limpa o cache."""
     try:
         result = project_service.create_project_service(db, project, user)
-        # _clear_projects_cache(user_id)
+        invalidar_cache_de_projetos(user)
         log_message(f"✅ Projeto criado: {project.name}", level="info")
         return result
     except Exception as e:
@@ -97,7 +123,7 @@ async def update_existing_project(
     """Atualiza projeto existente."""
     try:
         result = project_service.update_project_service(db, project_id, project)
-        # _clear_all_project_cache(user_id, project_id)
+        invalidar_cache_de_projetos(user_id)
         log_message(f"✅ Projeto atualizado: {project_id}", level="info")
         return result
     except Exception as e:
@@ -113,7 +139,7 @@ async def delete_existing_project(
     """Deleta projeto e limpa cache relacionado."""
     try:
         result = project_service.delete_project_service(db, project_id)
-        # _clear_all_project_cache(user_id, project_id)
+        invalidar_cache_de_projetos(user)
         log_message(f"✅ Projeto deletado: {project_id}", level="info")
         return result
     except Exception as e:

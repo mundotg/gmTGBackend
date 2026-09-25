@@ -17,6 +17,7 @@ from app.services.field_info import buscar_estrutura_tabela, buscar_ou_criar_cam
 from app.services.insert_row_service import build_insert_query
 from app.services.query_executor import executar_query_e_salvar
 from app.ultils.buscar_enum_bd import _fetch_enum_values
+from app.ultils.conect_database import is_mongo, get_mongo_database
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.generate_value import gerar_valor_pelo_tipo_de_dados_na_bd
 from app.ultils.logger import log_message
@@ -35,6 +36,10 @@ def insert_row_service_auto(
     Insere linhas automaticamente em lotes otimizados.
     Evita lentidão e travamento ao inserir grandes quantidades.
     """
+    # NoSQL: MongoDB não usa engine.connect()/SQL → gera DOCUMENTOS.
+    if is_mongo(engine):
+        return _auto_create_mongo(data, engine, user_id, connection, db, dry_run)
+
     tabela_stats = defaultdict(lambda: {"sucesso": 0, "erros": 0, "simulacao": 0})
     query_string = []
     start = time.time()
@@ -136,6 +141,113 @@ def insert_row_service_auto(
         "tempo_ms": duration_ms,
         "resumo": resumo
     }
+
+
+def _auto_create_mongo(data, engine, user_id, connection, db, dry_run: bool):
+    """
+    Geração automática de DOCUMENTOS no MongoDB (equivalente NoSQL do batch
+    INSERT). Cada "tabela" é uma coleção; para cada uma insere N documentos com
+    os campos padronizados + valores auto-gerados dos campos conhecidos. Não há
+    FKs no Mongo (esses campos são ignorados) e o `_id` é gerado pelo Mongo.
+    """
+    from app.services.insert_row_service import _coerce_mongo_value
+
+    start = time.time()
+    resumo = []
+    total_ok = 0
+
+    for config in data.configs:
+        tabela = config.tabela
+        if "." in tabela:
+            db_name, coll_name = tabela.split(".", 1)
+            database = engine[db_name]
+        else:
+            database = get_mongo_database(engine)
+            coll_name = tabela
+        if database is None:
+            resumo.append({"tabela": tabela, "sucesso": 0, "erros": config.quantidade, "simulacao": 0})
+            continue
+        coll = database[coll_name]
+
+        # Campos conhecidos (best-effort — usa os guardados; Mongo é schemaless).
+        try:
+            colunas = create_strutura_tabela(tabela, engine, db, connection.type, connection.id)
+        except Exception as e:  # noqa: BLE001
+            log_message(f"[auto mongo] sem estrutura p/ {tabela}, uso só campos padronizados: {e}", "warning")
+            colunas = []
+
+        padronizados = {cp.campo: cp.valor for cp in (config.camposPadronizados or []) if cp.campo}
+
+        docs = []
+        for _ in range(config.quantidade):
+            doc = {}
+            # 1) Valores auto-gerados dos campos conhecidos (exceto padronizados/_id/FK).
+            for col in colunas:
+                nome = col.nome
+                if nome == "_id" or getattr(col, "is_auto_increment", False) or getattr(col, "is_foreign_key", False):
+                    continue
+                if nome in padronizados:
+                    continue  # aplicado a seguir
+                raw = gerar_valor_auto(coluna=col, tabela_name=tabela)
+                if raw is None or str(raw).strip() == "":
+                    continue
+                doc[nome] = _coerce_mongo_value(nome, raw, col.tipo)
+
+            # 2) Campos padronizados — SEMPRE aplicados (mesmo fora do schema,
+            #    porque o Mongo é schemaless).
+            for campo, valor in padronizados.items():
+                if valor is None or str(valor).strip() == "":
+                    continue
+                doc[campo] = _coerce_mongo_value(campo, valor, "text")
+
+            if doc:
+                docs.append(doc)
+
+        ok = 0
+        if dry_run:
+            resumo.append({"tabela": tabela, "sucesso": 0, "erros": 0, "simulacao": len(docs)})
+        else:
+            try:
+                if docs:
+                    res = coll.insert_many(docs)
+                    ok = len(res.inserted_ids)
+            except Exception as e:  # noqa: BLE001
+                log_message(f"[auto mongo] erro insert_many em {coll_name}: {e}", "error")
+            total_ok += ok
+            resumo.append({"tabela": tabela, "sucesso": ok, "erros": config.quantidade - ok, "simulacao": 0})
+
+    duration_ms = int((time.time() - start) * 1000)
+
+    try:
+        create_query_history(
+            db=db,
+            user_id=user_id,
+            data=QueryHistoryCreate(
+                user_id=user_id,
+                db_connection_id=connection.id,
+                query=f"db.insertMany(...) → {', '.join(cfg.tabela for cfg in data.configs)}",
+                query_type="INSERT",
+                executed_at=datetime.now(timezone.utc),
+                duration_ms=duration_ms,
+                result_preview=json.dumps(resumo, ensure_ascii=False),
+                error_message=None,
+                is_favorite=False,
+                tags="insert_auto",
+                app_source="API",
+                executed_by=getattr(data, "executed_by", f"user_{user_id}"),
+                modified_by=None,
+                meta_info={
+                    "engine": "mongodb",
+                    "dry_run": dry_run,
+                    "total_inseridos": total_ok,
+                    "colecoes_afetadas": [cfg.tabela for cfg in data.configs],
+                },
+            ),
+        )
+    except Exception as hist_err:  # noqa: BLE001
+        log_message(f"⚠️ Falha ao salvar histórico (auto mongo): {hist_err}", "warning")
+
+    return {"status": "finalizado", "tempo_ms": duration_ms, "resumo": resumo}
 
 
 def gerar_dict_para_insercao(config : ConfiguracaoTabela, engine: Engine, db :Session, connection : DBConnection, user_id: int) -> Dict:

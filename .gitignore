@@ -40,9 +40,12 @@ __pycache__/
 *.DS_Store
 *.bin
 *.pid
+*.pkl
 database_connector.log
+initialized.pkl
 ocr_cache_data/
 temp_reports/
+storage_cache/
 # -------------------------------
 # 4. Dados de build e pacotes
 # -------------------------------

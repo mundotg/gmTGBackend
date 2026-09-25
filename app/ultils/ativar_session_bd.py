@@ -14,7 +14,7 @@ from app.cruds.queryhistory_crud import get_ultima_consulta
 from app.models.connection_models import ActiveConnection, DBConnection
 from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.users_schemas import DbInfoSchema
-from app.services.crypto_utils import aes_decrypt
+from app.services.crypto_utils import secret_decrypt
 from app.ultils.logger import log_message
 from datetime import datetime
 
@@ -40,9 +40,7 @@ def reativar_connection(id_user: int, db: Session) -> dict:
         if not conexao:
             return {"success": False, "config": None}
 
-        host = aes_decrypt(str(conexao.host))
-        # username= aes_decrypt(str(conexao.username))
-        # password =aes_decrypt(str(conexao.password))
+        host = secret_decrypt(str(conexao.host))
         type_db = str(conexao.type)
 
         stats = get_statistics_by_connection_geral(conexao.id)
@@ -84,7 +82,7 @@ def reativar_connection(id_user: int, db: Session) -> dict:
 
             engine = get_session_by_connection(conexao)
             if engine:
-                EngineManager.set(engine, id_user)
+                EngineManager.set(engine, id_user, connection_id=conexao.id)
             else:
                 log_message(
                     f"⚠️ Falha ao criar engine para o usuário {id_user}", "warning"
@@ -120,7 +118,7 @@ def desativar_connection(id_user: int, conn: int, db: Session) -> dict:
         }
     """
     try:
-        conexao_ativa = disconnect_active_connection(db, conn)
+        conexao_ativa = disconnect_active_connection(db, conn, id_user)
         conn_data: DBConnectionBase = get_db_connection_by_id(db, conn)
         conn_data.status = "disconnected"
         create_db_connection(db, id_user, conn_data)
@@ -130,7 +128,7 @@ def desativar_connection(id_user: int, conn: int, db: Session) -> dict:
                 "success": False,
                 "message": "Nenhuma conexão ativa encontrada para o usuário.",
             }
-        disconnect_active_connection(db, conexao_ativa.connection_id)
+        disconnect_active_connection(db, conexao_ativa.connection_id, id_user)
         if EngineManager.get(id_user):
             EngineManager.remove(id_user)
             log_message(f"🔌 Conexão desativada para o usuário {id_user}", "info")
@@ -162,7 +160,12 @@ def get_connection_current(
     connection = (
         db.query(DBConnection, ActiveConnection.activated_at)
         .join(ActiveConnection, ActiveConnection.connection_id == DBConnection.id)
-        .filter(DBConnection.user_id == id_user, ActiveConnection.status == True)
+        # Filtra pelo dono do ESTADO DE LIGAÇÃO, não pelo dono da conexão.
+        # Com `DBConnection.user_id` uma conexão partilhada nunca chegava a ser
+        # a conexão atual de quem a recebeu, e a partilha não servia para nada.
+        # Quem pode fazer o quê é decidido em `ensure_connection`, que exige o
+        # nível (read/write) antes de devolver a engine.
+        .filter(ActiveConnection.user_id == id_user, ActiveConnection.status == True)
         .first()
     )
 
@@ -199,7 +202,12 @@ async def get_connection_current_async(
     stmt = (
         select(DBConnection, ActiveConnection.activated_at)
         .join(ActiveConnection, ActiveConnection.connection_id == DBConnection.id)
-        .filter(DBConnection.user_id == id_user, ActiveConnection.status == True)
+        # Filtra pelo dono do ESTADO DE LIGAÇÃO, não pelo dono da conexão.
+        # Com `DBConnection.user_id` uma conexão partilhada nunca chegava a ser
+        # a conexão atual de quem a recebeu, e a partilha não servia para nada.
+        # Quem pode fazer o quê é decidido em `ensure_connection`, que exige o
+        # nível (read/write) antes de devolver a engine.
+        .filter(ActiveConnection.user_id == id_user, ActiveConnection.status == True)
     )
 
     result = await db.execute(stmt)

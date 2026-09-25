@@ -5,18 +5,35 @@ from datetime import datetime
 # ==========================================
 # TYPES E ENUMS GERAIS
 # ==========================================
-# Tipo que define os modelos auditáveis ou rastreáveis no sistema
+# Entidades que `GET /geral/paginate` aceita no parâmetro `tipo`.
+#
+# ⚠️ Tem de acompanhar `MODEL_MAP` em app/services/geral_services.py: um nome
+# aqui que lá não exista dá 403, e um nome só lá é rejeitado com 422 antes de
+# chegar ao serviço. Removido "project_team_association" — era uma Table de
+# associação, não um modelo mapeado, e a paginação rebentava com ela.
 OptionTipoModel = Literal[
-    "user", 
-    "project", 
-    "task", 
-    "sprint", 
-    "type_project", 
-    "Role", 
-    "project_team_association", 
-    "AuditLog", 
-    "TaskStats", 
-    "DBConnection"
+    # 👥 Pessoas e organização
+    "user",
+    "Role",
+    "Empresa",
+    "Cargo",
+    "RefreshToken",
+    # 📋 Gestão de projetos
+    "project",
+    "task",
+    "sprint",
+    "type_project",
+    "TaskStats",
+    "AuditLog",
+    # 🔌 Conexões e base de dados
+    "DBConnection",
+    "ActiveConnection",
+    "ConnectionLog",
+    "DBHealthCheck",
+    "QueryHistory",
+    "DBStructure",
+    "DBField",
+    "DBEnumField",
 ]
 
 
@@ -36,6 +53,10 @@ class SettingsBase(BaseModel):
     email_notifications: bool = Field(default=True)
     app_notifications: bool = Field(default=True)
     timezone: str = Field(default="UTC")
+    usar_dados_locais: bool = Field(
+        default=True,
+        description="A False, ignora metadados em cache (tabelas, colunas, enums) e lê sempre da origem.",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -69,6 +90,7 @@ class SettingsUpdate(BaseModel):
     sidebar_collapsed: Optional[bool] = None
     preferred_db_type: Optional[str] = None
     email_notifications: Optional[bool] = None
+    usar_dados_locais: Optional[bool] = None
     app_notifications: Optional[bool] = None
     timezone: Optional[str] = None
 

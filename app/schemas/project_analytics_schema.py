@@ -28,13 +28,22 @@ class ProjectProgressSchema(BaseModel):
     completed: int
 
 
+class TaskStatusSchema(BaseModel):
+    status: str
+    label: str
+    count: int
+
+
 class ProjectAnalyticsResponse(BaseModel):
     overview: OverviewSchema
     recentActivity: List[ActivitySchema]
     projectProgress: List[ProjectProgressSchema]
+    taskStatus: List[TaskStatusSchema] = []
+
+    # janela temporal aplicada ("week" | "month")
+    range: Optional[str] = None
 
     # opcional (já preparado pro futuro)
     weeklyActivity: list = []
     teamPerformance: list = []
-    taskStatus: list = []
     projectTypes: list = []

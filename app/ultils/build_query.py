@@ -484,12 +484,73 @@ def build_select_view(
         return "*"
 
 
+def _bare_table_name(identifier: Optional[str]) -> Optional[str]:
+    """Nome da tabela sem schema/aspas (última parte relevante).
+
+    `public.db_structures` → `db_structures`; `"tabela"` → `tabela`.
+    """
+    if not identifier:
+        return None
+    segs = [p.strip('"`[]') for p in str(identifier).split(".") if p.strip('"`[]')]
+    return segs[-1].lower() if segs else None
+
+
+def _column_table_qualifier(col: str) -> Optional[str]:
+    """Tabela (sem schema) que qualifica a coluna, ou None se vier sem qualificador.
+
+    `tables.table_catalog` → `tables`; `public.db_structures.status` →
+    `db_structures`; `status` → None (assume-se a tabela base).
+    """
+    segs = [p.strip('"`[]') for p in str(col).split(".") if p.strip('"`[]')]
+    if len(segs) <= 1:
+        return None
+    return segs[-2].lower()
+
+
+def _allowed_table_names(
+    base_table: Optional[str],
+    table_list: Optional[List[str]] = None,
+    joins: Optional[Any] = None,
+) -> set:
+    """Conjunto de nomes de tabela (sem schema) que a query realmente usa."""
+    names: set = set()
+    n = _bare_table_name(base_table)
+    if n:
+        names.add(n)
+    for t in table_list or []:
+        n = _bare_table_name(t)
+        if n:
+            names.add(n)
+
+    join_iter = []
+    if isinstance(joins, dict):
+        join_iter = list(joins.values())
+    elif isinstance(joins, (list, tuple)):
+        join_iter = list(joins)
+    for j in join_iter:
+        tbl = getattr(j, "table", None)
+        if tbl is None and isinstance(j, dict):
+            tbl = j.get("table")
+        n = _bare_table_name(tbl)
+        if n:
+            names.add(n)
+
+    return names
+
+
 def format_order_by(
     db_type: str,
     order_by: Optional[List[Union[dict, "OrderByOption"]]] = None,
+    allowed_tables: Optional[set] = None,
 ) -> str:
     """
     Garante ORDER BY válido.
+
+    Se `allowed_tables` for fornecido, ignora colunas de ordenação que
+    referenciem uma tabela que NÃO faz parte da query (ex.: um sort de
+    `tables.table_catalog` — da listagem do information_schema — que vazou
+    para uma query de dados de outra tabela). Sem esta guarda, o Postgres
+    rejeitava a query inteira com "missing FROM-clause entry".
     """
     if not order_by:
         return "ORDER BY (SELECT NULL)"
@@ -506,6 +567,19 @@ def format_order_by(
 
         if not col or not str(col).strip():
             continue
+
+        # Descarta ordenações por tabelas que não estão na query.
+        if allowed_tables is not None:
+            qualifier = _column_table_qualifier(col)
+            if qualifier is not None and qualifier not in allowed_tables:
+                from app.ultils.logger import log_message
+
+                log_message(
+                    f"⚠️ ORDER BY ignorado: coluna '{col}' refere a tabela "
+                    f"'{qualifier}' fora da query {sorted(allowed_tables)}.",
+                    "warning",
+                )
+                continue
 
         direction = str(direction).upper()
         if direction not in ("ASC", "DESC"):
@@ -575,7 +649,8 @@ def get_query_string(
 
     # ORDER BY
     if order_by and len(order_by) > 0:
-        query += f" {format_order_by(db_type, order_by)}"  # type: ignore
+        allowed = _allowed_table_names(base_table, table_list, joins)
+        query += f" {format_order_by(db_type, order_by, allowed)}"  # type: ignore
 
     # Paginação
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
@@ -611,9 +686,14 @@ def get_query_string_advance(
     offset: Optional[int] = None,
     distinct: Optional[DistinctList] = None,
     aliases: Optional[dict[str, str]] = None,
+    params: Optional[dict[str, Any]] = None,
 ) -> str:
     """
     Gera query SQL adaptada ao banco, com JOIN, filtros, ordenação, DISTINCT e paginação.
+
+    `params`: dicionário de bind params da query (o mesmo devolvido com os
+    filtros). Passá-lo permite às condições de JOIN com LIKE usar parâmetros em
+    vez de embutir o valor no SQL.
     """
     db_type = db_type.lower()
     quoted_base_table = quote_identifier(db_type, base_table)
@@ -625,9 +705,8 @@ def get_query_string_advance(
         base_table=base_table,
         joins=joins,
         table_list=safe_table_list,
+        params=params,
     )
-
-    print("JOIN SQL:", join_sql)
 
     select_view = build_select_view(db_type, select, aliases)
 
@@ -685,7 +764,8 @@ def get_query_string_advance(
         query += f" {filters}"
 
     if order_by and len(order_by) > 0:
-        query += f" {format_order_by(db_type, order_by)}"  # type: ignore
+        allowed = _allowed_table_names(base_table, safe_table_list, joins)
+        query += f" {format_order_by(db_type, order_by, allowed)}"  # type: ignore
 
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
         if max_rows is not None:
@@ -722,6 +802,7 @@ def get_count_query(
     filters: Optional[str] = None,
     distinct: Optional[Any] = None,  # Ajuste para DistinctList
     db_type: str = "mysql",
+    params: Optional[dict[str, Any]] = None,
 ) -> str:
     """
     Gera uma query SQL otimizada para contar registros.
@@ -736,7 +817,11 @@ def get_count_query(
     quoted_base_table = quote_identifier(db_type, base_table)
 
     # JOINs
-    join_sql = build_join_clause(db_type, base_table, joins, None) if joins else ""
+    join_sql = (
+        build_join_clause(db_type, base_table, joins, None, params=params)
+        if joins
+        else ""
+    )
 
     # Prepara o filtro com espaço inicial seguro
     filter_sql = f" {filters}" if filters else ""

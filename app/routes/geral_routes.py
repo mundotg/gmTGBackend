@@ -31,6 +31,8 @@ from app.schemas.queryhistory_schemas import QueryHistoryCreate, QueryHistoryOut
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 
+from app.ultils.permissions import require_permission
+
 router = APIRouter(prefix="/geral", tags=["Geral"])
 
 
@@ -39,6 +41,7 @@ router = APIRouter(prefix="/geral", tags=["Geral"])
 # ==========================================
 @router.post(
     "/queries/",
+    dependencies=[Depends(require_permission("query:execute"))],
     response_model=QueryHistoryOut,
     status_code=status.HTTP_201_CREATED,
     summary="Salvar histórico de Query",
@@ -74,6 +77,7 @@ def create_query(
 # ==========================================
 @router.post(
     "/statistics/",
+    dependencies=[Depends(require_permission("table:stats"))],
     response_model=DBStatisticsOut,
     status_code=status.HTTP_201_CREATED,
     summary="Criar estatísticas de conexão",
@@ -106,6 +110,7 @@ async def create_statistic(
 
 @router.get(
     "/statistics/{connection_id}",
+    dependencies=[Depends(require_permission("table:stats"))],
     response_model=DBStatisticsOut,
     summary="Obter estatísticas de uma conexão",
 )
@@ -273,7 +278,11 @@ async def update_language_settings(
 # ==========================================
 # Paginação Global
 # ==========================================
-@router.get("/paginate", summary="Listagem paginada e filtrada de entidades")
+@router.get(
+    "/paginate",
+    summary="Listagem paginada e filtrada de entidades",
+    dependencies=[Depends(require_permission("entity:list"))],
+)
 async def listar_elementos(
     tipo: OptionTipoModel = Query(
         ..., description="A entidade a listar (ex: user, project)"

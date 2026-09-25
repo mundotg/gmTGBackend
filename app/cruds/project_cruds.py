@@ -39,12 +39,23 @@ def create_project(db: Session, project: ProjectSchema) -> Optional[ProjectORM]:
         # Remove campos que não são diretos da tabela principal
         project_data = project.model_dump(
             by_alias=False,
-            exclude={"team", "tasks", "sprint", "type_project", "connection"}
+            exclude={"team", "tasks", "sprint", "sprints", "type_project", "connection"},
+            exclude_unset=True,
         )
 
-        project_data.setdefault("id", str(uuid4()))
+        # ⚠️ Não gerar `id`: a chave primária é Integer com autoincremento.
+        # `setdefault("id", str(uuid4()))` escrevia um UUID numa coluna inteira.
+        project_data.pop("id", None)
+        project_data.pop("sprints", None)
         project_data.setdefault("created_at", datetime.utcnow())
         project_data.setdefault("is_active", True)
+
+        # O dono é obrigatório na tabela e chega como string do frontend.
+        owner_id = project_data.get("owner_id")
+        project_data["owner_id"] = int(owner_id) if owner_id else None
+        if not project_data["owner_id"]:
+            log_message("Tentativa de criar projeto sem dono", "warning")
+            return None
 
         # Buscar e associar TypeProject se existir
         type_project_obj = None
@@ -102,7 +113,14 @@ def update_project(db: Session, project_id: str, project_data: ProjectSchema) ->
         return None
 
     try:
-        updates = project_data.model_dump(exclude_unset=True, by_alias=False)
+        updates = project_data.model_dump(
+            exclude_unset=True,
+            by_alias=False,
+            exclude={"team", "tasks", "sprint", "sprints", "type_project", "connection"},
+        )
+        # Estes nunca são alterados por um update.
+        for imutavel in ("id", "created_at"):
+            updates.pop(imutavel, None)
 
         # Atualiza campos diretos
         for attr, value in updates.items():
@@ -120,7 +138,9 @@ def update_project(db: Session, project_id: str, project_data: ProjectSchema) ->
             connection_obj = db.query(DBConnection).filter(
                 DBConnection.id == project_data.connection.id
             ).first()
-            project.connection = connection_obj
+            # A relação no ORM chama-se `db_connection`. Atribuir a `connection`
+            # criava um atributo solto no objeto e a conexão nunca era guardada.
+            project.db_connection = connection_obj
 
         if project_data.team:
             team_ids = [str(uid) for uid in project_data.team]

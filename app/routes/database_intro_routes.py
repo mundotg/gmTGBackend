@@ -121,7 +121,13 @@ async def sse_stream(generator: AsyncGenerator[str, None]) -> AsyncGenerator[str
 # 🚀 ROTEADOR PRINCIPAL
 # ============================================================
 
-router = APIRouter(prefix="/database", tags=["Database Operations"])
+from app.ultils.permissions import require_permission
+
+# Introspecao do schema.
+router = APIRouter(
+    prefix="/database", tags=["Database Operations"],
+    dependencies=[Depends(require_permission("table:describe", "table:read"))],
+)
 
 
 # ============================================================

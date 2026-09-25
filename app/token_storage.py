@@ -18,8 +18,18 @@ from app.ultils.logger import log_message
 ACCESS_TOKEN_EXPIRE_MINUTES = get_env_int("ACCESS_TOKEN_EXPIRE_MINUTES", 30)
 REFRESH_TOKEN_EXPIRE_DAYS = get_env_int("REFRESH_TOKEN_EXPIRE_DAYS", 7)
 
-BIND_IP = get_env("BIND_IP", "true").lower() == "true"
-BIND_UA = get_env("BIND_UA", "true").lower() == "true"
+# Enforcement ESTRITO do binding do refresh token por IP / User-Agent.
+#
+# Por omissão é TOLERANTE (só regista aviso) — igual ao binding do access
+# token em `assert_access_token_binding`. Motivo: o refresh token dura dias e
+# tanto o IP (rede móvel/VPN/dev) como o User-Agent (o browser muda a string
+# ao AUTO-ATUALIZAR — Chrome/Edge) mudam legitimamente a meio da vida do
+# token, e o binding estrito trancava a sessão para sempre ("dispositivo
+# diferente"). O portão de segurança real mantém-se: o token tem de existir,
+# não estar revogado nem expirado, é httpOnly e guardado só como hash.
+# Quem quiser device-binding rígido ativa com BIND_IP=true / BIND_UA=true.
+BIND_IP = get_env("BIND_IP", "false").lower() == "true"
+BIND_UA = get_env("BIND_UA", "false").lower() == "true"
 
 
 # =========================
@@ -135,13 +145,26 @@ def assert_refresh_token_binding(db: Session, token: str, fp: dict) -> None:
     if ensure_utc(db_token.expires_at) <= utcnow():
         raise ValueError("Sessão expirada")
 
-    if BIND_IP:
-        if db_token.user_IP != (fp["user_ip_prefix"] or "").strip():
+    # IP: divergência é apenas avisada (só falha se BIND_IP estiver ativo).
+    if db_token.user_IP != (fp["user_ip_prefix"] or "").strip():
+        log_message(
+            f"⚠️ refresh: IP divergente (guardado={db_token.user_IP} "
+            f"atual={(fp['user_ip_prefix'] or '').strip()})",
+            "warning",
+        )
+        if BIND_IP:
             raise ValueError("Sessão inválida (IP diferente)")
 
-    if BIND_UA:
-        ua_hash = sha256_hex(normalize_user_agent(fp["user_agent"]))
-        if db_token.user_agent != ua_hash:
+    # User-Agent: divergência é apenas avisada (só falha se BIND_UA ativo).
+    # A causa habitual é o browser ter-se auto-atualizado, mudando a UA.
+    ua_hash = sha256_hex(normalize_user_agent(fp["user_agent"]))
+    if db_token.user_agent != ua_hash:
+        log_message(
+            "⚠️ refresh: User-Agent divergente (browser atualizado?) — "
+            "sessão mantida por o token ser válido/não revogado.",
+            "warning",
+        )
+        if BIND_UA:
             raise ValueError("Sessão inválida (dispositivo diferente)")
 
 

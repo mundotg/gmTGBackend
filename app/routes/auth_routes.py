@@ -2,10 +2,11 @@ import traceback
 from datetime import timedelta
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Security
 from sqlalchemy.orm import Session
 
 from app import database, auth
+from app.config.api_security import cookie_scheme, refresh_cookie_scheme
 from app.cruds import user_crud
 from app.models import user_model
 from app.request_fingerprint import build_fingerprint
@@ -24,6 +25,7 @@ from app.token_storage import (
 from app.config.dotenv import get_env
 from app.ultils.ativar_session_bd import reativar_connection
 from app.ultils.logger import log_message
+from app.ultils.rate_limit import limit_login_attempts
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -240,16 +242,19 @@ async def login_user(
     db: Session = Depends(database.get_db),
 ):
     try:
+        # 🛡️ trava brute-force antes de tocar na BD ou correr bcrypt
+        limit_login_attempts(request, credentials.email)
 
-        # print(f"credentials: {credentials}")
         user = user_crud.get_user_by_email(db, credentials.email)
         if not user:
-            raise HTTPException(status_code=401, detail="E-mail não encontrado")
+            # Mensagem genérica: distinguir "email não existe" de "senha errada"
+            # permite enumerar contas registadas.
+            raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
         if not auth.verify_password(
             aes_decrypt(credentials.senha), user.hashed_password
         ):
-            raise HTTPException(status_code=401, detail="Senha incorreta")
+            raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
         fp = build_fingerprint(request, FINGERPRINT_SALT)
 
@@ -296,7 +301,7 @@ async def login_user(
 async def refresh_access_token(
     request: Request,
     response: Response,
-    refresh_token: str | None = Cookie(None, alias="refresh_token"),
+    refresh_token: str | None = Security(refresh_cookie_scheme),
     db: Session = Depends(database.get_db),
 ):
     try:
@@ -373,7 +378,7 @@ async def refresh_access_token(
 @router.get("/me", response_model=users_schemas.UserOut2)
 async def get_current_user(
     request: Request,
-    access_token: str | None = Cookie(None, alias="access_token"),
+    access_token: str | None = Security(cookie_scheme),
     db: Session = Depends(database.get_db),
 ):
     if not access_token:
@@ -407,7 +412,7 @@ async def get_current_user(
 async def logout_user(
     request: Request,
     response: Response,
-    refresh_token: str | None = Cookie(None, alias="refresh_token"),
+    refresh_token: str | None = Security(refresh_cookie_scheme),
     db: Session = Depends(database.get_db),
 ):
     try:

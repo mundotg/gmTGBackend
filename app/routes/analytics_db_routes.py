@@ -18,7 +18,13 @@ from app.routes.connection_routes import get_current_user_id
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
 
-router = APIRouter(prefix="/analytics/db", tags=["DatabaseAnalytics"])
+from app.ultils.permissions import require_permission
+
+# Analitica sobre a base do cliente.
+router = APIRouter(
+    prefix="/analytics/db", tags=["DatabaseAnalytics"],
+    dependencies=[Depends(require_permission("analytics:db:view"))],
+)
 
 
 # =========================

@@ -16,9 +16,15 @@ def retrieve_project_service(db: Session, project_id: str) -> ProjectResponseSch
     return project
 
 def create_project_service(db: Session, project: ProjectSchema, user_id: str) -> ProjectResponseSchema:
-    project.owner_id = project.owner_id or user_id
+    # O dono é sempre quem está autenticado: aceitar `ownerId` do corpo
+    # deixava criar projetos em nome de outra pessoa.
+    project.owner_id = str(user_id)
     project.team = project.team or []
+
     newproj = create_project(db, project)
+    if not newproj:
+        raise HTTPException(status_code=400, detail="Não foi possível criar o projeto")
+
     return ProjectResponseSchema.model_validate(newproj, from_attributes=True)
 
 def update_project_service(db: Session, project_id: str, project: ProjectSchema) -> ProjectResponseSchema:

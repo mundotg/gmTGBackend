@@ -99,17 +99,41 @@ def gerar_relatorio_estrutura_com_cache(metadata_raw: List[Dict[str, Any]], user
 
 
 # @cache_result(ttl=CACHE_TTL, user_id="user_relatorio_query_{user_id}")
+def _build_query_context(query_result: dict, preview: list) -> dict:
+    """Contexto de variáveis para um relatório de CONSULTA (usado no template)."""
+    now = datetime.now()
+    columns = query_result.get("columns") or (list(preview[0].keys()) if preview else [])
+    return {
+        "data": {
+            "hoje": now.strftime("%d/%m/%Y"),
+            "hora": now.strftime("%H:%M"),
+            "iso": now.isoformat(timespec="seconds"),
+        },
+        "query": {
+            "total": len(preview),
+            "colunas": columns,
+            "linhas": preview,  # lista de dicts → binding de tabela
+            "duracao_ms": query_result.get("duration_ms", 0),
+            "sql": query_result.get("query", ""),
+        },
+    }
+
+
 async def gerar_relatorio_query_com_cache(query_result: dict, user_id: int, db: Session, formato: str = FORMATO_PDF) -> str:
     _validar_formato(formato)
-    
+
+    # Template opcional do construtor (page `createtamplete`). Se presente, é
+    # ele que define o relatório, com as variáveis `{{...}}` preenchidas.
+    user_template = query_result.pop("template", None)
+
     payload_obj = QueryPayload(**(query_result.get("QueryPayload") or query_result.get("queryPayload", {})))
     payload_obj.limit = None
     rs_dict = await QueryExecutionService().execute_query(payload_obj, db, user_id)
 
-    query_result["preview"] = rs_dict.get("preview", [])
+    preview = rs_dict.get("preview", [])
+    query_result["preview"] = preview
     query_result["duration_ms"] = rs_dict.get("duration_ms", query_result.get("duration_ms", 0))
 
-    
     # 🚀 A CORREÇÃO ESTÁ AQUI: Remover AMBAS as chaves e NÃO voltar a injetar o payload_obj
     query_result.pop("QueryPayload", None)
     query_result.pop("queryPayload", None)
@@ -118,10 +142,16 @@ async def gerar_relatorio_query_com_cache(query_result: dict, user_id: int, db: 
     file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("query", user_id, "pdf" if formato == FORMATO_PDF else "xlsx")
 
     if formato == FORMATO_PDF:
-        GenericReportGenerator(logo_path=LOGO_PATH).generate_report(str(file_path), QueryReportBuilder(resultado_tipado).build())
+        gen = GenericReportGenerator(logo_path=LOGO_PATH)
+        if user_template and isinstance(user_template, list):
+            # Usa o TEMPLATE do utilizador + contexto (variáveis + binding).
+            context = _build_query_context(query_result, preview)
+            gen.generate_report(str(file_path), user_template, context=context)
+        else:
+            gen.generate_report(str(file_path), QueryReportBuilder(resultado_tipado).build())
     else:
         ExcelReportGenerator(logo_path=LOGO_PATH).generate_query_report(str(file_path), resultado_tipado)
-        
+
     return str(file_path)
 
 def gerar_relatorio_tarefas_com_cache(stats: dict, user_id: int, project: Optional[dict], sprint: Optional[dict], tasks: Optional[list], db: Session, formato: str = FORMATO_PDF) -> str:
@@ -130,15 +160,21 @@ def gerar_relatorio_tarefas_com_cache(stats: dict, user_id: int, project: Option
         raise ValueError("Relatório de tarefas suporta apenas PDF no momento.")
 
     file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("tarefas", user_id, "pdf")
-    antes = {p.name for p in Path(".").glob("relatorio_tarefas_*.pdf")}
-    
-    gerar_relatorio_tarefas(stats, project, sprint, tasks, logo_path=str(LOGO_PATH))
-    
-    novos = sorted({p.name for p in Path(".").glob("relatorio_tarefas_*.pdf")} - antes)
-    if not novos:
-        raise FileNotFoundError("O gerador não produziu arquivo PDF detectável.")
+    REPORT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    Path(novos[-1]).rename(file_path)
+    # Escreve direto no destino, como os outros tipos de relatório já faziam.
+    gerar_relatorio_tarefas(
+        stats,
+        project,
+        sprint,
+        tasks,
+        logo_path=str(LOGO_PATH),
+        output_path=str(file_path),
+    )
+
+    if not file_path.exists():
+        raise FileNotFoundError("O gerador não produziu o ficheiro PDF.")
+
     return str(file_path)
 
 

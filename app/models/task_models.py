@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Float, ForeignKey, Integer, String, DateTime, Boolean, Text, Table
+    JSON, Column, Float, ForeignKey, Integer, String, DateTime, Boolean, Text, Table
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -92,6 +92,26 @@ class Task(Base, TimestampMixin):
     status = Column(String(50), default="pendente")
     completed_at = Column(DateTime)
 
+    # ⏱️ Planeamento
+    # O TaskSchema e o formulário do frontend já pediam estes campos; sem as
+    # colunas, criar uma tarefa rebentava e /stats/task dava 500 a somar
+    # `estimated_hours`.
+    estimated_hours = Column(Float, default=0.0)
+
+    # Lista de etiquetas. JSON em vez de ARRAY para funcionar também em SQLite
+    # (usado nos testes) e não só em Postgres.
+    tags = Column(JSON, default=list)
+
+    # Agendamento/repetição: {"repeat": "semanal", "until": "..."}
+    schedule = Column(JSON)
+
+    # ✅ Validação
+    # None = ainda não revista · True = aprovada · False = reprovada
+    is_validated = Column(Boolean, nullable=True)
+    comentario_is_validated = Column(String(500))
+    validated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    validated_at = Column(DateTime)
+
     sprint_id = Column(Integer, ForeignKey("sprints.id", ondelete="SET NULL"))
 
     assigned_to_id = Column(
@@ -112,6 +132,7 @@ class Task(Base, TimestampMixin):
     assigned_user = relationship("User", foreign_keys=[assigned_to_id])
     delegated_user = relationship("User", foreign_keys=[delegated_to_id])
     creator_user = relationship("User", foreign_keys=[created_by_id])
+    validator_user = relationship("User", foreign_keys=[validated_by_id])
 
     project_id = Column(
         Integer,
@@ -128,6 +149,16 @@ class Sprint(Base, TimestampMixin):
     name = Column(String(255), nullable=False)
     start_date = Column(DateTime, default=datetime.utcnow)
     end_date = Column(DateTime, nullable=False)
+
+    # 🎯 Objetivo e estado
+    # O SprintSchema, o CreateSprintModal e os endpoints de toggle/cancelar já
+    # usavam estes campos. Sem as colunas, criar sprint dava TypeError e
+    # ativar/cancelar eram silenciosamente ignorados (o SQLAlchemy aceita
+    # atribuir um atributo que não é coluna, e nada é gravado).
+    goal = Column(String(255))
+    is_active = Column(Boolean, default=True, nullable=False)
+    cancelled = Column(Boolean, default=False, nullable=False)
+    motivo_cancelamento = Column(String(255))
 
     created_by_id = Column(
         Integer,

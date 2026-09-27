@@ -8,6 +8,9 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.auth import decode_token
 from app.config.api_security import bearer_scheme, cookie_scheme
 
+# 🚀 IMPORTAÇÃO CRÍTICA: Necessário para revelar o ID do utilizador
+from app.services.crypto_utils import aes_decrypt
+
 
 def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
     if not authorization:
@@ -41,35 +44,6 @@ def _get_sub_from_payload(payload: Any) -> Optional[str]:
     return None
 
 
-# def get_current_user_id(
-#     access_token: Optional[str] = Cookie(None, alias="access_token"),
-#     authorization: Optional[str] = Header(None),
-# ) -> int:
-#     # 1) token via cookie tem prioridade
-#     token = access_token or _extract_bearer_token(authorization)
-
-#     if not token:
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail="Token não fornecido (cookie access_token ou Authorization Bearer).",
-#         )
-
-#     payload = decode_token(token)
-#     sub = _get_sub_from_payload(payload)
-
-#     if not sub:
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail="Token inválido ou expirado.",
-#         )
-
-#     try:
-#         return int(sub)
-#     except ValueError:
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail="Token inválido: 'sub' não é numérico.",
-#         )
 def get_current_user_id(
     access_token: Optional[str] = Security(cookie_scheme),
     credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
@@ -85,18 +59,21 @@ def get_current_user_id(
         )
 
     payload = decode_token(token)
-    sub = _get_sub_from_payload(payload)
+    encrypted_sub = _get_sub_from_payload(payload)
 
-    if not sub:
+    if not encrypted_sub:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido ou expirado.",
         )
 
+    # 🚀 CORREÇÃO: Desencriptar o 'sub' antes de converter para inteiro
     try:
-        return int(sub)
-    except ValueError:
+        decrypted_sub = aes_decrypt(encrypted_sub)
+        return int(decrypted_sub)
+    except Exception:
+        # Apanha tanto falhas no aes_decrypt() como no int()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido: 'sub' não é numérico.",
+            detail="Token inválido ou corrompido.",
         )

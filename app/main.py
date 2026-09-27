@@ -263,6 +263,8 @@ if allow_all:
         withBd=True,
     )
 
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[] if allow_all else origins,
@@ -383,7 +385,6 @@ app.include_router(datascience_routes.router)
 # Separados de propósito: o orquestrador não deve reiniciar o contentor
 # só porque a base de dados está em baixo — isso resolve-se tirando-o do
 # balanceador (readiness), não matando o processo (liveness).
-
 
 @app.get("/health/live", tags=["Health"])
 async def liveness():

@@ -7,9 +7,12 @@ import hashlib
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.config.dotenv import get_env, get_env_int
+from app.config.dotenv import get_env, get_env_bool, get_env_int
 from app.models.user_model import RefreshToken
 from app.ultils.logger import log_message
+
+# 🚀 IMPORTAÇÃO CRÍTICA PARA A CONSISTÊNCIA DE SEGURANÇA
+from app.services.crypto_utils import aes_encrypt, aes_decrypt
 
 
 # =========================
@@ -19,17 +22,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = get_env_int("ACCESS_TOKEN_EXPIRE_MINUTES", 30)
 REFRESH_TOKEN_EXPIRE_DAYS = get_env_int("REFRESH_TOKEN_EXPIRE_DAYS", 7)
 
 # Enforcement ESTRITO do binding do refresh token por IP / User-Agent.
-#
-# Por omissão é TOLERANTE (só regista aviso) — igual ao binding do access
-# token em `assert_access_token_binding`. Motivo: o refresh token dura dias e
-# tanto o IP (rede móvel/VPN/dev) como o User-Agent (o browser muda a string
-# ao AUTO-ATUALIZAR — Chrome/Edge) mudam legitimamente a meio da vida do
-# token, e o binding estrito trancava a sessão para sempre ("dispositivo
-# diferente"). O portão de segurança real mantém-se: o token tem de existir,
-# não estar revogado nem expirado, é httpOnly e guardado só como hash.
-# Quem quiser device-binding rígido ativa com BIND_IP=true / BIND_UA=true.
-BIND_IP = get_env("BIND_IP", "false").lower() == "true"
-BIND_UA = get_env("BIND_UA", "false").lower() == "true"
+BIND_IP = get_env_bool("BIND_IP", False)
+BIND_UA = get_env_bool("BIND_UA", False)
 
 
 # =========================
@@ -79,10 +73,11 @@ def store_refresh_token(
     try:
         fp = _validate_fp(fp)
 
+        # 🚀 IP e Hash guardados de forma totalmente ilegível na BD
         db_token = RefreshToken(
             token=sha256_hex(token),  # 🔐 guarda hash
             user_id=user_id,
-            user_IP=(fp["user_ip_prefix"] or "").strip(),
+            user_IP=(fp["user_ip_prefix"] or "").strip(), # 🔐 guarda IP encriptado
             user_agent=sha256_hex(normalize_user_agent(fp["user_agent"])),
             expires_at=utcnow() + timedelta(days=days_valid),
             revoked=False,
@@ -131,8 +126,8 @@ def is_refresh_token_valid(db: Session, token: str) -> bool:
         )
         return False
 
-
 def assert_refresh_token_binding(db: Session, token: str, fp: dict) -> None:
+    
     fp = _validate_fp(fp)
     db_token = _get_token(db, token)
 
@@ -145,20 +140,43 @@ def assert_refresh_token_binding(db: Session, token: str, fp: dict) -> None:
     if ensure_utc(db_token.expires_at) <= utcnow():
         raise ValueError("Sessão expirada")
 
+    # 1. Prepara os valores atuais para comparação
+    current_ip = (fp["user_ip_prefix"] or "").strip()
+    current_ua_raw = fp.get("user_agent", "")
+    current_ua_hash = sha256_hex(normalize_user_agent(current_ua_raw))
+
+    # 🚀 2. Desencripta o IP da BD de forma segura (Fallback para compatibilidade)
+    try:
+        # Se for um bloco AES válido, desencripta
+        db_ip = aes_decrypt(db_token.user_IP) if db_token.user_IP else ""
+    except Exception:
+        # Se falhar (ex: tokens antigos que ainda estavam em texto limpo), usa o valor cru
+        db_ip = db_token.user_IP
+
+    # 3. LOG CRÍTICO DE DEPURAÇÃO: Mostra tudo o que vai ser comparado
+    log_message(
+        f"🔍 DEPURAÇÃO DE BINDING (REFRESH TOKEN):\n"
+        f"  -> IP Guardado na BD : '{db_ip}' (Desencriptado)\n"
+        f"  -> IP Atual (Request): '{current_ip}'\n"
+        f"  -> UA Hash (BD)      : '{db_token.user_agent}'\n"
+        f"  -> UA Hash (Atual)   : '{current_ua_hash}'\n"
+        f"  -> UA Raw (Texto)    : '{current_ua_raw[:60]}...'\n"
+        f"  -> BIND_IP={BIND_IP} | BIND_UA={BIND_UA}",
+        "info"
+    )
+
     # IP: divergência é apenas avisada (só falha se BIND_IP estiver ativo).
-    if db_token.user_IP != (fp["user_ip_prefix"] or "").strip():
+    if db_ip != current_ip:
         log_message(
-            f"⚠️ refresh: IP divergente (guardado={db_token.user_IP} "
-            f"atual={(fp['user_ip_prefix'] or '').strip()})",
+            f"⚠️ refresh: IP divergente (guardado={db_ip} "
+            f"atual={current_ip})",
             "warning",
         )
         if BIND_IP:
             raise ValueError("Sessão inválida (IP diferente)")
 
     # User-Agent: divergência é apenas avisada (só falha se BIND_UA ativo).
-    # A causa habitual é o browser ter-se auto-atualizado, mudando a UA.
-    ua_hash = sha256_hex(normalize_user_agent(fp["user_agent"]))
-    if db_token.user_agent != ua_hash:
+    if db_token.user_agent != current_ua_hash:
         log_message(
             "⚠️ refresh: User-Agent divergente (browser atualizado?) — "
             "sessão mantida por o token ser válido/não revogado.",

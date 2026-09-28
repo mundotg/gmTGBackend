@@ -20,7 +20,6 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import decode_token
 from app.config.redis import read_cache, write_cache
 from app.database import get_db
 from app.routes.connection_routes import get_current_user_id
@@ -30,13 +29,20 @@ from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.logger import log_message
 
 # Analise sobre os dados da base ligada: e leitura de tabelas.
-from app.ultils.permissions import require_permission
+from app.ultils.permissions import require_permission, ws_has_permission
+from app.ultils.get_id_by_token import ws_user_id
 
 router = APIRouter(
     prefix="/datascience",
     tags=["Data Science"],
     dependencies=[Depends(require_permission("table:read", "query:execute"))],
 )
+
+# As WebSockets ficam num router próprio, SEM a dependência de permissão acima:
+# as dependências de router também correm nas rotas WS e ali rebentam
+# (APIKeyCookie exige um Request HTTP). A permissão é verificada dentro da WS
+# com `ws_has_permission`, depois de autenticar.
+ws_router = APIRouter(prefix="/datascience", tags=["Data Science"])
 
 MAX_ANALYZE_ROWS = 5000  # cap de linhas a analisar (memória/tempo)
 
@@ -96,25 +102,19 @@ async def analyze_endpoint(
 
 
 # ══════════════════════════ WebSocket (tempo real) ══════════════════════════
-def _ws_user_id(websocket: WebSocket) -> Optional[int]:
-    token = websocket.cookies.get("access_token") or websocket.query_params.get("token")
-    if not token:
-        return None
-    try:
-        payload = decode_token(token)
-        sub = payload.get("sub") if isinstance(payload, dict) else None
-        return int(sub) if sub is not None else None
-    except Exception:  # noqa: BLE001
-        return None
 
 
-@router.websocket("/ws")
+@ws_router.websocket("/ws")
 async def datascience_ws(websocket: WebSocket):
     await websocket.accept()
-    user_id = _ws_user_id(websocket)
+    user_id = ws_user_id(websocket)
     if user_id is None:
         await websocket.send_json({"stage": "error", "message": "Não autenticado."})
         await websocket.close(code=4401)
+        return
+    if not await ws_has_permission(user_id, "table:read", "query:execute"):
+        await websocket.send_json({"stage": "error", "message": "Permissão insuficiente."})
+        await websocket.close(code=4403)
         return
 
     try:

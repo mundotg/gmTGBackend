@@ -2,7 +2,7 @@ import asyncio
 import json
 import traceback
 from datetime import datetime
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from fastapi import (
     APIRouter,
@@ -14,13 +14,12 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import decode_token
 from app.database import AsyncSessionLocal, get_db_async
-from app.ultils.get_id_by_token import get_current_user_id
+from app.ultils.get_id_by_token import get_current_user_id, ws_user_id
 from app.ultils.logger import log_message
 from importantConfig.convert_string_to_dict import PayloadError, converter_tables_origen
 
-from app.ultils.permissions import require_permission
+from app.ultils.permissions import require_permission, ws_has_permission
 
 # Copiar dados entre bases: escreve no destino.
 router = APIRouter(
@@ -28,23 +27,16 @@ router = APIRouter(
     dependencies=[Depends(require_permission("data:transfer"))],
 )
 
+# As WebSockets ficam num router próprio, SEM a dependência de permissão acima:
+# as dependências de router também correm nas rotas WS e ali rebentam
+# (APIKeyCookie exige um Request HTTP). A permissão é verificada dentro da WS
+# com `ws_has_permission`, depois de autenticar.
+ws_router = APIRouter(prefix="/transfer", tags=["Database Operations"])
+
 
 def sse(event: str, data: str) -> str:
     lines = str(data).splitlines() or [""]
     return f"event: {event}\n" + "\n".join([f"data: {ln}" for ln in lines]) + "\n\n"
-
-
-def _ws_user_id(websocket: WebSocket) -> Optional[int]:
-    """Autentica a WS pelo cookie `access_token` (mesmo padrão do backup)."""
-    token = websocket.cookies.get("access_token") or websocket.query_params.get("token")
-    if not token:
-        return None
-    try:
-        payload = decode_token(token)
-        sub = payload.get("sub") if isinstance(payload, dict) else None
-        return int(sub) if sub is not None else None
-    except Exception:
-        return None
 
 
 @router.get("/stream")
@@ -203,14 +195,18 @@ async def transfer_stream(
 #   servidor → cliente: {"event": "status|log|warning|error|done|final", "data": "..."}
 #   cliente → servidor (opcional): {"action": "cancel"}
 # ============================================================
-@router.websocket("/ws")
+@ws_router.websocket("/ws")
 async def transfer_ws(websocket: WebSocket):
     await websocket.accept()
 
-    user_id = _ws_user_id(websocket)
+    user_id = ws_user_id(websocket)
     if user_id is None:
         await websocket.send_json({"event": "error", "data": "Não autenticado."})
         await websocket.close(code=4401)
+        return
+    if not await ws_has_permission(user_id, "data:transfer"):
+        await websocket.send_json({"event": "error", "data": "Permissão insuficiente."})
+        await websocket.close(code=4403)
         return
 
     async def send(event: str, data: str) -> None:

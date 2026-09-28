@@ -366,6 +366,7 @@ app.include_router(database_intro_routes.router)
 app.include_router(deadlock_monitory_route.router)
 app.include_router(ocr_routes.router)
 app.include_router(transfer_data_routes.router)
+app.include_router(transfer_data_routes.ws_router)  # WebSockets: sem dependências de router (ver ws_has_permission)
 app.include_router(database_operations_routes.router)
 app.include_router(backup_restore_routes.router)
 app.include_router(queryhistory_routes.router)
@@ -376,7 +377,9 @@ app.include_router(logs_routes.router)
 app.include_router(storage_routes.router)
 app.include_router(pentest_routes.router)
 app.include_router(sql_editor_routes.router)
+app.include_router(sql_editor_routes.ws_router)  # WebSockets: sem dependências de router (ver ws_has_permission)
 app.include_router(datascience_routes.router)
+app.include_router(datascience_routes.ws_router)  # WebSockets: sem dependências de router (ver ws_has_permission)
 
 
 # ------------------------------------------------------------

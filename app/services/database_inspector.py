@@ -265,7 +265,7 @@ def get_table_names(
     db: Session,
 ) -> list[str]:
 
-    table_cache = get_db_structures(db, connection_id)
+    table_cache = None # get_db_structures(db, connection_id)
     if table_cache:
         log_message(
             f"Usando cache para tabelas | connection_id={connection_id} | user={id_user} | tables={len(table_cache)}",
@@ -448,7 +448,7 @@ def get_strutures_names_only(
     """
     structures = get_db_structures(db, connection_id)
     if structures:
-        print(f"structures: {structures}")
+        # print(f"structures: {structures}")
         return [DBStructureOut.model_validate(s) for s in structures]
 
     try:

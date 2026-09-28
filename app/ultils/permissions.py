@@ -119,3 +119,40 @@ def require_permission(*required: str):
         return current_user
 
     return dependency
+
+
+def _load_user_sync(user_id: int):
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return (
+            db.query(user_model.User)
+            .options(
+                joinedload(user_model.User.role).joinedload(user_model.Role.permissions)
+            )
+            .filter(user_model.User.id == user_id)
+            .first()
+        )
+    finally:
+        db.close()
+
+
+async def ws_has_permission(user_id: int, *required: str) -> bool:
+    """
+    Equivalente de `require_permission` para WebSockets.
+
+    As dependências de router (`APIRouter(dependencies=[require_permission])`)
+    também correm nas rotas WebSocket, e ali rebentam: `get_current_user_id`
+    usa APIKeyCookie/HTTPBearer, que exigem um `Request` HTTP ("APIKeyCookie.
+    __call__() missing 1 required positional argument: 'request'"). Por isso as
+    WS ficam num router sem essa dependência e verificam aqui, depois de
+    autenticar com `ws_user_id` — mesmas regras: utilizador ativo e pelo menos
+    uma das permissões (com wildcards e `admin:*`).
+    """
+    from fastapi.concurrency import run_in_threadpool
+
+    user = await run_in_threadpool(_load_user_sync, user_id)
+    if not user or not user.is_active:
+        return False
+    return user_has_permission(user.permissions, required)

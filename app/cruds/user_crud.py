@@ -167,6 +167,31 @@ def get_or_create_cargo(db: Session, cargo_data: users_schemas.CargoSchema):
         raise
 
 
+# Plano atribuído a quem se regista. `users.plan_id` é obrigatório (NOT NULL) e
+# o registo não o preenchia: toda a inscrição falhava com IntegrityError — que
+# o `except` abaixo reportava como "E-mail já está em uso".
+DEFAULT_SIGNUP_PLAN = "free"
+
+
+def _default_signup_plan(db: Session):
+    """
+    Plano por omissão para novas contas (por nome, não por id). Os planos são
+    criados pelo seed no arranque; se ainda não existir, cria-se com os mesmos
+    valores do seed para o registo não depender da ordem de arranque.
+    """
+    from app.models.clouds_models import Plan
+    from app.seed_new import PLANOS_DATA
+
+    plan = db.query(Plan).filter(Plan.name == DEFAULT_SIGNUP_PLAN).first()
+    if plan:
+        return plan
+    _, max_storage, max_requests = next(p for p in PLANOS_DATA if p[0] == DEFAULT_SIGNUP_PLAN)
+    plan = Plan(name=DEFAULT_SIGNUP_PLAN, max_storage_mb=max_storage, max_requests_per_day=max_requests)
+    db.add(plan)
+    db.flush()
+    return plan
+
+
 # -----------------------------
 # 🧑 Criar novo usuário
 # -----------------------------
@@ -210,6 +235,7 @@ def create_user(db: Session, user: users_schemas.UserCreate) -> user_model.User:
             cargo_id=cargo.id if cargo else None,
             hashed_password=hashed_pw,
             concorda_termos=bool(user.concorda_termos),
+            plan_id=_default_signup_plan(db).id,
         )
 
         db.add(db_user)
@@ -225,10 +251,18 @@ def create_user(db: Session, user: users_schemas.UserCreate) -> user_model.User:
         log_message(f"✅ Usuário criado: {email_norm}", "success")
         return db_user
 
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        log_message(f"❌ Duplicate email: {email_norm}", "error")
-        raise ValueError("E-mail já está em uso.")
+        detalhe = str(getattr(e, "orig", e))
+        # Só um conflito no e-mail é "e-mail em uso" (corrida entre a
+        # verificação acima e o insert). Qualquer outra restrição (NOT NULL,
+        # FK, ...) é um erro nosso: regista-se a causa real em vez de a
+        # esconder atrás de uma mensagem falsa ao utilizador.
+        if "ix_users_email" in detalhe or "(email)" in detalhe:
+            log_message(f"❌ Duplicate email: {email_norm}", "error")
+            raise ValueError("E-mail já está em uso.")
+        log_message(f"🔥 Registo falhou por restrição da base de dados: {detalhe}", "error")
+        raise ValueError("Não foi possível criar a conta. Tente novamente ou contacte o suporte.")
 
     except Exception as e:
         db.rollback()

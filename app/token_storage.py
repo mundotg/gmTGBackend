@@ -154,16 +154,16 @@ def assert_refresh_token_binding(db: Session, token: str, fp: dict) -> None:
         db_ip = db_token.user_IP
 
     # 3. LOG CRÍTICO DE DEPURAÇÃO: Mostra tudo o que vai ser comparado
-    log_message(
-        f"🔍 DEPURAÇÃO DE BINDING (REFRESH TOKEN):\n"
-        f"  -> IP Guardado na BD : '{db_ip}' (Desencriptado)\n"
-        f"  -> IP Atual (Request): '{current_ip}'\n"
-        f"  -> UA Hash (BD)      : '{db_token.user_agent}'\n"
-        f"  -> UA Hash (Atual)   : '{current_ua_hash}'\n"
-        f"  -> UA Raw (Texto)    : '{current_ua_raw[:60]}...'\n"
-        f"  -> BIND_IP={BIND_IP} | BIND_UA={BIND_UA}",
-        "info"
-    )
+    # log_message(
+    #     f"🔍 DEPURAÇÃO DE BINDING (REFRESH TOKEN):\n"
+    #     f"  -> IP Guardado na BD : '{db_ip}' (Desencriptado)\n"
+    #     f"  -> IP Atual (Request): '{current_ip}'\n"
+    #     f"  -> UA Hash (BD)      : '{db_token.user_agent}'\n"
+    #     f"  -> UA Hash (Atual)   : '{current_ua_hash}'\n"
+    #     f"  -> UA Raw (Texto)    : '{current_ua_raw[:60]}...'\n"
+    #     f"  -> BIND_IP={BIND_IP} | BIND_UA={BIND_UA}",
+    #     "info"
+    # )
 
     # IP: divergência é apenas avisada (só falha se BIND_IP estiver ativo).
     if db_ip != current_ip:

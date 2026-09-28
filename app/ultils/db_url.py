@@ -19,7 +19,12 @@ indispensável:
   para os campos separados (ver `_maybe_remap_host`);
 * no caminho async com asyncpg, `sslmode`/`channel_binding` saem da query e
   passam a `connect_args` — o asyncpg não conhece esses parâmetros e rebentaria
-  com TypeError.
+  com TypeError;
+* em PostgreSQL, parâmetros de ORM que não são do libpq (`pgbouncer`,
+  `schema`, `connection_limit`, ... — comuns em URLs do Neon/Supabase/Prisma)
+  saem da query, com tradução quando existe (`schema` → search_path,
+  `pgbouncer=true` → sem cache de prepared statements). Deixados, o psycopg2
+  recusava a URL inteira ("invalid connection option").
 
 `parse_db_url` extrai host/porta/base/utilizador só para **preencher as colunas
 da nossa tabela** (são NOT NULL e a listagem de conexões mostra host e base). A
@@ -28,13 +33,13 @@ ligação em si nunca é remontada a partir desses valores.
 
 from __future__ import annotations
 
-import ssl
 from typing import Any, Callable, Dict, Optional, Tuple
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 from pymongo import MongoClient
 from sqlalchemy import create_engine
 
+from app.ultils.db_ssl import asyncpg_ssl_arg, resolve_pg_sslmode
 from app.ultils.logger import log_message
 
 
@@ -85,10 +90,67 @@ DEFAULT_PORTS: Dict[str, int] = {
 
 _ODBC_DRIVER = "ODBC Driver 17 for SQL Server"
 
-_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "host.docker.internal"}
+# Palavras-chave de ligação do libpq (PostgreSQL 17, "Parameter Key Words").
+# É o que o psycopg2 aceita na query de uma URL postgresql://. As URLs do Neon,
+# Supabase ou copiadas do Prisma trazem também opções do ORM (`pgbouncer`,
+# `schema`, `connection_limit`, `pool_timeout`, ...) que o libpq recusa com
+# `invalid dsn: invalid connection option "pgbouncer"` — por isso a query é
+# filtrada por esta lista antes de ligar.
+_LIBPQ_PARAMS = {
+    "host", "hostaddr", "port", "dbname", "user", "password", "passfile",
+    "require_auth", "channel_binding", "connect_timeout", "client_encoding",
+    "options", "application_name", "fallback_application_name", "keepalives",
+    "keepalives_idle", "keepalives_interval", "keepalives_count",
+    "tcp_user_timeout", "replication", "gssencmode", "sslmode", "requiressl",
+    "sslnegotiation", "sslcompression", "sslcert", "sslkey", "sslpassword",
+    "sslcertmode", "sslrootcert", "sslcrl", "sslcrldir", "sslsni",
+    "requirepeer", "ssl_min_protocol_version", "ssl_max_protocol_version",
+    "krbsrvname", "gsslib", "gssdelegation", "service", "target_session_attrs",
+    "load_balance_hosts",
+}
 
-# Parâmetros que o asyncpg não aceita: são do libpq/psycopg2.
-_ASYNCPG_UNSUPPORTED = {"sslmode", "channel_binding", "ssl_mode", "target_session_attrs"}
+_TRUE = {"1", "true", "yes", "on"}
+
+
+def _split_pg_query(url: str) -> Tuple[str, Dict[str, str]]:
+    """
+    Separa da query os parâmetros que não são do libpq.
+
+    Devolve a URL só com parâmetros libpq e um dict (chaves em minúsculas) com
+    os restantes, para quem chama traduzir os que têm equivalente (`schema`,
+    `pgbouncer`). Os descartados ficam registados no log.
+    """
+    mantidos, extras = [], {}
+    for chave, valor in parse_qsl(urlsplit(url).query, keep_blank_values=True):
+        if chave.lower() in _LIBPQ_PARAMS:
+            mantidos.append((chave, valor))
+        else:
+            extras[chave.lower()] = valor
+
+    if extras:
+        log_message(
+            f"🔧 URL PostgreSQL: parâmetros que não são do libpq tratados/ignorados: {sorted(extras)}",
+            level="info",
+        )
+    return _set_query(url, mantidos), extras
+
+
+def _pg_explicit_port(url: str) -> str:
+    """
+    Põe a porta na URL quando ela não a traz (5432).
+
+    Sem porta, o libpq e o asyncpg usam a variável de ambiente PGPORT. O .env
+    define PGPORT=5431 (de outra base), e o processo carrega-o: uma URL do Neon
+    sem porta ia bater a :5431 e morria em timeout. O mesmo em produção com
+    qualquer PG* no ambiente — a URL colada tem de valer por si.
+    """
+    partes = urlsplit(url)
+    autoridade = partes.netloc.rsplit("@", 1)[-1]
+    # Sem host (socket local) ou com vários hosts, não se mexe.
+    if not autoridade or "," in autoridade or _porta_tolerante(partes) is not None:
+        return url
+    userinfo = partes.netloc[: len(partes.netloc) - len(autoridade)]
+    return _set_netloc(url, f"{userinfo}{autoridade}:{DEFAULT_PORTS['PostgreSQL']}")
 
 
 class InvalidDatabaseUrl(ValueError):
@@ -368,6 +430,20 @@ def sync_url(url: str) -> str:
     if db_type_from_url(url) == "SQL Server":
         url = _ensure_odbc_driver(url)
 
+    if db_type_from_url(url) == "PostgreSQL":
+        url, extras = _split_pg_query(_pg_explicit_port(url))
+        params = parse_qsl(urlsplit(url).query, keep_blank_values=True)
+        chaves = {k.lower() for k, _ in params}
+        # `schema=` (Prisma) → search_path, se a URL não trouxer já `options`.
+        schema = extras.get("schema")
+        if schema and "options" not in chaves:
+            params.append(("options", f"-csearch_path={schema}"))
+        # sslmode explícito, pela regra da app, para o PGSSLMODE do ambiente
+        # (o .env tem `require`) não decidir por ela.
+        if "sslmode" not in chaves:
+            params.append(("sslmode", resolve_pg_sslmode(urlsplit(url).hostname, "")))
+        url = _set_query(url, params)
+
     return url
 
 
@@ -385,27 +461,47 @@ def async_url(url: str) -> Tuple[str, Dict[str, Any]]:
         url = _ensure_odbc_driver(url)
 
     if _scheme(url).endswith("asyncpg"):
+        url = _pg_explicit_port(url)
         partes = urlsplit(url)
-        params = parse_qsl(partes.query)
+        url, extras = _split_pg_query(url)
 
+        # O SQLAlchemy passa a query ao asyncpg.connect() como argumentos, e o
+        # asyncpg não conhece as palavras-chave do libpq (TypeError). Nada da
+        # query segue na URL: traduz-se o que tem equivalente e o resto
+        # (sslmode, channel_binding, ...) é só lido.
         modo = ""
-        mantidos = []
-        for chave, valor in params:
-            if chave.lower() in _ASYNCPG_UNSUPPORTED:
-                if chave.lower() in {"sslmode", "ssl_mode"}:
-                    modo = valor.lower()
-                continue
-            mantidos.append((chave, valor))
+        server_settings: Dict[str, str] = {}
+        for chave, valor in parse_qsl(urlsplit(url).query, keep_blank_values=True):
+            k = chave.lower()
+            if k in {"sslmode", "ssl_mode"}:
+                modo = valor.lower()
+            elif k == "application_name":
+                server_settings["application_name"] = valor
+            elif k == "connect_timeout" and valor.strip().isdigit():
+                connect_args["timeout"] = float(valor)
+            elif k in {"host", "user", "password"}:
+                connect_args[k] = valor
+            elif k == "port" and valor.strip().isdigit():
+                connect_args["port"] = int(valor)
+            elif k == "dbname":
+                connect_args["database"] = valor
+        url = _set_query(url, [])
 
-        url = _set_query(url, mantidos)
+        if extras.get("schema"):
+            server_settings["search_path"] = extras["schema"]
+        if server_settings:
+            connect_args["server_settings"] = server_settings
 
-        host = (partes.hostname or "").lower()
-        if host in _LOCAL_HOSTS or modo == "disable":
-            # ssl=False → o asyncpg nem tenta o upgrade (um servidor local
-            # costuma recusá-lo: "rejected SSL upgrade").
-            connect_args["ssl"] = False
-        elif modo or host:
-            connect_args["ssl"] = ssl.create_default_context()
+        # `pgbouncer=true` (Prisma): pooler em modo transação, onde prepared
+        # statements com nome falham ("prepared statement ... already
+        # exists"). Desliga as caches do asyncpg e do SQLAlchemy.
+        if (extras.get("pgbouncer") or "").lower() in _TRUE:
+            connect_args["statement_cache_size"] = 0
+            url = _set_query(url, [("prepared_statement_cache_size", "0")])
+
+        # Mesma regra de SSL das conexões por campos (app/ultils/db_ssl.py):
+        # local → sem SSL; require/verify-* respeitados; remoto → prefer.
+        connect_args["ssl"] = asyncpg_ssl_arg(partes.hostname, modo)
 
     return url, connect_args
 

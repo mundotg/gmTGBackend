@@ -22,10 +22,9 @@ from fastapi import (
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import decode_token
 from app.database import get_db_async
 from app.services import backup_jobs
-from app.ultils.get_id_by_token import get_current_user_id
+from app.ultils.get_id_by_token import get_current_user_id, ws_user_id
 from app.ultils.logger import log_message
 
 # NOTA: A correção do ProactorEventLoop deve ficar no main.py, não aqui.
@@ -418,25 +417,6 @@ async def download_backup(
 # ============================================================
 # 🔌 WebSocket de progresso do job
 # ============================================================
-def _ws_user_id(websocket: WebSocket) -> Optional[int]:
-    """
-    Autentica a WebSocket pelo cookie `access_token` (as WS enviam cookies do
-    mesmo site automaticamente). Devolve o user_id ou None.
-    """
-    token = websocket.cookies.get("access_token")
-    if not token:
-        # Fallback: ?token=... na query string (útil fora do browser).
-        token = websocket.query_params.get("token")
-    if not token:
-        return None
-    try:
-        payload = decode_token(token)
-        sub = payload.get("sub") if isinstance(payload, dict) else None
-        return int(sub) if sub is not None else None
-    except Exception:
-        return None
-
-
 @router.websocket("/ws/jobs/{job_id}")
 async def job_progress_ws(websocket: WebSocket, job_id: str):
     """
@@ -445,7 +425,7 @@ async def job_progress_ws(websocket: WebSocket, job_id: str):
     """
     await websocket.accept()
 
-    user_id = _ws_user_id(websocket)
+    user_id = ws_user_id(websocket)
     if user_id is None:
         await websocket.send_json({"event": "error", "message": "Não autenticado."})
         await websocket.close(code=4401)

@@ -32,7 +32,6 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import decode_token
 from app.config.redis import read_cache, write_cache
 from app.database import get_db_async
 from app.routes.connection_routes import get_current_user_id
@@ -44,7 +43,8 @@ from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.conect_database import is_mongo, get_mongo_database
 from app.ultils.connection_access import assert_user_connection_level_async
 from app.ultils.logger import log_message
-from app.ultils.permissions import get_current_user, require_permission, user_has_permission
+from app.ultils.permissions import get_current_user, require_permission, user_has_permission, ws_has_permission
+from app.ultils.get_id_by_token import ws_user_id
 
 # Baseline: quem pode executar consultas. Alterar dados exige ainda
 # `data:write`, verificado por instrucao dentro de /execute e /explain,
@@ -54,6 +54,12 @@ router = APIRouter(
     tags=["SQL Editor"],
     dependencies=[Depends(require_permission("query:execute"))],
 )
+
+# As WebSockets ficam num router próprio, SEM a dependência de permissão acima:
+# as dependências de router também correm nas rotas WS e ali rebentam
+# (APIKeyCookie exige um Request HTTP). A permissão é verificada dentro da WS
+# com `ws_has_permission`, depois de autenticar.
+ws_router = APIRouter(prefix="/sql-editor", tags=["SQL Editor"])
 
 MAX_ROWS = 2000
 FETCH_BATCH = 200
@@ -607,7 +613,7 @@ async def _run_sql(engine, query: str, limit: int) -> AsyncGenerator[str, None]:
                     await conn.rollback()
                 except Exception:  # noqa: BLE001
                     pass
-                yield _sse("error", {"message": str(e), "statement": stmt})
+                yield _sse("error", {"message": _db_error_message(e), "statement": stmt})
                 return
 
     yield _sse("complete", {"ok": True})
@@ -663,13 +669,48 @@ async def execute(
                     yield ev
         except Exception as e:  # noqa: BLE001
             log_message(f"[sql-editor] erro execução: {e}", "error")
-            yield _sse("error", {"message": str(e)})
+            yield _sse("error", {"message": _db_error_message(e)})
 
     return StreamingResponse(
         gen(),
         media_type="text/event-stream",
         headers={"X-Query-Id": query_id, "Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# Mensagens da base de dados reconhecidas → texto legível que nomeia o objeto.
+# PostgreSQL (psycopg2/asyncpg), MySQL, SQL Server e SQLite.
+_DB_ERROR_PATTERNS = [
+    (re.compile(r'relation "?([\w\.]+)"? does not exist', re.I), 'A tabela "{0}" não existe nesta base de dados.'),
+    (re.compile(r"Table '([^']+)' doesn't exist", re.I), 'A tabela "{0}" não existe nesta base de dados.'),
+    (re.compile(r"Invalid object name '([^']+)'", re.I), 'A tabela "{0}" não existe nesta base de dados.'),
+    (re.compile(r"no such table: ([\w\.]+)", re.I), 'A tabela "{0}" não existe nesta base de dados.'),
+    (re.compile(r'column "?([\w\.]+)"? does not exist', re.I), 'A coluna "{0}" não existe.'),
+    (re.compile(r"Unknown column '([^']+)'", re.I), 'A coluna "{0}" não existe.'),
+    (re.compile(r"Invalid column name '([^']+)'", re.I), 'A coluna "{0}" não existe.'),
+    (re.compile(r"no such column: ([\w\.]+)", re.I), 'A coluna "{0}" não existe.'),
+]
+
+
+def _db_error_message(e: Exception) -> str:
+    """
+    Texto de erro para mostrar no editor.
+
+    `str(e)` de uma exceção do SQLAlchemy traz a classe do driver, o SQL e um
+    link de documentação ("(sqlalchemy.dialects.postgresql.asyncpg.
+    ProgrammingError) <class '...UndefinedTableError'>: relation "us" does not
+    exist [SQL: ...] (Background on this error at: ...)"). Fica só a mensagem
+    da base de dados — traduzida quando é um caso comum.
+    """
+    orig = getattr(e, "orig", None)
+    raw = str(orig if orig is not None else e).strip()
+    raw = re.sub(r"^<class '[^']+'>:\s*", "", raw)
+    first = next((ln.strip() for ln in raw.splitlines() if ln.strip()), "") or str(e)
+    for pattern, template in _DB_ERROR_PATTERNS:
+        m = pattern.search(first)
+        if m:
+            return template.format(m.group(1))
+    return first
 
 
 def _ok(data: Any, message: str = "OK") -> JSONResponse:
@@ -719,7 +760,7 @@ async def explain(
         return _ok({"plan": plan})
     except Exception as e:  # noqa: BLE001
         return JSONResponse(
-            status_code=400, content={"success": False, "message": str(e), "data": None}
+            status_code=400, content={"success": False, "message": _db_error_message(e), "data": None}
         )
 
 
@@ -759,19 +800,9 @@ async def metrics(user_id: int = Depends(get_current_user_id)):
 
 
 # ══════════════════════════ WebSocket (tempo real) ══════════════════════════
-def _ws_user_id(websocket: WebSocket) -> Optional[int]:
-    token = websocket.cookies.get("access_token") or websocket.query_params.get("token")
-    if not token:
-        return None
-    try:
-        payload = decode_token(token)
-        sub = payload.get("sub") if isinstance(payload, dict) else None
-        return int(sub) if sub is not None else None
-    except Exception:  # noqa: BLE001
-        return None
 
 
-@router.websocket("/ws")
+@ws_router.websocket("/ws")
 async def realtime_ws(websocket: WebSocket):
     """
     Tempo real: o cliente envia `{type, query, cursor, tables}` e recebe
@@ -779,18 +810,26 @@ async def realtime_ws(websocket: WebSocket):
     Redis (`sqleditor:draft:{uid}`), permitindo retomar noutra aba/reconexão.
     """
     await websocket.accept()
-    user_id = _ws_user_id(websocket)
+    user_id = ws_user_id(websocket)
     if user_id is None:
         await websocket.send_json({"type": "error", "message": "Não autenticado."})
         await websocket.close(code=4401)
         return
+    if not await ws_has_permission(user_id, "query:execute"):
+        await websocket.send_json({"type": "error", "message": "Permissão insuficiente."})
+        await websocket.close(code=4403)
+        return
 
     draft_key = f"sqleditor:draft:{user_id}"
-    draft = read_cache(draft_key)
-    if draft:
-        await websocket.send_json({"type": "draft", "query": draft})
 
     try:
+        # Dentro do try: se o browser já fechou a ligação (reload, re-render),
+        # este envio levanta WebSocketDisconnect — fora do try escapava e o
+        # uvicorn registava "Exception in ASGI application".
+        draft = read_cache(draft_key)
+        if draft:
+            await websocket.send_json({"type": "draft", "query": draft})
+
         while True:
             msg = await websocket.receive_json()
             mtype = msg.get("type", "validate")

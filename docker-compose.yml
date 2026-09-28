@@ -1,4 +1,67 @@
 services:
+  # ---------------------------------------------------------------------------
+  #  Redis — cache da API
+  #
+  #  Mesma configuração do Redis do gmTGFrontEnd/docker-compose.yml. As duas
+  #  stacks publicam na mesma porta do anfitrião (6380 por omissão), por isso
+  #  sobe-se uma OU outra; o .env (localhost:6380) serve a ambas.
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    # Nome diferente do `mustainfo-redis` do compose do frontend, para as duas
+    # stacks não disputarem o mesmo contentor.
+    container_name: minha-api-redis
+
+    # Autenticação por ACL (utilizador + password). `REDIS_USERNAME` e
+    # `REDIS_PASSWORD` vêm do .env desta pasta, que o Compose lê para
+    # interpolar `${...}` — a mesma fonte que a app usa.
+    #
+    # `user default off` desliga o utilizador sem nome: sem identificação
+    # responde NOAUTH, e `AUTH <password>` sozinho já não entra. O utilizador
+    # da app tem acesso total (`~*` chaves, `&*` canais, `+@all` comandos); a
+    # password leva `>` à frente, que é como o ACL a reconhece.
+    #
+    # `--save 60 1` grava em disco ao fim de 60s se houver pelo menos 1
+    # alteração: o cache é recalculável, mas reiniciar o contentor a meio de um
+    # dia de trabalho não deve esvaziar tudo.
+    command:
+      - redis-server
+      - --user
+      - default
+      - "off"
+      - --user
+      - ${REDIS_USERNAME:-mustainf}
+      - "on"
+      - ">${REDIS_PASSWORD:-mustainf_redis_dev}"
+      - "~*"
+      - "&*"
+      - "+@all"
+      # `save` leva sempre um PAR — segundos e nº de alterações.
+      - --save
+      - "60"
+      - "1"
+      - --loglevel
+      - warning
+
+    ports:
+      # 6380 no anfitrião para não chocar com um Redis instalado no Windows na
+      # 6379. Dentro da rede do compose a porta continua a ser 6379.
+      - "${REDIS_PORT_HOST:-6380}:6379"
+
+    volumes:
+      - redisdata:/data
+
+    healthcheck:
+      # Com o `default` desligado, o ping sem `--user`/`--pass` responde NOAUTH
+      # e o contentor ficava eternamente "unhealthy".
+      test: ["CMD", "redis-cli", "--no-auth-warning", "--user", "${REDIS_USERNAME:-mustainf}", "--pass", "${REDIS_PASSWORD:-mustainf_redis_dev}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+    restart: unless-stopped
+
   app:
     build:
       context: .
@@ -32,8 +95,25 @@ services:
     # Para subir back e front juntos, usar o docker-compose.yml da raiz do
     # repositório.
 
+    depends_on:
+      redis:
+        # Espera pelo healthcheck: sem isto a API arrancava antes do Redis
+        # aceitar ligações e passava os primeiros pedidos sem cache.
+        condition: service_healthy
+
     environment:
       - PYTHONPATH=/app
+
+      # O .env aponta o Redis para localhost:6380 (backend a correr no
+      # anfitrião). Dentro do contentor `localhost` é o próprio contentor, por
+      # isso reescreve-se aqui para o serviço `redis` e a porta interna. A app
+      # carrega o .env com override=False, logo estes valores ganham.
+      # `app_cache_REDIS_URL` tem de ir também: ganha a tudo em `_build_url()`.
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_USERNAME=${REDIS_USERNAME:-mustainf}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-mustainf_redis_dev}
+      - app_cache_REDIS_URL=redis://${REDIS_USERNAME:-mustainf}:${REDIS_PASSWORD:-mustainf_redis_dev}@redis:6379/0
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -50,3 +130,7 @@ services:
     # melhora compatibilidade de hot reload no Windows
     tty: true
     stdin_open: true
+
+volumes:
+  # Persiste o dump do Redis entre `docker compose down` / `up`.
+  redisdata:

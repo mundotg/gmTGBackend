@@ -26,14 +26,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# -------- Ferramentas de backup/restore (opcional, download pesado) --------
-# pg_dump/mysqldump/mongodump só são precisos para executar backups reais.
-# Ativa com `--build-arg INSTALL_DUMP_TOOLS=true` quando houver rede/dados.
+# -------- Ferramentas de backup/restore (sempre) --------
+# pg_dump/pg_restore/psql e mysqldump/mysql são o que os backups de PostgreSQL
+# e MySQL executam. Eram opcionais (INSTALL_DUMP_TOOLS=false por omissão) e o
+# deploy não passa esse build-arg: em produção não havia pg_dump e todo o
+# backup PostgreSQL falhava.
+#
+# O cliente PostgreSQL vem do repositório oficial (PGDG) e não do Debian: o
+# `postgresql-client` do bookworm é o 15, e o pg_dump recusa servidores mais
+# novos do que ele ("server version mismatch"). Um pg_dump N faz dump de
+# servidores até N — PG_CLIENT_VERSION deve ser >= à versão mais alta servida.
+ARG PG_CLIENT_VERSION=17
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates gzip \
+    && . /etc/os-release \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+      | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+      > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+      postgresql-client-${PG_CLIENT_VERSION} default-mysql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# -------- mongodump/mongorestore (opcional, download pesado) --------
+# O backup MongoDB usa PyMongo/BSON (db_backup_restore_pymongo) e não precisa
+# destas ferramentas. Ativa com `--build-arg INSTALL_DUMP_TOOLS=true` se for
+# preciso o formato do mongodump.
 ARG INSTALL_DUMP_TOOLS=false
 RUN if [ "$INSTALL_DUMP_TOOLS" = "true" ]; then \
-      apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates gzip postgresql-client default-mysql-client \
-      && curl -fsSL https://pgp.mongodb.com/server-7.0.asc \
+      curl -fsSL https://pgp.mongodb.com/server-7.0.asc \
         | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg \
       && echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" \
         > /etc/apt/sources.list.d/mongodb-org-7.0.list \

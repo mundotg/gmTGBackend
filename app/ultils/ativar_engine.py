@@ -1,4 +1,3 @@
-import ssl  # 👈 ADICIONADO: Necessário para o ssl_context
 import traceback
 from urllib.parse import quote_plus
 from typing import Tuple
@@ -20,6 +19,7 @@ from app.config.engine_manager_cache import EngineManager
 from app.models.connection_models import DBConnection
 from app.schemas.connetion_schema import ConnectionAccessLevel
 from app.services.crypto_utils import secret_decrypt
+from app.ultils.db_ssl import asyncpg_ssl_arg
 from app.ultils.ativar_session_bd import (
     get_connection_by_id, get_connection_current, get_connection_current_async,
     get_connection_id_async, reativar_connection
@@ -352,20 +352,18 @@ class ConnectionManager:
                 if db_type in ["postgresql", "pg"]:
                     uri = uri_template.format(**uri_config)
 
-                    # `host.docker.internal` é o loopback do host (para onde
-                    # `localhost` foi remapeado): é local e, tal como localhost,
-                    # normalmente NÃO fala SSL. Se aqui não desligássemos o SSL,
-                    # o asyncpg tentava o upgrade e o servidor recusava
-                    # ("rejected SSL upgrade").
-                    local_hosts = {"localhost", "127.0.0.1", "host.docker.internal"}
-                    sslmode = (config.get("sslmode") or "disable").lower()
-
-                    if config["host"] in local_hosts or sslmode == "disable":
-                        # ssl=False → asyncpg nem tenta o upgrade (sem fallback
-                        # ao modo "prefer", que também tentaria SSL primeiro).
-                        connect_args = {"ssl": False}
-                    else:
-                        connect_args = {"ssl": ssl.create_default_context()}
+                    # Regra única de SSL (app/ultils/db_ssl.py), a mesma do
+                    # pg_dump: host local (incl. `host.docker.internal`, para
+                    # onde `localhost` é remapeado) → ssl=False, sem tentar o
+                    # upgrade ("rejected SSL upgrade"); remoto → 'prefer', que
+                    # usa SSL se o servidor o tiver e cai para simples se não;
+                    # require/verify-* escolhidos na conexão são respeitados.
+                    #
+                    # Antes, `disable` (o default da coluna) desligava o SSL
+                    # também em servidores remotos que o exigem, e qualquer
+                    # outro modo validava o certificado com o contexto por
+                    # omissão — o que falha com certificados self-signed.
+                    connect_args = {"ssl": asyncpg_ssl_arg(config["host"], config.get("sslmode"))}
 
                 # SQL Server
                 elif db_type in ["mssql", "sqlserver"]:

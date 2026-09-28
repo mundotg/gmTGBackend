@@ -13,16 +13,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from importantConfig.db_backup_restore_pymongo import _conn_parts_from_engine, _mongo_backup, _mongo_restore, _mssql_backup_target_path, _validate_conn_parts
+from importantConfig.db_backup_restore_pymongo import _conn_parts_from_engine, _mongo_backup, _mongo_restore, _validate_conn_parts
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pymongo import MongoClient, IndexModel
-from bson import BSON
 # Ajuste os imports conforme a estrutura do seu projeto
-from app.config.dependencies import _maybe_remap_host
 from app.models.connection_models import DBConnection
 from app.services.crypto_utils import secret_decrypt
 from app.ultils.ativar_session_bd import get_connection_id_async
+from app.ultils.db_ssl import resolve_pg_sslmode
 from app.ultils.logger import log_message
 
 BACKUP_DIR = "backups"
@@ -118,27 +116,27 @@ def _resolve_binary(bin_name: str, *, explicit_path: Optional[str] = None) -> st
         f"{alternativa}"
     )
 
-# def _mssql_backup_target_path(parts: _ConnParts, local_filepath: str) -> str:
-#     """
-#     Define onde o SQL Server vai salvar o arquivo.
-#     - Se LOCAL: usa o caminho absoluto do disco local.
-#     - Se REMOTO: exige uma UNC path (compartilhamento de rede), pois o servidor não vê o disco C: do python.
-#     """
-#     abs_local = os.path.abspath(local_filepath)
+def _mssql_backup_target_path(parts: _ConnParts, local_filepath: str) -> str:
+    """
+    Define onde o SQL Server vai salvar o arquivo.
+    - Se LOCAL: usa o caminho absoluto do disco local.
+    - Se REMOTO: exige uma UNC path (compartilhamento de rede), pois o servidor não vê o disco C: do python.
+    """
+    abs_local = os.path.abspath(local_filepath)
 
-#     if _is_local_host(parts.host):
-#         return abs_local
-    
-#     # Lógica para servidor remoto (opcional, requer configuração extra)
-#     # Se você tiver uma pasta compartilhada, pode configurar via ENV
-#     unc_base = os.environ.get("MSSQL_BACKUP_UNC", "").strip()
-#     if unc_base:
-#         filename = os.path.basename(abs_local)
-#         return os.path.join(unc_base, filename)
-        
-#     # Se for remoto e não tiver UNC configurado, vai falhar, mas tentamos o local como fallback
-#     log_message("⚠️ SQL Server remoto detectado. Se o backup falhar, verifique se o servidor tem acesso a este caminho.", level="warning")
-#     return abs_local
+    if _is_local_host(parts.host):
+        return abs_local
+
+    # Lógica para servidor remoto (opcional, requer configuração extra)
+    # Se você tiver uma pasta compartilhada, pode configurar via ENV
+    unc_base = os.environ.get("MSSQL_BACKUP_UNC", "").strip()
+    if unc_base:
+        filename = os.path.basename(abs_local)
+        return os.path.join(unc_base, filename)
+
+    # Se for remoto e não tiver UNC configurado, vai falhar, mas tentamos o local como fallback
+    log_message("⚠️ SQL Server remoto detectado. Se o backup falhar, verifique se o servidor tem acesso a este caminho.", level="warning")
+    return abs_local
 
 # ... (Funções auxiliares _now_stamp, _driver_name, _safe_filename_part mantidas iguais) ...
 def _now_stamp() -> str:
@@ -339,37 +337,35 @@ def _driver_from_conn(_conn: DBConnection, engine: Any = None) -> str:
         return t or "unknown"
 
 
-# def _conn_parts_from_engine(engine: Any, _conn: DBConnection) -> _ConnParts:
-#     # ⚠️ Os campos vêm cifrados em repouso — decifrar antes de os passar às
-#     # ferramentas de linha de comando. E remapear localhost→host.docker.internal
-#     # quando o backend corre em contentor (ver dependencies._maybe_remap_host).
-#     driver = _driver_from_conn(_conn, engine)
-#     db_name = _conn.database_name or "default"
-#     user = _dec(_conn.username)
-#     host = _maybe_remap_host(_dec(_conn.host) or "localhost")
-#     port = str(_conn.port) if _conn.port else ""
-#     password = _dec(_conn.password)
-#     return _ConnParts(driver, db_name, user, host, port, password)
 
-def _build_env(password: str) -> Dict[str, str]:
-    env = os.environ.copy()
+def _build_env(password: str, host: str = "", sslmode: str = "") -> Dict[str, str]:
+    """
+    Ambiente para pg_dump/pg_restore/mysqldump/... com as credenciais DA
+    CONEXÃO, nunca as herdadas do processo.
+
+    O .env define PGHOST/PGPASSWORD/PGSSLMODE=require de outra base (remota).
+    Copiados para aqui, o `PGSSLMODE=require` fazia o pg_dump exigir SSL a
+    qualquer servidor ("server does not support SSL, but SSL was required"
+    contra o Postgres local), e uma conexão sem password herdava a PGPASSWORD
+    dessa outra base. Por isso as variáveis libpq (PG + letras, ex. PGHOST;
+    `PG_DUMP_PATH` fica) e a MYSQL_PWD são removidas antes de pôr as da conexão.
+    """
+    env = {
+        k: v for k, v in os.environ.items()
+        if not re.fullmatch(r"PG[A-Z]+", k) and k != "MYSQL_PWD"
+    }
     if password:
         env["PGPASSWORD"] = password
         env["MYSQL_PWD"] = password
+    # SSL decidido pela mesma regra do engine da app (app/ultils/db_ssl.py):
+    # local → disable, remoto → prefer, require/verify-* da conexão respeitados.
+    env["PGSSLMODE"] = resolve_pg_sslmode(host, sslmode)
     return env
 
 
 def _backup_ext_for_driver(driver: str) -> str:
     mapping = { "postgresql": "backup", "mysql": "sql", "sqlite": "db", "oracle": "dmp", "mssql": "bak" }
     return mapping.get(driver, "bin")
-
-
-# def _validate_conn_parts(parts: _ConnParts) -> None:
-#     requires_host = ("postgresql", "mysql", "mssql", "oracle")
-#     if parts.driver in requires_host and not parts.host:
-#         raise ValueError("Host é obrigatório.")
-#     if not parts.db_name:
-#         raise ValueError("Nome do banco de dados é obrigatório.")
 
 
 # ===============================================================
@@ -425,7 +421,7 @@ async def backup_database(
     ext = _backup_ext_for_driver(parts.driver)
     filename = _build_backup_filename(parts.db_name, ext)
     filepath = os.path.join(BACKUP_DIR, filename)
-    env = _build_env(parts.password)
+    env = _build_env(parts.password, parts.host, _dec(getattr(_conn, "sslmode", "")))
 
     log_message(f"💾 Backup iniciado: {parts.db_name} [{parts.driver}]", level="info")
 
@@ -538,7 +534,7 @@ async def restore_backup(
         extracted_path = await _extract_file_async(filepath)
         final_restore_path = extracted_path
 
-    env = _build_env(parts.password)
+    env = _build_env(parts.password, parts.host, _dec(getattr(_conn, "sslmode", "")))
 
     log_message(f"♻️ Restaurando em: {parts.db_name} [{parts.driver}]", level="info")
 

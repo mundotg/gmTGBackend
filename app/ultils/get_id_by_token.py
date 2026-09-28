@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import HTTPException, Security, status
+from fastapi import HTTPException, Security, WebSocket, status
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.auth import decode_token
@@ -77,3 +77,23 @@ def get_current_user_id(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido ou corrompido.",
         )
+
+def ws_user_id(websocket: WebSocket) -> Optional[int]:
+    """
+    Autentica uma WebSocket pelo cookie `access_token` (as WS enviam cookies do
+    mesmo site automaticamente), com fallback para `?token=...` na query string
+    (útil fora do browser). Devolve o user_id ou None.
+
+    O `sub` do JWT vem encriptado (auth_routes: `aes_encrypt(str(user.id))`),
+    tal como em `get_current_user_id`. As WS faziam `int(sub)` direto — dava
+    sempre ValueError, devolvia None e toda a WS respondia "Não autenticado."
+    mesmo com sessão válida, enquanto os pedidos REST passavam.
+    """
+    token = websocket.cookies.get("access_token") or websocket.query_params.get("token")
+    if not token:
+        return None
+    try:
+        encrypted_sub = _get_sub_from_payload(decode_token(token))
+        return int(aes_decrypt(encrypted_sub)) if encrypted_sub else None
+    except Exception:  # noqa: BLE001
+        return None

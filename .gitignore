@@ -19,6 +19,14 @@ env.bak/
 .env.production
 .env.test
 backups/
+# Dumps de backup/restore fora da pasta backups/ (ex.: gerados ou copiados
+# para a raiz). Os ficheiros de codigo do modulo de backup nao sao afetados.
+*.backup
+*.backup.gz
+*.dump
+*.dump.gz
+*.archive.gz
+*.bak
 
 # -------------------------------
 # 2. Cache e arquivos compilados

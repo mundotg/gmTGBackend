@@ -12,6 +12,7 @@ from app.models.clouds_models import FileModel, Plan, StorageUsage, RequestUsage
 from app.models.user_model import (
     User,
     RefreshToken,
+    EmailVerificationToken,
     Role,
     Permission,
     Empresa,

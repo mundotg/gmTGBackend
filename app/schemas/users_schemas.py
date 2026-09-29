@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Any, Optional, List, Union
 from pydantic import (
@@ -232,6 +233,27 @@ class UserCreate(BaseModel):
     @classmethod
     def normalize_name(cls, v: str):
         return " ".join(v.title().split())
+
+    # -------------------------
+    # 📞 Telefone (obrigatório no registo)
+    # -------------------------
+    @field_validator("telefone")
+    @classmethod
+    def normalize_phone(cls, v: str):
+        # Aceita "+244 923 456 789", "923-456-789", "(244) 923456789"...
+        # e guarda só "+" e dígitos. 9 dígitos a começar por 9 = número
+        # angolano sem indicativo → +244.
+        raw = (v or "").strip()
+        digits = re.sub(r"\D", "", raw)
+        if not digits:
+            raise ValueError("O número de telefone é obrigatório.")
+        if not 9 <= len(digits) <= 15:
+            raise ValueError("Número de telefone inválido: indique entre 9 e 15 dígitos.")
+        if raw.startswith("+") or raw.startswith("00"):
+            return "+" + (digits[2:] if raw.startswith("00") else digits)
+        if len(digits) == 9 and digits.startswith("9"):
+            return "+244" + digits
+        return "+" + digits
 
     # -------------------------
     # 🔐 Senhas (melhor abordagem)

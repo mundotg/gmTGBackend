@@ -1,0 +1,16 @@
+Olá, {{ user_name }}!
+
+Recebemos um pedido para redefinir a palavra-passe associada à sua conta ({{ recipient_email }}).
+
+{% if reset_code %}
+Código de verificação: {{ reset_code }}
+(Válido por {{ expire_minutes|default(15) }} minutos)
+{% endif %}
+{% if reset_link %}
+Ligação de redefinição: {{ reset_link }}
+{% endif %}
+
+Se não solicitou a redefinição de palavra-passe, ignore esta mensagem.
+
+Atenciosamente,
+Equipa {{ platform_name }}

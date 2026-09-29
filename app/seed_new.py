@@ -353,8 +353,14 @@ def seed_admin_user(db: Session, empresa: Empresa, plano: Plan) -> User:
             "hashed_password": hash_password("Admin@123"),
             "concorda_termos": True,
             "is_active": True,
+            "email_verified": True,
         },
     )
+
+    if not admin.email_verified:
+        admin.email_verified = True
+        db.add(admin)
+        db.commit()
 
     log_message(
         f"👤 Usuário admin {'criado' if created else 'já existente'}",

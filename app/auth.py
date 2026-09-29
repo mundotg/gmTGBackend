@@ -1,17 +1,28 @@
 from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt
+from jose import JWTError, jwt, ExpiredSignatureError
 import bcrypt
 from app.config.dotenv import get_env
 from typing import Any, Optional
 
 ACCESS_TOKEN_EXPIRE_MINUTES = int(get_env("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 REFRESH_TOKEN_EXPIRE_DAYS = int(get_env("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+EMAIL_VERIFICATION_EXPIRE_HOURS = int(get_env("EMAIL_VERIFICATION_EXPIRE_HOURS", 24))
 
 SECRET_KEY = get_env("SECRET_KEY")
 ALGORITHM = get_env("ALGORITHM")
 
 if not SECRET_KEY or not ALGORITHM:
     raise ValueError("SECRET_KEY e ALGORITHM devem estar definidos no .env")
+
+
+class TokenExpiredError(Exception):
+    """Lançado quando o token de confirmação de e-mail expirou a sua validade."""
+    pass
+
+
+class TokenInvalidError(Exception):
+    """Lançado quando o token de confirmação é inválido ou corrompido."""
+    pass
 
 
 def hash_password(password: str) -> str:
@@ -59,4 +70,38 @@ def decode_subject(token: str) -> Optional[str]:
         return None
     sub = payload.get("sub")
     return str(sub) if sub is not None else None
+
+
+def create_email_verification_token(email: str, expires_delta: Optional[timedelta] = None) -> str:
+    """Cria um token JWT assinado para verificação de e-mail com validade temporal explícita."""
+    delta = expires_delta or timedelta(hours=EMAIL_VERIFICATION_EXPIRE_HOURS)
+    data = {"sub": email.strip().lower(), "typ": "email_verification"}
+    return create_token(data, delta)
+
+
+def verify_email_token(token: str) -> str:
+    """
+    Valida rigorosamente o token de confirmação de e-mail.
+    Lança TokenExpiredError se o token tiver ultrapassado a sua validade.
+    Lança TokenInvalidError se o token for inválido, malformado ou adulterado.
+    Retorna o e-mail validado.
+    """
+    if not token or not token.strip():
+        raise TokenInvalidError("Nenhum código de confirmação fornecido.")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except ExpiredSignatureError:
+        raise TokenExpiredError("A ligação de confirmação expirou. O prazo de validade terminou.")
+    except JWTError:
+        raise TokenInvalidError("A ligação de confirmação é inválida ou foi corrompida.")
+
+    if not isinstance(payload, dict) or payload.get("typ") != "email_verification":
+        raise TokenInvalidError("Tipo de token inválido para confirmação de e-mail.")
+
+    sub = payload.get("sub")
+    if not sub:
+        raise TokenInvalidError("Token não contém utilizador associado.")
+
+    return str(sub).strip().lower()
 

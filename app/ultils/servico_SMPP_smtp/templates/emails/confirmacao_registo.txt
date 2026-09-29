@@ -1,0 +1,23 @@
+Olá, {{ user_name }}!
+
+Seja bem-vindo(a)! O seu registo na plataforma {{ platform_name }} foi validado com sucesso.
+
+Dados da conta:
+- E-mail de acesso: {{ recipient_email }}
+- Status da conta: Ativa e confirmada
+{% if empresa %}
+- Organização: {{ empresa }}
+{% endif %}
+
+Para ativar e confirmar a segurança do seu e-mail, por favor aceda à seguinte ligação:
+{{ verification_url|default(login_url) }}
+
+(Nota: Esta ligação de confirmação é válida durante {{ validity_hours|default('24') }} horas. Após este período, terá de solicitar um novo e-mail.)
+
+Se não realizou esta inscrição ou acredita que se trate de um engano, por favor ignore esta mensagem ou contacte a nossa equipa através de {{ support_email }}.
+
+Atenciosamente,
+Equipa {{ platform_name }}
+
+---
+© {{ current_year }} {{ platform_name }}. Mensagem gerada automaticamente.

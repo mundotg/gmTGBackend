@@ -26,9 +26,6 @@ def get_user_by_email(db: Session, email: str):
     # Mantive a lógica, mas deixei o código mais enxuto.
     return (
         db.query(user_model.User)
-        .options(
-            load_only(user_model.User.id, user_model.User.email, user_model.User.nome)
-        )
         .filter(func.lower(user_model.User.email) == normalized_email)
         .first()
     )

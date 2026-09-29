@@ -46,6 +46,38 @@ class RefreshToken(Base):
 
 
 # =============================
+# 📧 Token de Confirmação de E-mail
+# =============================
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String, unique=True, index=True, nullable=False)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # 📅 Data criada
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    # ⏳ Prazo / Data limite de validade
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    # ✅ Data em que foi validado
+    validated_at = Column(DateTime(timezone=True), nullable=True)
+    # 🚩 Status de utilização
+    is_used = Column(Boolean, default=False, nullable=False)
+
+    user = relationship("User", back_populates="email_verification_tokens")
+
+    def __repr__(self):
+        return (
+            f"<EmailVerificationToken(id={self.id}, user_id={self.user_id}, "
+            f"is_used={self.is_used}, expires_at={self.expires_at})>"
+        )
+
+
+# =============================
 # 🏢 Empresa
 # =============================
 class Empresa(Base):
@@ -156,6 +188,9 @@ class User(Base, TimestampMixin):
     # 🔗 Tokens
     refresh_tokens = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
+    email_verification_tokens = relationship(
+        "EmailVerificationToken", back_populates="user", cascade="all, delete-orphan"
     )
 
     # 🔗 Projetos e tarefas

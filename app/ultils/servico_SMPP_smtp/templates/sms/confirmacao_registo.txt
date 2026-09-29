@@ -1,0 +1,1 @@
+Ola {{ user_name }}, a sua conta na {{ platform_name }} foi ativada com sucesso. Bem-vindo!

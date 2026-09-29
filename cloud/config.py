@@ -9,9 +9,19 @@ from typing import Iterator, List, Optional, Tuple
 import os
 import tempfile
 import shutil
+import logging
 
-from app.ultils.logger import log_message
+_logger = logging.getLogger("cloud.config")
 
+
+def log_message(message: str, level: str = "info") -> None:
+    """Wrapper com import preguiçoso para evitar importação circular com app/main/storage_routes."""
+    try:
+        from app.ultils.logger import log_message as _app_log
+        _app_log(message, level=level)
+    except Exception:
+        log_func = getattr(_logger, level if hasattr(_logger, level) else "info")
+        log_func(message)
 
 def _atomic_write(path: str, data_bytes: bytes) -> None:
     """Grava de forma atômica para evitar ficheiros corrompidos."""
@@ -66,7 +76,7 @@ class StorageService:
         # `host.docker.internal`). Se não definido, usa o interno.
         public_endpoint = os.getenv("STORAGE_PUBLIC_ENDPOINT") or internal_endpoint
 
-        _cfg = Config(signature_version="s3v4")
+        _cfg = Config(signature_version="s3v4", s3={"addressing_style": "path"})
 
         # Cliente interno (upload/list/delete/stream) — dentro do contentor.
         self.s3 = boto3.client(
@@ -104,12 +114,17 @@ class StorageService:
         try:
             self.s3.head_bucket(Bucket=self.bucket)
         except ClientError as e:
-            code = e.response.get("Error", {}).get("Code", "")
+            code = str(e.response.get("Error", {}).get("Code", ""))
             if code in ("404", "NoSuchBucket", "NotFound"):
-                self.s3.create_bucket(Bucket=self.bucket)
-                log_message(f"[STORAGE] Bucket criado: {self.bucket}", "info")
+                try:
+                    self.s3.create_bucket(Bucket=self.bucket)
+                    log_message(f"[STORAGE] Bucket criado: {self.bucket}", "info")
+                except Exception as create_err:
+                    log_message(f"[STORAGE] Não foi possível criar bucket na cloud ({create_err}), fallback local ativo.", "warning")
             else:
-                raise
+                log_message(f"[STORAGE] head_bucket falhou ({e}), fallback local ativo.", "warning")
+        except Exception as e:
+            log_message(f"[STORAGE] Verificação do bucket falhou ({e}), fallback local ativo.", "warning")
 
     # -------------------------
     # 🔒 Validações
@@ -140,39 +155,45 @@ class StorageService:
             if file is None:
                 raise ValueError("Ficheiro inválido")
 
-            # Streaming: nem aqui nem no fallback o ficheiro é carregado
-            # inteiro para memória — `upload_fileobj` parte em multipart
-            # sozinho, o que também levanta o limite de 5 GB do put_object.
-            file.seek(0, os.SEEK_END)
-            if file.tell() == 0:
-                raise ValueError("Ficheiro vazio")
-            file.seek(0)
-
-            extra = {"ContentType": content_type} if content_type else {}
-
-            # tenta cloud
+            # Valida e verifica se o ficheiro está acessível e não está vazio
             try:
-                self.s3.upload_fileobj(
-                    file,
-                    self.bucket,
-                    key,
-                    ExtraArgs=extra or None,
-                )
-                log_message(f"Upload feito para cloud: {key}", "info")
-                return key
-
-            except (EndpointConnectionError, ClientError) as e:
-                # fallback local
+                file.seek(0, os.SEEK_END)
+                if file.tell() == 0:
+                    raise ValueError("Ficheiro vazio")
                 file.seek(0)
-                local_path = self._get_local_path(key)
-                _atomic_copy(local_path, file)
+            except ValueError:
+                raise
+            except Exception as e:
+                raise ValueError(f"Ficheiro inacessível ou inválido: {e}")
 
-                log_message(
-                    f"Cloud indisponível, salvo localmente: {key} | {str(e)}",
-                    "warning",
-                )
+            # 1. Salva localmente primeiro de forma atômica (garante persistência 100% segura)
+            local_path = self._get_local_path(key)
+            _atomic_copy(local_path, file)
 
-                return key
+            # 2. Tenta sincronizar com a cloud se configurado
+            if self.bucket and self.s3:
+                extra = {"ContentType": content_type} if content_type else {}
+                try:
+                    with open(local_path, "rb") as f_cloud:
+                        self.s3.upload_fileobj(
+                            f_cloud,
+                            self.bucket,
+                            key,
+                            ExtraArgs=extra or None,
+                        )
+                    log_message(f"Upload feito para cloud: {key}", "info")
+                except (EndpointConnectionError, ClientError) as e:
+                    log_message(
+                        f"Cloud indisponível ({str(e)}), ficheiro mantido no storage local: {key}",
+                        "warning",
+                    )
+                except Exception as e:
+                    log_message(
+                        f"Falha ao sincronizar com cloud ({str(e)}), ficheiro mantido no storage local: {key}",
+                        "warning",
+                    )
+
+            return key
 
         except ValueError:
             raise
@@ -257,7 +278,7 @@ class StorageService:
                     Params={"Bucket": self.bucket, "Key": key},
                     ExpiresIn=expires,
                 )
-            except (EndpointConnectionError, ClientError) as e:
+            except Exception as e:
                 log_message(
                     f"Objeto indisponível na cloud ({key}): {e}. A usar fallback.",
                     "warning",
@@ -288,23 +309,23 @@ class StorageService:
             if not data:
                 raise ValueError("Dados vazios")
 
-            try:
-                self.s3.put_object(
-                    Bucket=self.bucket,
-                    Key=key,
-                    Body=data,
-                )
-                log_message(f"[CACHE] Upload bytes: {key}", "warning")
+            # Salva localmente primeiro de forma atômica
+            local_path = self._get_local_path(key)
+            _atomic_write(local_path, data)
 
-            except (EndpointConnectionError, ClientError) as e:
-                # fallback local
-                local_path = self._get_local_path(key)
-                _atomic_write(local_path, data)
-
-                log_message(
-                    f"[CACHE] Fallback local (upload_bytes): {key} | {str(e)}",
-                    "warning",
-                )
+            if self.bucket and self.s3:
+                try:
+                    self.s3.put_object(
+                        Bucket=self.bucket,
+                        Key=key,
+                        Body=data,
+                    )
+                    log_message(f"[CACHE] Upload bytes cloud: {key}", "info")
+                except Exception as e:
+                    log_message(
+                        f"[CACHE] Cloud falhou ({e}), salvo apenas local: {key}",
+                        "warning",
+                    )
 
         except Exception as e:
             log_message(f"[CACHE] Erro upload_bytes: {e}", "error")
@@ -325,13 +346,8 @@ class StorageService:
                 )
                 return response["Body"].read()
 
-            except (
-                self.s3.exceptions.NoSuchKey,
-                EndpointConnectionError,
-                ClientError,
-            ) as e:
-                # NoSuchKey também cai para o local: o ficheiro pode ter sido
-                # gravado em cache enquanto a cloud estava indisponível.
+            except Exception as e:
+                # NoSuchKey, ClientError, etc. caem para o local
                 log_message(
                     f"[CACHE] Cloud falhou ao ler {key} ({e}), tentando local...",
                     "warning",
@@ -392,13 +408,8 @@ class StorageService:
                 log_message(f"Streaming da cloud: {key}", "info")
                 return stream(), size, content_type
 
-            except (
-                self.s3.exceptions.NoSuchKey,
-                EndpointConnectionError,
-                ClientError,
-            ) as e:
-                # NoSuchKey também cai para o local: ficheiros enviados enquanto
-                # a cloud estava em baixo só existem no cache.
+            except Exception as e:
+                # NoSuchKey, ClientError, etc. caem para o local
                 log_message(
                     f"Cloud falhou, fallback local: {key} | {str(e)}",
                     "warning",

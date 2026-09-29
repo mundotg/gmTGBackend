@@ -1,0 +1,1 @@
+{{ platform_name }}: O seu codigo de verificacao e {{ code }}. Valido por {{ expire_minutes|default(5) }} minutos. Nao compartilhe.

@@ -1,8 +1,10 @@
+import asyncio
 import traceback
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Security
+from email_validator import validate_email, EmailNotValidError
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Security, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app import database, auth
@@ -26,6 +28,7 @@ from app.config.dotenv import get_env
 from app.ultils.ativar_session_bd import reativar_connection
 from app.ultils.logger import log_message
 from app.ultils.rate_limit import limit_login_attempts
+from app.ultils.servico_SMPP_smtp import send_email
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -36,6 +39,7 @@ TRUST_PROXY_HEADERS = get_env("TRUST_PROXY_HEADERS", "false").lower() == "true"
 COOKIE_HTTPONLY = get_env("COOKIE_HTTPONLY", "true").lower() == "true"
 FINGERPRINT_SALT = get_env("FINGERPRINT_SALT", "change-me-please")
 ENV = get_env("ENV", "development").lower()
+FRONTEND_URL = get_env("FRONTEND_URL", "http://localhost:3000").rstrip("/")
 
 
 def _cookie_domain():
@@ -191,6 +195,53 @@ def assert_access_token_binding(request: Request, access_token: str) -> dict:
     return payload
 
 
+class VerifyEmailRequest(users_schemas.BaseModel):
+    token: str
+
+
+class ResendVerificationRequest(users_schemas.BaseModel):
+    email: users_schemas.EmailStr
+
+
+def send_registration_confirmation_email(
+    recipient_email: str,
+    user_name: str,
+    empresa: Optional[str] = None,
+    verification_token: Optional[str] = None,
+) -> dict:
+    """Envia um e-mail de confirmação de registo via SMTP com link seguro de verificação."""
+    verification_url = (
+        f"{FRONTEND_URL}/auth/verify-email?token={verification_token}"
+        if verification_token
+        else f"{FRONTEND_URL}/auth/login"
+    )
+    login_url = f"{FRONTEND_URL}/auth/login"
+
+    try:
+        resultado = send_email(
+            to=recipient_email,
+            subject="Confirmação de Registo - MustaInf",
+            template_name="confirmacao_registo",
+            context={
+                "user_name": user_name,
+                "recipient_email": recipient_email,
+                "empresa": empresa,
+                "verification_url": verification_url,
+                "login_url": login_url,
+                "platform_name": "MustaInf",
+                "validity_hours": auth.EMAIL_VERIFICATION_EXPIRE_HOURS,
+            },
+        )
+        if resultado.get("success"):
+            log_message(f"📧 E-mail de confirmação de registo enviado para {recipient_email}", "success")
+        else:
+            log_message(f"⚠️ Não foi possível enviar e-mail de confirmação para {recipient_email}: {resultado.get('message')}", "warning")
+        return resultado
+    except Exception as exc:
+        log_message(f"❌ Falha ao tentar enviar e-mail de registo via SMTP: {exc}", "error")
+        return {"success": False, "message": str(exc), "error": str(exc)}
+
+
 @router.post(
     "/register",
     response_model=users_schemas.UserOut,
@@ -198,10 +249,183 @@ def assert_access_token_binding(request: Request, access_token: str) -> dict:
 )
 async def register_user(
     user: users_schemas.UserCreate,
+    response: Response,
     db: Session = Depends(database.get_db),
 ):
+    email_norm = (user.email or "").strip().lower()
+    if not email_norm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="E-mail é obrigatório.",
+            headers={"X-Error-Code": "EMAIL_REQUIRED"},
+        )
+
+    # 1. 🔍 Validação rigorosa de sintaxe e entregabilidade do domínio (MX record)
+    try:
+        validate_email(email_norm, check_deliverability=True)
+    except EmailNotValidError as exc:
+        log_message(f"❌ E-mail inválido ou domínio inexistente no registo ({email_norm}): {exc}", "warning")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"E-mail inválido ou inexistente: {exc}",
+            headers={"X-Error-Code": "INVALID_EMAIL"},
+        )
+
+    # 2. ⚡ Verifica se o e-mail já existe na base de dados
+    existing_user = user_crud.get_user_by_email(db, email_norm)
+    if existing_user:
+        if existing_user.email_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Este e-mail já se encontra registado e confirmado. Por favor, inicie sessão.",
+                headers={"X-Error-Code": "ALREADY_REGISTERED_VERIFIED"},
+            )
+
+        # O e-mail já existe mas ainda NÃO foi verificado:
+        # Consulta o token mais recente não utilizado
+        latest_token = (
+            db.query(user_model.EmailVerificationToken)
+            .filter(
+                user_model.EmailVerificationToken.user_id == existing_user.id,
+                user_model.EmailVerificationToken.is_used == False,
+            )
+            .order_by(user_model.EmailVerificationToken.created_at.desc())
+            .first()
+        )
+
+        now_utc = datetime.now(timezone.utc)
+        token_expirou = True
+        if latest_token and latest_token.expires_at:
+            exp = (
+                latest_token.expires_at
+                if latest_token.expires_at.tzinfo
+                else latest_token.expires_at.replace(tzinfo=timezone.utc)
+            )
+            token_expirou = now_utc > exp
+        else:
+            token_expirou = True
+
+        # Se o token ainda NÃO expirou: pede para ele confirmar o e-mail
+        if not token_expirou:
+            log_message(
+                f"ℹ️ Registo repetido para {email_norm}: conta aguarda confirmação e ligação anterior ainda se encontra válida.",
+                "info",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Este e-mail já foi registado mas aguarda confirmação. Enviámos recentemente uma ligação de confirmação que ainda se encontra válida. Por favor, verifique a sua caixa de entrada (ou pasta de spam) e confirme o seu e-mail.",
+                headers={"X-Error-Code": "ALREADY_REGISTERED_UNVERIFIED"},
+            )
+
+        # Caso o token de verificação tenha expirado: apenas envia um novo e-mail de verificação
+        log_message(
+            f"🔄 Registo para {email_norm}: token anterior expirado. A enviar novo e-mail de confirmação.",
+            "info",
+        )
+        token_verificacao = auth.create_email_verification_token(email_norm)
+        nome_destinatario = (user.nome or "").strip() or existing_user.nome or "Utilizador"
+        nome_empresa = (
+            user.empresa.nome
+            if user.empresa
+            else (existing_user.empresa.nome if getattr(existing_user, "empresa", None) else None)
+        )
+
+        resultado_email = await asyncio.to_thread(
+            send_registration_confirmation_email,
+            recipient_email=email_norm,
+            user_name=nome_destinatario,
+            empresa=nome_empresa,
+            verification_token=token_verificacao,
+        )
+
+        if not resultado_email.get("success"):
+            motivo = resultado_email.get("message") or "Servidor de e-mail rejeitou o destinatário."
+            log_message(
+                f"❌ Falha ao reenviar e-mail de confirmação no registo para {email_norm}: {motivo}",
+                "warning",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"E-mail inválido ou não foi possível entregar a confirmação ({motivo}).",
+                headers={"X-Error-Code": "EMAIL_DELIVERY_FAILED"},
+            )
+
+        # Regista o novo token na tabela email_verification_tokens com o novo prazo
+        prazo = datetime.now(timezone.utc) + timedelta(hours=auth.EMAIL_VERIFICATION_EXPIRE_HOURS)
+        novo_token_registro = user_model.EmailVerificationToken(
+            token=token_verificacao,
+            user_id=existing_user.id,
+            expires_at=prazo,
+            is_used=False,
+        )
+        db.add(novo_token_registro)
+
+        # Atualiza a senha e dados cadastrais caso o utilizador os tenha fornecido neste novo envio
+        if hasattr(user, "senha") and user.senha:
+            existing_user.hashed_password = auth.hash_password(user.senha)
+        if user.nome:
+            existing_user.nome = user.nome.strip()
+        if user.apelido:
+            existing_user.apelido = user.apelido.strip()
+        if user.telefone:
+            existing_user.telefone = user.telefone.strip()
+
+        db.commit()
+        db.refresh(existing_user)
+
+        log_message(f"✅ Novo e-mail de confirmação enviado para {email_norm} com sucesso (token renovado).", "success")
+
+        response.headers["X-Verification-Action"] = "token_renewed"
+
+        return {
+            **existing_user.__dict__,
+            "id": existing_user.id,
+            "permissions": list(existing_user.permissions),
+            "role": existing_user.role,
+        }
+
+    # 3. 📧 Envia PRIMEIRO o e-mail de confirmação com link de validação e certifica-se de que foi entregue/aceite
+    nome_destinatario = (user.nome or "").strip() or "Utilizador"
+    nome_empresa = user.empresa.nome if user.empresa else None
+    token_verificacao = auth.create_email_verification_token(email_norm)
+
+    resultado_email = await asyncio.to_thread(
+        send_registration_confirmation_email,
+        recipient_email=email_norm,
+        user_name=nome_destinatario,
+        empresa=nome_empresa,
+        verification_token=token_verificacao,
+    )
+
+    if not resultado_email.get("success"):
+        motivo = resultado_email.get("message") or "Servidor de e-mail rejeitou o destinatário."
+        log_message(
+            f"❌ Registo cancelado para {email_norm}. Falha na entrega do e-mail de confirmação: {motivo}",
+            "warning",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"E-mail inválido ou não foi possível entregar a confirmação ({motivo}). O registo não foi concluído.",
+            headers={"X-Error-Code": "EMAIL_DELIVERY_FAILED"},
+        )
+
+    # 4. 💾 Se o e-mail foi validado e entregue com sucesso, cria e salva o utilizador na BD
     try:
         db_user = user_crud.create_user(db, user)
+
+        # 🎫 Regista o token na tabela email_verification_tokens com data de criação e prazo de validade
+        prazo = datetime.now(timezone.utc) + timedelta(hours=auth.EMAIL_VERIFICATION_EXPIRE_HOURS)
+        token_registro = user_model.EmailVerificationToken(
+            token=token_verificacao,
+            user_id=db_user.id,
+            expires_at=prazo,
+            is_used=False,
+        )
+        db.add(token_registro)
+        db.commit()
+
+        response.headers["X-Verification-Action"] = "new_user"
+
         return {
             **db_user.__dict__,
             "id": db_user.id,
@@ -209,11 +433,160 @@ async def register_user(
             "role": db_user.role,
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Erro interno ao criar usuário: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno ao criar usuário: {str(e)}",
         )
+
+
+@router.get("/verify-email")
+def verify_email_get(
+    token: str,
+    db: Session = Depends(database.get_db),
+):
+    """Valida o e-mail do utilizador através do token assinado e regista a validação na base de dados."""
+    try:
+        email = auth.verify_email_token(token)
+    except auth.TokenExpiredError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A ligação de confirmação expirou. O prazo de validade terminou. Por favor solicite um novo e-mail.",
+        )
+    except auth.TokenInvalidError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A ligação de confirmação é inválida ou foi corrompida. Por favor solicite um novo e-mail.",
+        )
+
+    user = user_crud.get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Utilizador associado a este token não foi encontrado.",
+        )
+
+    # 🔍 Consulta o registro do token na tabela email_verification_tokens
+    token_record = (
+        db.query(user_model.EmailVerificationToken)
+        .filter(user_model.EmailVerificationToken.token == token)
+        .first()
+    )
+
+    now_utc = datetime.now(timezone.utc)
+
+    if token_record:
+        if token_record.is_used:
+            return {
+                "success": True,
+                "already_verified": True,
+                "message": "Este endereço de e-mail já foi confirmado anteriormente. A sua conta está ativa.",
+                "email": user.email,
+                "nome": user.nome,
+                "validated_at": token_record.validated_at.isoformat() if token_record.validated_at else None,
+            }
+
+        exp = (
+            token_record.expires_at
+            if token_record.expires_at.tzinfo
+            else token_record.expires_at.replace(tzinfo=timezone.utc)
+        )
+        if now_utc > exp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A ligação de confirmação expirou. O prazo de validade terminou. Por favor solicite um novo e-mail.",
+            )
+
+        # ✅ Atualiza a data validada e marca como utilizado
+        token_record.validated_at = now_utc
+        token_record.is_used = True
+    elif user.email_verified:
+        return {
+            "success": True,
+            "already_verified": True,
+            "message": "Este endereço de e-mail já foi confirmado anteriormente. A sua conta está ativa.",
+            "email": user.email,
+            "nome": user.nome,
+        }
+
+    user.email_verified = True
+    user.is_active = True
+    db.commit()
+    log_message(f"✅ E-mail validado e ativado com sucesso para: {email}", "success")
+
+    return {
+        "success": True,
+        "message": "E-mail confirmado com sucesso! A sua conta foi ativada.",
+        "email": user.email,
+        "nome": user.nome,
+        "validated_at": token_record.validated_at.isoformat() if token_record and token_record.validated_at else now_utc.isoformat(),
+    }
+
+
+@router.post("/verify-email")
+def verify_email_post(
+    payload: VerifyEmailRequest,
+    db: Session = Depends(database.get_db),
+):
+    """Valida o e-mail do utilizador via requisição POST JSON com o token."""
+    return verify_email_get(token=payload.token, db=db)
+
+
+@router.post("/resend-verification")
+async def resend_verification_email(
+    payload: ResendVerificationRequest,
+    db: Session = Depends(database.get_db),
+):
+    """Reenvia o e-mail de ativação e confirmação com novo token seguro e regista na base de dados."""
+    email_norm = payload.email.strip().lower()
+    user = user_crud.get_user_by_email(db, email_norm)
+    if not user:
+        return {
+            "success": True,
+            "message": "Se o e-mail estiver registado, a mensagem de confirmação foi reenviada.",
+        }
+
+    if user.email_verified:
+        return {
+            "success": True,
+            "already_verified": True,
+            "message": "Este endereço de e-mail já se encontra confirmado e ativo.",
+        }
+
+    token = auth.create_email_verification_token(user.email)
+
+    # 🎫 Salva o novo token na tabela email_verification_tokens com data de criação e prazo de validade
+    prazo = datetime.now(timezone.utc) + timedelta(hours=auth.EMAIL_VERIFICATION_EXPIRE_HOURS)
+    token_registro = user_model.EmailVerificationToken(
+        token=token,
+        user_id=user.id,
+        expires_at=prazo,
+        is_used=False,
+    )
+    db.add(token_registro)
+    db.commit()
+
+    nome_empresa = user.empresa.nome if getattr(user, "empresa", None) else None
+
+    resultado = await asyncio.to_thread(
+        send_registration_confirmation_email,
+        recipient_email=user.email,
+        user_name=user.nome,
+        empresa=nome_empresa,
+        verification_token=token,
+    )
+
+    if not resultado.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Não foi possível reenviar o e-mail de confirmação: {resultado.get('message')}",
+        )
+
+    return {
+        "success": True,
+        "message": "E-mail de confirmação reenviado com sucesso. Verifique a sua caixa de entrada.",
+    }
 
 
 @router.post("/login", response_model=users_schemas.LoginResponse)
@@ -231,6 +604,22 @@ async def login_user(
             aes_decrypt(credentials.senha), user.hashed_password
         ):
             raise HTTPException(status_code=401, detail="Credenciais inválidas")
+
+        # 🔒 Valida se o e-mail da conta foi confirmado
+        if not user.email_verified:
+            log_message(f"⚠️ Login bloqueado: e-mail não verificado ({user.email})", "warning")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="E-mail não verificado. Por favor confirme o seu e-mail através da ligação enviada para a sua caixa de entrada.",
+            )
+
+        # 🔒 Valida se a conta está ativa
+        if not user.is_active:
+            log_message(f"⚠️ Login bloqueado: conta inativa ({user.email})", "warning")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Esta conta está desativada. Por favor contacte o suporte.",
+            )
 
         fp = build_fingerprint(request, FINGERPRINT_SALT)
 

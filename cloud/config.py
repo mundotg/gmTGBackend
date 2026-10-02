@@ -76,7 +76,12 @@ class StorageService:
         # `host.docker.internal`). Se não definido, usa o interno.
         public_endpoint = os.getenv("STORAGE_PUBLIC_ENDPOINT") or internal_endpoint
 
-        _cfg = Config(signature_version="s3v4", s3={"addressing_style": "path"})
+        _cfg = Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "path"},
+            connect_timeout=2,
+            retries={"max_attempts": 1},
+        )
 
         # Cliente interno (upload/list/delete/stream) — dentro do contentor.
         self.s3 = boto3.client(

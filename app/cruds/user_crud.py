@@ -1,7 +1,7 @@
 from typing import Iterable, Optional, Sequence
 
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload, load_only
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
@@ -9,6 +9,7 @@ from app import auth
 from app.models import user_model
 from app.models.task_models import AuditLog
 from app.schemas import users_schemas
+from app.ultils.company_permissions import is_company_permission
 from app.ultils.logger import log_message
 from app.ultils.permissions import SUPER_PERMISSION, is_superadmin
 
@@ -349,7 +350,25 @@ def _permission_out(permission: user_model.Permission) -> users_schemas.Permissi
         name=permission.name,
         description=permission.description,
         category=_category_of(permission.name),
+        company_scope=is_company_permission(permission.name),
     )
+
+
+def _assert_company_role_permissions(
+    empresa_id: Optional[int], permissions: Iterable[user_model.Permission]
+) -> None:
+    """Um cargo da empresa só pode ter permissões relacionadas com a empresa."""
+    if empresa_id is None:
+        return
+    fora = sorted(p.name for p in permissions if not is_company_permission(p.name))
+    if fora:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Um cargo da empresa só pode ter acessos relacionados com a empresa. "
+                f"Não permitido: {', '.join(fora)}."
+            ),
+        )
 
 
 def _role_is_locked(role: user_model.Role) -> bool:
@@ -373,6 +392,7 @@ def _role_out(
         is_locked=_role_is_locked(role),
         is_active=bool(role.is_active),
         users_count=users_count,
+        empresa_id=role.empresa_id,
     )
 
 
@@ -382,10 +402,17 @@ def _member_out(user: user_model.User) -> users_schemas.MemberSchema:
         nome=user.nome,
         apelido=user.apelido,
         email=user.email,
+        telefone=user.telefone,
         is_active=bool(user.is_active),
         role_id=user.role_id,
         role_name=user.role.name if user.role else None,
+        empresa_role_id=user.empresa_role_id,
+        empresa_role_name=user.empresa_role.name if user.empresa_role else None,
+        cargo_id=user.cargo_id,
+        cargo_nome=user.cargo.nome if user.cargo else None,
+        empresa_id=user.empresa_id,
         is_superadmin=is_superadmin(user),
+        created_at=user.created_at,
     )
 
 
@@ -426,13 +453,19 @@ def get_role_or_404(db: Session, role_id: int) -> user_model.Role:
     return role
 
 
-def _users_count_by_role(db: Session) -> dict[int, int]:
-    rows = (
-        db.query(user_model.User.role_id, func.count(user_model.User.id))
-        .group_by(user_model.User.role_id)
-        .all()
-    )
-    return {role_id: total for role_id, total in rows if role_id is not None}
+def _users_count_by_role(db: Session, empresa_id: Optional[int] = None) -> dict[int, int]:
+    # Com empresa: só os membros dessa empresa. Sem isto, uma função global
+    # mostrava no ecrã de uma empresa o total de TODAS as empresas.
+    counts: dict[int, int] = {}
+    # Uma função conta quem a tem como tipo de utilizador E quem a tem como cargo.
+    for coluna in (user_model.User.role_id, user_model.User.empresa_role_id):
+        query = db.query(coluna, func.count(user_model.User.id))
+        if empresa_id is not None:
+            query = query.filter(user_model.User.empresa_id == empresa_id)
+        for role_id, total in query.group_by(coluna).all():
+            if role_id is not None:
+                counts[role_id] = counts.get(role_id, 0) + total
+    return counts
 
 
 def _assert_can_touch_superpermission(
@@ -463,6 +496,21 @@ def _assert_role_editable(role: user_model.Role) -> None:
                 "A função de super admin está bloqueada: alterar as suas permissões "
                 "podia deixar o sistema sem ninguém capaz de gerir acessos."
             ),
+        )
+
+
+def _assert_can_manage_role(actor: user_model.User, role: user_model.Role) -> None:
+    if is_superadmin(actor):
+        return
+    if role.empresa_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas super administradores podem modificar funções globais do sistema.",
+        )
+    if actor.empresa_id != role.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Não tem permissão para gerir funções de outra organização.",
         )
 
 
@@ -500,9 +548,19 @@ def list_permissions(db: Session) -> list[users_schemas.PermissionSchema]:
     return [_permission_out(p) for p in permissions]
 
 
-def list_roles(db: Session) -> list[users_schemas.RoleSchema]:
-    counts = _users_count_by_role(db)
-    roles = _roles_query(db).order_by(user_model.Role.name).all()
+def list_roles(
+    db: Session, empresa_id: Optional[int] = None
+) -> list[users_schemas.RoleSchema]:
+    counts = _users_count_by_role(db, empresa_id)
+    query = _roles_query(db)
+    if empresa_id is not None:
+        query = query.filter(
+            or_(
+                user_model.Role.empresa_id == empresa_id,
+                user_model.Role.empresa_id.is_(None),
+            )
+        )
+    roles = query.order_by(user_model.Role.name).all()
     return [_role_out(role, counts.get(role.id, 0)) for role in roles]
 
 
@@ -530,10 +588,30 @@ def create_role(
     db: Session,
     actor: user_model.User,
     data: users_schemas.RoleCreateSchema,
+    empresa_id: Optional[int] = None,
 ) -> users_schemas.RoleSchema:
-    existente = (
-        db.query(user_model.Role.id).filter(user_model.Role.name == data.name).first()
-    )
+    target_empresa_id = data.empresa_id if data.empresa_id is not None else empresa_id
+    if not is_superadmin(actor) and target_empresa_id is None:
+        target_empresa_id = actor.empresa_id
+
+    if not is_superadmin(actor) and target_empresa_id != actor.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Não tem permissão para criar funções para outra organização.",
+        )
+
+    dup_query = db.query(user_model.Role.id).filter(user_model.Role.name == data.name)
+    if target_empresa_id is not None:
+        dup_query = dup_query.filter(
+            or_(
+                user_model.Role.empresa_id == target_empresa_id,
+                user_model.Role.empresa_id.is_(None),
+            )
+        )
+    else:
+        dup_query = dup_query.filter(user_model.Role.empresa_id.is_(None))
+
+    existente = dup_query.first()
     if existente:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -542,10 +620,12 @@ def create_role(
 
     permissions = _get_permissions_or_404(db, data.permission_ids)
     _assert_can_touch_superpermission(actor, permissions)
+    _assert_company_role_permissions(target_empresa_id, permissions)
 
     role = user_model.Role(
         name=data.name,
         description=data.description,
+        empresa_id=target_empresa_id,
         permissions=permissions,
     )
 
@@ -577,6 +657,8 @@ def update_role(
     data: users_schemas.RoleUpdateSchema,
 ) -> users_schemas.RoleSchema:
     role = get_role_or_404(db, role_id)
+    _assert_can_manage_role(actor, role)
+    _assert_role_editable(role)
 
     if data.name is not None and data.name != role.name:
         if role.name in SYSTEM_ROLE_NAMES:
@@ -584,14 +666,21 @@ def update_role(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"A função de sistema '{role.name}' não pode ser renomeada.",
             )
-        duplicada = (
-            db.query(user_model.Role.id)
-            .filter(
-                user_model.Role.name == data.name,
-                user_model.Role.id != role.id,
-            )
-            .first()
+        dup_query = db.query(user_model.Role.id).filter(
+            user_model.Role.name == data.name,
+            user_model.Role.id != role.id,
         )
+        if role.empresa_id is not None:
+            dup_query = dup_query.filter(
+                or_(
+                    user_model.Role.empresa_id == role.empresa_id,
+                    user_model.Role.empresa_id.is_(None),
+                )
+            )
+        else:
+            dup_query = dup_query.filter(user_model.Role.empresa_id.is_(None))
+
+        duplicada = dup_query.first()
         if duplicada:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -625,6 +714,7 @@ def delete_role(
     reassign_to_id: Optional[int] = None,
 ) -> None:
     role = get_role_or_404(db, role_id)
+    _assert_can_manage_role(actor, role)
 
     if role.name in SYSTEM_ROLE_NAMES:
         raise HTTPException(
@@ -634,7 +724,12 @@ def delete_role(
 
     membros = (
         db.query(user_model.User)
-        .filter(user_model.User.role_id == role.id)
+        .filter(
+            or_(
+                user_model.User.role_id == role.id,
+                user_model.User.empresa_role_id == role.id,
+            )
+        )
         .all()
     )
 
@@ -654,10 +749,20 @@ def delete_role(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A função de destino tem de ser diferente da que vai ser removida.",
             )
+        # Os membros só podem passar para uma função global ou da mesma empresa.
+        if destino.empresa_id is not None and destino.empresa_id != role.empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A função de destino pertence a outra empresa.",
+            )
         _assert_can_touch_superpermission(actor, destino.permissions or [])
 
         for membro in membros:
-            membro.role_id = destino.id
+            # Mantém o lugar: quem a tinha como cargo fica com o novo cargo.
+            if membro.empresa_role_id == role.id:
+                membro.empresa_role_id = destino.id
+            if membro.role_id == role.id:
+                membro.role_id = destino.id
 
         log_message(
             f"🔁 {len(membros)} membro(s) transferidos de '{role.name}' "
@@ -680,9 +785,11 @@ def set_role_permissions(
 ) -> users_schemas.RoleSchema:
     """Substitui integralmente as permissões da função (usado pelo botão Guardar)."""
     role = get_role_or_404(db, role_id)
+    _assert_can_manage_role(actor, role)
     _assert_role_editable(role)
 
     novas = _get_permissions_or_404(db, permission_ids)
+    _assert_company_role_permissions(role.empresa_id, novas)
 
     antigas_nomes = {p.name for p in (role.permissions or [])}
     novas_nomes = {p.name for p in novas}
@@ -736,6 +843,7 @@ def toggle_role_permission(
 ) -> users_schemas.RoleSchema:
     """Concede (grant=True) ou retira (grant=False) uma permissão isolada."""
     role = get_role_or_404(db, role_id)
+    _assert_can_manage_role(actor, role)
     _assert_role_editable(role)
 
     permission = db.get(user_model.Permission, permission_id)
@@ -746,6 +854,8 @@ def toggle_role_permission(
         )
 
     _assert_can_touch_superpermission(actor, [permission])
+    if grant:
+        _assert_company_role_permissions(role.empresa_id, [permission])
 
     atuais = list(role.permissions or [])
     ja_tem = any(p.id == permission.id for p in atuais)
@@ -858,6 +968,16 @@ def set_member_role(
                 detail=f"A função '{nova_role.name}' está desativada.",
             )
         _assert_can_touch_superpermission(actor, nova_role.permissions or [])
+        # O tipo de utilizador é sempre uma função global; as da empresa são
+        # o cargo (set_member_cargo).
+        if nova_role.empresa_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"'{nova_role.name}' é um cargo da empresa, não um tipo de utilizador. "
+                    "Atribua-o no campo Cargo."
+                ),
+            )
 
     # Despromover o último super admin ativo deixaria o sistema sem gestor.
     perde_super = is_superadmin(membro) and not (
@@ -890,6 +1010,57 @@ def set_member_role(
         f"👤 Função de {membro.email} alterada por {actor.email}",
         "success",
     )
+    return _member_out(membro)
+
+
+def set_member_cargo(
+    db: Session,
+    actor: user_model.User,
+    empresa_id: int,
+    user_id: int,
+    role_id: Optional[int],
+) -> users_schemas.MemberSchema:
+    """Define (ou retira, com None) o cargo de um membro na sua empresa."""
+    membro = _get_member_or_404(db, actor, user_id)
+    if membro.empresa_id != empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Membro não encontrado nesta empresa.",
+        )
+    # Quem pode mudar cargos não muda o próprio: era uma forma de se promover a
+    # um cargo com mais ações (o mesmo vale para o tipo de utilizador).
+    if membro.id == actor.id and not is_superadmin(actor):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Não pode alterar o seu próprio cargo — peça a outro gestor da empresa.",
+        )
+
+    novo: Optional[user_model.Role] = None
+    if role_id is not None:
+        novo = get_role_or_404(db, role_id)
+        if novo.empresa_id != empresa_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="O cargo tem de ser um dos cargos desta empresa.",
+            )
+        if not novo.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"O cargo '{novo.name}' está desativado.",
+            )
+
+    anterior = membro.empresa_role.name if membro.empresa_role else "sem cargo"
+    membro.empresa_role_id = role_id
+    _audit(
+        db,
+        actor,
+        f"Alterou o cargo de {membro.email}: '{anterior}' → '{novo.name if novo else 'sem cargo'}'",
+        "User",
+        membro.id,
+    )
+    db.commit()
+    db.refresh(membro)
+    log_message(f"👤 Cargo de {membro.email} alterado por {actor.email}", "success")
     return _member_out(membro)
 
 

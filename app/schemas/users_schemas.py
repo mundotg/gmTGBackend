@@ -22,6 +22,9 @@ class EmpresaSchema(BaseModel):
     tamanho: Optional[str] = Field(None, alias="companySize")
     nif: Optional[str] = None
     endereco: Optional[str] = None
+    is_active: bool = True
+    users_count: int = 0
+    criado_em: Optional[datetime] = None
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -40,6 +43,22 @@ class EmpresaUpdateSchema(BaseModel):
     )
     nif: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)]] = None
     endereco: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)]] = None
+    is_active: Optional[bool] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class EmpresaCreateSchema(BaseModel):
+    """Criação de nova empresa."""
+
+    nome: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=150)] = Field(
+        ..., alias="company"
+    )
+    tamanho: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)]] = Field(
+        None, alias="companySize"
+    )
+    nif: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=50)]] = None
+    endereco: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)]] = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -48,6 +67,15 @@ class EmpresaComPermissoesSchema(EmpresaSchema):
     """Empresa + o que este utilizador pode fazer sobre ela (para a UI)."""
 
     can_manage: bool = False
+
+
+class EmpresaPaginadaSchema(BaseModel):
+    items: List[EmpresaComPermissoesSchema]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    is_admin: bool = False
 
 
 # -----------------------------
@@ -60,6 +88,8 @@ class PermissionSchema(BaseModel):
     # Derivada do prefixo do nome ("db_connection:read" → "Conexões de BD").
     # Serve só para a UI agrupar as permissões.
     category: Optional[str] = None
+    # Pode ser concedida por um cargo da empresa (app/ultils/company_permissions).
+    company_scope: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -79,6 +109,7 @@ class RoleSchema(BaseModel):
     is_locked: bool = False
     is_active: bool = True
     users_count: int = 0
+    empresa_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -90,6 +121,7 @@ class RoleCreateSchema(BaseModel):
     name: str = Field(..., min_length=2, max_length=50)
     description: Optional[str] = Field(None, max_length=200)
     permission_ids: List[int] = []
+    empresa_id: Optional[int] = None
 
     @field_validator("name")
     @classmethod
@@ -130,13 +162,76 @@ class MemberSchema(BaseModel):
     nome: str
     apelido: Optional[str] = None
     email: str
+    telefone: Optional[str] = None
     is_active: bool = True
 
+    # Tipo de utilizador (função global do sistema)
     role_id: Optional[int] = None
     role_name: Optional[str] = None
+    # Cargo (função da empresa do membro)
+    empresa_role_id: Optional[int] = None
+    empresa_role_name: Optional[str] = None
+    # Título profissional livre (tabela `cargos`) — sem permissões associadas.
+    cargo_id: Optional[int] = None
+    cargo_nome: Optional[str] = None
+    empresa_id: Optional[int] = None
     is_superadmin: bool = False
+    created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MemberPaginadoSchema(BaseModel):
+    items: List[MemberSchema]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    # Gestão completa (tipo de utilizador, ativar/desativar) — permissões gerais.
+    can_manage_members: bool = False
+    # Ações da empresa, que também se podem dar por cargo:
+    can_add_members: bool = False      # company:invite
+    can_remove_members: bool = False   # company:remove_member
+    can_change_cargo: bool = False     # company:assign_cargo
+
+
+class CandidateUserSchema(BaseModel):
+    id: int
+    nome: str
+    apelido: Optional[str] = None
+    email: str
+    telefone: Optional[str] = None
+    is_active: bool = True
+    empresa_id: Optional[int] = None
+    empresa_nome: Optional[str] = None
+    cargo_nome: Optional[str] = None
+    role_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CandidateUserPaginadoSchema(BaseModel):
+    items: List[CandidateUserSchema]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class MemberCreateSchema(BaseModel):
+    user_id: Optional[int] = None
+    nome: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)]] = None
+    apelido: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]] = None
+    email: Optional[EmailStr] = None
+    telefone: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=30)]] = None
+    cargo: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]] = None
+    # Tipo de utilizador (função global)
+    role_id: Optional[int] = None
+    # Cargo da empresa (função da empresa)
+    empresa_role_id: Optional[int] = None
+    senha: Optional[Annotated[str, StringConstraints(min_length=6)]] = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class MemberRoleUpdateSchema(BaseModel):
@@ -193,6 +288,7 @@ class UserCreate(BaseModel):
     )
 
     concorda_termos: bool = Field(..., alias="terms")
+    oauth_token: Optional[str] = Field(None, alias="oauthToken")
 
     model_config = ConfigDict(
         populate_by_name=True,

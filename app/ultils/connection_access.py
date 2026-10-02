@@ -26,9 +26,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models.connection_models import DBConnection, DBConnectionShare
+from app.models.connection_models import (
+    ConnectionRole,
+    DBConnection,
+    DBConnectionShare,
+    EmpresaConnection,
+)
 from app.models.user_model import Role, User
-from app.schemas.connetion_schema import ConnectionAccessLevel
+from app.schemas.connetion_schema import ConnectionAccessLevel, EffectiveConnectionRules
 from app.ultils.logger import log_message
 from app.ultils.permissions import is_superadmin
 
@@ -119,6 +124,7 @@ def resolve_access_level(
     if nivel:
         return nivel
 
+    # 1. Share direto do utilizador (tem precedência)
     share = (
         db.query(DBConnectionShare)
         .filter(
@@ -127,7 +133,170 @@ def resolve_access_level(
         )
         .first()
     )
-    return ConnectionAccessLevel(share.access_level) if share else None
+    if share:
+        return ConnectionAccessLevel(share.access_level)
+
+    # 2. Acesso corporativo via Empresa vinculada à conexão (N:N)
+    if getattr(user, "empresa_id", None):
+        emp_assoc = (
+            db.query(EmpresaConnection)
+            .filter(
+                EmpresaConnection.connection_id == conn.id,
+                EmpresaConnection.empresa_id == user.empresa_id,
+            )
+            .first()
+        )
+        if emp_assoc:
+            return ConnectionAccessLevel(emp_assoc.access_level or "read")
+
+    return None
+
+
+def get_effective_connection_rules(
+    db: Session, conn: DBConnection, user: User
+) -> EffectiveConnectionRules:
+    """
+    Resolve as regras granulares de segurança (tabelas, campos, tipos de consulta, max_rows)
+    aplicáveis a `user` na conexão `conn`.
+    """
+    if conn.user_id == user.id or is_superadmin(user):
+        return EffectiveConnectionRules()
+
+    # 1. Share direto
+    share = (
+        db.query(DBConnectionShare)
+        .options(joinedload(DBConnectionShare.role))
+        .filter(
+            DBConnectionShare.connection_id == conn.id,
+            DBConnectionShare.user_id == user.id,
+        )
+        .first()
+    )
+
+    if share:
+        rules = EffectiveConnectionRules()
+        if share.role:
+            r = share.role
+            rules.allowed_tables = list(r.allowed_tables or [])
+            rules.blocked_tables = list(r.blocked_tables or [])
+            rules.allowed_columns = dict(r.allowed_columns or {})
+            rules.blocked_columns = dict(r.blocked_columns or {})
+            rules.allowed_query_types = list(r.allowed_query_types or [])
+            rules.max_rows = r.max_rows
+
+        if share.allowed_tables:
+            rules.allowed_tables = list(share.allowed_tables)
+        if share.blocked_tables:
+            rules.blocked_tables = list(set(rules.blocked_tables + list(share.blocked_tables)))
+        if share.allowed_columns:
+            rules.allowed_columns.update(share.allowed_columns)
+        if share.blocked_columns:
+            rules.blocked_columns.update(share.blocked_columns)
+        if share.allowed_query_types:
+            rules.allowed_query_types = list(share.allowed_query_types)
+        if share.max_rows is not None:
+            rules.max_rows = share.max_rows if rules.max_rows is None else min(rules.max_rows, share.max_rows)
+        return rules
+
+    # 2. Acesso via Empresa
+    if getattr(user, "empresa_id", None):
+        emp_assoc = (
+            db.query(EmpresaConnection)
+            .options(joinedload(EmpresaConnection.role))
+            .filter(
+                EmpresaConnection.connection_id == conn.id,
+                EmpresaConnection.empresa_id == user.empresa_id,
+            )
+            .first()
+        )
+        if emp_assoc and emp_assoc.role:
+            r = emp_assoc.role
+            return EffectiveConnectionRules(
+                allowed_tables=list(r.allowed_tables or []),
+                blocked_tables=list(r.blocked_tables or []),
+                allowed_columns=dict(r.allowed_columns or {}),
+                blocked_columns=dict(r.blocked_columns or {}),
+                allowed_query_types=list(r.allowed_query_types or []),
+                max_rows=r.max_rows,
+            )
+
+    return EffectiveConnectionRules()
+
+
+def validate_connection_query_rules(
+    rules: EffectiveConnectionRules,
+    query_type: Optional[str] = None,
+    tables: Optional[list[str]] = None,
+    columns_by_table: Optional[dict[str, list[str]]] = None,
+) -> None:
+    """Valida se uma ação/consulta viola as regras granulares da conexão."""
+    # 1. Tipo de consulta (SELECT, INSERT, UPDATE, DELETE, DDL, etc.)
+    if query_type and rules.allowed_query_types:
+        tipos_permitidos = [t.strip().upper() for t in rules.allowed_query_types if t.strip()]
+        if tipos_permitidos and query_type.strip().upper() not in tipos_permitidos:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Operação do tipo '{query_type}' não é permitida pelo seu perfil nesta conexão. Tipos autorizados: {', '.join(tipos_permitidos)}.",
+            )
+
+    # 2. Tabelas
+    if tables:
+        for raw_tbl in tables:
+            tbl = raw_tbl.split(".")[-1].strip('`"[]').lower()
+            if not tbl:
+                continue
+
+            # Bloqueadas
+            blocked = [t.split(".")[-1].strip('`"[]').lower() for t in rules.blocked_tables or []]
+            if tbl in blocked:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Acesso à tabela '{raw_tbl}' está expressamente bloqueado para o seu perfil nesta conexão.",
+                )
+
+            # Permitidas (se lista não estiver vazia, funciona como whitelist)
+            allowed = [t.split(".")[-1].strip('`"[]').lower() for t in rules.allowed_tables or []]
+            if allowed and tbl not in allowed:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Acesso à tabela '{raw_tbl}' não é permitido pelo seu perfil nesta conexão.",
+                )
+
+    # 3. Colunas por tabela
+    if columns_by_table:
+        for raw_tbl, cols in columns_by_table.items():
+            tbl = raw_tbl.split(".")[-1].strip('`"[]').lower()
+            if not tbl or not cols:
+                continue
+
+            # Colunas bloqueadas
+            blocked_cols: list[str] = []
+            for b_tbl, b_cols in (rules.blocked_columns or {}).items():
+                if b_tbl.split(".")[-1].strip('`"[]').lower() == tbl:
+                    blocked_cols.extend([c.strip().lower() for c in b_cols])
+
+            for col in cols:
+                clean_col = col.strip('`"[]').lower()
+                if clean_col in blocked_cols:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Acesso à coluna '{col}' na tabela '{raw_tbl}' está bloqueado nesta conexão.",
+                    )
+
+            # Colunas permitidas (whitelist se definida)
+            allowed_cols: list[str] = []
+            for a_tbl, a_cols in (rules.allowed_columns or {}).items():
+                if a_tbl.split(".")[-1].strip('`"[]').lower() == tbl:
+                    allowed_cols.extend([c.strip().lower() for c in a_cols])
+
+            if allowed_cols:
+                for col in cols:
+                    clean_col = col.strip('`"[]').lower()
+                    if clean_col != "*" and clean_col not in allowed_cols:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"Acesso à coluna '{col}' na tabela '{raw_tbl}' não está autorizado para o seu perfil.",
+                        )
 
 
 def assert_connection_level(
@@ -179,7 +348,87 @@ async def resolve_access_level_async(
         )
     )
     share = resultado.scalars().first()
-    return ConnectionAccessLevel(share.access_level) if share else None
+    if share:
+        return ConnectionAccessLevel(share.access_level)
+
+    if getattr(user, "empresa_id", None):
+        emp_res = await db.execute(
+            select(EmpresaConnection).where(
+                EmpresaConnection.connection_id == conn.id,
+                EmpresaConnection.empresa_id == user.empresa_id,
+            )
+        )
+        emp_assoc = emp_res.scalars().first()
+        if emp_assoc:
+            return ConnectionAccessLevel(emp_assoc.access_level or "read")
+
+    return None
+
+
+async def get_effective_connection_rules_async(
+    db: AsyncSession, conn: DBConnection, user: User
+) -> EffectiveConnectionRules:
+    """Versão assíncrona para resolução de regras de conexão."""
+    if conn.user_id == user.id or is_superadmin(user):
+        return EffectiveConnectionRules()
+
+    resultado = await db.execute(
+        select(DBConnectionShare)
+        .options(selectinload(DBConnectionShare.role))
+        .where(
+            DBConnectionShare.connection_id == conn.id,
+            DBConnectionShare.user_id == user.id,
+        )
+    )
+    share = resultado.scalars().first()
+
+    if share:
+        rules = EffectiveConnectionRules()
+        if share.role:
+            r = share.role
+            rules.allowed_tables = list(r.allowed_tables or [])
+            rules.blocked_tables = list(r.blocked_tables or [])
+            rules.allowed_columns = dict(r.allowed_columns or {})
+            rules.blocked_columns = dict(r.blocked_columns or {})
+            rules.allowed_query_types = list(r.allowed_query_types or [])
+            rules.max_rows = r.max_rows
+
+        if share.allowed_tables:
+            rules.allowed_tables = list(share.allowed_tables)
+        if share.blocked_tables:
+            rules.blocked_tables = list(set(rules.blocked_tables + list(share.blocked_tables)))
+        if share.allowed_columns:
+            rules.allowed_columns.update(share.allowed_columns)
+        if share.blocked_columns:
+            rules.blocked_columns.update(share.blocked_columns)
+        if share.allowed_query_types:
+            rules.allowed_query_types = list(share.allowed_query_types)
+        if share.max_rows is not None:
+            rules.max_rows = share.max_rows if rules.max_rows is None else min(rules.max_rows, share.max_rows)
+        return rules
+
+    if getattr(user, "empresa_id", None):
+        emp_res = await db.execute(
+            select(EmpresaConnection)
+            .options(selectinload(EmpresaConnection.role))
+            .where(
+                EmpresaConnection.connection_id == conn.id,
+                EmpresaConnection.empresa_id == user.empresa_id,
+            )
+        )
+        emp_assoc = emp_res.scalars().first()
+        if emp_assoc and emp_assoc.role:
+            r = emp_assoc.role
+            return EffectiveConnectionRules(
+                allowed_tables=list(r.allowed_tables or []),
+                blocked_tables=list(r.blocked_tables or []),
+                allowed_columns=dict(r.allowed_columns or {}),
+                blocked_columns=dict(r.blocked_columns or {}),
+                allowed_query_types=list(r.allowed_query_types or []),
+                max_rows=r.max_rows,
+            )
+
+    return EffectiveConnectionRules()
 
 
 async def assert_user_connection_level_async(

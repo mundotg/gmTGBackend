@@ -10,6 +10,7 @@ import json
 import traceback
 from typing import Any, AsyncGenerator, Optional
 
+from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
@@ -17,6 +18,11 @@ from app.models.connection_models import DBConnection
 from app.schemas.query_select_upAndInsert_schema import QueryPayload
 from app.services.query_service import QueryService
 from app.ultils.ativar_engine import ConnectionManager
+from app.ultils.connection_access import (
+    load_actor_async,
+    get_effective_connection_rules_async,
+    validate_connection_query_rules,
+)
 from app.ultils.logger import log_message
 
 
@@ -215,6 +221,26 @@ async def executar_query_e_salvar_stream(
 
             engine, connection = await ConnectionManager.get_engine_async(db, user_id)
 
+            actor = await load_actor_async(db, user_id)
+            rules = await get_effective_connection_rules_async(db, connection, actor)
+
+            cols_map = {}
+            if body.baseTable and body.fields:
+                cols_map[body.baseTable] = [f.field for f in body.fields if hasattr(f, "field") and f.field]
+
+            validate_connection_query_rules(
+                rules=rules,
+                query_type="SELECT",
+                tables=[body.baseTable] if body.baseTable else [],
+                columns_by_table=cols_map if cols_map else None,
+            )
+
+            if rules.max_rows is not None and rules.max_rows > 0:
+                if body.limit:
+                    body.limit = min(body.limit, rules.max_rows)
+                else:
+                    body.limit = rules.max_rows
+
             needs_chunking = bool(body.limit and body.limit > CHUNK_SIZE)
 
             if needs_chunking:
@@ -250,6 +276,8 @@ async def executar_query_e_salvar_stream(
             await asyncio.sleep(0.01)
             yield _sse_event("status", {"status": "completed"})
 
+        except HTTPException as exc:
+            yield _sse_event("error", {"error": exc.detail})
         except Exception as exc:
             log_message(
                 f"❌ Erro no stream SSE: {exc}\n{traceback.format_exc()}",

@@ -1,6 +1,6 @@
 from typing_extensions import Annotated
-from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
-from typing import Optional, List
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 
@@ -182,7 +182,7 @@ class DatasetOpenResponse(BaseModel):
 
 
 # =========================================================
-# 🤝 Partilha de conexões
+# 🤝 Partilha e Roles de Conexão
 # =========================================================
 class ConnectionAccessLevel(str, Enum):
     """Do mais fraco para o mais forte. `manage` permite repartilhar."""
@@ -192,6 +192,68 @@ class ConnectionAccessLevel(str, Enum):
     manage = "manage"
 
 
+class ConnectionRolePermissionOut(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EffectiveConnectionRules(BaseModel):
+    allowed_tables: List[str] = []
+    blocked_tables: List[str] = []
+    allowed_columns: Dict[str, List[str]] = {}
+    blocked_columns: Dict[str, List[str]] = {}
+    allowed_query_types: List[str] = []
+    max_rows: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConnectionRoleOut(BaseModel):
+    id: int
+    connection_id: int
+    name: str
+    description: Optional[str] = None
+    is_default: bool = False
+    permissions: List[ConnectionRolePermissionOut] = []
+    allowed_tables: List[str] = []
+    blocked_tables: List[str] = []
+    allowed_columns: Dict[str, List[str]] = {}
+    blocked_columns: Dict[str, List[str]] = {}
+    allowed_query_types: List[str] = []
+    max_rows: Optional[int] = None
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConnectionRoleCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=50)
+    description: Optional[str] = Field(None, max_length=200)
+    permission_ids: List[int] = []
+    allowed_tables: Optional[List[str]] = []
+    blocked_tables: Optional[List[str]] = []
+    allowed_columns: Optional[Dict[str, List[str]]] = {}
+    blocked_columns: Optional[Dict[str, List[str]]] = {}
+    allowed_query_types: Optional[List[str]] = []
+    max_rows: Optional[int] = None
+
+
+class ConnectionRoleUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=50)
+    description: Optional[str] = Field(None, max_length=200)
+    permission_ids: Optional[List[int]] = None
+    allowed_tables: Optional[List[str]] = None
+    blocked_tables: Optional[List[str]] = None
+    allowed_columns: Optional[Dict[str, List[str]]] = None
+    blocked_columns: Optional[Dict[str, List[str]]] = None
+    allowed_query_types: Optional[List[str]] = None
+    max_rows: Optional[int] = None
+
+
 class ConnectionShareOut(BaseModel):
     id: int
     connection_id: int
@@ -199,6 +261,14 @@ class ConnectionShareOut(BaseModel):
     user_nome: Optional[str] = None
     user_email: Optional[str] = None
     access_level: ConnectionAccessLevel
+    role_id: Optional[int] = None
+    role_name: Optional[str] = None
+    allowed_tables: List[str] = []
+    blocked_tables: List[str] = []
+    allowed_columns: Dict[str, List[str]] = {}
+    blocked_columns: Dict[str, List[str]] = {}
+    allowed_query_types: List[str] = []
+    max_rows: Optional[int] = None
     granted_by_id: Optional[int] = None
     granted_by_nome: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -208,11 +278,51 @@ class ConnectionShareOut(BaseModel):
 
 class ConnectionShareCreate(BaseModel):
     user_id: int
-    access_level: ConnectionAccessLevel = ConnectionAccessLevel.read
+    access_level: Optional[ConnectionAccessLevel] = ConnectionAccessLevel.read
+    role_id: Optional[int] = None
+    allowed_tables: Optional[List[str]] = []
+    blocked_tables: Optional[List[str]] = []
+    allowed_columns: Optional[Dict[str, List[str]]] = {}
+    blocked_columns: Optional[Dict[str, List[str]]] = {}
+    allowed_query_types: Optional[List[str]] = []
+    max_rows: Optional[int] = None
 
 
 class ConnectionShareUpdate(BaseModel):
-    access_level: ConnectionAccessLevel
+    access_level: Optional[ConnectionAccessLevel] = None
+    role_id: Optional[int] = None
+    allowed_tables: Optional[List[str]] = None
+    blocked_tables: Optional[List[str]] = None
+    allowed_columns: Optional[Dict[str, List[str]]] = None
+    blocked_columns: Optional[Dict[str, List[str]]] = None
+    allowed_query_types: Optional[List[str]] = None
+    max_rows: Optional[int] = None
+
+
+class ConnectionEmpresaOut(BaseModel):
+    """Empresa vinculada a uma conexão."""
+
+    id: int
+    nome: str
+    tamanho: Optional[str] = None
+    nif: Optional[str] = None
+    access_level: ConnectionAccessLevel = ConnectionAccessLevel.read
+    role_id: Optional[int] = None
+    role_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConnectionEmpresaCreate(BaseModel):
+    empresa_id: Optional[int] = None
+    access_level: Optional[ConnectionAccessLevel] = ConnectionAccessLevel.read
+    role_id: Optional[int] = None
+
+
+class ConnectionEmpresaUpdate(BaseModel):
+    access_level: Optional[ConnectionAccessLevel] = None
+    role_id: Optional[int] = None
 
 
 class ConnectionAccessOut(BaseModel):
@@ -224,8 +334,27 @@ class ConnectionAccessOut(BaseModel):
     owner_nome: Optional[str] = None
     is_owner: bool = False
     access_level: Optional[ConnectionAccessLevel] = None
+    role_id: Optional[int] = None
+    role_name: Optional[str] = None
     can_read: bool = False
     can_write: bool = False
     can_share: bool = False
     can_delete: bool = False
     shares: List[ConnectionShareOut] = []
+    roles: List[ConnectionRoleOut] = []
+    empresas: List[ConnectionEmpresaOut] = []
+    effective_rules: Optional[EffectiveConnectionRules] = None
+
+
+class EmpresaConnectionOut(BaseModel):
+    """Conexão vinculada a uma empresa."""
+
+    id: int
+    name: str
+    type: str
+    host: str
+    database_name: str
+    status: Optional[str] = "available"
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

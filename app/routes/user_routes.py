@@ -99,11 +99,13 @@ async def list_permissions(
 
 @router.get("/roles", response_model=list[users_schemas.RoleSchema])
 async def list_roles(
+    empresa_id: Optional[int] = Query(None, description="Filtrar funções por empresa"),
     actor: user_model.User = Depends(_CAN_READ),
     db: Session = Depends(database.get_db),
 ):
     """Funções existentes, com as respetivas permissões e nº de membros."""
-    return user_crud.list_roles(db)
+    target_empresa_id = empresa_id if is_superadmin(actor) else (empresa_id or actor.empresa_id)
+    return user_crud.list_roles(db, empresa_id=target_empresa_id)
 
 
 @router.get("/members", response_model=list[users_schemas.MemberSchema])

@@ -411,6 +411,7 @@ def _member_out(user: user_model.User) -> users_schemas.MemberSchema:
         cargo_id=user.cargo_id,
         cargo_nome=user.cargo.nome if user.cargo else None,
         empresa_id=user.empresa_id,
+        empresa_nome=user.empresa.nome if user.empresa else None,
         is_superadmin=is_superadmin(user),
         created_at=user.created_at,
     )
@@ -1101,3 +1102,256 @@ def set_member_status(
     db.refresh(membro)
 
     return _member_out(membro)
+
+
+def update_member_full(
+    db: Session,
+    actor: user_model.User,
+    user_id: int,
+    data: users_schemas.MemberUpdateFullSchema,
+) -> users_schemas.MemberSchema:
+    membro = _get_member_or_404(db, actor, user_id)
+
+    # 1. Proteção de conta própria
+    if membro.id == actor.id:
+        if data.is_active is False:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Não pode desativar a sua própria conta.",
+            )
+        if data.role_id is not None and data.role_id != membro.role_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Não pode alterar a sua própria função global.",
+            )
+
+    # 2. Verificação de status
+    if data.is_active is not None and data.is_active != membro.is_active:
+        if not data.is_active and is_superadmin(membro) and _count_active_superadmins(db, membro.id) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este é o último super admin ativo e não pode ser desativado.",
+            )
+        membro.is_active = data.is_active
+
+    # 3. Verificação de função global (role)
+    if data.role_id is not None and data.role_id != membro.role_id:
+        if data.role_id == 0:
+            if is_superadmin(membro) and _count_active_superadmins(db, membro.id) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Este é o último super admin ativo e não pode ficar sem função.",
+                )
+            membro.role_id = None
+        else:
+            nova_role = get_role_or_404(db, data.role_id)
+            if not nova_role.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"A função '{nova_role.name}' está desativada.",
+                )
+            _assert_can_touch_superpermission(actor, nova_role.permissions or [])
+            if nova_role.empresa_id is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"'{nova_role.name}' é um cargo da empresa, não uma função global.",
+                )
+            perde_super = is_superadmin(membro) and not any(
+                p.name == SUPER_PERMISSION for p in nova_role.permissions or []
+            )
+            if perde_super and _count_active_superadmins(db, membro.id) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Este é o último super admin ativo. Promova outro membro antes de lhe retirar a função.",
+                )
+            membro.role_id = data.role_id
+
+    # 4. Verificação de e-mail único
+    if data.email:
+        email_norm = data.email.strip().lower()
+        if email_norm != (membro.email or "").lower():
+            existente = (
+                db.query(user_model.User.id)
+                .filter(
+                    func.lower(user_model.User.email) == email_norm,
+                    user_model.User.id != membro.id,
+                )
+                .first()
+            )
+            if existente:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Este e-mail já está associado a outro utilizador.",
+                )
+            membro.email = email_norm
+
+    # 5. Nome, apelido, telefone
+    if data.nome is not None:
+        membro.nome = data.nome.strip()
+    if data.apelido is not None:
+        membro.apelido = data.apelido.strip() or None
+    if data.telefone is not None:
+        membro.telefone = data.telefone.strip() or None
+
+    # 6. Empresa
+    if "empresa_id" in data.model_fields_set:
+        if data.empresa_id is None or data.empresa_id == 0:
+            membro.empresa_id = None
+        else:
+            empresa = db.get(user_model.Empresa, data.empresa_id)
+            if not empresa:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Empresa não encontrada.",
+                )
+            membro.empresa_id = empresa.id
+
+    # 7. Cargo
+    if data.cargo is not None:
+        cargo_str = data.cargo.strip()
+        if not cargo_str:
+            membro.cargo_id = None
+        else:
+            cargo_obj = get_or_create_cargo(
+                db, users_schemas.CargoSchema(position=cargo_str)
+            )
+            membro.cargo_id = cargo_obj.id if cargo_obj else None
+
+    # 8. Redefinição de senha
+    if data.senha and data.senha.strip():
+        membro.hashed_password = auth.hash_password(data.senha.strip())
+        log_message(
+            f"🔑 Senha do utilizador {membro.email} redefinida pelo administrador {actor.email}",
+            "info",
+        )
+
+    _audit(
+        db,
+        actor,
+        f"Atualizou a informação completa do utilizador '{membro.email}'",
+        "User",
+        membro.id,
+    )
+    db.commit()
+    db.refresh(membro)
+
+    log_message(
+        f"✅ Informação do utilizador {membro.email} atualizada por {actor.email}",
+        "success",
+    )
+    return _member_out(membro)
+
+
+def create_member_global(
+    db: Session,
+    actor: user_model.User,
+    data: users_schemas.MemberCreateGlobalSchema,
+) -> users_schemas.MemberSchema:
+    email_norm = data.email.strip().lower()
+    existente = (
+        db.query(user_model.User.id)
+        .filter(func.lower(user_model.User.email) == email_norm)
+        .first()
+    )
+    if existente:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Já existe um utilizador registado com este e-mail.",
+        )
+
+    # Função global (Role)
+    role_id = data.role_id
+    role = None
+    if role_id is not None:
+        role = get_role_or_404(db, role_id)
+        if not role.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"A função '{role.name}' está inativa.",
+            )
+        _assert_can_touch_superpermission(actor, role.permissions or [])
+        if role.empresa_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Não pode atribuir um cargo de empresa como função global.",
+            )
+
+    # Empresa
+    empresa_id = data.empresa_id
+    if empresa_id:
+        empresa = db.get(user_model.Empresa, empresa_id)
+        if not empresa:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Empresa não encontrada.",
+            )
+
+    # Cargo
+    cargo_id = None
+    if data.cargo and data.cargo.strip():
+        cargo_obj = get_or_create_cargo(
+            db, users_schemas.CargoSchema(position=data.cargo.strip())
+        )
+        cargo_id = cargo_obj.id if cargo_obj else None
+
+    # Senha
+    senha_plana = (data.senha or "").strip() or "Mudar@123"
+    hashed_pw = auth.hash_password(senha_plana)
+    plan = _default_signup_plan(db)
+
+    novo_user = user_model.User(
+        nome=data.nome.strip(),
+        apelido=(data.apelido or "").strip() or None,
+        email=email_norm,
+        telefone=(data.telefone or "").strip() or None,
+        role_id=role_id,
+        empresa_id=empresa_id,
+        cargo_id=cargo_id,
+        hashed_password=hashed_pw,
+        is_active=data.is_active,
+        email_verified=True,
+        concorda_termos=True,
+        plan_id=plan.id,
+    )
+    db.add(novo_user)
+    db.flush()
+
+    _audit(
+        db,
+        actor,
+        f"Criou o utilizador '{novo_user.email}' com função '{role.name if role else 'sem função'}'",
+        "User",
+        novo_user.id,
+    )
+    db.commit()
+    db.refresh(novo_user)
+
+    log_message(f"✅ Utilizador {novo_user.email} criado por {actor.email}", "success")
+    return _member_out(novo_user)
+
+
+def delete_member_global(
+    db: Session,
+    actor: user_model.User,
+    user_id: int,
+) -> None:
+    membro = _get_member_or_404(db, actor, user_id)
+
+    if membro.id == actor.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Não pode eliminar a sua própria conta.",
+        )
+
+    if is_superadmin(membro) and _count_active_superadmins(db, membro.id) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este é o último super admin ativo e não pode ser eliminado.",
+        )
+
+    email = membro.email
+    _audit(db, actor, f"Eliminou o utilizador '{email}'", "User", membro.id)
+    db.delete(membro)
+    db.commit()
+    log_message(f"🗑️ Utilizador {email} eliminado por {actor.email}", "success")
+

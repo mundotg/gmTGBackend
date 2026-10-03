@@ -217,6 +217,8 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
                         "ts": time.time(),
                         "val": redis_data["value"],
                         "ttl": MEMORY_CACHE_TTL,
+                        "user_id": redis_data.get("user_id"),
+                        "function": func.__name__,
                     }
                     return redis_data["value"]
             except Exception as e:
@@ -229,11 +231,15 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
             result = await func(*args, **kwargs)
             cacheable_result = _to_cacheable(result)
 
+            dono_id = _dono_de(args, kwargs)
+
             # L1
             MEMORY_CACHE[key] = {
                 "ts": time.time(),
                 "val": cacheable_result,
                 "ttl": MEMORY_CACHE_TTL,
+                "user_id": dono_id,
+                "function": func.__name__,
             }
 
             # L2
@@ -242,6 +248,7 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
                     "timestamp": time.time(),
                     "value": cacheable_result,
                     "function": func.__name__,
+                    "user_id": dono_id,
                 }
                 write_cache(cache_key, entry, ttl)
             except Exception as e:
@@ -294,6 +301,8 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
                         "ts": time.time(),
                         "val": redis_data["value"],
                         "ttl": MEMORY_CACHE_TTL,
+                        "user_id": redis_data.get("user_id"),
+                        "function": func.__name__,
                     }
                     return redis_data["value"]
             except Exception as e:
@@ -306,11 +315,15 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
             result = func(*args, **kwargs)
             cacheable_result = _to_cacheable(result)
 
+            dono_id = _dono_de(args, kwargs)
+
             # L1
             MEMORY_CACHE[key] = {
                 "ts": time.time(),
                 "val": cacheable_result,
                 "ttl": MEMORY_CACHE_TTL,
+                "user_id": dono_id,
+                "function": func.__name__,
             }
 
             # L2
@@ -319,6 +332,7 @@ def cache_result(ttl: Optional[int] = None, user_id: Optional[str] = None):
                     "timestamp": time.time(),
                     "value": cacheable_result,
                     "function": func.__name__,
+                    "user_id": dono_id,
                 }
                 write_cache(cache_key, entry, ttl)
             except Exception as e:
@@ -337,11 +351,11 @@ def clear_cache(pattern: str = f"{CACHE_PREFIX}*") -> int:
 
     try:
         if redis_client:
-        # if None:
+            search_pattern = pattern if pattern.startswith("*") else f"*{pattern}"
             cursor = 0
             while True:
                 cursor, keys = redis_client.scan(
-                    cursor=cursor, match=pattern, count=200
+                    cursor=cursor, match=search_pattern, count=200
                 )
 
                 if keys:

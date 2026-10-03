@@ -18,8 +18,10 @@ from typing_extensions import Annotated
 # =============================
 class EmpresaSchema(BaseModel):
     id: Optional[int] = None
-    nome: str = Field(..., alias="company")
-    tamanho: Optional[str] = Field(None, alias="companySize")
+    nome: str
+    company: Optional[str] = None
+    tamanho: Optional[str] = None
+    companySize: Optional[str] = None
     nif: Optional[str] = None
     endereco: Optional[str] = None
     is_active: bool = True
@@ -30,6 +32,37 @@ class EmpresaSchema(BaseModel):
         from_attributes=True,
         populate_by_name=True,
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_empresa_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            res = dict(data)
+            nome = res.get("nome") or res.get("company")
+            tam = res.get("tamanho") or res.get("companySize")
+            if nome is not None:
+                res["nome"] = nome
+                res["company"] = nome
+            if tam is not None:
+                res["tamanho"] = tam
+                res["companySize"] = tam
+            return res
+        elif hasattr(data, "nome"):
+            nome = getattr(data, "nome", "")
+            tam = getattr(data, "tamanho", None)
+            return {
+                "id": getattr(data, "id", None),
+                "nome": nome,
+                "company": nome,
+                "tamanho": tam,
+                "companySize": tam,
+                "nif": getattr(data, "nif", None),
+                "endereco": getattr(data, "endereco", None),
+                "is_active": getattr(data, "is_active", True),
+                "users_count": getattr(data, "users_count", 0),
+                "criado_em": getattr(data, "criado_em", None),
+            }
+        return data
 
 
 class EmpresaUpdateSchema(BaseModel):
@@ -175,6 +208,7 @@ class MemberSchema(BaseModel):
     cargo_id: Optional[int] = None
     cargo_nome: Optional[str] = None
     empresa_id: Optional[int] = None
+    empresa_nome: Optional[str] = None
     is_superadmin: bool = False
     created_at: Optional[datetime] = None
 
@@ -242,6 +276,34 @@ class MemberRoleUpdateSchema(BaseModel):
 
 class MemberStatusUpdateSchema(BaseModel):
     is_active: bool
+
+
+class MemberUpdateFullSchema(BaseModel):
+    nome: Optional[Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=255)]] = None
+    apelido: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]] = None
+    email: Optional[EmailStr] = None
+    telefone: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=30)]] = None
+    role_id: Optional[int] = None
+    empresa_id: Optional[int] = None
+    cargo: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]] = None
+    is_active: Optional[bool] = None
+    senha: Optional[Annotated[str, StringConstraints(min_length=6)]] = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class MemberCreateGlobalSchema(BaseModel):
+    nome: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=255)]
+    apelido: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]] = None
+    email: EmailStr
+    telefone: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=30)]] = None
+    role_id: Optional[int] = None
+    empresa_id: Optional[int] = None
+    cargo: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]] = None
+    is_active: bool = True
+    senha: Optional[Annotated[str, StringConstraints(min_length=6)]] = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 # -----------------------------

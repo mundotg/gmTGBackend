@@ -21,6 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import hash_password
+from app.config.cache_manager import CACHE_PREFIX, cache_result, clear_cache
 from app.cruds import user_crud
 from app.cruds.connection_cruds import (
     add_connection_empresa,
@@ -53,54 +54,32 @@ _WRITE_PERMS = ("company:update", "company:settings")
 _CAN_WRITE = require_permission(*_WRITE_PERMS)
 
 
-def _empresa_do_ator(actor: user_model.User, db: Session) -> user_model.Empresa:
-    """A empresa a que o utilizador pertence — ou 404 amigável."""
-    if not actor.empresa_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="A sua conta ainda não está associada a nenhuma empresa.",
-        )
-    empresa = (
-        db.query(user_model.Empresa)
-        .filter(user_model.Empresa.id == actor.empresa_id)
-        .first()
-    )
-    if not empresa:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Empresa não encontrada.",
-        )
-    return empresa
+def invalidate_empresas_cache():
+    """Invalida o cache de empresas paginadas e afins."""
+    try:
+        clear_cache(f"{CACHE_PREFIX}get_empresas_paginadas_cached:*")
+        clear_cache(f"{CACHE_PREFIX}get_shareable_empresas_cached:*")
+    except Exception as e:
+        log_message(f"Erro ao invalidar cache de empresas: {e}", "warning")
 
 
-@router.get("", response_model=users_schemas.EmpresaPaginadaSchema)
-async def listar_empresas(
-    busca: Optional[str] = Query(None, description="Pesquisa por nome, NIF ou endereço"),
-    status_filtro: Optional[str] = Query("todas", alias="status", description="Filtro de status: todas, ativas, inativas"),
-    page: int = Query(1, ge=1, description="Número da página"),
-    page_size: int = Query(10, ge=1, le=100, description="Registos por página"),
-    actor: user_model.User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Lista empresas com paginação e pesquisa.
-    - Super Admin vê todas as empresas da aplicação.
-    - Outros utilizadores veem apenas a(s) empresa(s) a que pertencem.
-    """
-    admin = is_superadmin(actor)
+@cache_result(ttl=180, user_id="empresas_paginadas")
+def get_empresas_paginadas_cached(
+    user_id: int,
+    is_superadmin: bool,
+    actor_empresa_id: Optional[int],
+    can_write: bool,
+    busca: Optional[str],
+    status_filtro: str,
+    page: int,
+    page_size: int,
+    *,
+    db: Session,
+) -> dict:
     query = db.query(user_model.Empresa)
 
-    if not admin:
-        if not actor.empresa_id:
-            return users_schemas.EmpresaPaginadaSchema(
-                items=[],
-                total=0,
-                page=page,
-                page_size=page_size,
-                total_pages=0,
-                is_admin=False,
-            )
-        query = query.filter(user_model.Empresa.id == actor.empresa_id)
+    if status_filtro == "minha" and actor_empresa_id:
+        query = query.filter(user_model.Empresa.id == actor_empresa_id)
 
     if busca and busca.strip():
         termo = f"%{busca.strip()}%"
@@ -135,32 +114,80 @@ async def listar_empresas(
         .all()
     )
 
-    can_write = user_has_permission(actor.permissions, _WRITE_PERMS)
-
     items = []
     for emp in empresas:
-        pode_gerir = admin or (emp.id == actor.empresa_id and can_write)
-        items.append(
-            users_schemas.EmpresaComPermissoesSchema(
-                id=emp.id,
-                nome=emp.nome,
-                tamanho=emp.tamanho,
-                nif=emp.nif,
-                endereco=emp.endereco,
-                is_active=emp.is_active if emp.is_active is not None else True,
-                users_count=user_counts.get(emp.id, 0),
-                criado_em=emp.criado_em,
-                can_manage=pode_gerir,
-            )
-        )
+        pode_gerir = is_superadmin or (emp.id == actor_empresa_id and can_write)
+        items.append({
+            "id": emp.id,
+            "nome": emp.nome,
+            "company": emp.nome,
+            "tamanho": emp.tamanho,
+            "companySize": emp.tamanho,
+            "nif": emp.nif,
+            "endereco": emp.endereco,
+            "is_active": emp.is_active if emp.is_active is not None else True,
+            "users_count": user_counts.get(emp.id, 0),
+            "criado_em": emp.criado_em.isoformat() if emp.criado_em else None,
+            "can_manage": pode_gerir,
+        })
 
-    return users_schemas.EmpresaPaginadaSchema(
-        items=items,
-        total=total,
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "is_admin": is_superadmin,
+    }
+
+
+def _empresa_do_ator(actor: user_model.User, db: Session) -> user_model.Empresa:
+    """A empresa a que o utilizador pertence — ou 404 amigável."""
+    if not actor.empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="A sua conta ainda não está associada a nenhuma empresa.",
+        )
+    empresa = (
+        db.query(user_model.Empresa)
+        .filter(user_model.Empresa.id == actor.empresa_id)
+        .first()
+    )
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Empresa não encontrada.",
+        )
+    return empresa
+
+
+@router.get("", response_model=users_schemas.EmpresaPaginadaSchema)
+async def listar_empresas(
+    busca: Optional[str] = Query(None, description="Pesquisa por nome, NIF ou endereço"),
+    status_filtro: Optional[str] = Query("todas", alias="status", description="Filtro de status: todas, ativas, inativas"),
+    page: int = Query(1, ge=1, description="Número da página"),
+    page_size: int = Query(10, ge=1, le=100, description="Registos por página"),
+    actor: user_model.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lista empresas com paginação e pesquisa (com cache no backend).
+    - Super Admin vê todas as empresas da aplicação.
+    - Outros utilizadores veem apenas a(s) empresa(s) a que pertencem.
+    """
+    admin = is_superadmin(actor)
+    can_write = user_has_permission(actor.permissions, _WRITE_PERMS)
+
+    return get_empresas_paginadas_cached(
+        user_id=actor.id,
+        is_superadmin=admin,
+        actor_empresa_id=actor.empresa_id,
+        can_write=can_write,
+        busca=busca.strip() if busca and busca.strip() else None,
+        status_filtro=status_filtro or "todas",
         page=page,
         page_size=page_size,
-        total_pages=total_pages,
-        is_admin=admin,
+        db=db,
     )
 
 
@@ -203,6 +230,7 @@ async def criar_empresa(
 
     _audit(db, actor, "create", "empresa", nova.id)
     db.commit()
+    invalidate_empresas_cache()
     log_message(f"🏢 Nova empresa criada #{nova.id} ('{nova.nome}') por user #{actor.id}", "info")
 
     return users_schemas.EmpresaComPermissoesSchema(
@@ -276,6 +304,7 @@ async def atualizar_minha_empresa(
 
     _audit(db, actor, "update", "empresa", empresa.id)
     db.commit()
+    invalidate_empresas_cache()
     log_message(
         f"🏢 Empresa #{empresa.id} atualizada por user #{actor.id}: {list(alteracoes)}",
         "info",
@@ -347,6 +376,7 @@ async def atualizar_empresa_por_id(
 
     _audit(db, actor, "update", "empresa", empresa.id)
     db.commit()
+    invalidate_empresas_cache()
     log_message(
         f"🏢 Empresa #{empresa.id} atualizada por user #{actor.id}: {list(alteracoes)}",
         "info",
@@ -741,6 +771,7 @@ async def adicionar_membro_empresa(
         db.refresh(existente)
         _audit(db, actor, "add_member", "user", existente.id)
         db.commit()
+        invalidate_empresas_cache()
         log_message(
             f"👥 Utilizador existente #{existente.id} associado à empresa #{empresa_id} por #{actor.id}",
             "info",
@@ -779,6 +810,7 @@ async def adicionar_membro_empresa(
 
     _audit(db, actor, "create_member", "user", novo_user.id)
     db.commit()
+    invalidate_empresas_cache()
     log_message(
         f"👥 Novo utilizador #{novo_user.id} ({novo_user.email}) criado e associado à empresa #{empresa_id} por #{actor.id}",
         "success",
@@ -833,6 +865,7 @@ async def remover_membro_empresa(
 
     _audit(db, actor, "remove_member", "user", alvo.id)
     db.commit()
+    invalidate_empresas_cache()
     log_message(
         f"👥 Utilizador #{alvo.id} desvinculado da empresa #{empresa_id} por #{actor.id}",
         "info",

@@ -99,11 +99,13 @@ async def list_permissions(
 
 @router.get("/roles", response_model=list[users_schemas.RoleSchema])
 async def list_roles(
+    empresa_id: Optional[int] = Query(None, description="Filtrar funções por empresa"),
     actor: user_model.User = Depends(_CAN_READ),
     db: Session = Depends(database.get_db),
 ):
     """Funções existentes, com as respetivas permissões e nº de membros."""
-    return user_crud.list_roles(db)
+    target_empresa_id = empresa_id if is_superadmin(actor) else (empresa_id or actor.empresa_id)
+    return user_crud.list_roles(db, empresa_id=target_empresa_id)
 
 
 @router.get("/members", response_model=list[users_schemas.MemberSchema])
@@ -221,3 +223,58 @@ async def set_member_status(
     db: Session = Depends(database.get_db),
 ):
     return user_crud.set_member_status(db, actor, user_id, data.is_active)
+
+
+@router.post(
+    "/members",
+    response_model=users_schemas.MemberSchema,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_member_global(
+    data: users_schemas.MemberCreateGlobalSchema,
+    actor: user_model.User = Depends(_CAN_MANAGE_MEMBERS),
+    db: Session = Depends(database.get_db),
+):
+    """Cria um novo membro no catálogo global com perfil completo."""
+    res = user_crud.create_member_global(db, actor, data)
+    from app.routes.empresa_routes import invalidate_empresas_cache
+    invalidate_empresas_cache()
+    return res
+
+
+@router.put(
+    "/members/{user_id}",
+    response_model=users_schemas.MemberSchema,
+)
+@router.patch(
+    "/members/{user_id}",
+    response_model=users_schemas.MemberSchema,
+)
+async def update_member_full(
+    user_id: int,
+    data: users_schemas.MemberUpdateFullSchema,
+    actor: user_model.User = Depends(_CAN_MANAGE_MEMBERS),
+    db: Session = Depends(database.get_db),
+):
+    """Atualização completa de informações do utilizador / perfil global pelo administrador."""
+    res = user_crud.update_member_full(db, actor, user_id, data)
+    from app.routes.empresa_routes import invalidate_empresas_cache
+    invalidate_empresas_cache()
+    return res
+
+
+@router.delete(
+    "/members/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_member_global(
+    user_id: int,
+    actor: user_model.User = Depends(_CAN_MANAGE_MEMBERS),
+    db: Session = Depends(database.get_db),
+):
+    """Remove permanentemente um utilizador do sistema (apenas admins)."""
+    user_crud.delete_member_global(db, actor, user_id)
+    from app.routes.empresa_routes import invalidate_empresas_cache
+    invalidate_empresas_cache()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+

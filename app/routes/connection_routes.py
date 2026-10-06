@@ -24,10 +24,13 @@ from app.config.cache_manager import CACHE_PREFIX, cache_result, clear_cache
 from app.config.dependencies import get_session_by_connection
 from app.config.engine_manager_cache import EngineManager
 from app.cruds.connection_cruds import (
+    add_connection_empresa,
     assert_connection_access,
     create_connection_log,
+    create_connection_role,
     create_db_connection,
     delete_connection,
+    delete_connection_role,
     desactivate_all_connections,
     disconnect_active_connection,
     get_active_connection_by_connid,
@@ -35,12 +38,20 @@ from app.cruds.connection_cruds import (
     get_connection_or_404,
     get_db_connection_by_id,
     get_db_connections_pagination_v1,
+    list_connection_available_permissions,
+    list_connection_empresas,
+    list_connection_roles,
     list_connection_shares,
+    list_shareable_empresas,
+    list_shareable_users,
     map_status,
     query_connections_simple,
+    remove_connection_empresa,
     revoke_connection_share,
     set_active_connection,
     share_connection,
+    update_connection_empresa,
+    update_connection_role,
     upsert_db_connection,
 )
 from app.database import get_db
@@ -49,9 +60,16 @@ from app.models.user_model import User
 from app.schemas.connetion_schema import (
     ConnectionAccessLevel,
     ConnectionAccessOut,
+    ConnectionEmpresaCreate,
+    ConnectionEmpresaOut,
+    ConnectionEmpresaUpdate,
     ConnectionPaginationOutput,
     ConnectionPassUserOut,
     ConnectionRequest,
+    ConnectionRoleCreate,
+    ConnectionRoleOut,
+    ConnectionRolePermissionOut,
+    ConnectionRoleUpdate,
     ConnectionShareCreate,
     ConnectionShareOut,
     ConnectionShareUpdate,
@@ -66,7 +84,7 @@ from app.services.dataset_service import (
     save_dataframe_to_sqlite,
 )
 from app.ultils.conect_database import close_engine
-from app.ultils.connection_access import assert_user_connection_level
+from app.ultils.connection_access import assert_connection_level, assert_user_connection_level, load_actor
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
 from app.ultils.permissions import get_current_user, is_superadmin
@@ -222,17 +240,12 @@ def _ensure_connection_exists(
 
 def _invalidate_connections_cache() -> None:
     """
-    Descarta o cache da listagem de conexões.
-
-    Sem isto, quem acabou de receber acesso a uma conexão só a via aparecer
-    até 5 minutos depois (TTL de `get_db_connections_pagination_cached`) — e
-    isso lê-se como "a partilha não funcionou".
-
-    O padrão inclui o nome da função, por isso em Redis só esta entrada cai;
-    o cache em memória é curto e reconstrói-se ao primeiro pedido.
+    Descarta o cache da listagem de conexões e candidatos a partilha.
     """
     try:
         clear_cache(f"{CACHE_PREFIX}get_db_connections_pagination_cached:*")
+        clear_cache(f"{CACHE_PREFIX}get_shareable_users_cached:*")
+        clear_cache(f"{CACHE_PREFIX}get_shareable_empresas_cached:*")
     except Exception as e:  # o cache nunca deve derrubar a operação principal
         log_message(f"⚠️ Falha ao invalidar cache de conexões: {e}", level="warning")
 
@@ -998,8 +1011,24 @@ async def get_connection_access_info(
     return list_connection_shares(db, conn_id, actor)
 
 
+@cache_result(ttl=120, user_id="shareable_users")
+async def get_shareable_users_cached(
+    conn_id: int, user_id: int, *, db: Session
+) -> list[dict]:
+    actor = load_actor(db, user_id)
+    return list_shareable_users(db, conn_id, actor)
+
+
+@cache_result(ttl=120, user_id="shareable_empresas")
+async def get_shareable_empresas_cached(
+    conn_id: int, user_id: int, *, db: Session
+) -> list[dict]:
+    actor = load_actor(db, user_id)
+    return list_shareable_empresas(db, conn_id, actor)
+
+
 @router.get("/connections/{conn_id}/shareable-users", response_model=list[dict])
-async def list_shareable_users(
+async def list_shareable_users_endpoint(
     conn_id: int,
     db: Session = Depends(get_db),
     actor: User = Depends(get_current_user),
@@ -1008,32 +1037,7 @@ async def list_shareable_users(
     Colegas a quem esta conexão pode ser partilhada: membros ativos da mesma
     empresa do dono, sem contar com o próprio dono nem com quem já tem acesso.
     """
-    conn = get_connection_or_404(db, conn_id)
-    acesso = assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
-
-    ja_com_acesso = {s.user_id for s in acesso.shares}
-    ja_com_acesso.add(conn.user_id)
-
-    query = db.query(User).filter(User.is_active.is_(True))
-
-    dono = conn.owner
-    if dono is not None and dono.empresa_id is not None:
-        query = query.filter(User.empresa_id == dono.empresa_id)
-    elif not is_superadmin(actor):
-        query = query.filter(User.empresa_id == actor.empresa_id)
-
-    candidatos = query.order_by(User.nome).all()
-
-    return [
-        {
-            "id": u.id,
-            "nome": u.nome,
-            "apelido": u.apelido,
-            "email": u.email,
-        }
-        for u in candidatos
-        if u.id not in ja_com_acesso
-    ]
+    return await get_shareable_users_cached(conn_id, actor.id, db=db)
 
 
 @router.post(
@@ -1047,8 +1051,21 @@ async def create_connection_share(
     db: Session = Depends(get_db),
     actor: User = Depends(get_current_user),
 ):
-    """Dá acesso a outro utilizador (ou atualiza o nível, se já tiver)."""
-    resultado = share_connection(db, conn_id, actor, data.user_id, data.access_level)
+    """Dá acesso a outro utilizador (ou atualiza o nível/role/regras, se já tiver)."""
+    resultado = share_connection(
+        db,
+        conn_id,
+        actor,
+        data.user_id,
+        data.access_level,
+        role_id=data.role_id,
+        allowed_tables=data.allowed_tables,
+        blocked_tables=data.blocked_tables,
+        allowed_columns=data.allowed_columns,
+        blocked_columns=data.blocked_columns,
+        allowed_query_types=data.allowed_query_types,
+        max_rows=data.max_rows,
+    )
     _invalidate_connections_cache()
     return resultado
 
@@ -1064,8 +1081,23 @@ async def update_connection_share(
     db: Session = Depends(get_db),
     actor: User = Depends(get_current_user),
 ):
-    """Altera o nível de acesso de quem já tem partilha."""
-    return share_connection(db, conn_id, actor, target_user_id, data.access_level)
+    """Altera o nível de acesso, role ou regras de quem já tem partilha."""
+    resultado = share_connection(
+        db,
+        conn_id,
+        actor,
+        target_user_id,
+        data.access_level,
+        role_id=data.role_id,
+        allowed_tables=data.allowed_tables,
+        blocked_tables=data.blocked_tables,
+        allowed_columns=data.allowed_columns,
+        blocked_columns=data.blocked_columns,
+        allowed_query_types=data.allowed_query_types,
+        max_rows=data.max_rows,
+    )
+    _invalidate_connections_cache()
+    return resultado
 
 
 @router.delete(
@@ -1082,3 +1114,149 @@ async def delete_connection_share(
     revoke_connection_share(db, conn_id, actor, target_user_id)
     _invalidate_connections_cache()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# =========================================================
+# 🔑 Rotas de Funções (Roles) por Conexão
+# =========================================================
+
+@router.get("/permissions/available", response_model=list[ConnectionRolePermissionOut])
+async def get_connection_available_permissions(
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Catálogo de permissões granulares aplicáveis a conexões de dados."""
+    return list_connection_available_permissions(db)
+
+
+@router.get("/connections/{conn_id}/roles", response_model=list[ConnectionRoleOut])
+async def get_connection_roles(
+    conn_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Lista as funções RBAC disponíveis nesta conexão específica."""
+    return list_connection_roles(db, conn_id, actor)
+
+
+@router.post(
+    "/connections/{conn_id}/roles",
+    response_model=ConnectionRoleOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_connection_role(
+    conn_id: int,
+    data: ConnectionRoleCreate,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Cria uma nova função RBAC isolada nesta conexão."""
+    return create_connection_role(db, conn_id, actor, data)
+
+
+@router.patch("/connections/{conn_id}/roles/{role_id}", response_model=ConnectionRoleOut)
+async def patch_connection_role(
+    conn_id: int,
+    role_id: int,
+    data: ConnectionRoleUpdate,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Atualiza metadados, permissões ou regras de uma função da conexão."""
+    return update_connection_role(db, conn_id, role_id, actor, data)
+
+
+@router.delete("/connections/{conn_id}/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_connection_role(
+    conn_id: int,
+    role_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Remove uma função da conexão."""
+    delete_connection_role(db, conn_id, role_id, actor)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# =========================================================
+# 🏢🔗🔌 Rotas de Associação N:N Conexão - Empresa
+# =========================================================
+
+@router.get("/connections/{conn_id}/empresas", response_model=list[ConnectionEmpresaOut])
+async def get_connection_empresas(
+    conn_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Lista as empresas vinculadas a esta conexão."""
+    return list_connection_empresas(db, conn_id, actor)
+
+
+@router.get("/connections/{conn_id}/shareable-empresas")
+async def get_connection_shareable_empresas(
+    conn_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Lista empresas disponíveis para vincular a esta conexão."""
+    return await get_shareable_empresas_cached(conn_id, actor.id, db=db)
+
+
+@router.post(
+    "/connections/{conn_id}/empresas",
+    response_model=ConnectionEmpresaOut,
+    status_code=status.HTTP_201_CREATED,
+)
+@router.post(
+    "/connections/{conn_id}/empresas/{empresa_id}",
+    response_model=ConnectionEmpresaOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_connection_empresa(
+    conn_id: int,
+    empresa_id: Optional[int] = None,
+    data: Optional[ConnectionEmpresaCreate] = None,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Vincula uma empresa a esta conexão (relação N:N), com nível e role opcionais."""
+    target_empresa_id = empresa_id or (data.empresa_id if data else None)
+    if not target_empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID da empresa é obrigatório.",
+        )
+    lvl = data.access_level if data else None
+    r_id = data.role_id if data else None
+    res = add_connection_empresa(db, conn_id, target_empresa_id, actor, access_level=lvl, role_id=r_id)
+    _invalidate_connections_cache()
+    return res
+
+
+@router.patch("/connections/{conn_id}/empresas/{empresa_id}", response_model=ConnectionEmpresaOut)
+async def patch_connection_empresa(
+    conn_id: int,
+    empresa_id: int,
+    data: ConnectionEmpresaUpdate,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Atualiza o nível de acesso ou role de uma empresa vinculada à conexão."""
+    res = update_connection_empresa(db, conn_id, empresa_id, actor, data)
+    _invalidate_connections_cache()
+    return res
+
+
+@router.delete("/connections/{conn_id}/empresas/{empresa_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_connection_empresa(
+    conn_id: int,
+    empresa_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
+    """Desvincula uma empresa desta conexão (relação N:N)."""
+    remove_connection_empresa(db, conn_id, empresa_id, actor)
+    _invalidate_connections_cache()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+

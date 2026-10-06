@@ -41,7 +41,11 @@ from app.schemas.query_select_upAndInsert_schema import QueryPayload
 from app.services.mongo_query_executor import run_mongo_query
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.conect_database import is_mongo, get_mongo_database
-from app.ultils.connection_access import assert_user_connection_level_async
+from app.ultils.connection_access import (
+    assert_user_connection_level_async,
+    get_effective_connection_rules_async,
+    validate_connection_query_rules,
+)
 from app.ultils.logger import log_message
 from app.ultils.permissions import get_current_user, require_permission, user_has_permission, ws_has_permission
 from app.ultils.get_id_by_token import ws_user_id
@@ -648,6 +652,24 @@ async def execute(
                 await assert_user_connection_level_async(
                     db, connection, user_id, ConnectionAccessLevel.write
                 )
+
+            # Validação granular de regras de conexão (tabelas, colunas, tipo de consulta, limites)
+            rules = await get_effective_connection_rules_async(db, connection, actor)
+            effective_limit = body.limit or 1000
+            if rules.max_rows is not None and rules.max_rows > 0:
+                effective_limit = min(effective_limit, rules.max_rows)
+
+            if is_mongo(engine):
+                m = _MONGO_RE.search(query.strip())
+                if m:
+                    coll_ref = m.group("coll")
+                    coll_name = coll_ref.split(".", 1)[1] if "." in coll_ref else coll_ref
+                    validate_connection_query_rules(rules, query_type="SELECT", tables=[coll_name])
+            else:
+                for stmt in split_statements(query):
+                    qtype = statement_type(stmt)
+                    tbls = extract_tables(stmt)
+                    validate_connection_query_rules(rules, query_type=qtype, tables=tbls)
         except HTTPException as e:
             # 403 de nível insuficiente (e 400 de conexão em falta) têm de
             # chegar ao editor como erro legível, não como "Sem conexão ativa".
@@ -665,7 +687,7 @@ async def execute(
                 async for ev in _run_mongo_shell(engine, connection, query):
                     yield ev
             else:
-                async for ev in _run_sql(engine, query, body.limit or 1000):
+                async for ev in _run_sql(engine, query, effective_limit):
                     yield ev
         except Exception as e:  # noqa: BLE001
             log_message(f"[sql-editor] erro execução: {e}", "error")

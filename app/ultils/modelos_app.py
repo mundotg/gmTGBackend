@@ -3,6 +3,10 @@ from app.models.connection_models import (
     ConnectionLog,
     DBConnection,
     DBConnectionShare,
+    ConnectionRole,
+    connection_roles_permissions,
+    EmpresaConnection,
+    empresa_connections,
 )
 from app.models.dbstatistics_models import DBStatistics
 from app.models.geral_model import Settings
@@ -13,6 +17,7 @@ from app.models.user_model import (
     User,
     RefreshToken,
     EmailVerificationToken,
+    OAuthAccount,
     Role,
     Permission,
     Empresa,

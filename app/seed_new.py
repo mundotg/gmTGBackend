@@ -87,6 +87,7 @@ ROLES_PERMISSIONS = {
             "company:members",
             "company:invite",
             "company:remove_member",
+            "company:assign_cargo",
             # DB CONNECTIONS
             "db_connection:create",
             "db_connection:read_own",
@@ -317,10 +318,14 @@ def seed_rbac(db: Session) -> None:
         permission_map[perm_name] = perm
 
     for role_name, data in ROLES_PERMISSIONS.items():
+        # Só as funções GLOBAIS (empresa_id NULL): a sincronização abaixo
+        # substitui as permissões, e não pode apanhar um cargo homónimo de
+        # uma empresa.
         role, _ = get_or_create(
             db,
             Role,
             name=role_name,
+            empresa_id=None,
             defaults={"description": data["description"]},
         )
         role.permissions = [permission_map[p] for p in data["permissions"]]
@@ -336,7 +341,7 @@ def seed_rbac(db: Session) -> None:
 # 👇 Adicionado o parâmetro 'plano'
 def seed_admin_user(db: Session, empresa: Empresa, plano: Plan) -> User:
     cargo_admin = db.query(Cargo).filter_by(nome="Admin").first()
-    role_admin = db.query(Role).filter_by(name="admin").first()
+    role_admin = db.query(Role).filter_by(name="admin", empresa_id=None).first()
 
     admin, created = get_or_create(
         db,
@@ -369,6 +374,95 @@ def seed_admin_user(db: Session, empresa: Empresa, plano: Plan) -> User:
     return admin
 
 
+def ensure_schema_columns(db: Session) -> None:
+    """
+    Garante que colunas e tabelas recentes existem no banco antes de qualquer query do seed.
+    Evita psycopg2.errors.UndefinedColumn em ambientes com banco existente.
+    """
+    from sqlalchemy import inspect, text
+    from app.database import Base
+    import app.models.connection_models  # noqa: F401
+    import app.models.user_model  # noqa: F401
+
+    try:
+        bind = db.get_bind()
+        inspector = inspect(bind)
+        existing_tables = set(inspector.get_table_names())
+
+        # Cria tabelas novas se não existirem (ex: connection_roles, connection_roles_permissions)
+        Base.metadata.create_all(bind=bind, checkfirst=True)
+
+        # Verifica e adiciona colunas em falta
+        if "roles" in existing_tables:
+            roles_cols = {c["name"] for c in inspector.get_columns("roles")}
+            if "empresa_id" not in roles_cols:
+                db.execute(
+                    text("ALTER TABLE roles ADD COLUMN empresa_id INTEGER REFERENCES empresas(id) ON DELETE CASCADE")
+                )
+                db.commit()
+                log_message("✅ Coluna 'empresa_id' adicionada à tabela 'roles'", "success")
+
+        if "db_connection_shares" in existing_tables:
+            shares_cols = {c["name"] for c in inspector.get_columns("db_connection_shares")}
+            if "role_id" not in shares_cols:
+                db.execute(
+                    text("ALTER TABLE db_connection_shares ADD COLUMN role_id INTEGER REFERENCES connection_roles(id) ON DELETE SET NULL")
+                )
+                db.commit()
+                log_message("✅ Coluna 'role_id' adicionada à tabela 'db_connection_shares'", "success")
+
+        if "empresa_connections" not in existing_tables:
+            db.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS empresa_connections (
+                        empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                        connection_id INTEGER NOT NULL REFERENCES db_connections(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                        access_level VARCHAR(20) DEFAULT 'read' NOT NULL,
+                        role_id INTEGER REFERENCES connection_roles(id) ON DELETE SET NULL,
+                        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                        PRIMARY KEY (empresa_id, connection_id)
+                    )
+                    """
+                )
+            )
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_empresa_connections_empresa_id ON empresa_connections(empresa_id)"))
+            db.execute(text("CREATE INDEX IF NOT EXISTS ix_empresa_connections_connection_id ON empresa_connections(connection_id)"))
+            db.commit()
+            log_message("✅ Tabela 'empresa_connections' criada", "success")
+        else:
+            ec_cols = {c["name"] for c in inspector.get_columns("empresa_connections")}
+            if "access_level" not in ec_cols:
+                db.execute(text("ALTER TABLE empresa_connections ADD COLUMN access_level VARCHAR(20) DEFAULT 'read' NOT NULL"))
+                db.commit()
+            if "role_id" not in ec_cols:
+                db.execute(text("ALTER TABLE empresa_connections ADD COLUMN role_id INTEGER REFERENCES connection_roles(id) ON DELETE SET NULL"))
+                db.commit()
+
+        if "connection_roles" in existing_tables:
+            cr_cols = {c["name"] for c in inspector.get_columns("connection_roles")}
+            for col_name in ("allowed_tables", "blocked_tables", "allowed_columns", "blocked_columns", "allowed_query_types"):
+                if col_name not in cr_cols:
+                    db.execute(text(f"ALTER TABLE connection_roles ADD COLUMN {col_name} JSON"))
+                    db.commit()
+            if "max_rows" not in cr_cols:
+                db.execute(text("ALTER TABLE connection_roles ADD COLUMN max_rows INTEGER"))
+                db.commit()
+
+        if "db_connection_shares" in existing_tables:
+            cs_cols = {c["name"] for c in inspector.get_columns("db_connection_shares")}
+            for col_name in ("allowed_tables", "blocked_tables", "allowed_columns", "blocked_columns", "allowed_query_types"):
+                if col_name not in cs_cols:
+                    db.execute(text(f"ALTER TABLE db_connection_shares ADD COLUMN {col_name} JSON"))
+                    db.commit()
+            if "max_rows" not in cs_cols:
+                db.execute(text("ALTER TABLE db_connection_shares ADD COLUMN max_rows INTEGER"))
+                db.commit()
+    except Exception as e:
+        db.rollback()
+        log_message(f"ℹ️ Verificação de esquema automático: {e}", "info")
+
+
 # ==========================================================
 # 🌱 SEED PRINCIPAL
 # ==========================================================
@@ -378,6 +472,7 @@ def seed_data(db: Session) -> None:
     log_message("🚀 Iniciando seed do sistema...", "info")
 
     try:
+        ensure_schema_columns(db)
         empresa = seed_empresa(db)
         seed_cargos(db)
         seed_rbac(db)

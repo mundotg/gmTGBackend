@@ -7,24 +7,38 @@ from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload, load_only, noload
 
-from app.models.user_model import User
+from app.models.user_model import Empresa, Permission, User
 from app.models.connection_models import (
     ActiveConnection,
     ConnectionLog,
+    ConnectionRole,
     DBConnection,
     DBConnectionShare,
+    EmpresaConnection,
+    empresa_connections,
 )
 from app.schemas.connetion_schema import (
     ConnectionAccessLevel,
     ConnectionAccessOut,
+    ConnectionEmpresaCreate,
+    ConnectionEmpresaOut,
+    ConnectionEmpresaUpdate,
+    ConnectionRoleCreate,
+    ConnectionRoleOut,
+    ConnectionRolePermissionOut,
+    ConnectionRoleUpdate,
     ConnectionShareOut,
     DBConnectionBase,
+    EffectiveConnectionRules,
+    EmpresaConnectionOut,
 )
 from app.schemas.users_schemas import PaginationOutput
 from app.services.crypto_utils import reencrypt_at_rest, secret_decrypt, secret_encrypt
 from app.ultils.connection_access import (
     ACCESS_ORDER,
+    assert_connection_level,
     forca_do_nivel,
+    get_effective_connection_rules,
     negar_acesso,
     resolve_access_level,
 )
@@ -829,6 +843,14 @@ def _share_out(share: DBConnectionShare) -> ConnectionShareOut:
         user_nome=share.user.nome if share.user else None,
         user_email=share.user.email if share.user else None,
         access_level=ConnectionAccessLevel(share.access_level),
+        role_id=share.role_id,
+        role_name=share.role.name if share.role else None,
+        allowed_tables=list(share.allowed_tables or []),
+        blocked_tables=list(share.blocked_tables or []),
+        allowed_columns=dict(share.allowed_columns or {}),
+        blocked_columns=dict(share.blocked_columns or {}),
+        allowed_query_types=list(share.allowed_query_types or []),
+        max_rows=share.max_rows,
         granted_by_id=share.granted_by_id,
         granted_by_nome=share.granted_by.nome if share.granted_by else None,
         created_at=share.created_at,
@@ -863,6 +885,124 @@ def get_share(
     )
 
 
+def _connection_role_out(role: ConnectionRole) -> ConnectionRoleOut:
+    return ConnectionRoleOut(
+        id=role.id,
+        connection_id=role.connection_id,
+        name=role.name,
+        description=role.description,
+        is_default=bool(role.is_default),
+        created_at=role.created_at,
+        allowed_tables=list(role.allowed_tables or []),
+        blocked_tables=list(role.blocked_tables or []),
+        allowed_columns=dict(role.allowed_columns or {}),
+        blocked_columns=dict(role.blocked_columns or {}),
+        allowed_query_types=list(role.allowed_query_types or []),
+        max_rows=role.max_rows,
+        permissions=[
+            ConnectionRolePermissionOut(
+                id=p.id,
+                name=p.name,
+                description=p.description,
+                category=p.name.split(":", 1)[0] if ":" in p.name else "outros",
+            )
+            for p in (role.permissions or [])
+        ],
+    )
+
+
+def _connection_empresa_out(assoc: EmpresaConnection) -> ConnectionEmpresaOut:
+    return ConnectionEmpresaOut(
+        id=assoc.empresa.id,
+        nome=assoc.empresa.nome,
+        tamanho=assoc.empresa.tamanho,
+        nif=assoc.empresa.nif,
+        access_level=ConnectionAccessLevel(assoc.access_level or "read"),
+        role_id=assoc.role_id,
+        role_name=assoc.role.name if assoc.role else None,
+        created_at=assoc.created_at or assoc.empresa.criado_em,
+    )
+
+
+def _get_connection_empresas(db: Session, conn_id: int) -> list[ConnectionEmpresaOut]:
+    assocs = (
+        db.query(EmpresaConnection)
+        .options(joinedload(EmpresaConnection.empresa), joinedload(EmpresaConnection.role))
+        .filter(EmpresaConnection.connection_id == conn_id)
+        .all()
+    )
+    return [_connection_empresa_out(a) for a in assocs if a.empresa]
+
+
+DEFAULT_CONN_ROLES = [
+    {
+        "name": "Leitor",
+        "description": "Apenas leitura de dados e consulta de estruturas.",
+        "is_default": True,
+        "permissions": ["query:execute", "query:read_history", "table:read", "table:describe", "db_connection:read_own"],
+    },
+    {
+        "name": "Operador de Dados",
+        "description": "Consulta e inserção/atualização de dados, sem permissões de DDL.",
+        "is_default": True,
+        "permissions": ["query:execute", "query:read_history", "query:export", "table:read", "table:describe", "data:write", "db_connection:read_own"],
+    },
+    {
+        "name": "DBA / Estrutura",
+        "description": "Controlo total de dados e esquemas (DDL, DML, transferências).",
+        "is_default": True,
+        "permissions": ["query:execute", "query:read_history", "query:export", "table:read", "table:describe", "table:stats", "data:write", "data:delete", "schema:manage", "data:transfer", "db_connection:read_own"],
+    },
+    {
+        "name": "Admin da Conexão",
+        "description": "Gestão completa da conexão, parâmetros e partilhas.",
+        "is_default": True,
+        "permissions": ["query:execute", "query:read_history", "query:export", "table:read", "table:describe", "table:stats", "data:write", "data:delete", "schema:manage", "data:transfer", "db_connection:read_own", "db_connection:update", "db_connection:test", "backup:read", "backup:execute"],
+    },
+]
+
+
+def _ensure_default_connection_roles(db: Session, conn: DBConnection) -> None:
+    """Garante a existência das roles padrão nesta conexão se ainda não existirem."""
+    existing_roles = {
+        r.name for r in db.query(ConnectionRole.name).filter(ConnectionRole.connection_id == conn.id).all()
+    }
+
+    all_perms = {p.name: p for p in db.query(Permission).all()}
+
+    criou_alguma = False
+    for spec in DEFAULT_CONN_ROLES:
+        if spec["name"] in existing_roles:
+            continue
+        role_perms = []
+        for p_name in spec["permissions"]:
+            if p_name in all_perms:
+                role_perms.append(all_perms[p_name])
+            else:
+                new_perm = Permission(name=p_name, description=f"Permissão {p_name}")
+                db.add(new_perm)
+                db.flush()
+                all_perms[p_name] = new_perm
+                role_perms.append(new_perm)
+
+        c_role = ConnectionRole(
+            connection_id=conn.id,
+            name=spec["name"],
+            description=spec["description"],
+            is_default=True,
+            permissions=role_perms,
+        )
+        db.add(c_role)
+        criou_alguma = True
+
+    if criou_alguma:
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            log_message(f"⚠️ Erro ao semear roles padrão para conexão #{conn.id}: {e}", "warning")
+
+
 def get_connection_access(
     db: Session, conn: DBConnection, user: User
 ) -> ConnectionAccessOut:
@@ -887,12 +1027,71 @@ def get_connection_access(
             .options(
                 joinedload(DBConnectionShare.user),
                 joinedload(DBConnectionShare.granted_by),
+                joinedload(DBConnectionShare.role),
             )
             .filter(DBConnectionShare.connection_id == conn.id)
             .order_by(DBConnectionShare.created_at.desc())
             .all()
         )
         shares = [_share_out(s) for s in registos]
+
+    connection_roles: list[ConnectionRoleOut] = []
+    if pode_partilhar or is_owner or superadmin:
+        conn_roles = (
+            db.query(ConnectionRole)
+            .options(joinedload(ConnectionRole.permissions))
+            .filter(ConnectionRole.connection_id == conn.id)
+            .order_by(ConnectionRole.name)
+            .all()
+        )
+        if not conn_roles:
+            _ensure_default_connection_roles(db, conn)
+            conn_roles = (
+                db.query(ConnectionRole)
+                .options(joinedload(ConnectionRole.permissions))
+                .filter(ConnectionRole.connection_id == conn.id)
+                .order_by(ConnectionRole.name)
+                .all()
+            )
+        connection_roles = [_connection_role_out(r) for r in conn_roles]
+
+    user_role_id = None
+    user_role_name = None
+    if is_owner:
+        user_role_name = "Proprietário"
+    elif superadmin:
+        user_role_name = "Super Admin"
+    else:
+        u_share = (
+            db.query(DBConnectionShare)
+            .options(joinedload(DBConnectionShare.role))
+            .filter(
+                DBConnectionShare.connection_id == conn.id,
+                DBConnectionShare.user_id == user.id,
+            )
+            .first()
+        )
+        if u_share and u_share.role:
+            user_role_id = u_share.role_id
+            user_role_name = u_share.role.name
+        elif getattr(user, "empresa_id", None):
+            emp_assoc = (
+                db.query(EmpresaConnection)
+                .options(joinedload(EmpresaConnection.role))
+                .filter(
+                    EmpresaConnection.connection_id == conn.id,
+                    EmpresaConnection.empresa_id == user.empresa_id,
+                )
+                .first()
+            )
+            if emp_assoc and emp_assoc.role:
+                user_role_id = emp_assoc.role_id
+                user_role_name = emp_assoc.role.name
+
+    empresas_list: list[ConnectionEmpresaOut] = []
+    if pode_partilhar or is_owner or superadmin:
+        empresas_list = _get_connection_empresas(db, conn.id)
+    effective_rules = get_effective_connection_rules(db, conn, user)
 
     return ConnectionAccessOut(
         connection_id=conn.id,
@@ -901,11 +1100,16 @@ def get_connection_access(
         owner_nome=conn.owner.nome if conn.owner else None,
         is_owner=is_owner,
         access_level=nivel,
+        role_id=user_role_id,
+        role_name=user_role_name,
         can_read=forca >= ACCESS_ORDER[ConnectionAccessLevel.read],
         can_write=forca >= ACCESS_ORDER[ConnectionAccessLevel.write],
         can_share=pode_partilhar,
         can_delete=is_owner or superadmin,
         shares=shares,
+        roles=connection_roles,
+        empresas=empresas_list,
+        effective_rules=effective_rules,
     )
 
 
@@ -946,9 +1150,16 @@ def share_connection(
     connection_id: int,
     actor: User,
     target_user_id: int,
-    access_level: ConnectionAccessLevel,
+    access_level: Optional[ConnectionAccessLevel] = None,
+    role_id: Optional[int] = None,
+    allowed_tables: Optional[list[str]] = None,
+    blocked_tables: Optional[list[str]] = None,
+    allowed_columns: Optional[dict[str, list[str]]] = None,
+    blocked_columns: Optional[dict[str, list[str]]] = None,
+    allowed_query_types: Optional[list[str]] = None,
+    max_rows: Optional[int] = None,
 ) -> ConnectionShareOut:
-    """Concede (ou atualiza) o acesso de outro utilizador a uma conexão."""
+    """Concede (ou atualiza) o acesso de outro utilizador a uma conexão com regras opcionais."""
     conn = get_connection_or_404(db, connection_id)
     assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
 
@@ -984,16 +1195,54 @@ def share_connection(
             detail="Só é possível partilhar com membros da mesma empresa.",
         )
 
+    # Validar role_id se fornecido
+    if role_id is not None:
+        c_role = (
+            db.query(ConnectionRole)
+            .filter(
+                ConnectionRole.id == role_id,
+                ConnectionRole.connection_id == conn.id,
+            )
+            .first()
+        )
+        if not c_role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="A função de conexão especificada não pertence a esta conexão.",
+            )
+
     share = get_share(db, conn.id, target_user_id)
     criou = share is None
 
     if share:
-        share.access_level = access_level.value
+        if access_level is not None:
+            share.access_level = access_level.value
+        if role_id is not None:
+            share.role_id = role_id
+        if allowed_tables is not None:
+            share.allowed_tables = allowed_tables
+        if blocked_tables is not None:
+            share.blocked_tables = blocked_tables
+        if allowed_columns is not None:
+            share.allowed_columns = allowed_columns
+        if blocked_columns is not None:
+            share.blocked_columns = blocked_columns
+        if allowed_query_types is not None:
+            share.allowed_query_types = allowed_query_types
+        if max_rows is not None:
+            share.max_rows = max_rows
     else:
         share = DBConnectionShare(
             connection_id=conn.id,
             user_id=target_user_id,
-            access_level=access_level.value,
+            access_level=access_level.value if access_level else "read",
+            role_id=role_id,
+            allowed_tables=allowed_tables or [],
+            blocked_tables=blocked_tables or [],
+            allowed_columns=allowed_columns or {},
+            blocked_columns=blocked_columns or {},
+            allowed_query_types=allowed_query_types or [],
+            max_rows=max_rows,
             granted_by_id=actor.id,
         )
         db.add(share)
@@ -1015,14 +1264,15 @@ def share_connection(
         details={
             "target_user_id": target_user_id,
             "target_email": alvo.email,
-            "access_level": access_level.value,
+            "access_level": share.access_level,
+            "role_id": role_id,
         },
         user_id=actor.id,
     )
 
     log_message(
         f"🤝 Conexão '{conn.name}' partilhada com {alvo.email} "
-        f"(nível={access_level.value}) por {actor.email}",
+        f"(nível={access_level.value}, role_id={role_id}) por {actor.email}",
         "success",
     )
 
@@ -1032,6 +1282,7 @@ def share_connection(
         .options(
             joinedload(DBConnectionShare.user),
             joinedload(DBConnectionShare.granted_by),
+            joinedload(DBConnectionShare.role),
         )
         .filter(DBConnectionShare.id == share.id)
         .first()
@@ -1077,10 +1328,536 @@ def revoke_connection_share(
 
 
 def get_shared_connection_ids(db: Session, user_id: int) -> list[int]:
-    """IDs das conexões partilhadas com este utilizador (não as que ele possui)."""
+    """IDs das conexões partilhadas com este utilizador ou com a sua empresa."""
+    user = db.query(User.empresa_id).filter(User.id == user_id).first()
+    empresa_id = user[0] if user else None
+
     rows = (
         db.query(DBConnectionShare.connection_id)
         .filter(DBConnectionShare.user_id == user_id)
         .all()
     )
-    return [row[0] for row in rows]
+    conn_ids = {row[0] for row in rows}
+
+    if empresa_id:
+        emp_rows = (
+            db.query(EmpresaConnection.connection_id)
+            .filter(EmpresaConnection.empresa_id == empresa_id)
+            .all()
+        )
+        conn_ids.update(row[0] for row in emp_rows)
+
+    return list(conn_ids)
+
+
+# =========================================================
+# 🔑 Gestão de Funções (Roles) por Conexão
+# =========================================================
+
+def list_connection_roles(
+    db: Session, connection_id: int, actor: User
+) -> list[ConnectionRoleOut]:
+    """Lista as funções RBAC disponíveis nesta conexão (semeando as padrões se não existirem)."""
+    conn = get_connection_or_404(db, connection_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.read)
+
+    roles = (
+        db.query(ConnectionRole)
+        .options(joinedload(ConnectionRole.permissions))
+        .filter(ConnectionRole.connection_id == conn.id)
+        .order_by(ConnectionRole.name)
+        .all()
+    )
+
+    if not roles:
+        _ensure_default_connection_roles(db, conn)
+        roles = (
+            db.query(ConnectionRole)
+            .options(joinedload(ConnectionRole.permissions))
+            .filter(ConnectionRole.connection_id == conn.id)
+            .order_by(ConnectionRole.name)
+            .all()
+        )
+
+    return [_connection_role_out(r) for r in roles]
+
+
+def create_connection_role(
+    db: Session, connection_id: int, actor: User, data: ConnectionRoleCreate
+) -> ConnectionRoleOut:
+    """Cria uma nova função RBAC isolada nesta conexão."""
+    conn = get_connection_or_404(db, connection_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
+
+    existente = (
+        db.query(ConnectionRole)
+        .filter(
+            ConnectionRole.connection_id == conn.id,
+            ConnectionRole.name == data.name.strip(),
+        )
+        .first()
+    )
+    if existente:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Já existe uma função com o nome '{data.name.strip()}' nesta conexão.",
+        )
+
+    perms = []
+    if data.permission_ids:
+        perms = (
+            db.query(Permission)
+            .filter(Permission.id.in_(data.permission_ids))
+            .all()
+        )
+
+    c_role = ConnectionRole(
+        connection_id=conn.id,
+        name=data.name.strip(),
+        description=data.description.strip() if data.description else None,
+        is_default=False,
+        permissions=perms,
+        allowed_tables=data.allowed_tables or [],
+        blocked_tables=data.blocked_tables or [],
+        allowed_columns=data.allowed_columns or {},
+        blocked_columns=data.blocked_columns or {},
+        allowed_query_types=data.allowed_query_types or [],
+        max_rows=data.max_rows,
+    )
+    db.add(c_role)
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        log_message(f"❌ Erro ao criar função de conexão: {e}", "error")
+        raise HTTPException(status_code=500, detail="Erro ao criar a função da conexão.")
+
+    db.refresh(c_role)
+    log_message(f"🔑 Função de conexão '{c_role.name}' criada para conexão #{conn.id} por {actor.email}", "success")
+    return _connection_role_out(c_role)
+
+
+def update_connection_role(
+    db: Session,
+    connection_id: int,
+    role_id: int,
+    actor: User,
+    data: ConnectionRoleUpdate,
+) -> ConnectionRoleOut:
+    """Atualiza uma função RBAC da conexão."""
+    conn = get_connection_or_404(db, connection_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
+
+    c_role = (
+        db.query(ConnectionRole)
+        .options(joinedload(ConnectionRole.permissions))
+        .filter(
+            ConnectionRole.id == role_id,
+            ConnectionRole.connection_id == conn.id,
+        )
+        .first()
+    )
+    if not c_role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Função da conexão não encontrada.",
+        )
+
+    if data.name is not None and data.name.strip() != c_role.name:
+        dup = (
+            db.query(ConnectionRole)
+            .filter(
+                ConnectionRole.connection_id == conn.id,
+                ConnectionRole.name == data.name.strip(),
+                ConnectionRole.id != c_role.id,
+            )
+            .first()
+        )
+        if dup:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Já existe uma função com o nome '{data.name.strip()}' nesta conexão.",
+            )
+        c_role.name = data.name.strip()
+
+    if data.description is not None:
+        c_role.description = data.description.strip() if data.description else None
+
+    if data.permission_ids is not None:
+        novas = (
+            db.query(Permission)
+            .filter(Permission.id.in_(data.permission_ids))
+            .all()
+        )
+        c_role.permissions = novas
+
+    if data.allowed_tables is not None:
+        c_role.allowed_tables = data.allowed_tables
+    if data.blocked_tables is not None:
+        c_role.blocked_tables = data.blocked_tables
+    if data.allowed_columns is not None:
+        c_role.allowed_columns = data.allowed_columns
+    if data.blocked_columns is not None:
+        c_role.blocked_columns = data.blocked_columns
+    if data.allowed_query_types is not None:
+        c_role.allowed_query_types = data.allowed_query_types
+    if data.max_rows is not None:
+        c_role.max_rows = data.max_rows
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        log_message(f"❌ Erro ao atualizar função de conexão: {e}", "error")
+        raise HTTPException(status_code=500, detail="Erro ao atualizar a função da conexão.")
+
+    db.refresh(c_role)
+    return _connection_role_out(c_role)
+
+
+def delete_connection_role(
+    db: Session, connection_id: int, role_id: int, actor: User
+) -> None:
+    """Remove uma função da conexão, desvinculando membros partilhados."""
+    conn = get_connection_or_404(db, connection_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
+
+    c_role = (
+        db.query(ConnectionRole)
+        .filter(
+            ConnectionRole.id == role_id,
+            ConnectionRole.connection_id == conn.id,
+        )
+        .first()
+    )
+    if not c_role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Função da conexão não encontrada.",
+        )
+
+    # Desvincular membros partilhados desta role
+    db.query(DBConnectionShare).filter(
+        DBConnectionShare.role_id == c_role.id
+    ).update({"role_id": None}, synchronize_session=False)
+
+    nome = c_role.name
+    db.delete(c_role)
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        log_message(f"❌ Erro ao remover função de conexão: {e}", "error")
+        raise HTTPException(status_code=500, detail="Erro ao remover a função da conexão.")
+
+    log_message(f"🗑️ Função de conexão '{nome}' (#{role_id}) removida por {actor.email}", "success")
+
+
+def list_connection_available_permissions(db: Session) -> list[ConnectionRolePermissionOut]:
+    """Retorna o catálogo de permissões aplicáveis a conexões de dados."""
+    prefixes = ("query:", "table:", "data:", "schema:", "db_connection:", "backup:")
+    all_perms = db.query(Permission).order_by(Permission.name).all()
+    conn_perms = [p for p in all_perms if any(p.name.startswith(pref) for pref in prefixes)]
+
+    return [
+        ConnectionRolePermissionOut(
+            id=p.id,
+            name=p.name,
+            description=p.description,
+            category=p.name.split(":", 1)[0] if ":" in p.name else "outros",
+        )
+        for p in conn_perms
+    ]
+
+
+# =========================================================
+# 🏢🔗🔌 Gestão N:N de Conexão com Empresas
+# =========================================================
+
+def list_connection_empresas(db: Session, conn_id: int, actor: User) -> list[ConnectionEmpresaOut]:
+    """Lista todas as empresas associadas a uma conexão com o seu nível de acesso e role."""
+    conn = get_connection_or_404(db, conn_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.read)
+    return _get_connection_empresas(db, conn_id)
+
+
+def list_shareable_users(db: Session, conn_id: int, actor: User) -> list[dict]:
+    """
+    Colegas a quem esta conexão pode ser partilhada: membros ativos da mesma
+    empresa do dono, sem contar com o próprio dono nem com quem já tem acesso.
+    """
+    conn = get_connection_or_404(db, conn_id)
+    assert_connection_level(db, conn, actor, ConnectionAccessLevel.manage)
+
+    ja_com_acesso = {
+        r[0] for r in db.query(DBConnectionShare.user_id).filter(DBConnectionShare.connection_id == conn_id).all()
+    }
+    ja_com_acesso.add(conn.user_id)
+
+    query = db.query(User.id, User.nome, User.apelido, User.email).filter(
+        User.is_active.is_(True),
+    )
+    if ja_com_acesso:
+        query = query.filter(User.id.notin_(ja_com_acesso))
+
+    dono = conn.owner
+    if dono is not None and dono.empresa_id is not None:
+        query = query.filter(User.empresa_id == dono.empresa_id)
+    elif not is_superadmin(actor):
+        query = query.filter(User.empresa_id == actor.empresa_id)
+
+    candidatos = query.order_by(User.nome).all()
+
+    return [
+        {
+            "id": u.id,
+            "nome": u.nome,
+            "apelido": u.apelido,
+            "email": u.email,
+        }
+        for u in candidatos
+    ]
+
+
+def list_shareable_empresas(db: Session, conn_id: int, actor: User) -> list[dict]:
+    """Lista empresas disponíveis para adicionar a esta conexão (exclui as já vinculadas)."""
+    conn = get_connection_or_404(db, conn_id)
+    assert_connection_level(db, conn, actor, ConnectionAccessLevel.manage)
+
+    # IDs já vinculados
+    vinculadas_ids = [
+        r[0] for r in db.query(EmpresaConnection.empresa_id).filter(EmpresaConnection.connection_id == conn_id).all()
+    ]
+
+    query = db.query(Empresa.id, Empresa.nome, Empresa.nif, Empresa.tamanho)
+    if not is_superadmin(actor):
+        if actor.empresa_id:
+            query = query.filter(Empresa.id == actor.empresa_id)
+        else:
+            return []
+
+    if vinculadas_ids:
+        query = query.filter(Empresa.id.notin_(vinculadas_ids))
+
+    empresas = query.order_by(Empresa.nome).all()
+    return [
+        {
+            "id": e.id,
+            "nome": e.nome,
+            "nif": e.nif,
+            "tamanho": e.tamanho,
+        }
+        for e in empresas
+    ]
+
+
+def add_connection_empresa(
+    db: Session,
+    conn_id: int,
+    empresa_id: int,
+    actor: User,
+    access_level: Optional[ConnectionAccessLevel] = None,
+    role_id: Optional[int] = None,
+) -> ConnectionEmpresaOut:
+    """Associa uma empresa à conexão (N:N), definindo nível de acesso e função."""
+    conn = get_connection_or_404(db, conn_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
+
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Empresa não encontrada.",
+        )
+
+    role_obj = None
+    if role_id is not None:
+        role_obj = (
+            db.query(ConnectionRole)
+            .filter(ConnectionRole.id == role_id, ConnectionRole.connection_id == conn.id)
+            .first()
+        )
+        if not role_obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="A função especificada não pertence a esta conexão.",
+            )
+
+    assoc = (
+        db.query(EmpresaConnection)
+        .filter(
+            EmpresaConnection.empresa_id == empresa_id,
+            EmpresaConnection.connection_id == conn_id,
+        )
+        .first()
+    )
+
+    nivel_str = access_level.value if access_level else "read"
+
+    if not assoc:
+        assoc = EmpresaConnection(
+            empresa_id=empresa_id,
+            connection_id=conn_id,
+            access_level=nivel_str,
+            role_id=role_id,
+        )
+        db.add(assoc)
+    else:
+        assoc.access_level = nivel_str
+        assoc.role_id = role_id
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        log_message(f"❌ Erro ao vincular empresa à conexão: {e}", "error")
+        raise HTTPException(status_code=500, detail="Erro ao vincular empresa à conexão.")
+
+    db.refresh(assoc)
+    log_message(
+        f"🔗 Empresa '{empresa.nome}' vinculada à conexão '{conn.name}' (nível={nivel_str}, role_id={role_id}) por {actor.email}",
+        "success",
+    )
+
+    return ConnectionEmpresaOut(
+        id=empresa.id,
+        nome=empresa.nome,
+        tamanho=empresa.tamanho,
+        nif=empresa.nif,
+        access_level=ConnectionAccessLevel(assoc.access_level or "read"),
+        role_id=assoc.role_id,
+        role_name=role_obj.name if role_obj else (assoc.role.name if assoc.role else None),
+        created_at=assoc.created_at or empresa.criado_em,
+    )
+
+
+def update_connection_empresa(
+    db: Session,
+    conn_id: int,
+    empresa_id: int,
+    actor: User,
+    data: ConnectionEmpresaUpdate,
+) -> ConnectionEmpresaOut:
+    """Atualiza o nível de acesso ou role de uma empresa vinculada à conexão."""
+    conn = get_connection_or_404(db, conn_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
+
+    assoc = (
+        db.query(EmpresaConnection)
+        .options(joinedload(EmpresaConnection.empresa), joinedload(EmpresaConnection.role))
+        .filter(
+            EmpresaConnection.empresa_id == empresa_id,
+            EmpresaConnection.connection_id == conn_id,
+        )
+        .first()
+    )
+    if not assoc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Esta empresa não está vinculada a esta conexão.",
+        )
+
+    if data.role_id is not None:
+        if data.role_id == 0:
+            assoc.role_id = None
+        else:
+            role_obj = (
+                db.query(ConnectionRole)
+                .filter(ConnectionRole.id == data.role_id, ConnectionRole.connection_id == conn.id)
+                .first()
+            )
+            if not role_obj:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="A função especificada não pertence a esta conexão.",
+                )
+            assoc.role_id = data.role_id
+
+    if data.access_level is not None:
+        assoc.access_level = data.access_level.value
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        log_message(f"❌ Erro ao atualizar acesso da empresa: {e}", "error")
+        raise HTTPException(status_code=500, detail="Erro ao atualizar acesso da empresa.")
+
+    db.refresh(assoc)
+    return ConnectionEmpresaOut(
+        id=assoc.empresa.id,
+        nome=assoc.empresa.nome,
+        tamanho=assoc.empresa.tamanho,
+        nif=assoc.empresa.nif,
+        access_level=ConnectionAccessLevel(assoc.access_level or "read"),
+        role_id=assoc.role_id,
+        role_name=assoc.role.name if assoc.role else None,
+        created_at=assoc.created_at or assoc.empresa.criado_em,
+    )
+
+
+def remove_connection_empresa(db: Session, conn_id: int, empresa_id: int, actor: User) -> None:
+    """Desvincula uma empresa da conexão (N:N)."""
+    conn = get_connection_or_404(db, conn_id)
+    assert_connection_access(db, conn, actor, ConnectionAccessLevel.manage)
+
+    assoc = (
+        db.query(EmpresaConnection)
+        .filter(
+            EmpresaConnection.empresa_id == empresa_id,
+            EmpresaConnection.connection_id == conn_id,
+        )
+        .first()
+    )
+    if assoc:
+        db.delete(assoc)
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            log_message(f"❌ Erro ao desvincular empresa da conexão: {e}", "error")
+            raise HTTPException(status_code=500, detail="Erro ao desvincular empresa da conexão.")
+
+        log_message(
+            f"✂️ Empresa #{empresa_id} desvinculada da conexão '{conn.name}' por {actor.email}",
+            "info",
+        )
+
+
+def list_empresa_connections(db: Session, empresa_id: int, actor: User) -> list[EmpresaConnectionOut]:
+    """Lista todas as conexões associadas a uma empresa específica."""
+    empresa = db.query(Empresa).filter(Empresa.id == empresa_id).first()
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Empresa não encontrada.",
+        )
+
+    if not is_superadmin(actor) and actor.empresa_id != empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Não tem permissão para aceder aos recursos desta empresa.",
+        )
+
+    out = []
+    for c in empresa.connections:
+        dec_host = c.host
+        try:
+            dec_host = secret_decrypt(c.host)
+        except Exception:
+            pass
+
+        out.append(
+            EmpresaConnectionOut(
+                id=c.id,
+                name=c.name,
+                type=c.type,
+                host=dec_host,
+                database_name=c.database_name,
+                status=c.status,
+                created_at=c.created_at,
+            )
+        )
+    return out
+
+

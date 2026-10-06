@@ -6,6 +6,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Table,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -58,8 +59,142 @@ class DBConnection(Base):
         foreign_keys="[DBConnectionShare.connection_id]",
     )
 
+    # 🔑 Roles de conexão específicas desta base de dados
+    roles = relationship(
+        "ConnectionRole",
+        back_populates="connection",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # 🏢 Relação N:N com empresas vinculadas
+    empresas = relationship(
+        "Empresa",
+        secondary="empresa_connections",
+        back_populates="connections",
+        lazy="selectin",
+    )
+
     def __repr__(self):
         return f"<DBConnection(id={self.id}, name='{self.name}', type='{self.type}')>"
+
+
+# =============================
+# 🏢🔗🔌 Empresa - Connection Association (N:N)
+# =============================
+class EmpresaConnection(Base):
+    """
+    Tabela de associação N:N entre Empresas e Conexões de Banco de Dados.
+    Permite que uma ou mais empresas partilhem/acedam à mesma conexão e vice-versa.
+    """
+
+    __tablename__ = "empresa_connections"
+
+    empresa_id = Column(
+        Integer,
+        ForeignKey("empresas.id", ondelete="CASCADE", onupdate="CASCADE"),
+        primary_key=True,
+        index=True,
+    )
+    connection_id = Column(
+        Integer,
+        ForeignKey("db_connections.id", ondelete="CASCADE", onupdate="CASCADE"),
+        primary_key=True,
+        index=True,
+    )
+    access_level = Column(String(20), nullable=False, default="read")
+    role_id = Column(
+        Integer,
+        ForeignKey("connection_roles.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=True,
+    )
+
+    empresa = relationship(
+        "Empresa", foreign_keys=[empresa_id], overlaps="connections,empresas"
+    )
+    connection = relationship(
+        "DBConnection", foreign_keys=[connection_id], overlaps="connections,empresas"
+    )
+    role = relationship("ConnectionRole", foreign_keys=[role_id])
+
+
+empresa_connections = EmpresaConnection.__table__
+
+
+# =============================
+# 🛡️ Connection Role - Permission Association Table
+# =============================
+connection_roles_permissions = Table(
+    "connection_roles_permissions",
+    Base.metadata,
+    Column(
+        "connection_role_id",
+        Integer,
+        ForeignKey("connection_roles.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "permission_id",
+        Integer,
+        ForeignKey("permissions.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+
+# =============================
+# 🔑 Connection Role (Role por Conexão)
+# =============================
+class ConnectionRole(Base):
+    """
+    Função/Role criada e isolada no âmbito de uma conexão específica.
+    Define com granularidade o que cada utilizador partilhado pode fazer
+    nesta conexão de dados (consultas, DDL, DML, exportação, etc.).
+    Inclui regras granulares de tabelas, campos e tipos de query permitidos.
+    """
+
+    __tablename__ = "connection_roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    connection_id = Column(
+        Integer,
+        ForeignKey("db_connections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String(50), nullable=False)
+    description = Column(String(200), nullable=True)
+    is_default = Column(Boolean, default=False)
+
+    # 🎯 Regras Avançadas de Segurança e Granularidade
+    allowed_tables = Column(JSON, default=list, nullable=True)
+    blocked_tables = Column(JSON, default=list, nullable=True)
+    allowed_columns = Column(JSON, default=dict, nullable=True)
+    blocked_columns = Column(JSON, default=dict, nullable=True)
+    allowed_query_types = Column(JSON, default=list, nullable=True)
+    max_rows = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("connection_id", "name", name="uq_connection_role_name"),
+    )
+
+    connection = relationship("DBConnection", back_populates="roles")
+    permissions = relationship(
+        "Permission",
+        secondary=connection_roles_permissions,
+        lazy="selectin",
+    )
+
+    def __repr__(self):
+        return f"<ConnectionRole(id={self.id}, connection_id={self.connection_id}, name='{self.name}')>"
 
 
 class DBConnectionShare(Base):
@@ -71,8 +206,9 @@ class DBConnectionShare(Base):
       - write  → o anterior + alterar dados (insert/update/delete)
       - manage → o anterior + partilhar a conexão com outros
 
-    Apagar a conexão e retirar o acesso ao dono continuam reservados ao dono
-    e ao super admin.
+    Além disso, pode estar vinculado a uma `ConnectionRole` customizada desta
+    conexão (`role_id`), definindo exatamente as permissões granulares,
+    e ter regras avançadas próprias de tabelas, campos e tipos de consulta.
     """
 
     __tablename__ = "db_connection_shares"
@@ -91,6 +227,22 @@ class DBConnectionShare(Base):
         index=True,
     )
     access_level = Column(String(20), nullable=False, default="read")
+
+    # Role granular específica desta conexão
+    role_id = Column(
+        Integer,
+        ForeignKey("connection_roles.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # 🎯 Regras Avançadas Personalizadas do Membro (sobrepõem ou estendem a role)
+    allowed_tables = Column(JSON, default=list, nullable=True)
+    blocked_tables = Column(JSON, default=list, nullable=True)
+    allowed_columns = Column(JSON, default=dict, nullable=True)
+    blocked_columns = Column(JSON, default=dict, nullable=True)
+    allowed_query_types = Column(JSON, default=list, nullable=True)
+    max_rows = Column(Integer, nullable=True)
 
     # Quem concedeu o acesso (para auditoria). SET NULL: se essa conta for
     # apagada, a partilha mantém-se válida.
@@ -115,11 +267,12 @@ class DBConnectionShare(Base):
     )
     user = relationship("User", foreign_keys=[user_id])
     granted_by = relationship("User", foreign_keys=[granted_by_id])
+    role = relationship("ConnectionRole", foreign_keys=[role_id])
 
     def __repr__(self):
         return (
             f"<DBConnectionShare(connection_id={self.connection_id}, "
-            f"user_id={self.user_id}, level='{self.access_level}')>"
+            f"user_id={self.user_id}, level='{self.access_level}', role_id={self.role_id})>"
         )
 
 

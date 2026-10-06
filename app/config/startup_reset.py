@@ -124,7 +124,7 @@ def apply_model_updates():
 
     try:
         # Lista tabelas existentes antes da criação
-        from sqlalchemy import inspect
+        from sqlalchemy import inspect, text
 
         inspector = inspect(engine)
         existing_tables = inspector.get_table_names()
@@ -133,8 +133,51 @@ def apply_model_updates():
         # Cria novas tabelas
         Base.metadata.create_all(bind=engine, checkfirst=True)
 
+        # Migração segura de colunas novas em tabelas existentes
+        with engine.connect() as conn:
+            try:
+                if "roles" in existing_tables:
+                    colunas_roles = [c["name"] for c in inspector.get_columns("roles")]
+                    if "empresa_id" not in colunas_roles:
+                        conn.execute(text("ALTER TABLE roles ADD COLUMN empresa_id INTEGER REFERENCES empresas(id) ON DELETE CASCADE"))
+                        conn.commit()
+                        log_message("✅ Coluna 'empresa_id' adicionada à tabela 'roles'", "success")
+            except Exception as ex_col:
+                log_message(f"ℹ️ Verificação da coluna 'empresa_id': {ex_col}", "info")
+
+            try:
+                if "db_connection_shares" in existing_tables:
+                    colunas_shares = [c["name"] for c in inspector.get_columns("db_connection_shares")]
+                    if "role_id" not in colunas_shares:
+                        conn.execute(text("ALTER TABLE db_connection_shares ADD COLUMN role_id INTEGER REFERENCES connection_roles(id) ON DELETE SET NULL"))
+                        conn.commit()
+                        log_message("✅ Coluna 'role_id' adicionada à tabela 'db_connection_shares'", "success")
+            except Exception as ex_col2:
+                log_message(f"ℹ️ Verificação da coluna 'role_id': {ex_col2}", "info")
+
+            try:
+                if "empresa_connections" not in existing_tables:
+                    conn.execute(
+                        text(
+                            """
+                            CREATE TABLE IF NOT EXISTS empresa_connections (
+                                empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                                connection_id INTEGER NOT NULL REFERENCES db_connections(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                                created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+                                PRIMARY KEY (empresa_id, connection_id)
+                            )
+                            """
+                        )
+                    )
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_empresa_connections_empresa_id ON empresa_connections(empresa_id)"))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_empresa_connections_connection_id ON empresa_connections(connection_id)"))
+                    conn.commit()
+                    log_message("✅ Tabela 'empresa_connections' criada", "success")
+            except Exception as ex_ec:
+                log_message(f"ℹ️ Verificação da tabela 'empresa_connections': {ex_ec}", "info")
+
         # Lista tabelas após criação
-        new_tables = inspector.get_table_names()
+        new_tables = inspect(engine).get_table_names()
         created_tables = set(new_tables) - set(existing_tables)
 
         if created_tables:
@@ -232,7 +275,7 @@ def should_run_initialization() -> bool:
     env = get_env("ENV", "dev").lower()
     force_reset = get_env("FORCE_DB_RESET", "false").lower() == "true"
 
-    if env != "dev" and not force_reset:
+    if env not in ("dev", "development") and not force_reset:
         log_message(
             f"🚫 Sincronização automática desativada (ENV={env}, FORCE_DB_RESET={force_reset})",
             "warning",

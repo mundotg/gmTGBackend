@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from typing import Optional, Union
 
 
-def load_env():
+def load_env(override: bool = False):
     possible_paths = []
 
     # 1. Caminho do executável (PyInstaller)
@@ -26,7 +26,7 @@ def load_env():
     # 🔎 Carrega o primeiro .env que existir
     for path in possible_paths:
         if os.path.exists(path):
-            load_dotenv(path, override=False)
+            load_dotenv(path, override=override)
             print(f"[ENV] Carregado: {path}")
             return
 

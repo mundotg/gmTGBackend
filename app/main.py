@@ -16,7 +16,9 @@ from app.config.dotenv import get_env, get_env_list_cors
 from app.config.startup_reset import init_on_startup
 from app.database import SessionLocal, check_database_health, sync_engine
 from app.middleware import (
+    MaintenanceModeMiddleware,
     RequestContextMiddleware,
+    StrictAuditMiddleware,
     SystemGuardMiddleware,
     register_exception_handlers,
 )
@@ -237,9 +239,13 @@ app = FastAPI(
 # as respostas de erro e os preflight OPTIONS levem sempre os headers de CORS.
 app.add_middleware(RequestContextMiddleware)
 
-# Depois do RequestContext, para que um pedido recusado por manutencao ja
-# tenha ID de correlacao no log.
-app.add_middleware(SystemGuardMiddleware)
+# Modo Manutenção: recusa pedidos de quem não é administrador, com 503.
+# O login e os endpoints de health continuam abertos.
+app.add_middleware(MaintenanceModeMiddleware)
+
+# Modo de Auditoria Rigorosa: regista o corpo de POST, PUT, PATCH e DELETE
+# com palavras-passe e tokens substituídos quando ativado nas definições do sistema.
+app.add_middleware(StrictAuditMiddleware)
 
 # ------------------------------------------------------------
 # CORS

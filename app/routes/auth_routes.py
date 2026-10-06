@@ -52,52 +52,116 @@ API_BASE_URL = get_env("API_BASE_URL", get_env("BACKEND_URL", "http://localhost:
 # -----------------------------
 AUTH0_DOMAIN = get_env("AUTH0_DOMAIN", "").strip().rstrip("/")
 AUTH0_BASE_URL = f"https://{AUTH0_DOMAIN}" if AUTH0_DOMAIN and not AUTH0_DOMAIN.startswith("http") else AUTH0_DOMAIN
+AUTH0_LINKEDIN_CONNECTION = get_env("AUTH0_LINKEDIN_CONNECTION", "linkedin").strip()
+AUTH0_LINKEDIN_REDIRECT_URI = get_env("AUTH0_LINKEDIN_REDIRECT_URI", "").strip()
 
-OAUTH_PROVIDERS = {
-    "google": {
-        "client_id": get_env("GOOGLE_CLIENT_ID", ""),
-        "client_secret": get_env("GOOGLE_CLIENT_SECRET", ""),
-        "auth_url": "https://accounts.google.com/o/oauth2/v2/auth",
-        "token_url": "https://oauth2.googleapis.com/token",
-        "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
-        "scopes": ["openid", "email", "profile"],
-    },
-    "github": {
-        "client_id": get_env("GITHUB_CLIENT_ID", ""),
-        "client_secret": get_env("GITHUB_CLIENT_SECRET", ""),
-        "auth_url": "https://github.com/login/oauth/authorize",
-        "token_url": "https://github.com/login/oauth/access_token",
-        "userinfo_url": "https://api.github.com/user",
-        "emails_url": "https://api.github.com/user/emails",
-        "scopes": ["read:user", "user:email"],
-    },
-    "gitlab": {
-        "client_id": get_env("GITLAB_CLIENT_ID", ""),
-        "client_secret": get_env("GITLAB_CLIENT_SECRET", ""),
-        "auth_url": f"{get_env('GITLAB_URL', 'https://gitlab.com').rstrip('/')}/oauth/authorize",
-        "token_url": f"{get_env('GITLAB_URL', 'https://gitlab.com').rstrip('/')}/oauth/token",
-        "userinfo_url": f"{get_env('GITLAB_URL', 'https://gitlab.com').rstrip('/')}/api/v4/user",
-        "scopes": ["read_user", "openid", "profile", "email"],
-    },
-    "microsoft": {
-        "client_id": get_env("MICROSOFT_CLIENT_ID", ""),
-        "client_secret": get_env("MICROSOFT_CLIENT_SECRET") or get_env("MICROSOFT_CLIENT_VALOR", ""),
-        "auth_url": f"https://login.microsoftonline.com/{get_env('MICROSOFT_TENANT_ID', 'common')}/oauth2/v2.0/authorize",
-        "token_url": f"https://login.microsoftonline.com/{get_env('MICROSOFT_TENANT_ID', 'common')}/oauth2/v2.0/token",
-        "userinfo_url": "https://graph.microsoft.com/v1.0/me",
-        "scopes": ["openid", "profile", "email", "User.Read"],
-    },
-}
 
-if AUTH0_BASE_URL:
-    OAUTH_PROVIDERS["auth0"] = {
-        "client_id": get_env("AUTH0_CLIENT_ID", ""),
-        "client_secret": get_env("AUTH0_CLIENT_SECRET", ""),
-        "auth_url": f"{AUTH0_BASE_URL}/authorize",
-        "token_url": f"{AUTH0_BASE_URL}/oauth/token",
-        "userinfo_url": f"{AUTH0_BASE_URL}/userinfo",
-        "scopes": ["openid", "profile", "email"],
+def get_oauth_provider(provider_key: str) -> Optional[dict]:
+    """Retorna dinamicamente as configurações do provedor OAuth recarregando o .env."""
+    try:
+        from app.config.dotenv import load_env
+        load_env(override=True)
+    except Exception:
+        pass
+
+    auth0_domain = get_env("AUTH0_DOMAIN", "").strip().rstrip("/")
+    auth0_base_url = f"https://{auth0_domain}" if auth0_domain and not auth0_domain.startswith("http") else auth0_domain
+    auth0_linkedin_conn = get_env("AUTH0_LINKEDIN_CONNECTION", "linkedin").strip()
+    auth0_client_id = get_env("AUTH0_CLIENT_ID", "").strip()
+    auth0_client_secret = get_env("AUTH0_CLIENT_SECRET", "").strip()
+
+    linkedin_client_id = get_env("LINKEDIN_CLIENT_ID", "").strip()
+    linkedin_client_secret = get_env("LINKEDIN_CLIENT_SECRET", "").strip()
+
+    if provider_key == "linkedin":
+        if linkedin_client_id and linkedin_client_secret:
+            return {
+                "client_id": linkedin_client_id,
+                "client_secret": linkedin_client_secret,
+                "auth_url": "https://www.linkedin.com/oauth/v2/authorization",
+                "token_url": "https://www.linkedin.com/oauth/v2/accessToken",
+                "userinfo_url": "https://api.linkedin.com/v2/userinfo",
+                "scopes": ["openid", "profile", "email"],
+            }
+        elif auth0_base_url and auth0_client_id:
+            return {
+                "client_id": auth0_client_id,
+                "client_secret": auth0_client_secret,
+                "auth_url": f"{auth0_base_url}/authorize",
+                "token_url": f"{auth0_base_url}/oauth/token",
+                "userinfo_url": f"{auth0_base_url}/userinfo",
+                "scopes": ["openid", "profile", "email"],
+                "connection": auth0_linkedin_conn,
+                "is_auth0_proxy": True,
+            }
+
+    if provider_key == "auth0" and auth0_base_url and auth0_client_id:
+        return {
+            "client_id": auth0_client_id,
+            "client_secret": auth0_client_secret,
+            "auth_url": f"{auth0_base_url}/authorize",
+            "token_url": f"{auth0_base_url}/oauth/token",
+            "userinfo_url": f"{auth0_base_url}/userinfo",
+            "scopes": ["openid", "profile", "email"],
+        }
+
+    gitlab_scopes_raw = get_env("GITLAB_SCOPES", "read_user").strip()
+    gitlab_scopes = [s for s in gitlab_scopes_raw.split() if s] if gitlab_scopes_raw else ["read_user"]
+
+    providers = {
+        "google": {
+            "client_id": get_env("GOOGLE_CLIENT_ID", ""),
+            "client_secret": get_env("GOOGLE_CLIENT_SECRET", ""),
+            "auth_url": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token_url": "https://oauth2.googleapis.com/token",
+            "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
+            "scopes": ["openid", "email", "profile"],
+        },
+        "github": {
+            "client_id": get_env("GITHUB_CLIENT_ID", ""),
+            "client_secret": get_env("GITHUB_CLIENT_SECRET", ""),
+            "auth_url": "https://github.com/login/oauth/authorize",
+            "token_url": "https://github.com/login/oauth/access_token",
+            "userinfo_url": "https://api.github.com/user",
+            "emails_url": "https://api.github.com/user/emails",
+            "scopes": ["read:user", "user:email"],
+        },
+        "gitlab": {
+            "client_id": get_env("GITLAB_CLIENT_ID", ""),
+            "client_secret": get_env("GITLAB_CLIENT_SECRET", ""),
+            "auth_url": f"{get_env('GITLAB_URL', 'https://gitlab.com').rstrip('/')}/oauth/authorize",
+            "token_url": f"{get_env('GITLAB_URL', 'https://gitlab.com').rstrip('/')}/oauth/token",
+            "userinfo_url": f"{get_env('GITLAB_URL', 'https://gitlab.com').rstrip('/')}/api/v4/user",
+            "scopes": gitlab_scopes,
+        },
+        "microsoft": {
+            "client_id": get_env("MICROSOFT_CLIENT_ID", ""),
+            "client_secret": get_env("MICROSOFT_CLIENT_SECRET") or get_env("MICROSOFT_CLIENT_VALOR", ""),
+            "auth_url": f"https://login.microsoftonline.com/{get_env('MICROSOFT_TENANT_ID', 'common')}/oauth2/v2.0/authorize",
+            "token_url": f"https://login.microsoftonline.com/{get_env('MICROSOFT_TENANT_ID', 'common')}/oauth2/v2.0/token",
+            "userinfo_url": "https://graph.microsoft.com/v1.0/me",
+            "scopes": ["openid", "profile", "email", "User.Read"],
+        },
     }
+    return providers.get(provider_key)
+
+
+class _OAuthProvidersProxy(dict):
+    def get(self, key, default=None):
+        val = get_oauth_provider(key)
+        return val if val is not None else default
+
+    def __getitem__(self, key):
+        val = get_oauth_provider(key)
+        if val is None:
+            raise KeyError(key)
+        return val
+
+    def __contains__(self, key):
+        return get_oauth_provider(key) is not None
+
+
+OAUTH_PROVIDERS = _OAuthProvidersProxy()
 
 
 def _cookie_domain():
@@ -1003,7 +1067,12 @@ def buscar_ou_criar_usuario_oauth(db: Session, user_data: dict) -> user_model.Us
     return user
 
 
-async def _initiate_oauth_login(provider: str, request: Request, next_url: Optional[str] = None) -> Response:
+async def _initiate_oauth_login(
+    provider: str,
+    request: Request,
+    next_url: Optional[str] = None,
+    connection: Optional[str] = None,
+) -> Response:
     """Gera URL de autorização e redireciona para o provedor com proteção de state anti-CSRF."""
     provider_key = provider.lower().replace("-", "_")
     if provider_key == "azure_ad":
@@ -1014,11 +1083,15 @@ async def _initiate_oauth_login(provider: str, request: Request, next_url: Optio
         log_message(f"⚠️ Provedor '{provider_key}' chamado sem credenciais configuradas.", "warning")
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"Provedor OAuth '{provider}' não está configurado. Defina as variáveis de ambiente necessárias (ex: {provider_key.upper()}_CLIENT_ID e {provider_key.upper()}_CLIENT_SECRET).",
+            detail=f"Provedor OAuth '{provider}' não está configurado. Defina as variáveis de ambiente necessárias (ex: {provider_key.upper()}_CLIENT_ID e {provider_key.upper()}_CLIENT_SECRET ou AUTH0_DOMAIN/AUTH0_CLIENT_ID).",
         )
 
     state = secrets.token_urlsafe(32)
-    redirect_uri = _get_redirect_uri(request, provider_key)
+
+    if cfg.get("is_auth0_proxy"):
+        redirect_uri = AUTH0_LINKEDIN_REDIRECT_URI or _get_redirect_uri(request, "auth0")
+    else:
+        redirect_uri = _get_redirect_uri(request, provider_key)
 
     params = {
         "client_id": cfg["client_id"],
@@ -1027,6 +1100,11 @@ async def _initiate_oauth_login(provider: str, request: Request, next_url: Optio
         "scope": " ".join(cfg["scopes"]),
         "state": state,
     }
+
+    if connection:
+        params["connection"] = connection
+    elif cfg.get("connection"):
+        params["connection"] = cfg["connection"]
 
     if provider_key == "google":
         params["access_type"] = "offline"
@@ -1047,6 +1125,34 @@ async def _initiate_oauth_login(provider: str, request: Request, next_url: Optio
         samesite=COOKIE_SAMESITE,
         path="/",
     )
+    if cfg.get("is_auth0_proxy") or provider_key == "linkedin":
+        response.set_cookie(
+            key="oauth_state_auth0",
+            value=state,
+            max_age=600,
+            httponly=True,
+            secure=COOKIE_SECURE,
+            samesite=COOKIE_SAMESITE,
+            path="/",
+        )
+        response.set_cookie(
+            key="oauth_state_linkedin",
+            value=state,
+            max_age=600,
+            httponly=True,
+            secure=COOKIE_SECURE,
+            samesite=COOKIE_SAMESITE,
+            path="/",
+        )
+        response.set_cookie(
+            key="oauth_provider_intended",
+            value="linkedin",
+            max_age=600,
+            httponly=True,
+            secure=COOKIE_SECURE,
+            samesite=COOKIE_SAMESITE,
+            path="/",
+        )
     if next_url:
         response.set_cookie(
             key="oauth_next",
@@ -1092,6 +1198,8 @@ async def _handle_oauth_callback(
 
     # 1. Validação do state anti-CSRF
     cookie_state = request.cookies.get(f"oauth_state_{provider_key}")
+    if not cookie_state and provider_key in ("auth0", "linkedin"):
+        cookie_state = request.cookies.get("oauth_state_auth0") or request.cookies.get("oauth_state_linkedin")
     if cookie_state and state and cookie_state != state:
         return _error_redirect("Estado OAuth inválido")
 
@@ -1106,9 +1214,15 @@ async def _handle_oauth_callback(
 
     cfg = OAUTH_PROVIDERS.get(provider_key)
     if not cfg:
-        return _error_redirect(f"Provedor {provider_key} não suportado")
+        if provider_key == "linkedin" and "auth0" in OAUTH_PROVIDERS:
+            cfg = OAUTH_PROVIDERS["auth0"]
+        else:
+            return _error_redirect(f"Provedor {provider_key} não suportado")
 
-    redirect_uri = _get_redirect_uri(request, provider_key)
+    if cfg.get("is_auth0_proxy"):
+        redirect_uri = AUTH0_LINKEDIN_REDIRECT_URI or _get_redirect_uri(request, "auth0")
+    else:
+        redirect_uri = _get_redirect_uri(request, provider_key)
 
     # 3. Troca de código por token de acesso
     user_data = {"provider": provider_key}
@@ -1193,6 +1307,20 @@ async def _handle_oauth_callback(
                 user_data["email"] = profile.get("email")
                 user_data["name"] = profile.get("name") or profile.get("nickname")
                 user_data["avatar_url"] = profile.get("picture")
+                sub_str = str(profile.get("sub") or "")
+                if sub_str.startswith("linkedin|") or request.cookies.get("oauth_provider_intended") == "linkedin":
+                    user_data["provider"] = "linkedin"
+
+            elif provider_key == "linkedin":
+                user_data["id"] = str(profile.get("sub") or profile.get("id"))
+                user_data["email"] = profile.get("email")
+                user_data["name"] = (
+                    profile.get("name")
+                    or f"{profile.get('given_name', '')} {profile.get('family_name', '')}".strip()
+                    or profile.get("nickname")
+                )
+                user_data["avatar_url"] = profile.get("picture")
+                user_data["provider"] = "linkedin"
 
             # Salva tokens e payload bruto recebidos do provedor
             user_data["access_token"] = access_token_prov
@@ -1280,9 +1408,15 @@ async def _handle_oauth_callback(
             secure=COOKIE_SECURE,
             samesite=COOKIE_SAMESITE,
         )
-        reg_redirect.delete_cookie(key=f"oauth_state_{provider_key}", path="/")
-        reg_redirect.delete_cookie(key=f"oauth_next_{provider_key}", path="/")
-        reg_redirect.delete_cookie(key="oauth_next", path="/")
+        for c_key in (
+            f"oauth_state_{provider_key}",
+            "oauth_state_auth0",
+            "oauth_state_linkedin",
+            "oauth_provider_intended",
+            f"oauth_next_{provider_key}",
+            "oauth_next",
+        ):
+            reg_redirect.delete_cookie(key=c_key, path="/")
         return reg_redirect
 
     # Se já existe utilizador: sincroniza/vincula a conta OAuth e segue para login
@@ -1347,8 +1481,14 @@ async def _handle_oauth_callback(
     )
 
     # Remove cookies temporários do fluxo OAuth
-    success_redirect.delete_cookie(f"oauth_state_{provider_key}", path="/")
-    success_redirect.delete_cookie("oauth_next", path="/")
+    for c_key in (
+        f"oauth_state_{provider_key}",
+        "oauth_state_auth0",
+        "oauth_state_linkedin",
+        "oauth_provider_intended",
+        "oauth_next",
+    ):
+        success_redirect.delete_cookie(c_key, path="/")
 
     return success_redirect
 
@@ -1389,8 +1529,23 @@ async def microsoft_login(request: Request, next: Optional[str] = None):
 @router.get("/auth0/login", summary="Iniciar login Auth0")
 @router.get("/oauth2/auth0/login", include_in_schema=False)
 @router.get("/auth0", include_in_schema=False)
-async def auth0_login(request: Request, next: Optional[str] = None):
-    return await _initiate_oauth_login("auth0", request, next)
+async def auth0_login(
+    request: Request,
+    next: Optional[str] = None,
+    connection: Optional[str] = None,
+):
+    return await _initiate_oauth_login("auth0", request, next, connection=connection)
+
+
+@router.get("/linkedin/login", summary="Iniciar login LinkedIn")
+@router.get("/oauth2/linkedin/login", include_in_schema=False)
+@router.get("/linkedin", include_in_schema=False)
+async def linkedin_login(
+    request: Request,
+    next: Optional[str] = None,
+    connection: Optional[str] = None,
+):
+    return await _initiate_oauth_login("linkedin", request, next, connection=connection)
 
 
 # Rota genérica de login
@@ -1462,6 +1617,18 @@ async def auth0_callback(
     db: Session = Depends(database.get_db),
 ):
     return await _handle_oauth_callback("auth0", request, response, db, code, state)
+
+
+@router.get("/linkedin/callback", summary="Callback OAuth LinkedIn")
+@router.get("/oauth2/linkedin/callback", include_in_schema=False)
+async def linkedin_callback(
+    request: Request,
+    response: Response,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    db: Session = Depends(database.get_db),
+):
+    return await _handle_oauth_callback("linkedin", request, response, db, code, state)
 
 
 @router.get("/oauth2/{provider}/callback", include_in_schema=False)

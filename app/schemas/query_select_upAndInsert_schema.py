@@ -142,6 +142,7 @@ class QueryPayload(BaseModel):
     joins: Optional[dict[str, AdvancedJoinOption]] = None
     table_list: Optional[List[str]] = None
     select: Optional[List[str]] = Field(default_factory=list)
+    fields: Optional[List[Any]] = None
     aliaisTables: Optional[Dict[str, str]] = None
     where: Optional[List[CondicaoFiltro]] = None
     orderBy: Optional[List[OrderByOption]] = None

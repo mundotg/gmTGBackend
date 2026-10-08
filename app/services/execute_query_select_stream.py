@@ -225,13 +225,31 @@ async def executar_query_e_salvar_stream(
             rules = await get_effective_connection_rules_async(db, connection, actor)
 
             cols_map = {}
-            if body.baseTable and body.fields:
-                cols_map[body.baseTable] = [f.field for f in body.fields if hasattr(f, "field") and f.field]
+            requested_cols: list[str] = []
+            raw_cols = getattr(body, "select", None) or getattr(body, "fields", None) or []
+            for item in raw_cols:
+                if isinstance(item, str) and item.strip():
+                    requested_cols.append(item.strip().split(".")[-1].strip('`"[]'))
+                elif hasattr(item, "field") and getattr(item, "field", None):
+                    requested_cols.append(str(item.field).strip().split(".")[-1].strip('`"[]'))
+
+            if body.baseTable and requested_cols:
+                cols_map[body.baseTable] = requested_cols
+
+            tables = [body.baseTable] if body.baseTable else []
+            if getattr(body, "table_list", None):
+                for t in body.table_list:
+                    if t and t not in tables:
+                        tables.append(t)
+            if getattr(body, "joins", None) and isinstance(body.joins, dict):
+                for join_tbl in body.joins.keys():
+                    if join_tbl and join_tbl not in tables:
+                        tables.append(join_tbl)
 
             validate_connection_query_rules(
                 rules=rules,
                 query_type="SELECT",
-                tables=[body.baseTable] if body.baseTable else [],
+                tables=tables,
                 columns_by_table=cols_map if cols_map else None,
             )
 

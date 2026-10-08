@@ -95,6 +95,36 @@ def is_superadmin(user: user_model.User) -> bool:
     return SUPER_PERMISSION in set(user.permissions or ())
 
 
+def is_admin(user: user_model.User) -> bool:
+    """True se o utilizador for admin (detém `admin:*` ou tem papel de administrador)."""
+    if not user or not user.is_active:
+        return False
+    if is_superadmin(user):
+        return True
+    role_name = getattr(getattr(user, "role", None), "name", "") or ""
+    if role_name.strip().lower() in ("admin", "administrador", "superadmin"):
+        return True
+    return user_has_permission(user.permissions, (SUPER_PERMISSION,))
+
+
+def require_admin():
+    """
+    Dependência FastAPI que garante que apenas administradores têm acesso.
+    Lança 403 Forbidden para qualquer outro utilizador.
+    """
+    def dependency(
+        current_user: user_model.User = Depends(get_current_user),
+    ) -> user_model.User:
+        if not is_admin(current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso negado. Apenas administradores podem aceder a recursos de sistema.",
+            )
+        return current_user
+
+    return dependency
+
+
 def require_permission(*required: str):
     """
     Uso:

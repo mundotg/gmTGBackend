@@ -27,13 +27,17 @@ from app.database import SessionLocal, check_database_health, get_db, sync_engin
 from app.models.user_model import User
 from app.services import system_settings_service as definicoes
 from app.ultils.logger import get_log_file_path, log_message
-from app.ultils.permissions import get_current_user, require_permission
+from app.ultils.permissions import get_current_user, require_admin, require_permission
 from app.version import get_version_info
 
-router = APIRouter(prefix="/system", tags=["Sistema"])
+router = APIRouter(
+    prefix="/system",
+    tags=["Sistema"],
+    dependencies=[Depends(require_admin())],
+)
 
-# Leitura do estado: qualquer pessoa que possa ver a aba.
-_PODE_VER = require_permission("settings:system", "logs:view", "admin:*")
+# Acesso exclusivo a administradores
+_PODE_VER = require_admin()
 
 
 # ══════════════════════════ modelos ══════════════════════════
@@ -220,7 +224,7 @@ def alterar_definicao(
     key: str,
     valor: bool = Body(..., embed=True),
     db: Session = Depends(get_db),
-    ator: User = Depends(require_permission("settings:system")),
+    ator: User = Depends(_PODE_VER),
 ):
     try:
         definicao = definicoes.definicao(key)
@@ -282,7 +286,7 @@ def _nivel_da_linha(linha: str) -> Optional[str]:
 
 
 @router.post("/cache/clear-all", summary="Limpar todo o cache da aplicação")
-def limpar_todo_o_cache(ator: User = Depends(require_permission("settings:system"))):
+def limpar_todo_o_cache(ator: User = Depends(_PODE_VER)):
     """
     Descarta o cache inteiro: Redis e memória do processo.
 

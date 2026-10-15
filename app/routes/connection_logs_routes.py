@@ -18,10 +18,10 @@ from app.ultils.logger import log_message
 
 from app.ultils.permissions import require_permission
 
-# Registos de ligacao.
+# Registos de ligação do próprio utilizador (autenticado por get_current_user_id nas rotas).
 router = APIRouter(
-    prefix="/log", tags=["connections_log"],
-    dependencies=[Depends(require_permission("logs:view", "logs:read"))],
+    prefix="/log",
+    tags=["connections_log"],
 )
 
 # -----------------------------

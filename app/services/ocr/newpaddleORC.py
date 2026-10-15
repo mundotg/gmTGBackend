@@ -1,22 +1,49 @@
+import os
+import sys
+import ctypes
 import traceback
-from paddleocr import PaddleOCR
 import cv2
 import numpy as np
 
-# test_ocr.py
-import os
-os.environ['FLAGS_use_mkldnn'] = '0'
-os.environ['FLAGS_use_onednn'] = '0'
+def _setup_paddle_environment():
+    """
+    Garante que os caminhos do cache do PaddleX/PaddleOCR no Windows
+    utilizem o caminho 8.3 (short path) para evitar falhas do runtime C++ do Paddle
+    ao tentar abrir caminhos com caracteres acentuados ou especiais (ex: Francemysebastião).
+    """
+    try:
+        user_paddlex = os.path.normpath(os.path.expanduser("~/.paddlex"))
+        os.makedirs(user_paddlex, exist_ok=True)
+
+        buf = ctypes.create_unicode_buffer(500)
+        ctypes.windll.kernel32.GetShortPathNameW(user_paddlex, buf, 500)
+        short_path = buf.value
+        if short_path:
+            os.environ["PADDLE_PDX_CACHE_HOME"] = short_path
+    except Exception:
+        pass
+
+    os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+    os.environ.setdefault("FLAGS_use_mkldnn", "0")
+    os.environ.setdefault("FLAGS_use_onednn", "0")
+
+_setup_paddle_environment()
 
 from paddleocr import PaddleOCR
 
-# Teste simples
+# Singleton do motor PaddleOCR para evitar recarga pesada de modelos a cada requisição
+_ocr_engine = None
 
-# Teste com uma imagem (substitua pelo caminho da sua imagem)
-# result = ocr.ocr('caminho/para/sua/imagem.jpg')
-# print("OCR executado com sucesso!")
-
-# from app.services.analyzer import save_report
+def get_ocr_engine():
+    global _ocr_engine
+    if _ocr_engine is None:
+        _setup_paddle_environment()
+        try:
+            # Versões recentes do PaddleOCR usam use_textline_orientation
+            _ocr_engine = PaddleOCR(lang="pt", use_textline_orientation=True)
+        except TypeError:
+            _ocr_engine = PaddleOCR(lang="pt", use_angle_cls=True)
+    return _ocr_engine
 
 def group_text_by_lines(texts, boxes, y_threshold=15):
     """
@@ -35,7 +62,7 @@ def group_text_by_lines(texts, boxes, y_threshold=15):
             "y": y_center
         })
 
-    # ordena de cima para baixo
+    # Ordena de cima para baixo
     items.sort(key=lambda i: i["y"])
 
     lines = []
@@ -55,7 +82,7 @@ def group_text_by_lines(texts, boxes, y_threshold=15):
                 "words": [item]
             })
 
-    # ordena palavras da linha da esquerda para direita
+    # Ordena palavras da linha da esquerda para a direita
     final_lines = []
     for line in lines:
         line["words"].sort(key=lambda w: w["x"])
@@ -63,13 +90,10 @@ def group_text_by_lines(texts, boxes, y_threshold=15):
         final_lines.append(sentence)
 
     return final_lines
+
 def analyze_image(image_bytes):
     try:
-        
-        ocr = PaddleOCR(
-            lang="pt",
-            use_angle_cls=True
-        )
+        ocr = get_ocr_engine()
 
         img = cv2.imdecode(
             np.frombuffer(image_bytes, np.uint8),
@@ -77,12 +101,12 @@ def analyze_image(image_bytes):
         )
 
         if img is None:
-            raise RuntimeError("Imagem inválida")
+            raise RuntimeError("Imagem inválida ou não pôde ser decodificada.")
 
         result = ocr.ocr(img)
 
         if not result:
-            raise RuntimeError("OCR executado, mas nenhum resultado retornado")
+            raise RuntimeError("OCR executado, mas nenhum resultado retornado.")
 
         texts = []
         boxes = []
@@ -97,15 +121,18 @@ def analyze_image(image_bytes):
             boxes = page.get("rec_boxes", [])
 
             if len(texts) != len(boxes):
-                raise RuntimeError("Quantidade de textos e boxes não coincide")
+                raise RuntimeError("Quantidade de textos e caixas delimitadoras não coincide.")
 
         # =====================================================
         # CASO 2: PaddleOCR padrão (lista de linhas)
         # =====================================================
         else:
             for line in result[0]:
+                if not line or not isinstance(line, (list, tuple)):
+                    continue
+
                 box = line[0]
-                text = line[1][0]
+                text = line[1][0] if len(line) > 1 and isinstance(line[1], (list, tuple)) else str(line[1])
 
                 if not isinstance(box, (list, tuple)):
                     continue
@@ -120,12 +147,15 @@ def analyze_image(image_bytes):
                 boxes.append([x_min, y_min, x_max, y_max])
 
         if not texts:
-            raise RuntimeError("OCR executado, mas nenhum texto reconhecido")
+            # Fallback amigável se a imagem não contiver texto legível
+            return {
+                "text": "",
+                "lines": [],
+                "file": None
+            }
 
         boxes = np.array(boxes)
-
         lines = group_text_by_lines(texts, boxes)
-
         full_text = "\n".join(lines)
 
         return {

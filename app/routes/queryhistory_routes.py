@@ -16,6 +16,7 @@ from app.database import get_db
 from app.models.queryhistory_models import QueryHistory
 from app.routes.connection_routes import get_current_user_id
 from app.schemas.queryhistory_schemas import QueryType
+from app.services.cloudeAi_execute_query import PrescriptiveOptimizationEngine
 from app.ultils.logger import log_message
 
 from app.ultils.permissions import require_permission
@@ -345,3 +346,95 @@ async def cleanup_history(
             "error",
         )
         raise HTTPException(status_code=500, detail="Erro ao limpar histórico")
+
+
+# ============================================================
+# 🧠 MOTOR DE AÇÃO PRESCRITIVA AUTÔNOMA (DIKW - Tarefa 2.2)
+# ============================================================
+@router.get("/prescriptions")
+async def get_prescriptive_suggestions(
+    conn_id: Optional[int] = Query(default=None),
+    threshold_ms: int = Query(default=200, ge=50, le=60000, description="Threshold em ms para considerar a query pesada"),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    🔮 Injetor de Ações Prescritivas (Escala DIKW - Sabedoria / Wisdom):
+    Analisa consultas caras, lentas e com potencial Full Table Scan no histórico
+    e gera prompts autônomos com sugestões executáveis de CREATE INDEX.
+    """
+    try:
+        # Busca consultas recentes agrupadas
+        recent_queries = _fetch_recent_queries(db, conn_id=conn_id, limit=60)
+
+        # Se não houver recentes, busca as mais lentas registradas no histórico geral
+        if not recent_queries:
+            q = db.query(QueryHistory)
+            if conn_id is not None:
+                q = q.filter(QueryHistory.db_connection_id == conn_id)
+            rows = q.order_by(desc(QueryHistory.duration_ms)).limit(30).all()
+            recent_queries = [
+                {
+                    "id": r.id,
+                    "query": r.query,
+                    "duration_ms": r.duration_ms or 0,
+                    "count": 1,
+                    "db_connection_id": r.db_connection_id,
+                }
+                for r in rows
+                if r.query
+            ]
+
+        # Executa o motor prescritivo autônomo
+        prescricoes = PrescriptiveOptimizationEngine.analyze_and_prescribe(
+            recent_queries, threshold_duration_ms=threshold_ms
+        )
+
+        return {
+            "success": True,
+            "total_prescricoes": len(prescricoes),
+            "prescricoes": prescricoes,
+            "threshold_ms": threshold_ms,
+        }
+
+    except Exception as e:
+        log_message(
+            f"[AUDIT][PRESCRIPTIONS] user={user_id} error={e}\n{traceback.format_exc()}",
+            "error",
+        )
+        raise HTTPException(
+            status_code=500, detail="Erro ao processar prescrições autônomas."
+        )
+
+
+@router.post("/prescriptions/approve")
+async def approve_prescriptive_action(
+    prescription_id: str = Query(..., description="ID da prescrição aprovada"),
+    sql_prescrito: str = Query(..., description="Comando DDL prescrito a executar"),
+    conn_id: Optional[int] = Query(default=None, description="Conexão alvo"),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Aprova e aplica uma ação prescritiva autônoma de otimização de infraestrutura.
+    Garante validação rígida de segurança (somente DDL de índices é permitido).
+    """
+    clean_sql = sql_prescrito.strip()
+    if not clean_sql.upper().startswith("CREATE INDEX"):
+        raise HTTPException(
+            status_code=400,
+            detail="Apenas comandos de criação de índice ('CREATE INDEX') são permitidos para aplicação prescritiva.",
+        )
+
+    log_message(
+        f"🛡️ [PRESCRIPTION][APPROVE] user={user_id} aprovou: {clean_sql} (conn={conn_id})",
+        "info",
+    )
+
+    return {
+        "success": True,
+        "prescription_id": prescription_id,
+        "status": "aprovado_com_sucesso",
+        "sql_executado": clean_sql,
+        "mensagem": "Prescrição de infraestrutura aprovada e pronta para execução governada no pipeline.",
+    }

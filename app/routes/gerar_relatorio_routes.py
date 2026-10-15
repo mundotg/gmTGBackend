@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import inspect
 import json
 import traceback
@@ -35,7 +36,9 @@ LOGO_PATH = BASE_DIR / "relatorio" / get_env("LOGO_PATH", "fotor-ai-202502181342
 
 FORMATO_PDF = "pdf"
 FORMATO_EXCEL = "excel"
-FORMATOS_VALIDOS = {FORMATO_PDF, FORMATO_EXCEL}
+FORMATO_CSV = "csv"
+FORMATO_JSON = "json"
+FORMATOS_VALIDOS = {FORMATO_PDF, FORMATO_EXCEL, FORMATO_CSV, FORMATO_JSON}
 
 REPORT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -44,13 +47,19 @@ REPORT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 # =============================
 
 def _criar_resposta_arquivo(file_path: Path, tempo: float, formato: str) -> FileResponse:
-    media_type = "application/pdf" if formato == FORMATO_PDF else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    media_map = {
+        FORMATO_PDF: "application/pdf",
+        FORMATO_EXCEL: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        FORMATO_CSV: "text/csv; charset=utf-8",
+        FORMATO_JSON: "application/json; charset=utf-8",
+    }
+    media_type = media_map.get(formato, "application/octet-stream")
     headers = {
         "X-Tempo-Geracao": f"{tempo:.2f}s",
         "X-Formato": formato,
         "Content-Disposition": f'attachment; filename="{file_path.name}"',
     }
-    log_message(f"📦 Enviando arquivo: {file_path.name} | Tempo: {tempo:.2f}s")
+    log_message(f"📦 Enviando arquivo: {file_path.name} | Formato: {formato.upper()} | Tempo: {tempo:.2f}s")
     return FileResponse(path=str(file_path), media_type=media_type, filename=file_path.name, headers=headers)
 
 
@@ -63,7 +72,7 @@ def limpar_arquivos_temporarios(dias_retencao: int = 1) -> None:
         limite = datetime.now().timestamp() - (dias_retencao * 86400)
         removidos = [
             f.unlink(missing_ok=True) or f.name 
-            for pattern in ("*.pdf", "*.xlsx") 
+            for pattern in ("*.pdf", "*.xlsx", "*.csv", "*.json") 
             for f in REPORT_TEMP_DIR.glob(pattern) 
             if f.is_file() and f.stat().st_ctime < limite
         ]
@@ -88,12 +97,47 @@ def gerar_relatorio_estrutura_com_cache(metadata_raw: List[Dict[str, Any]], user
     if not metadata_raw or not isinstance(metadata_raw, list):
         raise ValueError("Lista de metadados vazia ou inválida.")
     
-    file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("metadados", user_id, "pdf" if formato == FORMATO_PDF else "xlsx")
+    extensao_map = {
+        FORMATO_PDF: "pdf",
+        FORMATO_EXCEL: "xlsx",
+        FORMATO_CSV: "csv",
+        FORMATO_JSON: "json",
+    }
+    extensao = extensao_map.get(formato, "bin")
+    file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("metadados", user_id, extensao)
     
     if formato == FORMATO_PDF:
         GenericReportGenerator(logo_path=LOGO_PATH).generate_report(str(file_path), ReportStructureBuilder(metadata_raw).build())
-    else:
+    elif formato == FORMATO_EXCEL:
         ExcelReportGenerator(logo_path=LOGO_PATH).generate_structure_report(str(file_path), metadata_raw)
+    elif formato == FORMATO_CSV:
+        with open(file_path, mode="w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow(["tabela", "coluna", "tipo", "nulo", "chave_primaria", "padrao"])
+            for item in metadata_raw:
+                if isinstance(item, dict):
+                    tbl = item.get("table_name") or item.get("tabela") or item.get("name") or "tabela"
+                    cols = item.get("columns") or item.get("colunas") or []
+                    if cols:
+                        for col in cols:
+                            if isinstance(col, dict):
+                                writer.writerow([
+                                    tbl,
+                                    col.get("name") or col.get("nome") or "",
+                                    col.get("type") or col.get("tipo") or "",
+                                    col.get("nullable", col.get("nulo", True)),
+                                    col.get("primary_key", col.get("pk", False)),
+                                    col.get("default") or col.get("padrao") or "",
+                                ])
+                    else:
+                        writer.writerow([tbl, "", "", "", "", ""])
+    elif formato == FORMATO_JSON:
+        with open(file_path, mode="w", encoding="utf-8") as f:
+            json.dump({
+                "total_tabelas": len(metadata_raw),
+                "metadados": metadata_raw,
+                "gerado_em": datetime.now().isoformat(),
+            }, f, ensure_ascii=False, indent=2, default=str)
         
     return str(file_path)
 
@@ -139,7 +183,14 @@ async def gerar_relatorio_query_com_cache(query_result: dict, user_id: int, db: 
     query_result.pop("queryPayload", None)
 
     resultado_tipado = QueryResultType(**query_result)
-    file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("query", user_id, "pdf" if formato == FORMATO_PDF else "xlsx")
+    extensao_map = {
+        FORMATO_PDF: "pdf",
+        FORMATO_EXCEL: "xlsx",
+        FORMATO_CSV: "csv",
+        FORMATO_JSON: "json",
+    }
+    extensao = extensao_map.get(formato, "bin")
+    file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("query", user_id, extensao)
 
     if formato == FORMATO_PDF:
         gen = GenericReportGenerator(logo_path=LOGO_PATH)
@@ -149,31 +200,81 @@ async def gerar_relatorio_query_com_cache(query_result: dict, user_id: int, db: 
             gen.generate_report(str(file_path), user_template, context=context)
         else:
             gen.generate_report(str(file_path), QueryReportBuilder(resultado_tipado).build())
-    else:
+    elif formato == FORMATO_EXCEL:
         ExcelReportGenerator(logo_path=LOGO_PATH).generate_query_report(str(file_path), resultado_tipado)
+    elif formato == FORMATO_CSV:
+        with open(file_path, mode="w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            cols = query_result.get("columns") or (list(preview[0].keys()) if preview else [])
+            if cols:
+                writer.writerow(cols)
+                for row in preview:
+                    if isinstance(row, dict):
+                        writer.writerow([row.get(c, "") for c in cols])
+                    elif isinstance(row, (list, tuple)):
+                        writer.writerow(row)
+                    else:
+                        writer.writerow([str(row)])
+    elif formato == FORMATO_JSON:
+        with open(file_path, mode="w", encoding="utf-8") as f:
+            json.dump({
+                "total": len(preview),
+                "duracao_ms": query_result.get("duration_ms", 0),
+                "colunas": query_result.get("columns") or (list(preview[0].keys()) if preview else []),
+                "linhas": preview,
+                "gerado_em": datetime.now().isoformat(),
+            }, f, ensure_ascii=False, indent=2, default=str)
 
     return str(file_path)
 
 def gerar_relatorio_tarefas_com_cache(stats: dict, user_id: int, project: Optional[dict], sprint: Optional[dict], tasks: Optional[list], db: Session, formato: str = FORMATO_PDF) -> str:
     _validar_formato(formato)
-    if formato != FORMATO_PDF:
-        raise ValueError("Relatório de tarefas suporta apenas PDF no momento.")
-
-    file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("tarefas", user_id, "pdf")
+    extensao_map = {
+        FORMATO_PDF: "pdf",
+        FORMATO_EXCEL: "xlsx",
+        FORMATO_CSV: "csv",
+        FORMATO_JSON: "json",
+    }
+    extensao = extensao_map.get(formato, "bin")
+    file_path = REPORT_TEMP_DIR / _gerar_nome_arquivo("tarefas", user_id, extensao)
     REPORT_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Escreve direto no destino, como os outros tipos de relatório já faziam.
-    gerar_relatorio_tarefas(
-        stats,
-        project,
-        sprint,
-        tasks,
-        logo_path=str(LOGO_PATH),
-        output_path=str(file_path),
-    )
+    if formato == FORMATO_PDF:
+        gerar_relatorio_tarefas(
+            stats,
+            project,
+            sprint,
+            tasks,
+            logo_path=str(LOGO_PATH),
+            output_path=str(file_path),
+        )
+    elif formato == FORMATO_CSV:
+        with open(file_path, mode="w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow(["id", "titulo", "status", "prioridade", "responsavel"])
+            for t in (tasks or []):
+                if isinstance(t, dict):
+                    writer.writerow([
+                        t.get("id", ""),
+                        t.get("titulo") or t.get("title") or "",
+                        t.get("status", ""),
+                        t.get("prioridade") or t.get("priority") or "",
+                        t.get("user") or t.get("responsavel") or "",
+                    ])
+    elif formato == FORMATO_JSON:
+        with open(file_path, mode="w", encoding="utf-8") as f:
+            json.dump({
+                "estatisticas": stats,
+                "projeto": project,
+                "sprint": sprint,
+                "tarefas": tasks or [],
+                "gerado_em": datetime.now().isoformat(),
+            }, f, ensure_ascii=False, indent=2, default=str)
+    else:
+        raise ValueError(f"Formato '{formato}' não implementado para relatório de tarefas (use pdf, csv ou json).")
 
     if not file_path.exists():
-        raise FileNotFoundError("O gerador não produziu o ficheiro PDF.")
+        raise FileNotFoundError(f"O gerador não produziu o ficheiro {extensao}.")
 
     return str(file_path)
 

@@ -395,8 +395,21 @@ async def register_user(
         try:
             decrypted = aes_decrypt(raw_token)
             data = json.loads(decrypted)
-            if data.get("email", "").strip().lower() == email_norm:
+            token_email = (data.get("email") or "").strip().lower()
+            if token_email == email_norm:
                 oauth_pending = data
+            else:
+                log_message(
+                    f"⚠️ Conflito no registo OAuth: e-mail submetido ({email_norm}) diferente do e-mail autenticado ({token_email})",
+                    "warning",
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"O e-mail submetido ({email_norm}) não corresponde ao e-mail da conta externa autenticada ({token_email}).",
+                    headers={"X-Error-Code": "OAUTH_EMAIL_MISMATCH"},
+                )
+        except HTTPException:
+            raise
         except Exception as e:
             log_message(f"⚠️ Erro ao decifrar oauth_pending no registo: {e}", "warning")
 
@@ -1277,6 +1290,8 @@ async def _handle_oauth_callback(
                 user_data["name"] = profile.get("name") or profile.get("login")
                 user_data["avatar_url"] = profile.get("avatar_url")
                 user_data["email"] = profile.get("email")
+                if profile.get("company"):
+                    user_data["company"] = profile.get("company").lstrip("@").strip()
 
                 # Se o e-mail for privado no GitHub, consulta /user/emails
                 if not user_data["email"]:
@@ -1377,6 +1392,8 @@ async def _handle_oauth_callback(
             "expires_at": expires_at_str,
             "raw_data": user_data.get("raw_data"),
         }
+        if user_data.get("company"):
+            oauth_pending_payload["company"] = user_data["company"]
 
         full_name = (user_data.get("name") or "").strip()
         parts = full_name.split(" ", 1) if full_name else []
@@ -1394,6 +1411,8 @@ async def _handle_oauth_callback(
         }
         if user_data.get("avatar_url"):
             reg_params["avatar_url"] = user_data["avatar_url"]
+        if user_data.get("company"):
+            reg_params["company"] = user_data["company"]
 
         reg_url = f"{frontend_base.rstrip('/')}/auth/register?{urlencode(reg_params)}"
         reg_redirect = RedirectResponse(url=reg_url, status_code=status.HTTP_302_FOUND)

@@ -41,6 +41,8 @@ __pycache__/
 # 3. Logs e arquivos temporários
 # -------------------------------
 *.log
+*.log.*
+*.log*
 *.tmp
 *.bak
 *.swp
@@ -49,7 +51,7 @@ __pycache__/
 *.bin
 *.pid
 *.pkl
-database_connector.log
+database_connector.log*
 initialized.pkl
 ocr_cache_data/
 temp_reports/

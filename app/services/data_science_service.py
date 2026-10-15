@@ -12,6 +12,7 @@ uma vez (para cache Redis / REST).
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 import math
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
@@ -469,3 +470,115 @@ def analisar(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         elif stage in result:
             result[stage] = data
     return result
+
+
+# ══════════════════════════ INFRAESTRUTURA PREDITIVA (DIKW) ══════════════════════════
+def prever_saturacao_infraestrutura(
+    historico_valores: List[float],
+    capacidade_maxima: float,
+    unidade: str = "MB",
+    intervalo_dias: float = 1.0,
+    nome_metrica: str = "armazenamento",
+) -> Dict[str, Any]:
+    """
+    Infraestrutura Preditiva (Escala DIKW - Tarefa 2.1):
+    Aplica regressão linear (np.polyfit) sobre séries temporais de infraestrutura
+    (contagem de linhas, volume em disco, conexões do pool) para calcular:
+    - Taxa de crescimento diário (slope)
+    - Previsão em dias até a saturação (100% da capacidade)
+    - Data estimada do esgotamento
+    - Nível de risco operacional ('critico', 'alerta', 'estavel')
+    - Projeções futuras (+7d, +30d, +90d)
+    """
+    if not historico_valores or capacidade_maxima <= 0:
+        return {
+            "metrica": nome_metrica,
+            "status": "indeterminado",
+            "mensagem": "Dados insuficientes ou capacidade inválida para projeção.",
+            "dias_ate_saturacao": None,
+            "nivel_risco": "estavel",
+        }
+
+    y = np.array(historico_valores, dtype=float)
+    valor_atual = float(y[-1])
+    capacidade = float(capacidade_maxima)
+    pct_atual = round((valor_atual / capacidade) * 100, 2)
+
+    # Caso com 1 único valor: gera baseline comparativa
+    if len(y) < 2:
+        return {
+            "metrica": nome_metrica,
+            "unidade": unidade,
+            "valor_atual": _clean(round(valor_atual, 2)),
+            "capacidade_maxima": _clean(round(capacidade, 2)),
+            "ocupacao_pct": pct_atual,
+            "taxa_crescimento_diaria": 0.0,
+            "dias_ate_saturacao": None,
+            "data_estimada_saturacao": None,
+            "nivel_risco": "alerta" if pct_atual >= 80 else "estavel",
+            "recomendacao": (
+                f"Ocupação atual em {pct_atual}%. Acumulando histórico para regressão linear."
+            ),
+            "projecao_proximos_dias": {
+                "em_7_dias": _clean(round(valor_atual, 2)),
+                "em_30_dias": _clean(round(valor_atual, 2)),
+                "em_90_dias": _clean(round(valor_atual, 2)),
+            },
+        }
+
+    x = np.arange(len(y), dtype=float) * intervalo_dias
+    slope, intercept = np.polyfit(x, y, 1)
+    slope_diario = float(slope / intervalo_dias)
+
+    # Projeção de saturação
+    if slope_diario > 0:
+        dias_restantes = (capacidade - valor_atual) / slope_diario
+        dias_ate_saturacao = round(max(0.0, float(dias_restantes)), 1)
+        data_estimada = (datetime.now() + timedelta(days=dias_ate_saturacao)).strftime("%Y-%m-%d")
+
+        if dias_ate_saturacao <= 7 or pct_atual >= 90:
+            nivel_risco = "critico"
+            recomendacao = (
+                f"🚨 Risco Crítico: Saturação prevista em ~{dias_ate_saturacao} dias "
+                f"({data_estimada}). Recomenda-se aumentar a cota ou liberar espaço imediatamente."
+            )
+        elif dias_ate_saturacao <= 30 or pct_atual >= 75:
+            nivel_risco = "alerta"
+            recomendacao = (
+                f"⚠️ Alerta de Capacidade: Esgotamento projetado para daqui a ~{dias_ate_saturacao} dias. "
+                "Planeje expansão de infraestrutura ou limpeza preventiva."
+            )
+        else:
+            nivel_risco = "estavel"
+            recomendacao = (
+                f"✅ Capacidade estável. Esgotamento projetado em ~{dias_ate_saturacao} dias. "
+                "Crescimento sob controle."
+            )
+    else:
+        dias_ate_saturacao = None
+        data_estimada = None
+        nivel_risco = "estavel"
+        recomendacao = "✅ Recurso estável ou com tendência de redução no consumo."
+
+    proj_7 = max(0.0, float(valor_atual + (slope_diario * 7)))
+    proj_30 = max(0.0, float(valor_atual + (slope_diario * 30)))
+    proj_90 = max(0.0, float(valor_atual + (slope_diario * 90)))
+
+    return {
+        "metrica": nome_metrica,
+        "unidade": unidade,
+        "valor_atual": _clean(round(valor_atual, 2)),
+        "capacidade_maxima": _clean(round(capacidade, 2)),
+        "ocupacao_pct": pct_atual,
+        "taxa_crescimento_diaria": _clean(round(slope_diario, 4)),
+        "dias_ate_saturacao": dias_ate_saturacao,
+        "data_estimada_saturacao": data_estimada,
+        "nivel_risco": nivel_risco,
+        "recomendacao": recomendacao,
+        "projecao_proximos_dias": {
+            "em_7_dias": _clean(round(proj_7, 2)),
+            "em_30_dias": _clean(round(proj_30, 2)),
+            "em_90_dias": _clean(round(proj_90, 2)),
+        },
+    }
+

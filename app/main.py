@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -271,6 +272,14 @@ if allow_all:
 
 
 
+# ------------------------------------------------------------
+# Compressão de Rede (FinOps - Egress)
+# ------------------------------------------------------------
+# Respostas com tamanho superior a 1KB (1000 bytes) são compactadas automaticamente
+# via GZip quando o cliente suporta (Accept-Encoding: gzip), diminuindo drasticamente
+# o consumo de banda de exportações (CSV, JSON, relatórios).
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[] if allow_all else origins,
@@ -278,7 +287,14 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID", "X-Error-Code", "X-Verification-Action"],
+    expose_headers=[
+        "X-Request-ID",
+        "X-Error-Code",
+        "X-Verification-Action",
+        "Content-Encoding",
+        "Content-Disposition",
+        "Content-Length",
+    ],
 )
 
 # ------------------------------------------------------------

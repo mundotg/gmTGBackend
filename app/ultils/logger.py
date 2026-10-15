@@ -53,17 +53,110 @@ except OSError:
     # é o comportamento antigo. Nunca deve impedir o arranque da aplicação.
     LOG_FILE_PATH = Path(LOG_FILE_NAME).resolve()
 
-# Configuração de logging
-logging.basicConfig(
+from logging.handlers import TimedRotatingFileHandler
+
+# Configurações de Rotação (FinOps - Aceitação da Tarefa 1.1)
+DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+DEFAULT_BACKUP_COUNT = 5              # Retém 5 backups
+DEFAULT_WHEN = "midnight"             # Rotação diária
+
+
+class TimedAndSizeRotatingFileHandler(TimedRotatingFileHandler):
+    """
+    Handler híbrido de rotação por tempo e tamanho (FinOps):
+    - Rotação diária à meia-noite (when="midnight", interval=1)
+    - Rotação imediata se atingir o limite de tamanho (maxBytes)
+    - Retém no máximo backupCount ficheiros rotacionados
+    - Preserva encoding UTF-8 para emojis e caracteres acentuados
+    """
+
+    def __init__(
+        self,
+        filename: str,
+        when: str = DEFAULT_WHEN,
+        interval: int = 1,
+        backupCount: int = DEFAULT_BACKUP_COUNT,
+        encoding: str = "utf-8",
+        maxBytes: int = DEFAULT_MAX_BYTES,
+        **kwargs,
+    ):
+        super().__init__(
+            filename=filename,
+            when=when,
+            interval=interval,
+            backupCount=backupCount,
+            encoding=encoding,
+            **kwargs,
+        )
+        self.maxBytes = maxBytes
+
+    def shouldRollover(self, record: logging.LogRecord) -> int:
+        # Verifica se o arquivo precisa de rotação por tamanho
+        if self.stream is None:
+            self.stream = self._open()
+        if self.maxBytes > 0:
+            msg = "%s\n" % self.format(record)
+            self.stream.seek(0, 2)  # Move cursor para o fim
+            if self.stream.tell() + len(msg.encode(self.encoding or "utf-8")) >= self.maxBytes:
+                return 1
+        # Fallback para rotação diária agendada
+        return super().shouldRollover(record)
+
+
+# Resolução de limites a partir do ambiente ou defaults
+try:
+    MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", str(DEFAULT_MAX_BYTES)))
+except ValueError:
+    MAX_BYTES = DEFAULT_MAX_BYTES
+
+try:
+    BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", str(DEFAULT_BACKUP_COUNT)))
+except ValueError:
+    BACKUP_COUNT = DEFAULT_BACKUP_COUNT
+
+LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+LOG_FORMATTER = logging.Formatter(LOG_FORMAT)
+
+# Configuração do File Handler com rotação inteligente
+file_handler = TimedAndSizeRotatingFileHandler(
     filename=str(LOG_FILE_PATH),
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    # Sem isto o handler usa o encoding da locale — cp1252 no Windows. As
-    # mensagens desta aplicação levam acentos e emojis (❌, ⚠️); em cp1252 a
-    # escrita rebenta com UnicodeEncodeError, que o `logging` engole, e a
-    # linha nunca chega ao ficheiro.
+    when=os.getenv("LOG_ROTATE_WHEN", DEFAULT_WHEN),
+    interval=1,
+    backupCount=BACKUP_COUNT,
     encoding="utf-8",
+    maxBytes=MAX_BYTES,
 )
+file_handler.setFormatter(LOG_FORMATTER)
+file_handler.setLevel(logging.INFO)
+
+# StreamHandler para o console (stdout / docker logs) com tratamento de UTF-8 seguro
+try:
+    # Garante que no Windows emojis como 🔧 e ❌ não rebentem por causa de cp1252
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    console_stream = sys.stdout
+except Exception:
+    console_stream = sys.stdout
+
+console_handler = logging.StreamHandler(console_stream)
+console_handler.setFormatter(LOG_FORMATTER)
+console_handler.setLevel(logging.INFO)
+
+# Configuração do root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+# Limpa handlers anteriores para evitar duplicações em hot-reloads
+root_logger.handlers.clear()
+root_logger.addHandler(file_handler)
+root_logger.addHandler(console_handler)
+
+# Se o arquivo já existente no disco exceder o limite (ex: os 25MB detectados),
+# força a primeira rotação imediatamente na inicialização
+try:
+    if LOG_FILE_PATH.exists() and LOG_FILE_PATH.stat().st_size >= MAX_BYTES:
+        file_handler.doRollover()
+except Exception:
+    pass
 
 logger = logging.getLogger(__name__)
 

@@ -921,7 +921,6 @@ async def executar_query_e_salvar_stream(
                     )
 
     # ✅ CORREÇÃO: Retornar o StreamingResponse diretamente
-    # print("🔍 DEBUG: Criando StreamingResponse")
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
@@ -931,3 +930,130 @@ async def executar_query_e_salvar_stream(
             "Access-Control-Allow-Origin": "*",
         },
     )
+
+
+# ============================================================
+# 🧠 MOTOR DE AÇÃO PRESCRITIVA AUTÔNOMA (DIKW - Tarefa 2.2)
+# ============================================================
+class PrescriptiveOptimizationEngine:
+    """
+    Injetor de Ações Prescritivas (Escala DIKW - Sabedoria / Wisdom):
+    Analisa consultas com alto custo computacional, latência elevada e Full Table Scans
+    no histórico de execução e formula prompts autônomos com DDL acionável
+    (ex: CREATE INDEX) prontos para aprovação do usuário.
+    """
+
+    TABLE_REGEX = re.compile(r"\bFROM\s+([a-zA-Z0-9_\.\"]+)", re.IGNORECASE)
+    WHERE_REGEX = re.compile(r"\bWHERE\s+(.*?)(?:\bGROUP\s+BY|\bORDER\s+BY|\bLIMIT|;|$)", re.IGNORECASE | re.DOTALL)
+    WHERE_COLUMNS_REGEX = re.compile(r"([a-zA-Z0-9_]+)\s*(?:=|>=|<=|>|<|LIKE|ILIKE|IN)\s*", re.IGNORECASE)
+    ORDER_REGEX = re.compile(r"\bORDER\s+BY\s+([a-zA-Z0-9_\s,]+)(?:\bLIMIT|;|$)", re.IGNORECASE)
+
+    @classmethod
+    def _clean_identifier(cls, name: str) -> str:
+        return name.replace('"', '').replace("'", '').strip()
+
+    @classmethod
+    def _extract_query_metadata(cls, sql: str) -> Dict[str, Any]:
+        """Extrai tabela principal e colunas filtradas/ordenadas da consulta."""
+        table = None
+        tb_match = cls.TABLE_REGEX.search(sql)
+        if tb_match:
+            raw_tb = tb_match.group(1).split()[-1]
+            # remove alias se houver
+            table = cls._clean_identifier(raw_tb.split(".")[-1])
+
+        where_cols = []
+        wh_match = cls.WHERE_REGEX.search(sql)
+        if wh_match:
+            where_body = wh_match.group(1)
+            raw_cols = cls.WHERE_COLUMNS_REGEX.findall(where_body)
+            # ignora palavras reservadas
+            stopwords = {"and", "or", "not", "null", "true", "false", "between"}
+            where_cols = [
+                cls._clean_identifier(c)
+                for c in raw_cols
+                if cls._clean_identifier(c).lower() not in stopwords
+            ]
+
+        order_cols = []
+        ord_match = cls.ORDER_REGEX.search(sql)
+        if ord_match:
+            ord_body = ord_match.group(1)
+            for part in ord_body.split(","):
+                token = part.strip().split()[0] if part.strip() else ""
+                clean_tok = cls._clean_identifier(token)
+                if clean_tok and clean_tok.lower() not in {"asc", "desc"}:
+                    order_cols.append(clean_tok)
+
+        return {
+            "table": table,
+            "where_columns": list(dict.fromkeys(where_cols)),
+            "order_columns": list(dict.fromkeys(order_cols)),
+        }
+
+    @classmethod
+    def analyze_and_prescribe(
+        cls,
+        queries_history: List[Dict[str, Any]],
+        threshold_duration_ms: int = 300,
+    ) -> List[Dict[str, Any]]:
+        """
+        Avalia o histórico e gera prescrições com prompts autônomos.
+        """
+        prescricoes = []
+        seen_suggestions = set()
+
+        for idx, item in enumerate(queries_history):
+            sql = (item.get("query") or "").strip()
+            duration = item.get("duration_ms") or 0
+            count = item.get("count", 1)
+
+            if not sql or (duration < threshold_duration_ms and count < 3):
+                continue
+
+            meta = cls._extract_query_metadata(sql)
+            table = meta["table"]
+            cols = meta["where_columns"] or meta["order_columns"]
+
+            if not table or not cols:
+                continue
+
+            coluna_alvo = cols[0]
+            index_name = f"idx_{table}_{coluna_alvo}"
+            sugestao_key = f"{table}.{coluna_alvo}"
+
+            if sugestao_key in seen_suggestions:
+                continue
+            seen_suggestions.add(sugestao_key)
+
+            # Define severidade e impacto
+            if duration >= 1000 or count >= 5:
+                prioridade = "ALTA"
+                impacto = "Redução de até 95% no tempo de resposta (eliminação de Full Table Scan)."
+            else:
+                prioridade = "MEDIA"
+                impacto = "Redução de até 70% na latência e economia de CPU no banco."
+
+            sql_prescrito = f"CREATE INDEX {index_name} ON {table} ({coluna_alvo});"
+            prompt_autonomo = (
+                f"Identificamos que as consultas na tabela '{table}' filtrando por '{coluna_alvo}' "
+                f"apresentam latência de {duration}ms (executadas {count}x). "
+                f"Deseja aprovar a criação do índice '{index_name}' para otimizar a infraestrutura?"
+            )
+
+            prescricoes.append({
+                "prescription_id": f"presc_{idx + 1}_{table}_{coluna_alvo}",
+                "tipo_acao": "CREATE_INDEX",
+                "prioridade": prioridade,
+                "tabela": table,
+                "coluna_alvo": coluna_alvo,
+                "duracao_observada_ms": duration,
+                "frequencia_execucao": count,
+                "impacto_estimado": impacto,
+                "sql_prescrito": sql_prescrito,
+                "prompt_autonomo": prompt_autonomo,
+                "status": "pendente_aprovacao",
+            })
+
+        return prescricoes
+

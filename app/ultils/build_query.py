@@ -780,7 +780,7 @@ def get_query_string_advance(
         if max_rows is not None:
             query += f" FETCH NEXT {max_rows} ROWS ONLY"
 
-    elif db_type == "oracle":
+    elif db_type.lower() in {"oracle", "oracledb"} or "oracle" in db_type.lower():
         if max_rows is None:
             max_rows = 1000
 

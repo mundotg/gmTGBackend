@@ -42,7 +42,8 @@ def get_current_user(
     user = (
         db.query(user_model.User)
         .options(
-            joinedload(user_model.User.role).joinedload(user_model.Role.permissions)
+            joinedload(user_model.User.role).joinedload(user_model.Role.permissions),
+            joinedload(user_model.User.empresa_role).joinedload(user_model.Role.permissions),
         )
         .filter(user_model.User.id == user_id)
         .first()
@@ -159,11 +160,34 @@ def _load_user_sync(user_id: int):
         return (
             db.query(user_model.User)
             .options(
-                joinedload(user_model.User.role).joinedload(user_model.Role.permissions)
+                joinedload(user_model.User.role).joinedload(user_model.Role.permissions),
+                joinedload(user_model.User.empresa_role).joinedload(user_model.Role.permissions),
             )
             .filter(user_model.User.id == user_id)
             .first()
         )
+    finally:
+        db.close()
+
+
+def _check_ws_permissions_sync(user_id: int, required: tuple[str, ...]) -> bool:
+    from app.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        user = (
+            db.query(user_model.User)
+            .options(
+                joinedload(user_model.User.role).joinedload(user_model.Role.permissions),
+                joinedload(user_model.User.empresa_role).joinedload(user_model.Role.permissions),
+            )
+            .filter(user_model.User.id == user_id)
+            .first()
+        )
+        if not user or not user.is_active:
+            return False
+        # Avaliado enquanto a sessão SQLAlchemy ainda está aberta e ativa
+        return user_has_permission(user.permissions, required)
     finally:
         db.close()
 
@@ -182,7 +206,4 @@ async def ws_has_permission(user_id: int, *required: str) -> bool:
     """
     from fastapi.concurrency import run_in_threadpool
 
-    user = await run_in_threadpool(_load_user_sync, user_id)
-    if not user or not user.is_active:
-        return False
-    return user_has_permission(user.permissions, required)
+    return await run_in_threadpool(_check_ws_permissions_sync, user_id, required)

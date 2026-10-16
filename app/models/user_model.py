@@ -328,6 +328,9 @@ class User(Base, TimestampMixin):
     query_history = relationship(
         "QueryHistory", back_populates="user", cascade="all, delete-orphan"
     )
+    datascience_analyses = relationship(
+        "DataScienceAnalysis", back_populates="user", cascade="all, delete-orphan"
+    )
 
     chat_sessions = relationship("ChatSession", back_populates="user")
 

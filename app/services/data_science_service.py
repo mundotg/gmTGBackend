@@ -13,6 +13,7 @@ uma vez (para cache Redis / REST).
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import json
 import math
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
@@ -57,6 +58,28 @@ def _build_df(rows: List[Dict[str, Any]]) -> pd.DataFrame:
     # Tenta refinar colunas object → numérico ou data (valores da BD podem vir string).
     for col in df.columns:
         if df[col].dtype == object:
+            # 1. Se contiver objetos unhashable (dict, list, set), serializa para JSON para permitir
+            # operações do pandas como duplicated(), nunique(), value_counts() sem 'unhashable type: dict'.
+            try:
+                has_unhashable = df[col].apply(lambda x: isinstance(x, (dict, list, set))).any()
+                if has_unhashable:
+                    df[col] = df[col].apply(
+                        lambda x: json.dumps(x, default=str, ensure_ascii=False)
+                        if isinstance(x, (dict, list, set))
+                        else x
+                    )
+            except Exception:
+                pass
+
+            # 2. Trava de segurança contra colunas com strings massivas (dumps, base64, result_preview gigante):
+            # limita cada célula a 2000 caracteres para evitar estourar a memória ou a base de dados.
+            try:
+                df[col] = df[col].apply(
+                    lambda x: (x[:2000] + "... [truncado]") if isinstance(x, str) and len(x) > 2000 else x
+                )
+            except Exception:
+                pass
+
             num = pd.to_numeric(df[col], errors="coerce")
             if num.notna().mean() >= 0.8:  # 80%+ convertem → numérica
                 df[col] = num
@@ -85,10 +108,14 @@ def _kind(s: pd.Series) -> str:
 def _overview(df: pd.DataFrame) -> Dict[str, Any]:
     total_cells = int(df.size)
     total_nulls = int(df.isna().sum().sum())
+    try:
+        n_duplicated = int(df.duplicated().sum())
+    except Exception:
+        n_duplicated = 0
     return {
         "n_rows": int(len(df)),
         "n_cols": int(df.shape[1]),
-        "n_duplicated": int(df.duplicated().sum()),
+        "n_duplicated": n_duplicated,
         "total_cells": total_cells,
         "total_nulls": total_nulls,
         "null_pct": round(total_nulls / total_cells * 100, 2) if total_cells else 0,
@@ -100,7 +127,13 @@ def _column_stats(name: str, s: pd.Series) -> Dict[str, Any]:
     kind = _kind(s)
     n = int(len(s))
     nulls = int(s.isna().sum())
-    distinct = int(s.nunique(dropna=True))
+    try:
+        distinct = int(s.nunique(dropna=True))
+    except Exception:
+        try:
+            distinct = int(s.astype(str).nunique(dropna=True))
+        except Exception:
+            distinct = 0
     base: Dict[str, Any] = {
         "name": name,
         "kind": kind,
@@ -367,10 +400,16 @@ def _anomalias(df: pd.DataFrame, top: int = 12) -> Dict[str, Any]:
     idxs = score[score > 3].sort_values(ascending=False).head(top).index
     rows = []
     for i in idxs:
+        row_dict = {}
+        for c in df.columns:
+            val = _clean(df.loc[i, c])
+            if isinstance(val, str) and len(val) > 250:
+                val = val[:250] + "... [truncado]"
+            row_dict[str(c)] = val
         rows.append({
             "index": int(i),
             "score": _clean(round(float(score[i]), 2)),
-            "row": {str(c): _clean(df.loc[i, c]) for c in df.columns},
+            "row": row_dict,
         })
     return {"count": count, "rows": rows}
 

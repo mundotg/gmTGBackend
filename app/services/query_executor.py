@@ -35,6 +35,25 @@ MAX_PREVIEW_ROWS = 50000
 FETCH_BATCH_SIZE = 100
 
 
+def _truncate_preview_for_history(preview_raw: Optional[Any], max_chars: int = 15000) -> Optional[str]:
+    """Limita o tamanho da prévia armazenada no histórico para evitar sobrecarga na base de dados."""
+    if not preview_raw:
+        return None
+    try:
+        if isinstance(preview_raw, list):
+            sample = preview_raw[:10]
+            dumped = json.dumps(sample, default=str)
+            if len(dumped) <= max_chars:
+                return dumped
+            return dumped[:max_chars] + "... [truncado]"
+        preview_str = str(preview_raw)
+        if len(preview_str) <= max_chars:
+            return preview_str
+        return preview_str[:max_chars] + "... [truncado]"
+    except Exception:
+        return str(preview_raw)[:max_chars]
+
+
 def is_safe_identifier(identifier: str) -> bool:
     """
     Valida se um identificador é seguro.
@@ -372,7 +391,9 @@ async def executar_query_e_salvar(
             executed_at=datetime.now(timezone.utc),
             duration_ms=duration_ms,
             result_preview=(
-                result_preview if not queryrequest.isCountQuery else str(result_preview)
+                str(result_preview)
+                if queryrequest.isCountQuery
+                else _truncate_preview_for_history(preview_rows)
             ),
             error_message=error_message,
             is_favorite=False,

@@ -89,7 +89,11 @@ def ws_user_id(websocket: WebSocket) -> Optional[int]:
     sempre ValueError, devolvia None e toda a WS respondia "Não autenticado."
     mesmo com sessão válida, enquanto os pedidos REST passavam.
     """
-    token = websocket.cookies.get("access_token") or websocket.query_params.get("token")
+    token = (
+        websocket.cookies.get("access_token")
+        or websocket.cookies.get("bk_access_token")
+        or websocket.query_params.get("token")
+    )
     if not token:
         return None
     try:

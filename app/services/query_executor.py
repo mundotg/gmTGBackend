@@ -92,7 +92,12 @@ def montar_filter_com_parametros(
                 f"Identificador inválido: {cond.table_name_fil}.{cond.column}"
             )
 
-        field = f"{cond.table_name_fil}.{cond.column}"
+        if cond.table_name_fil and cond.column.startswith(f"{cond.table_name_fil}."):
+            field = cond.column
+        elif cond.table_name_fil:
+            field = f"{cond.table_name_fil}.{cond.column}"
+        else:
+            field = cond.column
         # gera um prefixo único para o param name
         param_prefix = f"p_{idx}_"
 
@@ -324,6 +329,7 @@ async def executar_query_e_salvar(
     result_preview: Optional[str] = None
     error_message: Optional[str] = None
     colunas: List[str] = []
+    preview_rows: List[Dict[str, Any]] = []
 
     try:
         with engine.connect() as conn:

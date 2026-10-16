@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from time import time
 from typing import Any, Optional
 
-from fastapi import params
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 

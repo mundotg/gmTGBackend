@@ -365,13 +365,19 @@ async def query_more_endpoint(
         payload.offset = None
         op = ">" if direction == "ASC" else "<"
         parts = order_col.split(".")
-        table_ref = ".".join(parts[:-1]) if len(parts) >= 2 else (payload.baseTable or "")
+        if len(parts) >= 2:
+            table_ref = ".".join(parts[:-1])
+            col_name = parts[-1]
+        else:
+            table_ref = payload.baseTable or ""
+            col_name = order_col
+
         vt = _infer_value_type(body.cursor)
         payload.where = [
             *(payload.where or []),
             CondicaoFiltro(
                 table_name_fil=table_ref,
-                column=order_col,
+                column=col_name,
                 operator=op,
                 value=str(body.cursor),
                 column_type="number" if vt == "number" else "string",

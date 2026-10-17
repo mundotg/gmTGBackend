@@ -27,6 +27,8 @@ from app.schemas.query_select_upAndInsert_schema import (
     OrderByOption,
     QueryPayload,
     UpdateRequest,
+    UpdateAllRequest,
+    UpdateSelectedRequest,
 )
 
 # from app.services.cloudeAi_execute_query import executar_query_e_salvar_stream
@@ -37,7 +39,7 @@ from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
 from app.ultils.permissions import require_permission
-from app.ultils.update_line_build_exe import update_row_service
+from app.ultils.update_line_build_exe import update_row_service, update_all_by_query_service, update_selected_service
 
 
 class QueryChannelManager:
@@ -165,6 +167,80 @@ async def update_row_endpoint(
             raise
         except Exception as e:
             error_msg = f"Erro ao atualizar linha: {str(e)}"
+            log_message(f"{error_msg}\n{traceback.format_exc()}", "error")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/update_all", dependencies=[Depends(require_permission("data:write"))])
+async def update_all_endpoint(
+    data: UpdateAllRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Atualiza todos os registros correspondentes a uma query."""
+    background_tasks.add_task(cleanup_expired_channels)
+
+    async with handle_db_transaction(db):
+        try:
+            engine, connection = ConnectionManager.ensure_connection(
+                db, user_id, ConnectionAccessLevel.write
+            )
+
+            log_message(f"Atualizando todos os registros da query para usuário {user_id}", "info")
+            result = update_all_by_query_service(
+                data,
+                engine,
+                user_id,
+                connection.type,
+                connection.id,
+                db,
+            )
+
+            log_message("Registros em massa atualizados com sucesso", "success")
+            return result
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            error_msg = f"Erro ao atualizar registros em massa: {str(e)}"
+            log_message(f"{error_msg}\n{traceback.format_exc()}", "error")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/update_selected", dependencies=[Depends(require_permission("data:write"))])
+async def update_selected_endpoint(
+    data: UpdateSelectedRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Atualiza múltiplos registros selecionados."""
+    background_tasks.add_task(cleanup_expired_channels)
+
+    async with handle_db_transaction(db):
+        try:
+            engine, connection = ConnectionManager.ensure_connection(
+                db, user_id, ConnectionAccessLevel.write
+            )
+
+            log_message(f"Atualizando {len(data.rows_primary_keys)} registros selecionados para usuário {user_id}", "info")
+            result = update_selected_service(
+                data,
+                engine,
+                user_id,
+                connection.type,
+                connection.id,
+                db,
+            )
+
+            log_message("Registros selecionados atualizados com sucesso", "success")
+            return result
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            error_msg = f"Erro ao atualizar registros selecionados: {str(e)}"
             log_message(f"{error_msg}\n{traceback.format_exc()}", "error")
             raise HTTPException(status_code=500, detail=str(e))
 

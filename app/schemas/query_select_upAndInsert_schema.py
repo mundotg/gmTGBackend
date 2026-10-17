@@ -174,3 +174,13 @@ class ParametrosRelatorioSchema(BaseModel):
 
     class Config:
         json_schema_extra = {"example": {"formato": "excel", "incluirDetalhes": True}}
+
+
+class UpdateAllRequest(BaseModel):
+    updatedRow: Dict[str, Dict[str, ChangedField]]
+    query: QueryPayload
+
+
+class UpdateSelectedRequest(BaseModel):
+    updatedRow: Dict[str, Dict[str, ChangedField]]
+    rows_primary_keys: List[Dict[str, Dict[str, Any]]]

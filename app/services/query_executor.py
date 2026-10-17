@@ -33,6 +33,15 @@ from app.ultils.logger import log_message
 MAX_PREVIEW_ROWS = 50000
 # Tamanho do lote para fetchmany
 FETCH_BATCH_SIZE = 100
+# Limite máximo de caracteres por célula de preview (protege o frontend contra Out of Memory)
+MAX_CELL_CHARS = 30000
+
+
+def _sanitize_cell_value(val: Any, max_chars: int = MAX_CELL_CHARS) -> Any:
+    """Trunca células com strings excessivamente grandes para evitar OOM no browser."""
+    if isinstance(val, str) and len(val) > max_chars:
+        return val[:max_chars] + f"... [truncado: excede {max_chars // 1000}KB]"
+    return val
 
 
 def _truncate_preview_for_history(preview_raw: Optional[Any], max_chars: int = 15000) -> Optional[str]:
@@ -353,11 +362,12 @@ async def executar_query_e_salvar(
                         break
 
                     for row in batch:
-                        if queryrequest.select:
-                            # se select informado, usa ordem do select
-                            preview_rows.append(dict(zip(queryrequest.select, row)))
-                        else:
-                            preview_rows.append(dict(zip(keys, row)))
+                        row_cols = queryrequest.select if queryrequest.select else keys
+                        sanitized_row = {
+                            col: _sanitize_cell_value(val)
+                            for col, val in zip(row_cols, row)
+                        }
+                        preview_rows.append(sanitized_row)
 
                         fetched += 1
                         if fetched >= MAX_PREVIEW_ROWS:

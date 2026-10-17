@@ -8,7 +8,7 @@ from typing import Optional
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session, load_only, defer
 from sqlalchemy import desc, or_
 
 from app.config.cache_manager import cache_result
@@ -184,7 +184,7 @@ def _fetch_recent_queries(db: Session, conn_id: Optional[int], limit: int):
     if not conn_id:
         return []
 
-    q = db.query(QueryHistory).filter(
+    q = db.query(QueryHistory).options(defer(QueryHistory.result_preview)).filter(
         QueryHistory.query_type.in_([QueryType.SELECT.value, QueryType.COUNT.value]),
         QueryHistory.db_connection_id == conn_id,
     )

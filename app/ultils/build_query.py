@@ -10,6 +10,7 @@ from app.schemas.query_select_upAndInsert_schema import (
 )
 from app.services.editar_linha import (
     _convert_column_type_for_string_one,
+    _convert_column_type_for_string_one_V1,
     quote_identifier,
 )
 from app.ultils.logica_de_join_advance import (
@@ -944,26 +945,38 @@ def should_use_estimate(
 def build_update_query(
     table_name, db_type, updated_values, primary_key, primary_value
 ) -> TextClause | None:
-    """Constrói a query de atualização dinâmica."""
+    """
+    Constrói a query de atualização dinâmica parametrizada.
+    Compatível com qualquer banco de dados: PostgreSQL, MySQL, MariaDB, SQLite, Oracle, SQL Server.
+    Garante que as colunas no SET e no WHERE usem apenas o nome limpo da coluna,
+    evitando erros de qualificação 'too many dotted names' ou conflitos de schema.
+    """
+    if not updated_values:
+        return None
+
+    db_type = (db_type or "postgres").lower()
     set_clauses = []
-    for col, info in updated_values.items():
+    params = {}
+
+    for idx, (col, info) in enumerate(updated_values.items()):
         value = info.get("value")
-        col_type = info.get("type_column", "text")  # default string
-        set_clauses.append(
-            f"{quote_identifier(db_type, col)} = {_convert_column_type_for_string_one(value, col_type)}"
-        )
+        col_type = info.get("type_column", "text")
+        # Garante que no SET vá sempre apenas o nome da coluna (ex: "nome", não "public.users.nome")
+        clean_col = col.split(".")[-1]
+        param_name = f"b_set_{idx}"
+        quoted_col = quote_identifier(db_type, clean_col)
+        set_clauses.append(f"{quoted_col} = :{param_name}")
+        params[param_name] = _convert_column_type_for_string_one_V1(value, col_type)
 
     if not set_clauses:
         return None
 
-    primary_value_formatted = (
-        f"'{primary_value}'" if isinstance(primary_value, str) else str(primary_value)
-    )
-    query = text(
-        f"""
-        UPDATE {quote_identifier(db_type, table_name)}
-        SET {', '.join(set_clauses)}
-        WHERE {quote_identifier(db_type, primary_key)} = {primary_value_formatted};
-    """
-    )
-    return query
+    # Garante que no WHERE da chave primária vá sempre apenas o nome da coluna
+    clean_pk = primary_key.split(".")[-1]
+    quoted_pk = quote_identifier(db_type, clean_pk)
+    params["b_pk_val"] = primary_value
+
+    quoted_table = quote_identifier(db_type, table_name)
+    sql = f"UPDATE {quoted_table} SET {', '.join(set_clauses)} WHERE {quoted_pk} = :b_pk_val"
+
+    return text(sql).bindparams(**params)

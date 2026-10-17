@@ -33,6 +33,34 @@ from app.ultils.logger import log_message
 MAX_PREVIEW_ROWS = 50000
 # Tamanho do lote para fetchmany
 FETCH_BATCH_SIZE = 100
+# Limite máximo de caracteres por célula de preview (protege o frontend contra Out of Memory)
+MAX_CELL_CHARS = 30000
+
+
+def _sanitize_cell_value(val: Any, max_chars: int = MAX_CELL_CHARS) -> Any:
+    """Trunca células com strings excessivamente grandes para evitar OOM no browser."""
+    if isinstance(val, str) and len(val) > max_chars:
+        return val[:max_chars] + f"... [truncado: excede {max_chars // 1000}KB]"
+    return val
+
+
+def _truncate_preview_for_history(preview_raw: Optional[Any], max_chars: int = 15000) -> Optional[str]:
+    """Limita o tamanho da prévia armazenada no histórico para evitar sobrecarga na base de dados."""
+    if not preview_raw:
+        return None
+    try:
+        if isinstance(preview_raw, list):
+            sample = preview_raw[:10]
+            dumped = json.dumps(sample, default=str)
+            if len(dumped) <= max_chars:
+                return dumped
+            return dumped[:max_chars] + "... [truncado]"
+        preview_str = str(preview_raw)
+        if len(preview_str) <= max_chars:
+            return preview_str
+        return preview_str[:max_chars] + "... [truncado]"
+    except Exception:
+        return str(preview_raw)[:max_chars]
 
 
 def is_safe_identifier(identifier: str) -> bool:
@@ -73,7 +101,12 @@ def montar_filter_com_parametros(
                 f"Identificador inválido: {cond.table_name_fil}.{cond.column}"
             )
 
-        field = f"{cond.table_name_fil}.{cond.column}"
+        if cond.table_name_fil and cond.column.startswith(f"{cond.table_name_fil}."):
+            field = cond.column
+        elif cond.table_name_fil:
+            field = f"{cond.table_name_fil}.{cond.column}"
+        else:
+            field = cond.column
         # gera um prefixo único para o param name
         param_prefix = f"p_{idx}_"
 
@@ -305,6 +338,7 @@ async def executar_query_e_salvar(
     result_preview: Optional[str] = None
     error_message: Optional[str] = None
     colunas: List[str] = []
+    preview_rows: List[Dict[str, Any]] = []
 
     try:
         with engine.connect() as conn:
@@ -328,11 +362,12 @@ async def executar_query_e_salvar(
                         break
 
                     for row in batch:
-                        if queryrequest.select:
-                            # se select informado, usa ordem do select
-                            preview_rows.append(dict(zip(queryrequest.select, row)))
-                        else:
-                            preview_rows.append(dict(zip(keys, row)))
+                        row_cols = queryrequest.select if queryrequest.select else keys
+                        sanitized_row = {
+                            col: _sanitize_cell_value(val)
+                            for col, val in zip(row_cols, row)
+                        }
+                        preview_rows.append(sanitized_row)
 
                         fetched += 1
                         if fetched >= MAX_PREVIEW_ROWS:
@@ -372,7 +407,9 @@ async def executar_query_e_salvar(
             executed_at=datetime.now(timezone.utc),
             duration_ms=duration_ms,
             result_preview=(
-                result_preview if not queryrequest.isCountQuery else str(result_preview)
+                str(result_preview)
+                if queryrequest.isCountQuery
+                else _truncate_preview_for_history(preview_rows)
             ),
             error_message=error_message,
             is_favorite=False,

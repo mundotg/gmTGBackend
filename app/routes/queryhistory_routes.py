@@ -8,7 +8,7 @@ from typing import Optional
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, load_only
+from sqlalchemy.orm import Session, load_only, defer
 from sqlalchemy import desc, or_
 
 from app.config.cache_manager import cache_result
@@ -18,6 +18,7 @@ from app.routes.connection_routes import get_current_user_id
 from app.schemas.queryhistory_schemas import QueryType
 from app.services.cloudeAi_execute_query import PrescriptiveOptimizationEngine
 from app.ultils.logger import log_message
+from app.cruds.connection_cruds import get_active_connection_by_userid
 
 from app.ultils.permissions import require_permission
 
@@ -142,6 +143,14 @@ async def get_audit_logs(
     user_id: int = Depends(get_current_user_id),
 ):
     try:
+        # Se conn_id não foi informado, restringe estritamente à conexão ativa corrente do utilizador
+        if conn_id is None:
+            active = get_active_connection_by_userid(db, user_id)
+            if active:
+                conn_id = active.connection_id
+            else:
+                return []
+
         return get_cached_logs(
             user_id=user_id,
             limit=limit,
@@ -167,16 +176,18 @@ async def get_audit_logs(
 # =========================
 def _fetch_recent_queries(db: Session, conn_id: Optional[int], limit: int):
     """
-    Consultas SELECT recentes de uma conexão, DEDUPLICADAS pela string SQL
+    Consultas SELECT recentes da conexão corrente (conn_id obrigatório), DEDUPLICADAS pela string SQL
     (mantém a mais recente e conta as repetições) — serve para "usar novamente"
     e para gerar sugestões dinâmicas. Inclui o `payload` estruturado do
     `meta_info`, que permite recarregar a consulta no construtor.
     """
-    q = db.query(QueryHistory).filter(
-        QueryHistory.query_type.in_([QueryType.SELECT.value, QueryType.COUNT.value])
+    if not conn_id:
+        return []
+
+    q = db.query(QueryHistory).options(defer(QueryHistory.result_preview)).filter(
+        QueryHistory.query_type.in_([QueryType.SELECT.value, QueryType.COUNT.value]),
+        QueryHistory.db_connection_id == conn_id,
     )
-    if conn_id is not None:
-        q = q.filter(QueryHistory.db_connection_id == conn_id)
 
     # janela recente para deduplicar em memória (barato e suficiente)
     rows = q.order_by(desc(QueryHistory.executed_at)).limit(400).all()
@@ -192,6 +203,7 @@ def _fetch_recent_queries(db: Session, conn_id: Optional[int], limit: int):
         if key in seen:
             seen[key]["count"] += 1
             continue
+        has_error = bool(r.error_message and r.error_message.strip())
         item = {
             "id": r.id,
             "query": sql,
@@ -203,6 +215,9 @@ def _fetch_recent_queries(db: Session, conn_id: Optional[int], limit: int):
             "row_count": meta.get("row_count"),
             "is_favorite": r.is_favorite,
             "db_connection_id": r.db_connection_id,
+            "error_message": r.error_message,
+            "success": not has_error,
+            "status": "failed" if has_error else "success",
             "count": 1,
         }
         seen[key] = item
@@ -215,16 +230,25 @@ def _fetch_recent_queries(db: Session, conn_id: Optional[int], limit: int):
 @router.get("/recent-queries")
 async def get_recent_queries(
     conn_id: Optional[int] = Query(default=None),
-    limit: int = Query(default=15, ge=1, le=50),
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     """Consultas recentes (deduplicadas) para reutilizar/sugerir no construtor.
+    Mostra APENAS consultas da conexão corrente.
 
     Sem cache de propósito: o painel precisa de mostrar a consulta acabada de
     executar (tempo real). A query é leve (janela de 400 linhas).
     """
     try:
+        # Se conn_id não foi informado explicitamente, obtém a conexão ativa do utilizador
+        if conn_id is None:
+            active = get_active_connection_by_userid(db, user_id)
+            if active:
+                conn_id = active.connection_id
+            else:
+                return {"success": True, "data": {"recent": [], "topTables": []}}
+
         items = _fetch_recent_queries(db, conn_id, limit)
         # Sugestões dinâmicas: tabelas mais usadas nas consultas recentes.
         table_freq: dict[str, int] = {}

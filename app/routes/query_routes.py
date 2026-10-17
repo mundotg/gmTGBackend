@@ -27,6 +27,8 @@ from app.schemas.query_select_upAndInsert_schema import (
     OrderByOption,
     QueryPayload,
     UpdateRequest,
+    UpdateAllRequest,
+    UpdateSelectedRequest,
 )
 
 # from app.services.cloudeAi_execute_query import executar_query_e_salvar_stream
@@ -37,7 +39,7 @@ from app.ultils.QueryExecutionService import QueryExecutionService
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.logger import log_message
 from app.ultils.permissions import require_permission
-from app.ultils.update_line_build_exe import update_row_service
+from app.ultils.update_line_build_exe import update_row_service, update_all_by_query_service, update_selected_service
 
 
 class QueryChannelManager:
@@ -169,6 +171,80 @@ async def update_row_endpoint(
             raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/update_all", dependencies=[Depends(require_permission("data:write"))])
+async def update_all_endpoint(
+    data: UpdateAllRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Atualiza todos os registros correspondentes a uma query."""
+    background_tasks.add_task(cleanup_expired_channels)
+
+    async with handle_db_transaction(db):
+        try:
+            engine, connection = ConnectionManager.ensure_connection(
+                db, user_id, ConnectionAccessLevel.write
+            )
+
+            log_message(f"Atualizando todos os registros da query para usuário {user_id}", "info")
+            result = update_all_by_query_service(
+                data,
+                engine,
+                user_id,
+                connection.type,
+                connection.id,
+                db,
+            )
+
+            log_message("Registros em massa atualizados com sucesso", "success")
+            return result
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            error_msg = f"Erro ao atualizar registros em massa: {str(e)}"
+            log_message(f"{error_msg}\n{traceback.format_exc()}", "error")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/update_selected", dependencies=[Depends(require_permission("data:write"))])
+async def update_selected_endpoint(
+    data: UpdateSelectedRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Atualiza múltiplos registros selecionados."""
+    background_tasks.add_task(cleanup_expired_channels)
+
+    async with handle_db_transaction(db):
+        try:
+            engine, connection = ConnectionManager.ensure_connection(
+                db, user_id, ConnectionAccessLevel.write
+            )
+
+            log_message(f"Atualizando {len(data.rows_primary_keys)} registros selecionados para usuário {user_id}", "info")
+            result = update_selected_service(
+                data,
+                engine,
+                user_id,
+                connection.type,
+                connection.id,
+                db,
+            )
+
+            log_message("Registros selecionados atualizados com sucesso", "success")
+            return result
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            error_msg = f"Erro ao atualizar registros selecionados: {str(e)}"
+            log_message(f"{error_msg}\n{traceback.format_exc()}", "error")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/insert_row", dependencies=[Depends(require_permission("data:write"))])
 async def insert_row_endpoint(
     data: InsertRequest,
@@ -258,10 +334,11 @@ async def execute_query_scroll_endpoint(
 # ============================================================
 class QueryMoreRequest(BaseModel):
     payload: QueryPayload
-    cursor: Optional[str] = None            # último valor da coluna de ordem
-    order_column: Optional[str] = None      # coluna de ordem (o cliente indica)
+    cursor: Optional[str] = None            # último valor da coluna de ordem (keyset)
+    order_column: Optional[str] = None      # coluna de ordem indicada
     direction: Optional[str] = "ASC"
     limit: int = 50
+    offset: Optional[int] = None            # offset de fallback para NoSQL/Oracle sem cursor
 
 
 def _infer_value_type(v: Optional[str]) -> str:
@@ -294,14 +371,16 @@ def _derive_order(payload: QueryPayload, order_column: Optional[str]) -> tuple[O
 
 
 def _extract_col_value(row: Dict[str, Any], col: str) -> Any:
-    """Valor da coluna de ordem numa linha (chaves podem ser qualificadas)."""
+    """Valor da coluna de ordem numa linha (chaves podem ser qualificadas ou insensíveis a maiúsculas)."""
     if col in row:
         return row[col]
     leaf = col.split(".")[-1]
     if leaf in row:
         return row[leaf]
+    lower_leaf = leaf.lower()
     for k in row:
-        if str(k).split(".")[-1] == leaf:
+        k_leaf = str(k).split(".")[-1]
+        if k_leaf == leaf or k_leaf.lower() == lower_leaf:
             return row[k]
     return None
 
@@ -313,11 +392,10 @@ async def query_more_endpoint(
     user_id: int = Depends(get_current_user_id),
 ):
     """
-    Carrega a PÁGINA SEGUINTE por CURSOR (keyset): em vez de `OFFSET n` (que
-    re-varre a tabela e fica caro sob carga), aplica `WHERE ordem > cursor`
-    (usa índice, custo ~constante). Reutiliza o motor de query (SQL e MongoDB).
-    Cacheado em Redis por página → sob muita carga, pedidos idênticos não
-    voltam à BD.
+    Carrega a PÁGINA SEGUINTE por CURSOR (keyset) com fallback por OFFSET:
+    - Keyset: `WHERE ordem > cursor` (O(1) para SQL com índice e MongoDB por _id).
+    - Suporte nativo a NoSQL (MongoDB: prioriza _id e suporta skip) e Oracle (ROWNUM / OFFSET).
+    - Cache Redis por página.
     """
     payload = body.payload
     limit = max(1, min(body.limit or 50, 500))
@@ -326,35 +404,56 @@ async def query_more_endpoint(
     if not body.order_column and not body.direction:
         direction = derived_dir
 
-    # 🔑 Cache Redis (página) — chave por payload + cursor + ordem + limite.
+    # Detecta tipo da base ativa para NoSQL e Oracle
+    conn_type = ""
+    try:
+        from app.ultils.ativar_engine import ConnectionManager
+        _, connection = ConnectionManager().ensure_connection(db, user_id)
+        conn_type = (getattr(connection, "type", "") or "").lower()
+    except Exception:
+        pass
+
+    # NoSQL (MongoDB): se não houver coluna de ordenação explicitada, usa '_id'
+    if conn_type in {"mongodb", "mongo", "nosql"} or "mongo" in conn_type:
+        if not order_col:
+            order_col = "_id"
+
+    # 🔑 Cache Redis (página) — chave por payload + cursor + offset + ordem + limite.
     cache_key = None
     try:
         h = hashlib.sha1(
             json.dumps(payload.model_dump(exclude_none=True), sort_keys=True, default=str).encode()
         ).hexdigest()[:16]
-        cache_key = f"qmore:{user_id}:{h}:{order_col}:{direction}:{body.cursor}:{limit}"
+        cache_key = f"qmore:{user_id}:{h}:{order_col}:{direction}:{body.cursor}:{body.offset}:{limit}"
         cached = read_cache(cache_key)
         if cached:
             return cached
     except Exception:  # noqa: BLE001
         cache_key = None
 
-    # Prepara o payload da página seguinte (sem offset).
+    # Prepara o payload da página seguinte
     payload.limit = limit
-    payload.offset = None
     payload.isCountQuery = False
 
-    # Filtro keyset: só a partir do cursor (a 1ª página não leva cursor).
-    if order_col and body.cursor is not None and str(body.cursor) != "":
+    # Filtro keyset: só se houver cursor válido
+    has_valid_cursor = body.cursor is not None and str(body.cursor).strip() != ""
+    if order_col and has_valid_cursor:
+        payload.offset = None
         op = ">" if direction == "ASC" else "<"
         parts = order_col.split(".")
-        table_ref = ".".join(parts[:-1]) if len(parts) >= 2 else (payload.baseTable or "")
+        if len(parts) >= 2:
+            table_ref = ".".join(parts[:-1])
+            col_name = parts[-1]
+        else:
+            table_ref = payload.baseTable or ""
+            col_name = order_col
+
         vt = _infer_value_type(body.cursor)
         payload.where = [
             *(payload.where or []),
             CondicaoFiltro(
                 table_name_fil=table_ref,
-                column=order_col,
+                column=col_name,
                 operator=op,
                 value=str(body.cursor),
                 column_type="number" if vt == "number" else "string",
@@ -362,10 +461,12 @@ async def query_more_endpoint(
                 logicalOperator="AND",
             ),
         ]
-
-    # Garante ordenação determinística pela coluna de cursor.
-    if order_col and not (getattr(payload, "orderBy", None) or []):
-        payload.orderBy = [OrderByOption(column=order_col, direction=direction)]
+        # Garante ordenação determinística pela coluna de cursor
+        if not (getattr(payload, "orderBy", None) or []):
+            payload.orderBy = [OrderByOption(column=order_col, direction=direction)]
+    else:
+        # Fallback inteligente por OFFSET (ideal para Oracle sem cursor único ou NoSQL com skip)
+        payload.offset = body.offset if body.offset is not None and body.offset >= 0 else None
 
     result = await QueryExecutionService().execute_query(payload, db, user_id)
     preview: List[Dict[str, Any]] = result.get("preview", []) if isinstance(result, dict) else []
@@ -387,7 +488,7 @@ async def query_more_endpoint(
 
     if cache_key:
         try:
-            write_cache(cache_key, resp, ttl=45)  # curto: dados podem mudar
+            write_cache(cache_key, resp, ttl=45)
         except Exception:  # noqa: BLE001
             pass
 

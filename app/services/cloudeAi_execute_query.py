@@ -259,8 +259,12 @@ class QueryFilterBuilder:
         params: Dict[str, Any] = {}
 
         for i, condition in enumerate(conditions):
-            # Validação de segurança já feita pelo SecurityValidator
-            field = f"{condition.table_name_fil}.{condition.column}"
+            if condition.table_name_fil and condition.column.startswith(f"{condition.table_name_fil}."):
+                field = condition.column
+            elif condition.table_name_fil:
+                field = f"{condition.table_name_fil}.{condition.column}"
+            else:
+                field = condition.column
             # print(f" DEBUG: Processando condição {condition}")
             # Gera nome único do parâmetro
             param_prefix = f"param_{i}"

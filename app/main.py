@@ -20,7 +20,6 @@ from app.middleware import (
     MaintenanceModeMiddleware,
     RequestContextMiddleware,
     StrictAuditMiddleware,
-    SystemGuardMiddleware,
     register_exception_handlers,
 )
 from app.routes import (
@@ -55,6 +54,7 @@ from app.routes import (
     task_routes,
     transfer_data_routes,
     user_routes,
+    nexus_routes,
 )
 from app.schemas import project_analytics_routes
 from app.seed_new import seed_data
@@ -252,6 +252,17 @@ app.add_middleware(StrictAuditMiddleware)
 # CORS
 # ------------------------------------------------------------
 origins = get_env_list_cors("BACKEND_CORS_ORIGINS", ["http://localhost:3000"])
+
+# Adiciona dinamicamente a origem do Nexus Cognitiva se estiver num domínio dedicado
+nexus_frontend_url = get_env("NEXUS_FRONTEND_URL", "").strip().rstrip("/")
+if nexus_frontend_url and nexus_frontend_url.startswith("http"):
+    from urllib.parse import urlparse
+
+    parsed_nexus = urlparse(nexus_frontend_url)
+    nexus_origin = f"{parsed_nexus.scheme}://{parsed_nexus.netloc}"
+    if nexus_origin not in origins:
+        origins.append(nexus_origin)
+
 allow_all = "*" in origins
 
 # ⚠️ A spec proíbe responder "Access-Control-Allow-Origin: *" quando as cookies
@@ -402,6 +413,7 @@ app.include_router(sql_editor_routes.router)
 app.include_router(sql_editor_routes.ws_router)  # WebSockets: sem dependências de router (ver ws_has_permission)
 app.include_router(datascience_routes.router)
 app.include_router(datascience_routes.ws_router)  # WebSockets: sem dependências de router (ver ws_has_permission)
+app.include_router(nexus_routes.router)
 
 
 # ------------------------------------------------------------
@@ -458,3 +470,4 @@ if __name__ == "__main__":
         uvicorn.run(app, host=host, port=port)
     except KeyboardInterrupt:
         print("Sinal de paragem recebido. A encerrar o servidor graciosamente...")
+

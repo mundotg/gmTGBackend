@@ -42,3 +42,12 @@ from app.models.pentest_models import (
     SecurityTestRun,
     SecurityTestAttempt,
 )
+from app.models.nexus_models import (
+    NexusPost,
+    NexusComment,
+    NexusReaction,
+    NexusLike,
+    NexusShare,
+    NexusView,
+    NexusSave,
+)

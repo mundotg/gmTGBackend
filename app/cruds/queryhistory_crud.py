@@ -45,6 +45,8 @@ async def create_query_history_async(
     try:
         try:
             query_data = data.model_dump(exclude_unset=True)
+            if query_data.get("result_preview") and len(str(query_data["result_preview"])) > 30000:
+                query_data["result_preview"] = str(query_data["result_preview"])[:30000] + "... [truncado por tamanho]"
             new_query = QueryHistory(**query_data)
 
             db.add(new_query)
@@ -204,6 +206,10 @@ def create_query_history(db: Session, user_id: int, data: QueryHistoryCreate) ->
             dump_data = data.model_dump(exclude_unset=True)
             dump_data["user_id"] = user_id
             dump_data["executed_by"] = f"user_{user_id}"
+
+            # Trava de segurança: impede que previews gigantes derrubem a base de dados
+            if dump_data.get("result_preview") and len(str(dump_data["result_preview"])) > 30000:
+                dump_data["result_preview"] = str(dump_data["result_preview"])[:30000] + "... [truncado por tamanho]"
 
             new_query = QueryHistory(**dump_data)
             db.add(new_query)

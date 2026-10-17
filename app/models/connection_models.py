@@ -46,6 +46,7 @@ class DBConnection(Base):
     structures = relationship("DBStructure", back_populates="connection", cascade="all, delete-orphan", lazy="selectin")
     row_count_cache = relationship("TableRowCountCache", back_populates="connection", cascade="all, delete-orphan")
     health_checks = relationship("DBHealthCheck", back_populates="connection", cascade="all, delete-orphan", passive_deletes=True)
+    datascience_analyses = relationship("DataScienceAnalysis", back_populates="connection", cascade="all, delete-orphan", passive_deletes=True)
 
     # 🧩 Novo relacionamento com projetos
     projects = relationship("Project", back_populates="db_connection", cascade="all, delete-orphan")

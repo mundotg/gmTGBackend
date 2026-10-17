@@ -213,7 +213,7 @@ def get_log_file_path() -> Optional[Path]:
     return None
 
 # Definindo os níveis aceitos para melhor autocomplete e segurança (Type Hinting)
-LogLevel = Literal["info", "error", "success", "warning"]
+LogLevel = Literal["info", "error", "success", "warning", "debug"]
 
 
 def _log_to_file(message: str, level: LogLevel = "info") -> None:
@@ -224,6 +224,7 @@ def _log_to_file(message: str, level: LogLevel = "info") -> None:
         "error": logger.error,
         "success": logger.info,  # 'success' mapeia para info no logging padrão
         "warning": logger.warning,
+        "debug": logger.debug,
     }
 
     # Executa a função correspondente ao nível, usando logger.info como padrão

@@ -176,6 +176,44 @@ def apply_model_updates():
             except Exception as ex_ec:
                 log_message(f"ℹ️ Verificação da tabela 'empresa_connections': {ex_ec}", "info")
 
+            try:
+                if "data_lineage_events" not in existing_tables:
+                    conn.execute(
+                        text(
+                            """
+                            CREATE TABLE IF NOT EXISTS data_lineage_events (
+                                id SERIAL PRIMARY KEY,
+                                source_connection_id INTEGER REFERENCES db_connections(id) ON DELETE SET NULL,
+                                source_connection_name VARCHAR(255),
+                                source_db_type VARCHAR(50),
+                                source_table VARCHAR(255) NOT NULL,
+                                source_query TEXT,
+                                target_connection_id INTEGER REFERENCES db_connections(id) ON DELETE SET NULL,
+                                target_connection_name VARCHAR(255),
+                                target_db_type VARCHAR(50),
+                                target_table VARCHAR(255) NOT NULL,
+                                columns_mapping JSON,
+                                transformation_type VARCHAR(50) DEFAULT 'direct_transfer',
+                                transformation_rule TEXT,
+                                rows_transferred INTEGER DEFAULT 0,
+                                duration_ms INTEGER DEFAULT 0,
+                                status VARCHAR(30) DEFAULT 'success',
+                                error_message TEXT,
+                                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                                project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+                                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                            )
+                            """
+                        )
+                    )
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_lineage_source_table ON data_lineage_events(source_table)"))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_lineage_target_table ON data_lineage_events(target_table)"))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_lineage_created_at ON data_lineage_events(created_at)"))
+                    conn.commit()
+                    log_message("✅ Tabela 'data_lineage_events' criada", "success")
+            except Exception as ex_le:
+                log_message(f"ℹ️ Verificação da tabela 'data_lineage_events': {ex_le}", "info")
+
         # Lista tabelas após criação
         new_tables = inspect(engine).get_table_names()
         created_tables = set(new_tables) - set(existing_tables)

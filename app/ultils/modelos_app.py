@@ -51,3 +51,5 @@ from app.models.nexus_models import (
     NexusView,
     NexusSave,
 )
+from app.models.lineage_models import DataLineageEvent
+

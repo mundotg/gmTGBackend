@@ -56,6 +56,7 @@ from app.routes import (
     user_routes,
     nexus_routes,
     lineage_routes,
+    integration_routes,
 )
 from app.schemas import project_analytics_routes
 from app.seed_new import seed_data
@@ -416,6 +417,7 @@ app.include_router(datascience_routes.router)
 app.include_router(datascience_routes.ws_router)  # WebSockets: sem dependências de router (ver ws_has_permission)
 app.include_router(nexus_routes.router)
 app.include_router(lineage_routes.router)
+app.include_router(integration_routes.router)
 
 
 

@@ -9,6 +9,7 @@ import shutil
 import time
 import traceback
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -115,6 +116,113 @@ def _resolve_binary(bin_name: str, *, explicit_path: Optional[str] = None) -> st
         f"Executável '{bin_name}' não encontrado. Instale-o ou adicione ao PATH."
         f"{alternativa}"
     )
+
+def get_binary_info(bin_name: str, *, explicit_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Inspeciona um executável CLI no ambiente da API (caminho, se está instalado e versão).
+    """
+    try:
+        path = _resolve_binary(bin_name, explicit_path=explicit_path)
+    except Exception as e:
+        return {
+            "name": bin_name,
+            "installed": False,
+            "path": None,
+            "version": None,
+            "major_version": None,
+            "raw_output": None,
+            "error": str(e),
+        }
+
+    info: Dict[str, Any] = {
+        "name": bin_name,
+        "installed": True,
+        "path": path,
+        "version": None,
+        "major_version": None,
+        "raw_output": None,
+        "error": None,
+    }
+
+    try:
+        res = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=5)
+        out = (res.stdout or res.stderr or "").strip()
+        info["raw_output"] = out
+
+        # PostgreSQL: "pg_dump (PostgreSQL) 18.6 (Debian 18.6-1.pgdg13+2)"
+        m_pg = re.search(r"\(PostgreSQL\)\s*([0-9\.]+)", out)
+        if m_pg:
+            info["version"] = m_pg.group(1)
+            info["major_version"] = int(m_pg.group(1).split(".")[0])
+        else:
+            m_gen = re.search(r"(\d+)(?:\.(\d+))?(?:\.(\d+))?", out)
+            if m_gen:
+                major = int(m_gen.group(1))
+                minor = m_gen.group(2)
+                patch = m_gen.group(3)
+                info["major_version"] = major
+                info["version"] = ".".join(filter(None, [str(major), minor, patch]))
+    except Exception as e:
+        info["error"] = f"Falha ao executar --version: {e}"
+
+    return info
+
+def validate_backup_environment() -> Dict[str, Any]:
+    """
+    Valida e diagnostica o ambiente onde a API está a correr, inspecionando
+    as ferramentas de backup/restore CLI instaladas, versões e armazenamento.
+    """
+    tools = {
+        "pg_dump": get_binary_info("pg_dump", explicit_path=os.environ.get("PG_DUMP_PATH")),
+        "pg_restore": get_binary_info("pg_restore", explicit_path=os.environ.get("PG_RESTORE_PATH")),
+        "mysqldump": get_binary_info("mysqldump", explicit_path=os.environ.get("MYSQLDUMP_PATH")),
+        "mysql": get_binary_info("mysql", explicit_path=os.environ.get("MYSQL_PATH")),
+        "mongodump": get_binary_info("mongodump", explicit_path=os.environ.get("MONGODUMP_PATH")),
+        "mongorestore": get_binary_info("mongorestore", explicit_path=os.environ.get("MONGORESTORE_PATH")),
+        "sqlcmd": get_binary_info("sqlcmd", explicit_path=os.environ.get("SQLCMD_PATH")),
+    }
+
+    backup_dir_abs = os.path.abspath(BACKUP_DIR)
+    dir_exists = os.path.exists(backup_dir_abs)
+    dir_writable = os.access(backup_dir_abs, os.W_OK) if dir_exists else False
+
+    disk_free_mb = 0.0
+    disk_total_mb = 0.0
+    try:
+        usage = shutil.disk_usage(backup_dir_abs if dir_exists else ".")
+        disk_free_mb = round(usage.free / (1024 * 1024), 2)
+        disk_total_mb = round(usage.total / (1024 * 1024), 2)
+    except Exception:
+        pass
+
+    warnings: List[str] = []
+    pg_dump_tool = tools["pg_dump"]
+    if not pg_dump_tool["installed"]:
+        warnings.append("pg_dump não está instalado ou acessível no PATH do ambiente da API.")
+    elif pg_dump_tool.get("major_version") and pg_dump_tool["major_version"] < 18:
+        warnings.append(
+            f"pg_dump no contentor está na versão {pg_dump_tool.get('version')} (major {pg_dump_tool.get('major_version')}). "
+            "Para bases de dados PostgreSQL 18+, o contentor da API precisa ser atualizado para postgresql-client-18."
+        )
+
+    if not tools["mysqldump"]["installed"]:
+        warnings.append("mysqldump não está instalado ou acessível no PATH do ambiente da API.")
+
+    return {
+        "status": "warning" if warnings else "ok",
+        "warnings": warnings,
+        "environment": {
+            "os_name": os.name,
+            "platform": sys.platform,
+            "python_version": sys.version.split()[0],
+            "backup_dir": backup_dir_abs,
+            "backup_dir_exists": dir_exists,
+            "backup_dir_writable": dir_writable,
+            "disk_free_mb": disk_free_mb,
+            "disk_total_mb": disk_total_mb,
+        },
+        "tools": tools,
+    }
 
 def _mssql_backup_target_path(parts: _ConnParts, local_filepath: str) -> str:
     """
@@ -256,6 +364,25 @@ async def _run_command_async(
     # Detecção de erros comuns
     if result.returncode != 0 or "Access is denied" in out or "Operating system error 5" in out:
         log_message(f"❌ Falha ao {description}: {full_output}", level="error")
+
+        combined = f"{out} {err}".strip()
+        if "server version mismatch" in combined.lower():
+            m_srv = re.search(r"server version:\s*([0-9\.]+[^\s;]*)", combined, re.IGNORECASE)
+            m_cli = re.search(r"pg_dump version:\s*([0-9\.]+[^\s;]*)", combined, re.IGNORECASE)
+            srv_v = m_srv.group(1) if m_srv else "18.x"
+            cli_v = m_cli.group(1) if m_cli else "17.x"
+            raise RuntimeError(
+                f"Incompatibilidade de versões do PostgreSQL (server version mismatch):\n"
+                f"• Servidor da base de dados remoto: {srv_v}\n"
+                f"• Cliente pg_dump instalado no ambiente da API: {cli_v}\n\n"
+                f"O utilitário pg_dump não permite fazer backup de servidores com versão principal superior à do cliente instalado.\n\n"
+                f"🛠️ Solução para o ambiente de produção:\n"
+                f"1. No Dockerfile do backend, defina 'ARG PG_CLIENT_VERSION=18'.\n"
+                f"2. Reconstrua e reinicie o contentor da API no servidor:\n"
+                f"   docker compose build --build-arg PG_CLIENT_VERSION=18 app\n"
+                f"   docker compose up -d app"
+            )
+
         raise RuntimeError(f"Erro no banco de dados: {out} {err}")
 
     log_message(f"✅ {description.capitalize()} concluído em {duration}s", level="success")
@@ -429,6 +556,10 @@ async def backup_database(
         if parts.driver == "postgresql":
             # Busca binário pg_dump (aceita override via ENV 'PG_DUMP_PATH')
             pg_bin = _resolve_binary("pg_dump", explicit_path=os.environ.get("PG_DUMP_PATH"))
+            pg_info = get_binary_info("pg_dump", explicit_path=pg_bin)
+            if pg_info.get("version"):
+                log_message(f"ℹ️ Ferramenta pg_dump: v{pg_info['version']} ({pg_bin})", level="info")
+
             cmd = [
                 pg_bin, "-h", parts.host, "-p", parts.port or "5432", "-U", parts.user,
                 "-F", "c", "-f", filepath, parts.db_name,

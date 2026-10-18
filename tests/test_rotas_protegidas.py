@@ -78,6 +78,8 @@ ROTAS_DE_LEITURA = [
     ("/analytics/db/", "GET", "analytics:db:view"),
     # O paginador genérico expõe user, Role, RefreshToken e DBConnection.
     ("/geral/paginate", "GET", "entity:list"),
+    ("/database/environment", "GET", "backup:read"),
+    ("/database/environment/check-connection/{connection_id}", "GET", "backup:read"),
 ]
 
 

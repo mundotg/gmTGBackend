@@ -15,6 +15,7 @@ from app.services.editar_linha import _convert_column_type_for_string_one, quote
 from app.ultils.conect_database import assert_sql_engine, is_mongo, get_mongo_database
 from app.ultils.errorSQL_Logger import _lidar_com_erro_sql
 from app.ultils.logger import log_message
+from app.ultils.data_serializer import serialize_for_mongo, serialize_mongo_document
 
 def build_insert_query(table_name, db_type, insert_values):
     """Constrói a query de inserção dinâmica."""
@@ -54,42 +55,8 @@ def build_insert_query(table_name, db_type, insert_values):
 #  MongoDB (NoSQL) — inserção de documentos
 # ============================================================
 def _coerce_mongo_value(col: str, value: Any, type_column: Optional[str]) -> Any:
-    """Converte o valor (que chega como string) para o tipo adequado no Mongo."""
-    if value is None:
-        return None
-    s = str(value)
-    t = (type_column or "").lower()
-
-    # _id em formato ObjectId (24 hex) → ObjectId; caso contrário fica como está.
-    if col == "_id":
-        try:
-            from bson import ObjectId
-
-            if isinstance(value, str) and len(value) == 24:
-                return ObjectId(value)
-        except Exception:  # noqa: BLE001 - valor pode não ser ObjectId
-            return value
-        return value
-
-    if any(k in t for k in ("int", "serial")) and "point" not in t:
-        try:
-            f = float(s)
-            return int(f) if f.is_integer() else f
-        except (TypeError, ValueError):
-            return value
-    if any(k in t for k in ("float", "double", "decimal", "numeric", "real", "money", "number")):
-        try:
-            return float(s)
-        except (TypeError, ValueError):
-            return value
-    if "bool" in t or t == "bit":
-        return s.strip().lower() in ("true", "1", "yes", "sim", "t")
-    if any(k in t for k in ("json", "jsonb", "object", "array")):
-        try:
-            return json.loads(s)
-        except Exception:  # noqa: BLE001
-            return value
-    return value  # texto / data / uuid ficam como estão
+    """Converte o valor para o tipo adequado no Mongo com serialização completa."""
+    return serialize_for_mongo(value, dst_type=type_column, col_name=col)
 
 
 def _insert_mongo_service(
@@ -146,6 +113,8 @@ def _insert_mongo_service(
             if database is None:
                 raise ValueError("Não foi possível determinar a base MongoDB.")
 
+            # Serializa o documento antes de inserir no MongoDB
+            doc = serialize_mongo_document(doc)
             res = database[coll_name].insert_one(doc)
             total_tabelas += 1
             total_inseridos += 1

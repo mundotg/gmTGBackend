@@ -555,11 +555,12 @@ def get_structure_id_by_connection_and_table(
             visible_status, VISIBLE_STRUCTURE_STATUS
         )
 
+        simple_name = table_name.split(".")[-1] if "." in table_name else table_name
         q = (
             db.query(DBStructure.id)
             .filter(
                 DBStructure.db_connection_id == connection_id,
-                DBStructure.table_name == table_name,
+                (DBStructure.table_name == table_name) | (DBStructure.table_name == simple_name),
             )
             .filter(_status_filter(DBStructure.status, status_list))
         )

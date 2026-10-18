@@ -2,7 +2,7 @@ import asyncio
 import json
 import traceback
 from datetime import datetime
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from fastapi import (
     APIRouter,
@@ -12,9 +12,16 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal, get_db_async
+from app.schemas.connetion_schema import ConnectionAccessLevel
+from app.ultils.ativar_engine import ConnectionManager
+from app.ultils.ativar_session_bd import get_connection_id_async
+from app.ultils.conect_database import is_mongo, get_mongo_database
+from app.ultils.connection_access import assert_user_connection_level_async
 from app.ultils.get_id_by_token import get_current_user_id, ws_user_id
 from app.ultils.logger import log_message
 from importantConfig.convert_string_to_dict import PayloadError, converter_tables_origen
@@ -180,6 +187,112 @@ async def transfer_stream(
     return StreamingResponse(
         event_stream(), media_type="text/event-stream", headers=headers
     )
+
+
+class PreviewQueryRequest(BaseModel):
+    connection_id: int
+    query: str
+    table_name: Optional[str] = None
+    limit: Optional[int] = 10
+
+
+@router.post("/preview-query")
+async def preview_query(
+    body: PreviewQueryRequest,
+    db: AsyncSession = Depends(get_db_async),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Executa prévia da query para validação rápida de colunas e dados antes da migração."""
+    query = (body.query or "").strip().rstrip(";")
+    if not query:
+        return {"success": False, "error": "Query vazia.", "columns": [], "rows": [], "total": 0}
+
+    conn = await get_connection_id_async(db, user_id, body.connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail=f"Conexão {body.connection_id} não encontrada.")
+
+    await assert_user_connection_level_async(db, conn, user_id, ConnectionAccessLevel.read)
+
+    try:
+        engine = await ConnectionManager._create_async_engine(conn)
+        limit = max(1, min(body.limit or 10, 50))
+
+        if is_mongo(engine) or str(conn.type or "").lower() == "mongodb":
+            db_name = conn.database_name or getattr(conn, "database", None)
+            mongo_db = engine[db_name] if db_name else get_mongo_database(engine)
+            coll_name = body.table_name or "collection"
+            filter_doc = {}
+            if query.startswith("{") and query.endswith("}"):
+                try:
+                    filter_doc = json.loads(query)
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "error": f"JSON inválido para MongoDB: {e}",
+                        "columns": [],
+                        "rows": [],
+                        "total": 0,
+                    }
+
+            cursor = mongo_db[coll_name].find(filter_doc).limit(limit)
+            docs = list(cursor)
+            cols_set = set()
+            formatted_rows = []
+            for d in docs:
+                row_fmt = {}
+                for k, v in d.items():
+                    cols_set.add(k)
+                    row_fmt[k] = str(v) if not isinstance(v, (int, float, bool, str)) and v is not None else v
+                formatted_rows.append(row_fmt)
+
+            cols = sorted(list(cols_set))
+            return {
+                "success": True,
+                "columns": cols,
+                "rows": formatted_rows,
+                "total": len(formatted_rows),
+            }
+
+        # SQL
+        async with engine.connect() as sql_conn:
+            upper_q = query.upper()
+            if upper_q.startswith("SELECT") or upper_q.startswith("WITH"):
+                sql_to_run = f"SELECT * FROM ({query}) AS _preview_sub LIMIT {limit}"
+            else:
+                table_target = body.table_name or "table"
+                sql_to_run = f"SELECT * FROM {table_target} WHERE {query} LIMIT {limit}"
+
+            try:
+                res = await sql_conn.execute(text(sql_to_run))
+            except Exception:
+                res = await sql_conn.execute(text(f"{query} LIMIT {limit}"))
+
+            columns = list(res.keys())
+            rows = []
+            for r in res.fetchall():
+                row_map = r._mapping
+                row_dict = {}
+                for col in columns:
+                    val = row_map.get(col)
+                    row_dict[col] = str(val) if not isinstance(val, (int, float, bool, str)) and val is not None else val
+                rows.append(row_dict)
+
+            return {
+                "success": True,
+                "columns": columns,
+                "rows": rows,
+                "total": len(rows),
+            }
+
+    except Exception as e:
+        log_message(f"Erro no preview de query: {e}\n{traceback.format_exc()}", "error")
+        return {
+            "success": False,
+            "error": str(e),
+            "columns": [],
+            "rows": [],
+            "total": 0,
+        }
 
 
 # ============================================================

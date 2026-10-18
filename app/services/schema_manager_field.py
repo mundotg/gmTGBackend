@@ -544,7 +544,36 @@ def execute_add_column(
     # NoSQL: adicionar campo = pô-lo em todos os documentos (com o default, ou
     # null). Sem isto o campo não apareceria na grelha da app.
     if _is_mongo(engine, connection_model.type):
-        valor = getattr(field, "default", None)
+        raw_valor = getattr(field, "default_value", None) or getattr(field, "default", None)
+        valor = None if raw_valor == "" else raw_valor
+
+        tipo_str = (getattr(field, "type", "") or "").lower()
+        if valor is not None:
+            if tipo_str in ("int", "integer", "long"):
+                try:
+                    valor = int(valor)
+                except (ValueError, TypeError):
+                    pass
+            elif tipo_str in ("double", "float", "decimal", "number"):
+                try:
+                    valor = float(valor)
+                except (ValueError, TypeError):
+                    pass
+            elif tipo_str in ("bool", "boolean"):
+                if isinstance(valor, str):
+                    valor = valor.strip().lower() in ("true", "1", "yes")
+            elif tipo_str in ("date", "datetime", "timestamp"):
+                if isinstance(valor, str):
+                    if valor.strip().upper() in ("NOW()", "NOW", "CURRENT_DATE", "CURRENT_TIMESTAMP"):
+                        from datetime import datetime, timezone
+                        valor = datetime.now(timezone.utc)
+                    else:
+                        try:
+                            from datetime import datetime
+                            valor = datetime.fromisoformat(valor.strip())
+                        except Exception:
+                            pass
+
         _mongo_field_op(
             db,
             engine,
@@ -557,6 +586,32 @@ def execute_add_column(
             update={"$set": {field.name: valor}},
             resumo=f"{{$set: {{{field.name}: {valor!r}}}}}",
         )
+
+        # Persistência de Metadados no DBField para que o campo apareça no schema
+        structure_id = getattr(field, "table_id", None)
+        if structure_id:
+            field_in = DBFieldCreate(
+                name=field.name,
+                status="active",
+                type=map_column_type(field.type or "string", "mongodb"),
+                is_nullable=field.is_nullable if field.is_nullable is not None else True,
+                default_value=str(valor) if valor is not None else field.default_value,
+                is_primary_key=field.is_primary_key or False,
+                comment=field.comment,
+                referenced_table=field.referenced_table,
+                referenced_field=field.referenced_field,
+                is_unique=field.is_unique or False,
+                is_foreign_key=field.is_foreign_key or False,
+                is_auto_increment=field.is_auto_increment or False,
+                length=field.length,
+                precision=field.precision,
+                scale=field.scale,
+                is_unsigned=field.is_unsigned or False,
+            )
+            try:
+                create_db_field(db=db, field_in=field_in, structure_id=structure_id)
+            except Exception as exc:
+                log_message(f"⚠️ Erro ao persistir metadados do campo Mongo: {exc}", "warning")
         return
 
     fk_on_delete, fk_on_update = _validate_field_for_add(field)
@@ -723,30 +778,57 @@ def execute_alter_column(
     *,
     audit_ctx: AuditContext,
 ) -> None:
-    # NoSQL: só o rename tem equivalente — tipo, nullable e unique não são
-    # propriedades do campo no Mongo.
+    # NoSQL: rename aplica $rename nos documentos. Metadados são sincronizados no Postgres.
     if _is_mongo(engine, connection_model.type):
         original_name = field.original_name or field.name
-        if original_name == field.name:
-            log_message(
-                f"⚠️ MongoDB: alteração de '{field.name}' sem rename — tipo e "
-                "restrições não se aplicam a coleções; nada a fazer.",
-                "warning",
+        if original_name != field.name:
+            _mongo_field_op(
+                db,
+                engine,
+                connection_id=connection_model.id,
+                audit_ctx=audit_ctx,
+                operation="RENAME FIELD",
+                query_type=QueryType.ALTER_COLUMN,
+                structure_name=table_name,
+                column=field.name,
+                update={"$rename": {original_name: field.name}},
+                resumo=f"{{$rename: {{{original_name}: {field.name}}}}}",
             )
-            return
+        else:
+            log_message(
+                f"ℹ️ MongoDB: alteração de '{field.name}' sem renomeação — atualizando metadados.",
+                "info",
+            )
 
-        _mongo_field_op(
-            db,
-            engine,
-            connection_id=connection_model.id,
-            audit_ctx=audit_ctx,
-            operation="RENAME FIELD",
-            query_type=QueryType.ALTER_COLUMN,
-            structure_name=table_name,
-            column=field.name,
-            update={"$rename": {original_name: field.name}},
-            resumo=f"{{$rename: {{{original_name}: {field.name}}}}}",
-        )
+        structure_id = getattr(field, "table_id", None)
+        if structure_id:
+            field_in = DBFieldCreate(
+                name=field.name,
+                status="active",
+                type=map_column_type(field.type or "string", "mongodb"),
+                is_nullable=field.is_nullable if field.is_nullable is not None else True,
+                default_value=field.default_value,
+                is_primary_key=field.is_primary_key or False,
+                comment=field.comment,
+                referenced_table=field.referenced_table,
+                referenced_field=field.referenced_field,
+                is_unique=field.is_unique or False,
+                is_foreign_key=field.is_foreign_key or False,
+                is_auto_increment=field.is_auto_increment or False,
+                length=field.length,
+                precision=field.precision,
+                scale=field.scale,
+                is_unsigned=field.is_unsigned or False,
+            )
+            try:
+                update_fields_by_tablename(
+                    db=db,
+                    structure_id=structure_id,
+                    original_name=original_name,
+                    field_update=field_in,
+                )
+            except Exception as exc:
+                log_message(f"⚠️ Erro ao atualizar metadados do campo Mongo: {exc}", "warning")
         return
 
     db_type = _validate_dialect(connection_model.type)  # type: ignore

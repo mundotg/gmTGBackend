@@ -55,6 +55,10 @@ class StoreQueryRequest(BaseModel):
     query: Optional[QueryPayload] = None
     payload: Optional[QueryPayload] = None
     QueryPayload: Optional[QueryPayload] = None
+    estructura_das_tabelas_completa: Optional[Any] = None
+    estrutura_das_tabelas_completa: Optional[Any] = None
+    tabela_coluna: Optional[Any] = None
+    schema_info: Optional[Any] = None
 
     model_config = {"extra": "allow"}
 
@@ -65,6 +69,10 @@ class AnalyzeRequest(BaseModel):
     payload: Optional[QueryPayload] = None
     QueryPayload: Optional[QueryPayload] = None
     rows: Optional[List[Dict[str, Any]]] = None
+    estructura_das_tabelas_completa: Optional[Any] = None
+    estrutura_das_tabelas_completa: Optional[Any] = None
+    tabela_coluna: Optional[Any] = None
+    schema_info: Optional[Any] = None
 
     model_config = {"extra": "allow"}
 
@@ -99,13 +107,44 @@ def _extrair_payload_obj(data: Any) -> Optional[QueryPayload]:
     return None
 
 
-def _guardar_query_encriptada(payload_obj: QueryPayload, user_id: int) -> str:
+def _extrair_schema_info(data: Any) -> Optional[Any]:
+    """Extrai metadados de colunas e tabelas (tabela_coluna / estructura_das_tabelas_completa)."""
+    if isinstance(data, dict):
+        for k in (
+            "estructura_das_tabelas_completa",
+            "estrutura_das_tabelas_completa",
+            "tabela_coluna",
+            "schema_info",
+        ):
+            val = data.get(k)
+            if val is not None:
+                return val
+    elif hasattr(data, "__dict__"):
+        for k in (
+            "estructura_das_tabelas_completa",
+            "estrutura_das_tabelas_completa",
+            "tabela_coluna",
+            "schema_info",
+        ):
+            val = getattr(data, k, None)
+            if val is not None:
+                return val
+    return None
+
+
+def _guardar_query_encriptada(
+    payload_obj: QueryPayload, user_id: int, schema_info: Optional[Any] = None
+) -> str:
     """
-    Guarda a query encriptada e gera uma chave de sessão encriptada em AES-256-GCM.
+    Guarda a query e metadados de tabelas encriptados e gera uma chave de sessão encriptada em AES-256-GCM.
     Retorna o token encriptado que pode viajar na URL com total segurança.
     """
     session_id = secrets.token_urlsafe(24)
-    json_str = payload_obj.model_dump_json(exclude_none=True)
+    data_to_store = {
+        "payload": payload_obj.model_dump(exclude_none=True),
+        "schema_info": schema_info,
+    }
+    json_str = json.dumps(data_to_store, default=str)
     encrypted_payload = secret_encrypt(json_str)
 
     cache_key = f"ds_stored:{user_id}:{session_id}"
@@ -128,11 +167,11 @@ def _desencriptar_e_limpar_chave(encrypted_key: str) -> str:
 
 def _recuperar_query_por_chave(
     encrypted_key: str, user_id: Optional[int] = None
-) -> Optional[Tuple[QueryPayload, str, int]]:
+) -> Optional[Tuple[QueryPayload, Optional[Any], str, int]]:
     """
     Desencripta a chave recebida, valida a pertença do utilizador (se user_id for passado)
     ou infere o user_id da própria chave encriptada (AES-256-GCM com secret do servidor).
-    Retorna (payload_obj, session_id, token_user_id).
+    Retorna (payload_obj, schema_info, session_id, token_user_id).
     """
     try:
         clean_key = _desencriptar_e_limpar_chave(encrypted_key)
@@ -169,7 +208,12 @@ def _recuperar_query_por_chave(
 
         json_str = secret_decrypt(encrypted_payload)
         data_dict = json.loads(json_str)
-        return QueryPayload(**data_dict), session_id, actual_user_id
+        if isinstance(data_dict, dict) and "payload" in data_dict:
+            payload_obj = QueryPayload(**data_dict["payload"])
+            schema_info = data_dict.get("schema_info")
+            return payload_obj, schema_info, session_id, actual_user_id
+        else:
+            return QueryPayload(**data_dict), None, session_id, actual_user_id
     except Exception as e:
         log_message(f"[datascience] Erro ao recuperar query encriptada por chave: {e}", "warning")
         return None
@@ -237,6 +281,7 @@ def _hash_key(
     user_id: int,
     payload_obj: Optional[QueryPayload],
     raw_rows: Optional[List[Dict[str, Any]]] = None,
+    schema_info: Optional[Any] = None,
 ) -> str:
     try:
         if payload_obj is not None:
@@ -244,6 +289,8 @@ def _hash_key(
             src["_full"] = True
         else:
             src = {"rows_len": len(raw_rows or []), "sample": (raw_rows or [])[:2]}
+        if schema_info:
+            src["_has_schema"] = True
         h = hashlib.sha1(json.dumps(src, sort_keys=True, default=str).encode()).hexdigest()[:20]
     except Exception:  # noqa: BLE001
         h = "nohash"
@@ -303,7 +350,7 @@ async def store_query_endpoint(
     user_id: int = Depends(get_current_user_id),
 ):
     """
-    Guarda a query no backend de forma encriptada e devolve uma chave encriptada (AES-256-GCM).
+    Guarda a query e metadados de tabelas no backend de forma encriptada e devolve uma chave encriptada (AES-256-GCM).
     Essa chave é enviada como parâmetro para `/datascience?key=...`.
     """
     payload_obj = _extrair_payload_obj(req)
@@ -313,7 +360,8 @@ async def store_query_endpoint(
             detail="Nenhuma consulta válida ('query' ou 'payload') fornecida para armazenar.",
         )
 
-    encrypted_key = _guardar_query_encriptada(payload_obj, user_id)
+    schema_info = _extrair_schema_info(req)
+    encrypted_key = _guardar_query_encriptada(payload_obj, user_id, schema_info)
     return {
         "success": True,
         "key": encrypted_key,
@@ -328,6 +376,7 @@ async def analyze_endpoint(
     user_id: int = Depends(get_current_user_id),
 ):
     payload_obj: Optional[QueryPayload] = None
+    schema_info: Optional[Any] = None
     raw_rows: Optional[List[Dict[str, Any]]] = None
     session_id: Optional[str] = None
 
@@ -336,18 +385,22 @@ async def analyze_endpoint(
         if key:
             recovered = _recuperar_query_por_chave(str(key), user_id)
             if recovered:
-                payload_obj, session_id, _ = recovered
+                payload_obj, schema_info, session_id, _ = recovered
         if payload_obj is None:
             payload_obj = _extrair_payload_obj(req)
+        if schema_info is None:
+            schema_info = _extrair_schema_info(req)
         raw_rows = req.get("rows")
     else:
         key = getattr(req, "key", None)
         if key:
             recovered = _recuperar_query_por_chave(str(key), user_id)
             if recovered:
-                payload_obj, session_id, _ = recovered
+                payload_obj, schema_info, session_id, _ = recovered
         if payload_obj is None:
             payload_obj = _extrair_payload_obj(req)
+        if schema_info is None:
+            schema_info = _extrair_schema_info(req)
         raw_rows = getattr(req, "rows", None)
 
     if payload_obj is None and not raw_rows:
@@ -356,13 +409,13 @@ async def analyze_endpoint(
             detail="Nenhuma consulta ('query' / 'key') válida fornecida para análise.",
         )
 
-    cache_key = _hash_key(user_id, payload_obj, raw_rows)
+    cache_key = _hash_key(user_id, payload_obj, raw_rows, schema_info)
     cached = read_cache(cache_key)
     if cached:
         return {"success": True, "cached": True, **cached}
 
     preview, query_result = await _obter_dados_consulta(payload_obj, raw_rows, db, user_id)
-    result = analisar(preview)
+    result = analisar(preview, schema_info=schema_info)
     try:
         write_cache(cache_key, result, ttl=300)
     except Exception:  # noqa: BLE001
@@ -492,6 +545,7 @@ async def datascience_ws(websocket: WebSocket):
             msg = await websocket.receive_json()
             try:
                 payload_obj: Optional[QueryPayload] = None
+                schema_info: Optional[Any] = None
                 raw_rows: Optional[List[Dict[str, Any]]] = None
                 session_id: Optional[str] = None
                 user_id = initial_user_id
@@ -500,7 +554,7 @@ async def datascience_ws(websocket: WebSocket):
                 if isinstance(msg, dict) and msg.get("key"):
                     recovered = _recuperar_query_por_chave(str(msg["key"]), user_id)
                     if recovered:
-                        payload_obj, session_id, key_user_id = recovered
+                        payload_obj, schema_info, session_id, key_user_id = recovered
                         if user_id is None:
                             user_id = key_user_id
                     else:
@@ -511,6 +565,7 @@ async def datascience_ws(websocket: WebSocket):
                         continue
                 else:
                     payload_obj = _extrair_payload_obj(msg)
+                    schema_info = _extrair_schema_info(msg)
                     if isinstance(msg, dict):
                         raw_rows = msg.get("rows")
 
@@ -534,7 +589,7 @@ async def datascience_ws(websocket: WebSocket):
                 await websocket.send_json({"stage": "error", "message": f"Pedido inválido: {e}"})
                 continue
 
-            cache_key = _hash_key(user_id, payload_obj, raw_rows)
+            cache_key = _hash_key(user_id, payload_obj, raw_rows, schema_info)
             cached = read_cache(cache_key)
             if cached:
                 await websocket.send_json({
@@ -591,7 +646,10 @@ async def datascience_ws(websocket: WebSocket):
                 "segments": None,
                 "insights": [],
             }
-            for stage, data in analisar_stream(preview):
+            if schema_info:
+                full["tabela_coluna"] = schema_info
+
+            for stage, data in analisar_stream(preview, schema_info=schema_info):
                 if stage == "column":
                     full["columns"].append(data)
                 elif stage in full:

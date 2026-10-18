@@ -113,9 +113,9 @@ def converter_tables_origen(
 
             # Modo "funcionar": se enabled e falta destino, desabilita e avisa
             id_dest = _as_str(c.get("id_coluna_destino"))
-            if enabled and (not coluna_destino or not id_dest or id_dest == "0"):
+            if enabled and not coluna_destino:
                 warnings.append(
-                    f"Tabela '{table_id}', coluna '{coluna_origem or f'[{idx}]'}': enabled=true mas sem destino válido — desabilitada."
+                    f"Tabela '{table_id}', coluna '{coluna_origem or f'[{idx}]'}': enabled=true mas sem nome de coluna de destino — desabilitada."
                 )
                 enabled = False
 
@@ -126,7 +126,7 @@ def converter_tables_origen(
                     type_coluna_origem=_as_str(c.get("type_coluna_origem")),
                     type_coluna_destino=_as_str(c.get("type_coluna_destino")),
                     id_coluna_origem=_as_str(c.get("id_coluna_origem")),
-                    id_coluna_destino=id_dest,
+                    id_coluna_destino=id_dest or "0",
                     enabled=enabled,
                 )
             )
@@ -134,16 +134,18 @@ def converter_tables_origen(
         # 4) Opcional: se nenhuma coluna ficou enabled, você decide: ignora ou mantém
         if not any(col.enabled for col in colunas):
             msg = f"Tabela '{table_id}': nenhuma coluna ativa após validação."
-            # modo "só funcionar": mantém a tabela (talvez o usuário queira ver), mas avisa.
             warnings.append(msg)
-            # Se quiser ignorar, descomenta:
-            # continue
+
+        custom_query = _as_str(table_data.get("custom_query"))
+        where_clause = _as_str(table_data.get("where_clause"))
 
         result[table_id] = TableMapping(
             tabela_name_origem=tabela_name_origem,
             tabela_name_destino=tabela_name_destino,
             id_tabela_origen=id_tabela_origen or 0,
             id_tabela_destino=id_tabela_destino or 0,
+            custom_query=custom_query,
+            where_clause=where_clause,
             colunas_relacionados_para_transacao=colunas,
         )
 

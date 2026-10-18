@@ -164,6 +164,30 @@ async def _handle_endpoint(
         # utilizadores com acesso a esta conexão.
         invalidate_db_full_cache(getattr(cm, "id", None) if cm else None)
 
+        # Invalida o cache deste utilizador via generation policy (O(1))
+        try:
+            from app.config.user_cache_policy import limpar_cache_do_utilizador
+            limpar_cache_do_utilizador(user_id)
+        except Exception as ex_gen:
+            log_message(f"⚠️ Erro ao invalidar geração de cache do utilizador {user_id}: {ex_gen}", "warning")
+
+        # Invalida chaves de cache das funções de metadados e listagem de tabelas
+        try:
+            from app.config.cache_manager import clear_cache
+            for func_name in [
+                "get_tables_with_count_cached",
+                "get_tables_names_cached",
+                "get_fields_info_bulk_cached_wrapper",
+                "get_fields_info_cached_wrapper",
+                "get_structures_names_only_cached",
+                "get_structures_names_cached",
+                "get_table_count_cached",
+                "sync_connection_stats_cached",
+            ]:
+                clear_cache(func_name)
+        except Exception as ex_cc:
+            log_message(f"⚠️ Erro ao limpar cache de tabelas/estruturas DDL: {ex_cc}", "warning")
+
         dialect_name = getattr(cm, "type", "unknown") if cm else "unknown"
         log_message(
             f"✅ {action_name}: {log_context} (dialect={dialect_name}, user={user_id})",
@@ -180,25 +204,6 @@ async def _handle_endpoint(
             level="error",
         )
         raise _map_ddl_error_to_http(e)
-    finally:
-        # ✅ FORÇA O ENCERRAMENTO DAS CONEXÕES PENDENTES NO FINAL DA ROTA
-        engine = engine_ref_getter()
-        if engine:
-            try:
-                # AsyncEngine → await dispose(); Engine sync / MongoClient →
-                # close_engine trata cada caso (o MongoClient fecha-se com
-                # .close(); `engine.dispose()` num MongoClient dava
-                # "'Database' object is not callable" porque o pymongo devolve
-                # um Database para qualquer atributo desconhecido).
-                if (
-                    asyncio.iscoroutinefunction(getattr(engine, "dispose", None))
-                    or type(engine).__name__ == "AsyncEngine"
-                ):
-                    await engine.dispose()
-                else:
-                    await asyncio.to_thread(close_engine, engine)
-            except Exception as ex:
-                log_message(f"⚠️ Erro ao fazer dispose da engine: {ex}", "warning")
 
 
 # ============================================================
@@ -504,6 +509,7 @@ async def delete_tables_bulk(
 # ============================================================
 
 
+@router.post("/table", response_model=ResponseWrapper, summary="Criar nova Tabela", include_in_schema=False)
 @router.post("/table/", response_model=ResponseWrapper, summary="Criar nova Tabela")
 async def create_table(
     request: Request,

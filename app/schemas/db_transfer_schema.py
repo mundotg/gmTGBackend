@@ -19,6 +19,8 @@ class TableMapping(BaseModel):
   tabela_name_destino: str
   id_tabela_origen: int
   id_tabela_destino: int
+  custom_query: Optional[str] = None
+  where_clause: Optional[str] = None
   colunas_relacionados_para_transacao: Optional[list[ColumnMapping]] = None
 
 

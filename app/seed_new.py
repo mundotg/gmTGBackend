@@ -169,17 +169,27 @@ ROLES_PERMISSIONS = {
             "user:invite",
             "team:read",
             "company:read",
+            "db_connection:read_own",
             "db_connection:read_company",
+            "table:read",
+            "table:describe",
+            "table:stats",
+            "table:export",
             "query:execute",
             "query:read_history",
+            "query:export",
             "data:write",
             "entity:list",
             "project:create",
             "project:read",
+            "project:view",
             "project:update",
             "project:assign_user",
+            "analytics:db:view",
+            "analytics:project:view",
             "settings:projects",
             "settings:team",
+            "settings:user",
         ],
     },
     "developer": {
@@ -187,26 +197,53 @@ ROLES_PERMISSIONS = {
         "permissions": [
             "db_connection:create",
             "db_connection:read_own",
+            "db_connection:read_company",
+            "db_connection:update",
+            "db_connection:test",
+            "table:read",
+            "table:describe",
+            "table:stats",
+            "table:export",
             "query:execute",
             "query:read_history",
+            "query:export",
             "data:write",
             "data:delete",
             "schema:manage",
             "data:transfer",
             "entity:list",
-            "table:read",
-            "table:describe",
+            "project:read",
             "project:view",
+            "analytics:db:view",
+            "analytics:project:view",
             "settings:user",
         ],
     },
     "user": {
-        "description": "Usuário básico",
+        "description": "Usuário básico (leitura, consultas, histórico e análise)",
         "permissions": [
+            # Conexões (leitura, teste e criação própria)
             "db_connection:read_own",
+            "db_connection:read_company",
+            "db_connection:create",
+            "db_connection:update",
+            "db_connection:test",
+            # Tabelas, esquemas e estatísticas
+            "table:read",
+            "table:describe",
+            "table:stats",
+            "table:export",
+            # Consultas e histórico
             "query:execute",
-            "entity:list",
+            "query:read_history",
+            "query:export",
+            # Métricas e projetos
+            "analytics:db:view",
+            "analytics:project:view",
+            "project:read",
             "project:view",
+            # Configurações pessoais e paginação
+            "entity:list",
             "settings:user",
         ],
     },
@@ -329,6 +366,14 @@ def seed_rbac(db: Session) -> None:
             defaults={"description": data["description"]},
         )
         role.permissions = [permission_map[p] for p in data["permissions"]]
+
+    # 🛡️ Garante que utilizadores sem função global associada recebam a função básica 'user'
+    role_user = db.query(Role).filter_by(name="user", empresa_id=None).first()
+    if role_user:
+        usuarios_sem_funcao = db.query(User).filter(User.role_id == None).all()
+        for u in usuarios_sem_funcao:
+            u.role_id = role_user.id
+            log_message(f"👤 Utilizador {u.email} associado à função padrão 'user'", "info")
 
     log_message("🎭 RBAC sincronizado (roles + permissões)", "success")
 

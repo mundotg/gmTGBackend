@@ -68,7 +68,9 @@ redis_client = (
 # HELPERS
 # -------------------------
 def _build_key(key: str) -> str:
-    """Aplica prefixo global para isolamento."""
+    """Aplica prefixo global para isolamento, sem duplicar se já existir."""
+    if key.startswith(REDIS_PREFIX):
+        return key
     return f"{REDIS_PREFIX}{key}"
 
 

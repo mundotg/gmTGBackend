@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Callable, Optional, Any, Dict, TypeVar, ParamSpec, cast
 
 
-from app.config.redis import write_cache, read_cache, redis_client
+from app.config.redis import write_cache, read_cache, redis_client, REDIS_PREFIX
 from app.config.user_cache_policy import obter_geracao, usa_dados_locais
 
 # <-- Certifica-te de importar o cliente Redis aqui para o clear_cache!
@@ -351,10 +351,12 @@ def clear_cache(pattern: str = f"{CACHE_PREFIX}*") -> int:
 
     try:
         if redis_client:
-            if "*" in pattern:
+            if pattern.startswith("*"):
                 search_pattern = pattern
+            elif pattern.startswith(REDIS_PREFIX):
+                search_pattern = pattern if "*" in pattern else f"{pattern}*"
             else:
-                search_pattern = f"*{pattern}*"
+                search_pattern = f"*{pattern}" if pattern.endswith("*") else f"*{pattern}*"
             cursor = 0
             while True:
                 cursor, keys = redis_client.scan(

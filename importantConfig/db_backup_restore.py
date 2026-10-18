@@ -94,6 +94,21 @@ def _resolve_binary(bin_name: str, *, explicit_path: Optional[str] = None) -> st
                             return candidate
                 except Exception: pass
 
+    # 4. Heurística Linux (Debian/Ubuntu/PGDG coloca versões em /usr/lib/postgresql/<ver>/bin/)
+    if os.name != "nt":
+        clean_bin = bin_name.replace(".exe", "").lower()
+        if clean_bin in ("pg_dump", "pg_restore", "psql"):
+            base = "/usr/lib/postgresql"
+            if os.path.isdir(base):
+                try:
+                    versions = sorted([d for d in os.listdir(base) if d.isdigit()], key=lambda x: int(x), reverse=True)
+                    for v in versions:
+                        candidate = os.path.join(base, v, "bin", clean_bin)
+                        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+                            return candidate
+                except Exception:
+                    pass
+
     # Diz QUAL a variável a definir: sem isto, quem tem o binário instalado
     # fora do PATH não descobre a saída sem ler o código.
     env_vars = {
@@ -554,17 +569,42 @@ async def backup_database(
 
     try:
         if parts.driver == "postgresql":
-            # Busca binário pg_dump (aceita override via ENV 'PG_DUMP_PATH')
-            pg_bin = _resolve_binary("pg_dump", explicit_path=os.environ.get("PG_DUMP_PATH"))
-            pg_info = get_binary_info("pg_dump", explicit_path=pg_bin)
-            if pg_info.get("version"):
-                log_message(f"ℹ️ Ferramenta pg_dump: v{pg_info['version']} ({pg_bin})", level="info")
+            use_fallback = False
+            pg_bin = None
+            try:
+                pg_bin = _resolve_binary("pg_dump", explicit_path=os.environ.get("PG_DUMP_PATH"))
+                pg_info = get_binary_info("pg_dump", explicit_path=pg_bin)
+                if pg_info.get("version"):
+                    log_message(f"ℹ️ Ferramenta pg_dump detectada no ambiente: v{pg_info['version']} ({pg_bin})", level="info")
+            except Exception as e:
+                log_message(f"⚠️ pg_dump não encontrado no sistema ({e}). O backup usará o motor Python nativo.", level="warning")
+                use_fallback = True
 
-            cmd = [
-                pg_bin, "-h", parts.host, "-p", parts.port or "5432", "-U", parts.user,
-                "-F", "c", "-f", filepath, parts.db_name,
-            ]
-            await _run_command_async(cmd, env, "backup pg")
+            if not use_fallback and pg_bin:
+                try:
+                    cmd = [
+                        pg_bin, "-h", parts.host, "-p", parts.port or "5432", "-U", parts.user,
+                        "-F", "c", "-f", filepath, parts.db_name,
+                    ]
+                    await _run_command_async(cmd, env, "backup pg")
+                except Exception as dump_err:
+                    err_str = str(dump_err).lower()
+                    if "server version mismatch" in err_str or "version mismatch" in err_str:
+                        log_message(
+                            f"⚠️ pg_dump falhou por incompatibilidade de versões: {dump_err}\n"
+                            f"🔄 Ativando automaticamente o motor universal SQL em Python (compatível com todos os ambientes)...",
+                            level="warning",
+                        )
+                        use_fallback = True
+                    else:
+                        raise
+
+            if use_fallback:
+                from importantConfig.db_backup_restore_sql import python_postgres_backup
+                sql_filepath = filepath
+                if sql_filepath.endswith(".backup"):
+                    sql_filepath = sql_filepath[:-7] + ".sql"
+                filepath = await python_postgres_backup(_conn, sql_filepath)
 
         elif parts.driver == "mysql":
             mysql_bin = _resolve_binary("mysqldump", explicit_path=os.environ.get("MYSQLDUMP_PATH"))
@@ -671,13 +711,37 @@ async def restore_backup(
 
     try:
         if parts.driver == "postgresql":
-            pg_restore_bin = _resolve_binary("pg_restore", explicit_path=os.environ.get("PG_RESTORE_PATH"))
-            cmd = [
-                pg_restore_bin, "-h", parts.host, "-p", parts.port or "5432", "-U", parts.user,
-                "-d", parts.db_name, "--clean", "--if-exists", "--no-owner", "--no-acl",
-                final_restore_path,
-            ]
-            await _run_command_async(cmd, env, "restore pg")
+            if final_restore_path.endswith(".sql"):
+                # Arquivo SQL texto (gerado por fallback Python ou exportação padrão)
+                psql_bin = None
+                try:
+                    psql_bin = _resolve_binary("psql", explicit_path=os.environ.get("PSQL_PATH"))
+                except Exception:
+                    pass
+
+                restored_via_cli = False
+                if psql_bin:
+                    cmd = [
+                        psql_bin, "-h", parts.host, "-p", parts.port or "5432", "-U", parts.user,
+                        "-d", parts.db_name, "-f", final_restore_path,
+                    ]
+                    try:
+                        await _run_command_async(cmd, env, "restore pg via psql")
+                        restored_via_cli = True
+                    except Exception as psql_err:
+                        log_message(f"⚠️ psql falhou ({psql_err}). Tentando restauro nativo em Python...", level="warning")
+
+                if not restored_via_cli:
+                    from importantConfig.db_backup_restore_sql import python_postgres_restore
+                    await python_postgres_restore(_conn, final_restore_path)
+            else:
+                pg_restore_bin = _resolve_binary("pg_restore", explicit_path=os.environ.get("PG_RESTORE_PATH"))
+                cmd = [
+                    pg_restore_bin, "-h", parts.host, "-p", parts.port or "5432", "-U", parts.user,
+                    "-d", parts.db_name, "--clean", "--if-exists", "--no-owner", "--no-acl",
+                    final_restore_path,
+                ]
+                await _run_command_async(cmd, env, "restore pg")
 
         elif parts.driver == "mysql":
             mysql_bin = _resolve_binary("mysql", explicit_path=os.environ.get("MYSQL_PATH"))

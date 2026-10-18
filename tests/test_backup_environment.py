@@ -59,3 +59,34 @@ def test_run_command_async_detects_server_version_mismatch():
         assert "18.6" in msg
         assert "17.11" in msg
         assert "ARG PG_CLIENT_VERSION=18" in msg
+
+
+from unittest.mock import AsyncMock
+from importantConfig.db_backup_restore import backup_database
+from app.models.connection_models import DBConnection
+
+def test_backup_database_falls_back_to_python_sql():
+    mock_conn = MagicMock(spec=DBConnection)
+    mock_conn.type = "postgresql"
+    mock_conn.database_name = "testdb"
+    mock_conn.username = "testuser"
+    mock_conn.host = "localhost"
+    mock_conn.port = 5432
+    mock_conn.password = "testpass"
+
+    mock_db = MagicMock()
+
+    with patch("importantConfig.db_backup_restore.get_connection_id_async", new_callable=AsyncMock) as mock_get_conn:
+        mock_get_conn.return_value = mock_conn
+        with patch("importantConfig.db_backup_restore._resolve_binary", return_value="/usr/bin/pg_dump"):
+            with patch("importantConfig.db_backup_restore._run_command_async", side_effect=RuntimeError("server version mismatch")):
+                with patch("importantConfig.db_backup_restore_sql.python_postgres_backup", new_callable=AsyncMock) as mock_py_backup:
+                    mock_py_backup.return_value = "backups/testdb_backup.sql"
+                    with patch("importantConfig.db_backup_restore._file_exists_and_nonempty"):
+                        with patch("importantConfig.db_backup_restore._compress_file_async", new_callable=AsyncMock) as mock_compress:
+                            mock_compress.return_value = "backups/testdb_backup.sql.gz"
+                            
+                            res = asyncio.run(backup_database(mock_db, user_id=1, connection_id=1, compress=True))
+                            assert res == "backups/testdb_backup.sql.gz"
+                            mock_py_backup.assert_called_once()
+

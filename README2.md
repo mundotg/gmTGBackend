@@ -66,6 +66,14 @@ Além da análise e monitoramento, a plataforma oferece  **operações críticas
 * Eliminação segura de **tabelas**
 * Validação de impacto antes da execução (schemas, dependências)
 
+### 🔹 Dry-Run & Avaliação de Risco Pré-Execução (Impact Predictor)
+
+* **Previsão de Custo e Volume**: Executa o otimizador nativo (`EXPLAIN JSON` no PostgreSQL/MySQL, `explain("queryPlanner")` no MongoDB, `EXPLAIN QUERY PLAN` no SQLite) sem ler dados em disco nem executar mutações.
+* **Detecção de Varredura Total**: Alerta imediato contra `Sequential Scan` ou `COLLSCAN` em bases de produção.
+* **Sugestões Automáticas de Indexação**: Gera comandos executáveis `CREATE INDEX` com 1 clique para colunas filtradas.
+* **Guarda Pré-Execução (Impact Guard)**: Intercepta consultas de risco alto/crítico e solicita confirmação consciente do desenvolvedor antes da execução.
+* Documentação técnica completa: [docs/DRY_RUN_IMPACT_PREDICTOR.md](./docs/DRY_RUN_IMPACT_PREDICTOR.md).
+
 ### 🔹 Transações de Dados
 
 * Execução de **transações ACID**

@@ -151,6 +151,7 @@ def _auto_create_mongo(data, engine, user_id, connection, db, dry_run: bool):
     FKs no Mongo (esses campos são ignorados) e o `_id` é gerado pelo Mongo.
     """
     from app.services.insert_row_service import _coerce_mongo_value
+    from app.ultils.data_serializer import serialize_mongo_document
 
     start = time.time()
     resumo = []
@@ -201,7 +202,7 @@ def _auto_create_mongo(data, engine, user_id, connection, db, dry_run: bool):
                 doc[campo] = _coerce_mongo_value(campo, valor, "text")
 
             if doc:
-                docs.append(doc)
+                docs.append(serialize_mongo_document(doc))
 
         ok = 0
         if dry_run:

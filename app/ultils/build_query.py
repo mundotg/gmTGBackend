@@ -769,7 +769,7 @@ def get_query_string_advance(
         query += f" {format_order_by(db_type, order_by, allowed)}"  # type: ignore
 
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
-        if max_rows is not None:
+        if max_rows is not None and max_rows > 0:
             query += f" LIMIT {max_rows}"
         if offset is not None:
             query += f" OFFSET {offset}"
@@ -778,7 +778,7 @@ def get_query_string_advance(
         if not order_by or len(order_by) == 0:
             query += " ORDER BY (SELECT NULL)"
         query += f" OFFSET {offset or 0} ROWS"
-        if max_rows is not None:
+        if max_rows is not None and max_rows > 0:
             query += f" FETCH NEXT {max_rows} ROWS ONLY"
 
     elif db_type.lower() in {"oracle", "oracledb"} or "oracle" in db_type.lower():

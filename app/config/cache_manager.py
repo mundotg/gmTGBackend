@@ -351,7 +351,10 @@ def clear_cache(pattern: str = f"{CACHE_PREFIX}*") -> int:
 
     try:
         if redis_client:
-            search_pattern = pattern if pattern.startswith("*") else f"*{pattern}"
+            if "*" in pattern:
+                search_pattern = pattern
+            else:
+                search_pattern = f"*{pattern}*"
             cursor = 0
             while True:
                 cursor, keys = redis_client.scan(

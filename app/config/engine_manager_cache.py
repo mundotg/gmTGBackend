@@ -97,7 +97,19 @@ class EngineManager:
 
     @classmethod
     def get(cls, id_user: int) -> Optional[Engine]:
-        return cls.__engines.get(id_user)
+        engine = cls.__engines.get(id_user)
+        if engine is not None and is_mongo(engine):
+            try:
+                # Testa se o MongoClient continua aberto e responsivo
+                engine.admin.command("ping")
+            except Exception as err:
+                log_message(
+                    f"⚠️ MongoClient cached para o utilizador {id_user} não está operacional ({err}). Removendo do cache para forçar reconexão.",
+                    "warning",
+                )
+                cls.remove(id_user)
+                return None
+        return engine
 
     @classmethod
     def remove(cls, id_user: int):

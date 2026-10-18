@@ -2,11 +2,8 @@ import threading
 import time
 from datetime import datetime
 
-from app.config.cache_manager import MEMORY_CACHE_TTL
-from app.services.ocr._OCR_CACHE import MEMORY_CACHE
+from app.config.cache_manager import MEMORY_CACHE, MEMORY_CACHE_TTL
 from app.ultils.logger import log_message
-
-# importa do teu sistema
 
 
 def schedule_cache_cleanup(interval: int = 60):
@@ -34,12 +31,17 @@ def schedule_cache_cleanup(interval: int = 60):
                 for key in list(MEMORY_CACHE.keys()):
                     entry = MEMORY_CACHE.get(key)
 
-                    if not entry:
+                    if not entry or not isinstance(entry, dict):
+                        continue
+
+                    ts = entry.get("ts")
+                    if ts is None:
+                        # Entrada sem timestamp de criação
                         continue
 
                     ttl = entry.get("ttl", MEMORY_CACHE_TTL)
 
-                    if ttl is not None and (now - entry["ts"]) > ttl:
+                    if ttl is not None and (now - ts) > ttl:
                         MEMORY_CACHE.pop(key, None)
                         removed += 1
 

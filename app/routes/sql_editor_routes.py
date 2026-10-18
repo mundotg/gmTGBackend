@@ -38,6 +38,7 @@ from app.routes.connection_routes import get_current_user_id
 from app.models.user_model import User
 from app.schemas.connetion_schema import ConnectionAccessLevel
 from app.schemas.query_select_upAndInsert_schema import QueryPayload
+from app.services.impact_predictor_service import ImpactPredictorService
 from app.services.mongo_query_executor import run_mongo_query
 from app.ultils.ativar_engine import ConnectionManager
 from app.ultils.conect_database import is_mongo, get_mongo_database
@@ -752,37 +753,41 @@ async def analyze(body: AnalyzeBody, user_id: int = Depends(get_current_user_id)
 
 
 @router.post("/explain")
+@router.post("/impact")
 async def explain(
     body: AnalyzeBody,
     db: AsyncSession = Depends(get_db_async),
     user_id: int = Depends(get_current_user_id),
     actor: User = Depends(get_current_user),
 ):
-    engine, connection = await ConnectionManager.get_engine_async(db, user_id)
-    if is_mongo(engine):
-        return _ok({"plan": [], "note": "EXPLAIN não suportado nesta forma para MongoDB."})
-    stmt = split_statements(body.query or "")
-    if not stmt:
-        return _ok({"plan": []})
-
-    # `EXPLAIN` simples só planeia, mas o prefixo é colado a texto do utilizador:
-    # mandar `ANALYZE DELETE FROM x` produz `EXPLAIN ANALYZE DELETE FROM x`, que
-    # em PostgreSQL executa mesmo o DELETE. O plano de uma escrita exige, por
-    # isso, o mesmo nível que a escrita.
-    if requires_write(stmt[0]):
-        exigir_permissao_de_escrita(actor)
-        await assert_user_connection_level_async(
-            db, connection, user_id, ConnectionAccessLevel.write
-        )
-
     try:
-        async with engine.connect() as conn:
-            res = await conn.execute(text(f"EXPLAIN {stmt[0]}"))
-            plan = [dict(r._mapping) for r in res.fetchall()]
-        return _ok({"plan": plan})
+        engine, connection = await ConnectionManager.get_engine_async(db, user_id)
+        impact = await ImpactPredictorService.predict_impact(engine, connection, body.query or "")
+        
+        # Mantém compatibilidade retroativa com código que consome `plan`
+        raw_plan = impact.get("raw_plan")
+        if isinstance(raw_plan, list):
+            impact["plan"] = raw_plan
+        elif isinstance(raw_plan, dict):
+            impact["plan"] = [raw_plan]
+        else:
+            impact["plan"] = []
+
+        return _ok(impact, "Previsão de impacto concluída")
     except Exception as e:  # noqa: BLE001
         return JSONResponse(
-            status_code=400, content={"success": False, "message": _db_error_message(e), "data": None}
+            status_code=400,
+            content={
+                "success": False,
+                "message": _db_error_message(e),
+                "data": {
+                    "supported": False,
+                    "risk_level": "LOW",
+                    "summary": f"Não foi possível calcular o plano de impacto: {e}",
+                    "suggestions": [],
+                    "plan": [],
+                },
+            },
         )
 
 

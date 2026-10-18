@@ -23,6 +23,7 @@ from app.ultils.ativar_session_bd import get_connection_id_async
 from app.ultils.conect_database import is_mongo, get_mongo_database
 from app.ultils.connection_access import assert_user_connection_level_async
 from app.ultils.get_id_by_token import get_current_user_id, ws_user_id
+from app.services.impact_predictor_service import ImpactPredictorService
 from app.ultils.logger import log_message
 from importantConfig.convert_string_to_dict import PayloadError, converter_tables_origen
 
@@ -292,6 +293,39 @@ async def preview_query(
             "columns": [],
             "rows": [],
             "total": 0,
+        }
+
+
+@router.post("/impact-query")
+async def impact_query(
+    body: PreviewQueryRequest,
+    db: AsyncSession = Depends(get_db_async),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Executa Dry-Run e previsão de impacto da query antes de iniciar a migração."""
+    conn = await get_connection_id_async(db, user_id, body.connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail=f"Conexão {body.connection_id} não encontrada.")
+
+    await assert_user_connection_level_async(db, conn, user_id, ConnectionAccessLevel.read)
+
+    try:
+        engine = await ConnectionManager._create_async_engine(conn)
+        impact = await ImpactPredictorService.predict_impact(
+            engine, conn, body.query or "", table_hint=body.table_name
+        )
+        return {"success": True, "impact": impact}
+    except Exception as e:
+        log_message(f"Erro no cálculo de impacto: {e}\n{traceback.format_exc()}", "error")
+        return {
+            "success": False,
+            "error": str(e),
+            "impact": {
+                "supported": False,
+                "risk_level": "LOW",
+                "summary": f"Não foi possível calcular o impacto: {e}",
+                "suggestions": [],
+            },
         }
 
 

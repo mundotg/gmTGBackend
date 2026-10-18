@@ -48,6 +48,14 @@ Responsible for:
 - Query execution history
 - Streaming large query results
 
+### 🛡️ Dry-Run & Impact Predictor (Governance & Performance Safeguard)
+
+- **Pre-execution Impact Estimation**: Evaluates query cost, estimated rows, and scan types (Index Scan vs. Full Table/Sequential/Collection Scan) before running queries or transferring data.
+- **Engine-specific Explainers**: PostgreSQL (`EXPLAIN JSON`), MySQL (`EXPLAIN FORMAT=JSON`), MongoDB (`explain("queryPlanner")`), SQLite (`EXPLAIN QUERY PLAN`).
+- **Impact Guard**: Automatic safety interception for high-risk queries (Sequential Scan on large tables, `DELETE`/`UPDATE` without `WHERE`, destructive DDL).
+- **Index Recommendations**: Detects missing indexes on filtered columns and generates executable `CREATE INDEX` statements.
+- Complete documentation: [docs/DRY_RUN_IMPACT_PREDICTOR.md](./docs/DRY_RUN_IMPACT_PREDICTOR.md).
+
 ### 🗂️ Project & Task Management (Support Layer)
 
 - Projects, tasks, sprints, and user assignments
@@ -294,7 +302,8 @@ Designed to integrate seamlessly with **React / Next.js** dashboards.
 
 - JWT authentication and role-based access
 - Secure query execution (no raw SQL required by user)
-- Data transfer between databases
+- **Dry-Run & Impact Predictor** (pre-execution query risk assessment, scan detection, and index recommendations)
+- **Multi-Database Data Transfer** (transactional migrations between SQL and NoSQL with custom queries and live preview)
 - Query streaming for large datasets
 - Database schema inspection
 - Connection monitoring and statistics

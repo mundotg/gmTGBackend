@@ -36,7 +36,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # `postgresql-client` do bookworm é o 15, e o pg_dump recusa servidores mais
 # novos do que ele ("server version mismatch"). Um pg_dump N faz dump de
 # servidores até N — PG_CLIENT_VERSION deve ser >= à versão mais alta servida.
-ARG PG_CLIENT_VERSION=17
+# PostgreSQL 18.x suportado por omissão (pg_dump 18 suporta servidores <= 18).
+ARG PG_CLIENT_VERSION=18
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates gzip \
     && . /etc/os-release \
     && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \

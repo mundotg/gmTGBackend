@@ -74,6 +74,13 @@ Além da análise e monitoramento, a plataforma oferece  **operações críticas
 * **Guarda Pré-Execução (Impact Guard)**: Intercepta consultas de risco alto/crítico e solicita confirmação consciente do desenvolvedor antes da execução.
 * Documentação técnica completa: [docs/DRY_RUN_IMPACT_PREDICTOR.md](./docs/DRY_RUN_IMPACT_PREDICTOR.md).
 
+### 🔹 Linhagem Visual de Dados (Data Lineage & Flow)
+
+* **Grafo Interativo de Dependências**: Constrói um mapa em nós/arestas (DAG) powered by NetworkX exibindo a proveniência dos dados: `Banco A (pedidos) ➔ Filtro ➔ Banco B (analytics_pedidos)`.
+* **Análise de Impacto (Upstream/Downstream)**: Permite que DBAs e auditores verifiquem quais tabelas e relatórios serão afetados antes de aplicar um `DROP` ou `ALTER TABLE`.
+* **Rastreamento Automático**: Captura automática de transferências heterogêneas, volumes e consultas de transformação.
+* Documentação técnica completa: [docs/DATA_LINEAGE_AND_FLOW.md](./docs/DATA_LINEAGE_AND_FLOW.md).
+
 ### 🔹 Transações de Dados
 
 * Execução de **transações ACID**

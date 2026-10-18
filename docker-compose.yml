@@ -66,6 +66,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        PG_CLIENT_VERSION: ${PG_CLIENT_VERSION:-18}
     container_name: minha-api
 
     ports:

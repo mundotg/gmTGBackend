@@ -415,6 +415,96 @@ async def download_backup(
 
 
 # ============================================================
+# 🩺 Diagnóstico e Validação do Ambiente de Backup
+# ============================================================
+@router.get("/environment", dependencies=[Depends(require_permission("backup:read"))])
+async def get_backup_environment():
+    """
+    Retorna diagnóstico completo do ambiente onde a API está em execução:
+    ferramentas de backup/restore instaladas (pg_dump, pg_restore, mysqldump, etc.),
+    versões detectadas, diretório de backups e espaço em disco disponível.
+    """
+    from importantConfig.db_backup_restore import validate_backup_environment
+    return validate_backup_environment()
+
+
+@router.get("/environment/check-connection/{connection_id}", dependencies=[Depends(require_permission("backup:read"))])
+async def check_connection_backup_compatibility(
+    connection_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db_async),
+):
+    """
+    Valida a compatibilidade entre a base de dados de uma conexão e as ferramentas
+    instaladas no ambiente da API (ex: detecta antecipadamente se o pg_dump local
+    é compatível com a versão do servidor PostgreSQL).
+    """
+    import re
+    from importantConfig.db_backup_restore import get_binary_info
+    from app.ultils.ativar_session_bd import get_connection_id_async
+    from importantConfig.db_backup_restore_pymongo import _conn_parts_from_engine
+
+    conn = await get_connection_id_async(db, user_id, connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Conexão não encontrada.")
+
+    parts = _conn_parts_from_engine(None, conn)
+    driver = parts.driver
+
+    if driver == "postgresql":
+        pg_dump = get_binary_info("pg_dump", explicit_path=os.environ.get("PG_DUMP_PATH"))
+        client_version = pg_dump.get("version")
+        client_major = pg_dump.get("major_version")
+
+        server_version = None
+        server_major = None
+        try:
+            from app.ultils.ativar_engine import ConnectionManager
+            from sqlalchemy import text
+            engine, _ = await ConnectionManager.get_engine_async(db, user_id)
+            if engine:
+                async with engine.connect() as session:
+                    res = await session.execute(text("SHOW server_version;"))
+                    server_version = str(res.scalar() or "").strip()
+                    m = re.search(r"^(\d+)", server_version)
+                    if m:
+                        server_major = int(m.group(1))
+        except Exception:
+            pass
+
+        compatible = True
+        warnings = []
+        if not pg_dump["installed"]:
+            compatible = False
+            warnings.append("pg_dump não está instalado ou acessível no PATH do ambiente da API.")
+        elif server_major and client_major and client_major < server_major:
+            compatible = False
+            warnings.append(
+                f"Incompatibilidade: O servidor PostgreSQL está na versão {server_version} (major {server_major}), "
+                f"mas o pg_dump instalado na API está na versão {client_version} (major {client_major}). "
+                "Para realizar backups desta base de dados, atualize o contentor com PG_CLIENT_VERSION=18."
+            )
+
+        return {
+            "driver": driver,
+            "compatible": compatible,
+            "server_version": server_version,
+            "server_major": server_major,
+            "client_tool": "pg_dump",
+            "client_version": client_version,
+            "client_major": client_major,
+            "client_installed": pg_dump["installed"],
+            "warnings": warnings,
+        }
+
+    return {
+        "driver": driver,
+        "compatible": True,
+        "warnings": [],
+    }
+
+
+# ============================================================
 # 🔌 WebSocket de progresso do job
 # ============================================================
 @router.websocket("/ws/jobs/{job_id}")

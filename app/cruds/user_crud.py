@@ -223,6 +223,13 @@ def create_user(db: Session, user: users_schemas.UserCreate) -> user_model.User:
         empresa = get_or_create_empresa(db, user.empresa)
         cargo = get_or_create_cargo(db, user.cargo)
 
+        # 🔑 Atribui função global básica 'user' por omissão
+        role_padrao = (
+            db.query(user_model.Role)
+            .filter(user_model.Role.name == "user", user_model.Role.empresa_id == None)
+            .first()
+        )
+
         # 🎯 criar user
         db_user = user_model.User(
             nome=user.nome.strip(),
@@ -231,6 +238,7 @@ def create_user(db: Session, user: users_schemas.UserCreate) -> user_model.User:
             telefone=(user.telefone or "").strip(),
             empresa_id=empresa.id if empresa else None,
             cargo_id=cargo.id if cargo else None,
+            role_id=role_padrao.id if role_padrao else None,
             hashed_password=hashed_pw,
             concorda_termos=bool(user.concorda_termos),
             plan_id=_default_signup_plan(db).id,
@@ -1275,6 +1283,15 @@ def create_member_global(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Não pode atribuir um cargo de empresa como função global.",
             )
+    else:
+        role_default = (
+            db.query(user_model.Role)
+            .filter(user_model.Role.name == "user", user_model.Role.empresa_id == None)
+            .first()
+        )
+        if role_default:
+            role_id = role_default.id
+            role = role_default
 
     # Empresa
     empresa_id = data.empresa_id

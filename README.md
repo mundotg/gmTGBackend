@@ -56,6 +56,14 @@ Responsible for:
 - **Index Recommendations**: Detects missing indexes on filtered columns and generates executable `CREATE INDEX` statements.
 - Complete documentation: [docs/DRY_RUN_IMPACT_PREDICTOR.md](./docs/DRY_RUN_IMPACT_PREDICTOR.md).
 
+### 🗺️ Data Lineage & Flow (Visual DAG & Governance)
+
+- **Interactive End-to-End Lineage**: Directed Acyclic Graph (DAG) powered by NetworkX visualizing data flow across heterogeneous databases (PostgreSQL ➔ Filter ➔ MongoDB).
+- **Automatic Event Interception**: Captures data transfers, volumes, queries, and column mappings transparently.
+- **Impact Analysis (Upstream & Downstream)**: Evaluates the ripple effects of schema changes and table deletions with automated risk scoring (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
+- Complete documentation: [docs/DATA_LINEAGE_AND_FLOW.md](./docs/DATA_LINEAGE_AND_FLOW.md).
+
+
 ### 🗂️ Project & Task Management (Support Layer)
 
 - Projects, tasks, sprints, and user assignments

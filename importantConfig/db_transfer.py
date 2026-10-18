@@ -473,6 +473,25 @@ async def transfer_data(
                     print(msg)
                     yield msg
 
+                    # 🏛️ Rastreamento de Linhagem de Dados (Data Lineage & Flow) - Não bloqueante
+                    try:
+                        from app.services.lineage_service import LineageService
+                        await LineageService.record_transfer_event_async(
+                            db=db,
+                            user_id=id_user,
+                            source_conn=conn1,
+                            target_conn=conn2,
+                            source_table=origem,
+                            target_table=destino,
+                            source_query=getattr(tbl_map, "origem_query", None),
+                            columns_mapping=columns_valid,
+                            rows_transferred=total,
+                            status="success",
+                        )
+                    except Exception as ex_lin:
+                        print(f"⚠️ Aviso ao gravar linhagem de dados: {ex_lin}")
+
+
         print(" Transferência finalizada com sucesso")
         yield "🚀 Transferência finalizada com sucesso"
 

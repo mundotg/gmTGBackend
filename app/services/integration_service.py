@@ -125,11 +125,13 @@ class IntegrationService:
         saved_map = {rec.provider: rec for rec in saved_records}
 
         output: List[IntegrationItemOut] = []
+        handled_providers = set()
 
         for item in DEFAULT_CATALOGUE:
+            handled_providers.add(item["id"])
             rec = saved_map.get(item["id"])
             if rec:
-                connected = rec.is_active
+                connected = bool(rec.is_active)
                 last_sync = (
                     rec.last_sync.strftime("%d/%m/%Y %H:%M")
                     if rec.last_sync
@@ -161,6 +163,23 @@ class IntegrationService:
                     config=config_data,
                 )
             )
+
+        for prov_id, rec in saved_map.items():
+            if prov_id not in handled_providers:
+                output.append(
+                    IntegrationItemOut(
+                        id=rec.provider,
+                        name=rec.name or rec.provider.capitalize(),
+                        provider=rec.provider.capitalize(),
+                        category=rec.category or "Geral",
+                        description=f"Integração personalizada com {rec.name or rec.provider}.",
+                        badge=None,
+                        connected=bool(rec.is_active),
+                        last_sync=rec.last_sync.strftime("%d/%m/%Y %H:%M") if rec.last_sync else None,
+                        metrics=json.loads(rec.metrics) if rec.metrics else [],
+                        config=json.loads(rec.config) if rec.config else {},
+                    )
+                )
 
         return output
 

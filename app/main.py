@@ -57,6 +57,8 @@ from app.routes import (
     nexus_routes,
     lineage_routes,
     integration_routes,
+    video_routes,
+    game_routes,
 )
 from app.schemas import project_analytics_routes
 from app.seed_new import seed_data
@@ -418,6 +420,9 @@ app.include_router(datascience_routes.ws_router)  # WebSockets: sem dependência
 app.include_router(nexus_routes.router)
 app.include_router(lineage_routes.router)
 app.include_router(integration_routes.router)
+app.include_router(video_routes.router)
+app.include_router(game_routes.router)
+app.include_router(game_routes.ws_router)
 
 
 

@@ -66,6 +66,13 @@ async def delete_multiple_records(
     except HTTPException:
         raise
 
+    except ValueError as ve:
+        log_message(f"Aviso durante exclusão em lote: {str(ve)}", "warning")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve),
+        )
+
     except Exception as e:
         log_message(
             f"Erro interno durante exclusão em lote (User: {current_user_id}): {str(e)}\n{traceback.format_exc()}",
@@ -73,7 +80,7 @@ async def delete_multiple_records(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Não foi possível concluir a exclusão. Verifique dependências em outras tabelas ou tente novamente.",
+            detail=f"Não foi possível concluir a exclusão: {str(e)}",
         )
 
 
@@ -110,6 +117,13 @@ async def delete_all_records(
     except HTTPException:
         raise
 
+    except ValueError as ve:
+        log_message(f"Aviso durante exclusão total: {str(ve)}", "warning")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(ve),
+        )
+
     except Exception as e:
         log_message(
             f"Erro durante exclusão total: {str(e)}\n{traceback.format_exc()}",
@@ -117,5 +131,5 @@ async def delete_all_records(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao excluir todos os registros.",
+            detail=f"Erro ao excluir todos os registros: {str(e)}",
         )

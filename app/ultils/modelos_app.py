@@ -52,4 +52,15 @@ from app.models.nexus_models import (
     NexusSave,
 )
 from app.models.lineage_models import DataLineageEvent
+from app.models.video import Video
+from app.models.watch_history import WatchHistory
+from app.models.recommendation import Recommendation
+from app.models.game_models import (
+    GameSession,
+    GameMove,
+    GameChat,
+    GamePlayerStats,
+    SalaGame,
+    Matriz,
+)
 

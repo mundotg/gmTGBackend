@@ -1,0 +1,97 @@
+{
+  "version": "1.0.0",
+  "name": "Tapatan 3x3 Knowledge Base",
+  "description": "Arquivo de padrões táticos e jogadas históricas aprendidas para o motor de IA do MustaInf Tapatan.",
+  "openings": [
+    {
+      "board_hash": "111000222",
+      "player": 2,
+      "recommended_move": {
+        "from": 8,
+        "to": 5,
+        "intent": "Ocupação prioritária da Casa Central (5)",
+        "win_rate": 0.88
+      }
+    },
+    {
+      "board_hash": "101110222",
+      "player": 2,
+      "recommended_move": {
+        "from": 7,
+        "to": 4,
+        "intent": "Contenção de avanço pelo flanco esquerdo",
+        "win_rate": 0.75
+      }
+    },
+    {
+      "board_hash": "101011222",
+      "player": 2,
+      "recommended_move": {
+        "from": 9,
+        "to": 6,
+        "intent": "Contenção de avanço pelo flanco direito",
+        "win_rate": 0.75
+      }
+    },
+    {
+      "board_hash": "111020202",
+      "player": 2,
+      "recommended_move": {
+        "from": 8,
+        "to": 5,
+        "intent": "Posicionamento central dominante",
+        "win_rate": 0.85
+      }
+    }
+  ],
+  "learned_transitions": {
+    "101010222": [
+      {
+        "player": 2,
+        "from": 7,
+        "to": 4,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
+    ],
+    "101200122": [
+      {
+        "player": 2,
+        "from": 4,
+        "to": 5,
+        "intent": "Bloqueio crítico de alinhamento vencedor adversário"
+      }
+    ],
+    "001120122": [
+      {
+        "player": 2,
+        "from": 9,
+        "to": 6,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
+    ],
+    "101022120": [
+      {
+        "player": 2,
+        "from": 6,
+        "to": 9,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
+    ],
+    "100021122": [
+      {
+        "player": 2,
+        "from": 5,
+        "to": 2,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
+    ],
+    "020011122": [
+      {
+        "player": 2,
+        "from": 2,
+        "to": 3,
+        "intent": "Bloqueio crítico de alinhamento vencedor adversário"
+      }
+    ]
+  }
+}

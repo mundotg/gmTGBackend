@@ -147,17 +147,14 @@ class DeleteOperationService:
 
         filters, params = await self._build_where_clause(payload, connection_type)
 
-        if not filters:
-            raise ValueError("Exclusão total bloqueada: payload sem filtros.")
+        where_clause = f"\n            {filters}" if filters else ""
 
         sql = f"""
-            DELETE FROM {quote_identifier(connection_type, tabela)}
-            {filters}
+            DELETE FROM {quote_identifier(connection_type, tabela)}{where_clause}
         """
 
         log_message(f"DELETE ALL => {sql} | params={params}", "debug")
         result = conn.execute(text(sql), params)
-        conn.commit()
         return result.rowcount or 0
 
     async def _get_pk_by_index(

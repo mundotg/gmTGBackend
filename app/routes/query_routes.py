@@ -31,7 +31,6 @@ from app.schemas.query_select_upAndInsert_schema import (
     UpdateSelectedRequest,
 )
 
-# from app.services.cloudeAi_execute_query import executar_query_e_salvar_stream
 from app.services.execute_query_select_stream import executar_query_e_salvar_stream
 from app.services.insert_row_service import insert_row_service
 from app.services.insert_service_auto import insert_row_service_auto

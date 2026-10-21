@@ -69,14 +69,6 @@ def get_statistics_by_connection(connection_id: int) -> Optional[DBStatistics]:
             )
             return None
 
-
-from typing import Optional
-from sqlalchemy import select, func
-from sqlalchemy.exc import SQLAlchemyError
-
-# Importe as bibliotecas de log/modelos que você já usa no seu arquivo...
-
-
 def get_statistics_by_connection_geral(
     connection_id: int,
 ) -> Optional[ConnectionStatisticsOverview]:

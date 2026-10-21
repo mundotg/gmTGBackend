@@ -92,6 +92,62 @@
         "to": 3,
         "intent": "Bloqueio crítico de alinhamento vencedor adversário"
       }
+    ],
+    "100211022": [
+      {
+        "player": 2,
+        "from": 4,
+        "to": 7,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
+    ],
+    "110001222": [
+      {
+        "player": 2,
+        "from": 7,
+        "to": 5,
+        "intent": "Controle tático da Casa Central (5)"
+      }
+    ],
+    "010121022": [
+      {
+        "player": 2,
+        "from": 8,
+        "to": 7,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
+    ],
+    "001121202": [
+      {
+        "player": 2,
+        "from": 7,
+        "to": 8,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
+    ],
+    "001021122": [
+      {
+        "player": 2,
+        "from": 5,
+        "to": 1,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
+    ],
+    "011100222": [
+      {
+        "player": 2,
+        "from": 7,
+        "to": 5,
+        "intent": "Controle tático da Casa Central (5)"
+      }
+    ],
+    "011020122": [
+      {
+        "player": 2,
+        "from": 9,
+        "to": 6,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
     ]
   }
 }

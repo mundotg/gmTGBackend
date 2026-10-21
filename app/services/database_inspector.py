@@ -265,7 +265,7 @@ def get_table_names(
     db: Session,
 ) -> list[str]:
 
-    table_cache = None # get_db_structures(db, connection_id)
+    table_cache = get_db_structures(db, connection_id)
     if table_cache:
         log_message(
             f"Usando cache para tabelas | connection_id={connection_id} | user={id_user} | tables={len(table_cache)}",
@@ -832,7 +832,7 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
 
     try:
         engine, connection = ConnectionManager.ensure_connection(db, id_user)
-        print(f"Sincronizando estatísticas para usuário ID={id_user} e conexão ID={getattr(connection, 'id', '?')}...")
+        # print(f"Sincronizando estatísticas para usuário ID={id_user} e conexão ID={getattr(connection, 'id', '?')}...")
         # Verificação de segurança
         if not connection or not hasattr(connection, "id"):
             log_message(f"❌ Conexão inválida para usuário ID={id_user}", "error")
@@ -840,8 +840,8 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
 
         id_conn = cast(int, connection.id)
 
-        existing = None #get_statistics_by_connection(id_conn)
-        print(f"Estatísticas existentes para conexão ID={id_conn}: {existing}")
+        existing = get_statistics_by_connection(id_conn)
+        # print(f"Estatísticas existentes para conexão ID={id_conn}: {existing}")
         if existing:
             # Se for objeto SQLAlchemy, converter para dict
             if hasattr(existing, "__dict__"):

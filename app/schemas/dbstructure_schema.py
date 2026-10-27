@@ -282,7 +282,7 @@ class MetadataTableResponse(BaseModel):
     message: str
     executado_em: datetime
     connection_id: int
-    schema_name: str
+    schema_name: Optional[str] = None
     table_name: str
     total_colunas: int
     colunas: List[CampoDetalhado] = Field(default_factory=list)

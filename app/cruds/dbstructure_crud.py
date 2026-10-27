@@ -683,6 +683,70 @@ def create_db_field(db: Session, field_in: DBFieldCreate, structure_id: int) -> 
         pass
 
 
+def create_db_fields_bulk(
+    db: Session, fields_in: Sequence[DBFieldCreate], structure_id: int
+) -> List[DBField]:
+    """
+    Cria ou atualiza múltiplos campos em lote com um único commit.
+    Evita dezenas de fsync/commits sequenciais que causam lentidão extrema.
+    """
+    if not fields_in:
+        return []
+
+    if db is None:
+        return [
+            DBField(structure_id=structure_id, **field_in.model_dump(exclude_unset=True, exclude_none=True))
+            for field_in in fields_in
+        ]
+
+    try:
+        existing_fields = (
+            db.query(DBField)
+            .options(
+                load_only(DBField.id, DBField.name),  # type: ignore
+                noload(DBField.structure),
+                noload(DBField.enum_values),
+            )
+            .filter(DBField.structure_id == structure_id)
+            .all()
+        )
+        existing_map = {f.name: f for f in existing_fields}
+
+        result_objects: List[DBField] = []
+        has_changes = False
+
+        for field_in in fields_in:
+            data = field_in.model_dump(exclude_unset=True, exclude_none=True)
+            data.pop("structure_id", None)
+
+            existing = existing_map.get(field_in.name)
+            if existing:
+                _apply_model_data(existing, data)
+                result_objects.append(existing)
+                has_changes = True
+            else:
+                obj = DBField(structure_id=structure_id, **data)
+                db.add(obj)
+                result_objects.append(obj)
+                has_changes = True
+
+        if has_changes:
+            _safe_commit(
+                db,
+                action="criar campos bulk",
+                context=f"structure_id={structure_id} count={len(fields_in)}",
+            )
+            for obj in result_objects:
+                try:
+                    db.refresh(obj)
+                except Exception:
+                    pass
+
+        return result_objects
+    finally:
+        pass
+
+
 def get_fields_by_structure_pk(
     db: Session,
     structure_id: int,

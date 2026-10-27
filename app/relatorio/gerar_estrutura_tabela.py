@@ -69,7 +69,7 @@ class ReportStructureBuilder:
             for meta in self.metadata_list
         )
         total_indices = sum(len(meta.get("indices", [])) for meta in self.metadata_list)
-        schemas = list(set(meta["schema_name"] for meta in self.metadata_list))
+        schemas = [s for s in set(meta.get("schema_name") for meta in self.metadata_list) if s]
 
         return [
             {
@@ -89,7 +89,7 @@ class ReportStructureBuilder:
                         ["Total de Colunas", total_colunas],
                         ["Total de Foreign Keys", total_fks],
                         ["Total de Índices", total_indices],
-                        ["Schemas Encontrados", ", ".join(schemas)],
+                        ["Schemas Encontrados", ", ".join(schemas) if schemas else "Padrão"],
                         ["Média de Colunas/Tabela", f"{total_colunas / len(self.metadata_list):.1f}"],
                     ],
                     "col_widths": [8, 8],
@@ -106,10 +106,11 @@ class ReportStructureBuilder:
         """Detalhamento das tabelas"""
         estrutura = []
         for idx, meta in enumerate(self.metadata_list, 1):
+            schema_prefix = f"{meta['schema_name']}." if meta.get("schema_name") else ""
             estrutura.append(
                 {
                     "text": {
-                        "value": f"{idx}. Tabela: {meta['schema_name']}.{meta['table_name']}",
+                        "value": f"{idx}. Tabela: {schema_prefix}{meta['table_name']}",
                         "bold": True,
                         "size": 13,
                         "color": "#1e3a8a",

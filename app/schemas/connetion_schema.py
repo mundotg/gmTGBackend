@@ -1,5 +1,5 @@
 from typing_extensions import Annotated
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator, computed_field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -155,10 +155,21 @@ class ConnectionRequest(BaseModel):
         
 class ConnectionLogOut(BaseModel):
     id: int
-    connection_id: int
-    action: str
-    status: str
+    connection_id: Optional[int] = None
+    action: Optional[str] = None
+    status: str = "success"
     timestamp: datetime
+    details: Optional[Dict[str, Any]] = None
+
+    @computed_field
+    def connection(self) -> str:
+        if self.connection_id:
+            return f"Conexão #{self.connection_id}"
+        if self.details and isinstance(self.details, dict):
+            filename = self.details.get("filename")
+            if filename:
+                return f"Dataset: {filename}"
+        return "Conexão"
 
     model_config = ConfigDict(from_attributes=True) 
 

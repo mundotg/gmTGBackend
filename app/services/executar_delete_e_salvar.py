@@ -502,10 +502,12 @@ class DeleteOperationService:
         executed_by: str,
         modified_by: Optional[str],
         client_ip: Optional[str],
+        dry_run: bool = False,
     ) -> DeleteResponse:
         """
         Equivalente NoSQL do delete: `delete_one` por chave, ou `delete_many`
         por filtro (delete_all). Devolve o MESMO `DeleteResponse` do caminho SQL.
+        Suporta dry_run para simular sem deletar nada.
         """
         start = datetime.now(timezone.utc)
         itens: List[Dict[str, Any]] = []
@@ -528,8 +530,11 @@ class DeleteOperationService:
             mongo_filter = _build_mongo_filter(payloadQuery.where)
             if not mongo_filter:
                 raise ValueError("Exclusão total bloqueada: filtro vazio.")
-            res = _coll(payloadQuery.baseTable).delete_many(mongo_filter)
-            total = int(res.deleted_count)
+            if dry_run:
+                total = int(_coll(payloadQuery.baseTable).count_documents(mongo_filter))
+            else:
+                res = _coll(payloadQuery.baseTable).delete_many(mongo_filter)
+                total = int(res.deleted_count)
             itens.append({"tabela": payloadQuery.baseTable, "chave": "filter",
                           "valor": "delete_all", "afetados": total})
         else:
@@ -558,8 +563,11 @@ class DeleteOperationService:
                         else self._cast_value(pk_val, nd.get("keyType"))
                     )
                     try:
-                        res = _coll(table_name).delete_one({pk: filtro_val})
-                        afetados = int(res.deleted_count)
+                        if dry_run:
+                            afetados = int(_coll(table_name).count_documents({pk: filtro_val}))
+                        else:
+                            res = _coll(table_name).delete_one({pk: filtro_val})
+                            afetados = int(res.deleted_count)
                     except Exception as exc:  # noqa: BLE001
                         erros.append(f"'{table_name}': {exc}")
                         afetados = 0
@@ -577,7 +585,7 @@ class DeleteOperationService:
                     data=QueryHistoryCreate(
                         user_id=current_user_id,
                         db_connection_id=connection_id,
-                        query="DELETE mongo",
+                        query="DELETE mongo (dry-run)" if dry_run else "DELETE mongo",
                         query_type=QueryType.DELETE,
                         executed_at=start,
                         updated_at=datetime.now(timezone.utc),
@@ -585,30 +593,32 @@ class DeleteOperationService:
                         result_preview=json.dumps(itens, default=str, ensure_ascii=False),
                         error_message=json.dumps(erros, ensure_ascii=False) if erros else None,
                         is_favorite=False,
-                        tags="delete_mongo",
+                        tags="dry_run_delete_mongo" if dry_run else "delete_mongo",
                         app_source=app_source,
                         client_ip=client_ip,
                         executed_by=executed_by,
                         modified_by=modified_by or executed_by,
-                        meta_info={"engine": "mongodb", "total_deletados": total, "erros": erros},
+                        meta_info={"engine": "mongodb", "dry_run": dry_run, "total_deletados": total, "erros": erros},
                     ),
                 )
             except Exception as h:  # noqa: BLE001
                 log_message(f"⚠️ Falha ao salvar histórico (mongo delete): {h}", "warning")
 
+        prefixo = "[DRY-RUN] Simulação: " if dry_run else ""
         mensagem = (
-            f"{total} registro(s) excluído(s) com sucesso."
+            f"{prefixo}{total} registro(s) {'seriam excluídos. Nenhuma alteração foi efetuada.' if dry_run else 'excluído(s) com sucesso.'}"
             if total > 0
-            else "Nenhum registro foi excluído."
+            else f"{prefixo}Nenhum registro {'seria excluído.' if dry_run else 'foi excluído.'}"
         )
         erros_unicos = self._unique_preserve_order(erros)
         if erros_unicos:
             mensagem += f" Avisos: {', '.join(erros_unicos)}."
 
         return DeleteResponse(
-            success=total > 0,
+            success=total > 0 or len(erros_unicos) == 0,
             mensagem=mensagem,
             itens_afetados=itens,
+            dry_run=dry_run,
             executado_em=datetime.now(timezone.utc),
         )
 
@@ -623,6 +633,7 @@ class DeleteOperationService:
         executed_by: str = "sistema",
         modified_by: Optional[str] = None,
         client_ip: Optional[str] = None,
+        dry_run: bool = False,
     ) -> DeleteResponse:
         itens_afetados: List[Dict[str, Any]] = []
         erros: List[str] = []
@@ -649,6 +660,7 @@ class DeleteOperationService:
                 executed_by=executed_by,
                 modified_by=modified_by,
                 client_ip=client_ip,
+                dry_run=dry_run,
             )
 
         start = datetime.now(timezone.utc)
@@ -656,38 +668,121 @@ class DeleteOperationService:
         try:
             # Se for async engine, o ideal é async with.
             # Estou assumindo que o teu engine.begin() é compatível com await nas chamadas internas.
-            with engine.begin() as conn:
-                if delete_all:
-                    if not payloadQuery:
-                        raise ValueError(
-                            "Payload da query não informado para exclusão total."
+            conn_ctx = engine.connect() if dry_run else engine.begin()
+            with conn_ctx as conn:
+                trans = conn.begin() if dry_run else None
+                try:
+                    if delete_all:
+                        if not payloadQuery:
+                            raise ValueError(
+                                "Payload da query não informado para exclusão total."
+                            )
+
+                        afetados = await self._delete_all_by_payload(
+                            conn=conn,
+                            payload=payloadQuery,
+                            connection_type=connection_type,
                         )
 
-                    afetados = await self._delete_all_by_payload(
-                        conn=conn,
-                        payload=payloadQuery,
-                        connection_type=connection_type,
-                    )
+                        itens_afetados.append(
+                            {
+                                "tabela": payloadQuery.baseTable,
+                                "chave": "query",
+                                "valor": "delete_all",
+                                "afetados": afetados,
+                            }
+                        )
 
-                    itens_afetados.append(
-                        {
-                            "tabela": payloadQuery.baseTable,
-                            "chave": "query",
-                            "valor": "delete_all",
-                            "afetados": afetados,
-                        }
-                    )
+                    else:
+                        grouped_pks, fallbacks, erros_extra = self._prepare_delete_groups(
+                            registros=registros,
+                            payload_query=payloadQuery,
+                        )
+                        erros.extend(erros_extra)
 
-                else:
-                    grouped_pks, fallbacks, erros_extra = self._prepare_delete_groups(
-                        registros=registros,
-                        payload_query=payloadQuery,
-                    )
-                    erros.extend(erros_extra)
+                        # 1) delete em lote por PKs já recebidas diretamente
+                        for tabela_name, colunas in grouped_pks.items():
+                            for pk_coluna, valores in colunas.items():
+                                if not valores:
+                                    continue
 
-                    # 1) delete em lote por PKs já recebidas diretamente
-                    for tabela_name, colunas in grouped_pks.items():
-                        for pk_coluna, valores in colunas.items():
+                                afetados = await self._execute_bulk_delete_by_pks(
+                                    conn=conn,
+                                    tabela_name=tabela_name,
+                                    pk_coluna=pk_coluna,
+                                    valores=valores,
+                                    connection_type=connection_type,
+                                )
+
+                                itens_afetados.append(
+                                    {
+                                        "tabela": tabela_name,
+                                        "chave": pk_coluna,
+                                        "valor": f"{len(valores)} IDs",
+                                        "afetados": afetados,
+                                    }
+                                )
+
+                        # 2) resolver fallbacks:
+                        #    primeiro tenta obter PK por index quando possível
+                        fallback_pks: DefaultDict[Tuple[str, str], List[Any]] = defaultdict(
+                            list
+                        )
+                        direct_fallbacks: List[
+                            Tuple[str, Dict[str, Any], QueryPayload, int]
+                        ] = []
+
+                        for tabela_name, dados, payload, index in fallbacks:
+                            pk_coluna = dados.get("primaryKey")
+                            key_type = dados.get("keyType")
+                            is_pk_or_unique = bool(dados.get("isPrimarykeyOrUnique"))
+
+                            # se temos PK válida e a linha pode ser resolvida por index -> buscar valor real da PK
+                            if (
+                                pk_coluna
+                                and is_pk_or_unique
+                                and self._is_safe_with_dots(pk_coluna)
+                            ):
+                                try:
+                                    # SAVEPOINT: no Postgres, um SELECT que falha
+                                    # aborta a transação inteira e todos os comandos
+                                    # seguintes morrem com InFailedSqlTransaction.
+                                    with conn.begin_nested():
+                                        pk_valor = await self._get_pk_by_index(
+                                            conn=conn,
+                                            payload=payload,
+                                            tabela_name=tabela_name,
+                                            pk_coluna=pk_coluna,
+                                            index=index,
+                                            connection_type=connection_type,
+                                        )
+                                except Exception as exc:
+                                    log_message(
+                                        f"⚠️ Falha ao obter PK por índice em "
+                                        f"{tabela_name}.{pk_coluna} [index={index}]: {exc}",
+                                        "warning",
+                                    )
+                                    erros.append(
+                                        f"Erro ao obter PK por índice em {tabela_name}.{pk_coluna} [index={index}]: {exc}"
+                                    )
+                                    pk_valor = None
+
+                                if pk_valor is not None:
+                                    try:
+                                        fallback_pks[(tabela_name, pk_coluna)].append(
+                                            self._cast_value(pk_valor, key_type)
+                                        )
+                                    except Exception as exc:
+                                        erros.append(
+                                            f"Erro ao converter PK de fallback em {tabela_name}.{pk_coluna}: {exc}"
+                                        )
+                                    continue
+
+                            # se não der para resolver por PK, vai para delete direto por índice
+                            direct_fallbacks.append((tabela_name, dados, payload, index))
+
+                        # 3) delete em lote das PKs resolvidas via fallback
+                        for (tabela_name, pk_coluna), valores in fallback_pks.items():
                             if not valores:
                                 continue
 
@@ -703,157 +798,91 @@ class DeleteOperationService:
                                 {
                                     "tabela": tabela_name,
                                     "chave": pk_coluna,
-                                    "valor": f"{len(valores)} IDs",
+                                    "valor": f"{len(valores)} IDs (fallback)",
                                     "afetados": afetados,
                                 }
                             )
 
-                    # 2) resolver fallbacks:
-                    #    primeiro tenta obter PK por index quando possível
-                    fallback_pks: DefaultDict[Tuple[str, str], List[Any]] = defaultdict(
-                        list
-                    )
-                    direct_fallbacks: List[
-                        Tuple[str, Dict[str, Any], QueryPayload, int]
-                    ] = []
+                        # 4) delete direto por índice quando não foi possível resolver PK
+                        for tabela_name, dados, payload, index in direct_fallbacks:
+                            pk_coluna = dados.get("primaryKey")
+                            key_type = dados.get("keyType")
 
-                    for tabela_name, dados, payload, index in fallbacks:
-                        pk_coluna = dados.get("primaryKey")
-                        key_type = dados.get("keyType")
-                        is_pk_or_unique = bool(dados.get("isPrimarykeyOrUnique"))
+                            if not pk_coluna:
+                                erros.append(
+                                    f"Fallback por índice sem primaryKey informado para a tabela {tabela_name}"
+                                )
+                                itens_afetados.append(
+                                    {
+                                        "tabela": tabela_name,
+                                        "chave": "index",
+                                        "valor": index,
+                                        "afetados": 0,
+                                    }
+                                )
+                                continue
 
-                        # se temos PK válida e a linha pode ser resolvida por index -> buscar valor real da PK
-                        if (
-                            pk_coluna
-                            and is_pk_or_unique
-                            and self._is_safe_with_dots(pk_coluna)
-                        ):
+                            if not self._is_safe_with_dots(pk_coluna):
+                                erros.append(
+                                    f"PrimaryKey inválida/insegura no fallback: {pk_coluna}"
+                                )
+                                itens_afetados.append(
+                                    {
+                                        "tabela": tabela_name,
+                                        "chave": pk_coluna,
+                                        "valor": index,
+                                        "afetados": 0,
+                                    }
+                                )
+                                continue
+
                             try:
-                                # SAVEPOINT: no Postgres, um SELECT que falha
-                                # aborta a transação inteira e todos os comandos
-                                # seguintes morrem com InFailedSqlTransaction.
+                                # SAVEPOINT por registro: uma linha que não pode ser
+                                # identificada não invalida as exclusões anteriores.
                                 with conn.begin_nested():
-                                    pk_valor = await self._get_pk_by_index(
+                                    afetados = await self._delete_by_index_direct(
                                         conn=conn,
                                         payload=payload,
+                                        primaryKey=pk_coluna,
+                                        keyType=key_type or "",
+                                        is_pk_or_unique=False,
                                         tabela_name=tabela_name,
-                                        pk_coluna=pk_coluna,
                                         index=index,
                                         connection_type=connection_type,
                                     )
                             except Exception as exc:
                                 log_message(
-                                    f"⚠️ Falha ao obter PK por índice em "
-                                    f"{tabela_name}.{pk_coluna} [index={index}]: {exc}",
+                                    f"⚠️ Falha no delete por índice em {tabela_name} "
+                                    f"[index={index}]: {exc}",
                                     "warning",
                                 )
                                 erros.append(
-                                    f"Erro ao obter PK por índice em {tabela_name}.{pk_coluna} [index={index}]: {exc}"
+                                    f"Não foi possível excluir a linha {index} de {tabela_name}: {exc}"
                                 )
-                                pk_valor = None
+                                afetados = 0
 
-                            if pk_valor is not None:
-                                try:
-                                    fallback_pks[(tabela_name, pk_coluna)].append(
-                                        self._cast_value(pk_valor, key_type)
-                                    )
-                                except Exception as exc:
-                                    erros.append(
-                                        f"Erro ao converter PK de fallback em {tabela_name}.{pk_coluna}: {exc}"
-                                    )
-                                continue
-
-                        # se não der para resolver por PK, vai para delete direto por índice
-                        direct_fallbacks.append((tabela_name, dados, payload, index))
-
-                    # 3) delete em lote das PKs resolvidas via fallback
-                    for (tabela_name, pk_coluna), valores in fallback_pks.items():
-                        if not valores:
-                            continue
-
-                        afetados = await self._execute_bulk_delete_by_pks(
-                            conn=conn,
-                            tabela_name=tabela_name,
-                            pk_coluna=pk_coluna,
-                            valores=valores,
-                            connection_type=connection_type,
-                        )
-
-                        itens_afetados.append(
-                            {
-                                "tabela": tabela_name,
-                                "chave": pk_coluna,
-                                "valor": f"{len(valores)} IDs (fallback)",
-                                "afetados": afetados,
-                            }
-                        )
-
-                    # 4) delete direto por índice quando não foi possível resolver PK
-                    for tabela_name, dados, payload, index in direct_fallbacks:
-                        pk_coluna = dados.get("primaryKey")
-                        key_type = dados.get("keyType")
-
-                        if not pk_coluna:
-                            erros.append(
-                                f"Fallback por índice sem primaryKey informado para a tabela {tabela_name}"
-                            )
-                            itens_afetados.append(
-                                {
-                                    "tabela": tabela_name,
-                                    "chave": "index",
-                                    "valor": index,
-                                    "afetados": 0,
-                                }
-                            )
-                            continue
-
-                        if not self._is_safe_with_dots(pk_coluna):
-                            erros.append(
-                                f"PrimaryKey inválida/insegura no fallback: {pk_coluna}"
-                            )
                             itens_afetados.append(
                                 {
                                     "tabela": tabela_name,
                                     "chave": pk_coluna,
-                                    "valor": index,
-                                    "afetados": 0,
+                                    "valor": f"fallback_index={index}",
+                                    "afetados": afetados,
                                 }
                             )
-                            continue
 
-                        try:
-                            # SAVEPOINT por registro: uma linha que não pode ser
-                            # identificada não invalida as exclusões anteriores.
-                            with conn.begin_nested():
-                                afetados = await self._delete_by_index_direct(
-                                    conn=conn,
-                                    payload=payload,
-                                    primaryKey=pk_coluna,
-                                    keyType=key_type or "",
-                                    is_pk_or_unique=False,
-                                    tabela_name=tabela_name,
-                                    index=index,
-                                    connection_type=connection_type,
-                                )
-                        except Exception as exc:
-                            log_message(
-                                f"⚠️ Falha no delete por índice em {tabela_name} "
-                                f"[index={index}]: {exc}",
-                                "warning",
-                            )
-                            erros.append(
-                                f"Não foi possível excluir a linha {index} de {tabela_name}: {exc}"
-                            )
-                            afetados = 0
-
-                        itens_afetados.append(
-                            {
-                                "tabela": tabela_name,
-                                "chave": pk_coluna,
-                                "valor": f"fallback_index={index}",
-                                "afetados": afetados,
-                            }
+                    if dry_run and trans is not None:
+                        trans.rollback()
+                        log_message(
+                            f"🧪 [DRY-RUN] Rollback executado na exclusão. Nenhuma alteração persistida.",
+                            "info",
                         )
+                except Exception:
+                    if dry_run and trans is not None:
+                        try:
+                            trans.rollback()
+                        except Exception:
+                            pass
+                    raise
 
             duration_ms = int(
                 (datetime.now(timezone.utc) - start).total_seconds() * 1000
@@ -864,10 +893,12 @@ class DeleteOperationService:
             erros_unicos = self._unique_preserve_order(erros)
 
             if connection_id is not None:
+                tags_del = "dry_run_delete" if dry_run else ("delete_all" if delete_all else "delete_simple")
+                query_name = f"DELETE {'all' if delete_all else 'simple'} ({'dry-run' if dry_run else 'real'})"
                 historico = QueryHistoryCreate(
                     user_id=current_user_id,
                     db_connection_id=connection_id,
-                    query="DELETE simple",
+                    query=query_name,
                     query_type=QueryType.DELETE,
                     executed_at=start,
                     updated_at=datetime.now(timezone.utc),
@@ -883,38 +914,43 @@ class DeleteOperationService:
                         else None
                     ),
                     is_favorite=False,
-                    tags="delete_simple",
+                    tags=tags_del,
                     app_source=app_source,
                     client_ip=client_ip,
                     executed_by=executed_by,
                     modified_by=modified_by or executed_by,
                     meta_info={
                         "delete_all": delete_all,
+                        "dry_run": dry_run,
                         "erros": erros_unicos,
                         "total_deletados": total_deletados,
                     },
                 )
                 create_query_history(db=db, user_id=current_user_id, data=historico)
 
+            prefixo = "[DRY-RUN] Simulação: " if dry_run else ""
             mensagem = (
-                f"{total_deletados} registro(s) excluído(s) com sucesso."
+                f"{prefixo}{total_deletados} registro(s) {'seriam excluídos. Nenhuma alteração foi efetuada.' if dry_run else 'excluído(s) com sucesso.'}"
                 if total_deletados > 0
-                else "Nenhum registro foi excluído."
+                else f"{prefixo}Nenhum registro {'seria excluído.' if dry_run else 'foi excluído.'}"
             )
 
             if erros_unicos:
                 mensagem += f" Avisos: {', '.join(erros_unicos)}."
 
             return DeleteResponse(
-                success=total_deletados > 0,
+                success=total_deletados > 0 or len(erros_unicos) == 0,
                 mensagem=mensagem,
                 itens_afetados=itens_afetados,
+                dry_run=dry_run,
                 executado_em=datetime.now(timezone.utc),
             )
 
         except SQLAlchemyError as sa_err:
             error_msg = _lidar_com_erro_sql(sa_err)
             log_message(f"Erro SQL no delete: {error_msg}", "error")
+            if dry_run:
+                raise ValueError(f"Simulação de exclusão falhou: {error_msg}") from sa_err
             raise RuntimeError(f"Erro SQL: {error_msg}") from sa_err
 
         except Exception as exc:

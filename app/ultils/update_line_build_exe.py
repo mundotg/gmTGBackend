@@ -31,11 +31,15 @@ def update_row_service(
     app_source: str = "API",
     executed_by: str = "sistema",
     modified_by: Optional[str] = None,
+    dry_run: Optional[bool] = None,
 ) -> dict:
     """
     Atualiza registros existentes em uma ou mais tabelas e salva no histórico completo.
     Garante transação ACID: Se uma tabela falhar, todas as alterações são revertidas.
+    Suporta dry_run: se ativado, simula e valida toda a execução (restrições, tipos, FK/PK)
+    e executa rollback automático sem persistir nada no banco de dados.
     """
+    is_dry_run = dry_run if dry_run is not None else bool(getattr(data, "dry_run", False))
     resposta_query = ""
     query_string = ""
     start_time = time.time()
@@ -89,80 +93,103 @@ def update_row_service(
                 }
 
                 if set_dict:
-                    res = collection.update_one(filtro, {"$set": set_dict})
-                    resposta_query += f"{collection_name}: {res.modified_count} documento(s) atualizado(s).\n"
+                    if is_dry_run:
+                        count = collection.count_documents(filtro)
+                        resposta_query += f"{collection_name}: {count} documento(s) validados para atualização (simulação).\n"
+                    else:
+                        res = collection.update_one(filtro, {"$set": set_dict})
+                        resposta_query += f"{collection_name}: {res.modified_count} documento(s) atualizado(s).\n"
 
             sucesso = True
         else:
             # 2. Bancos Relacionais (PostgreSQL, MySQL, SQLite, Oracle, SQL Server, etc.)
-            with engine.begin() as conn:
-                for table_name, primary_key_data in data.tables_primary_keys_values.items():
-                    primary_key = primary_key_data.get("primaryKey")
-                    primary_value = primary_key_data.get("valor")
+            with engine.connect() as conn:
+                trans = conn.begin()
+                try:
+                    for table_name, primary_key_data in data.tables_primary_keys_values.items():
+                        primary_key = primary_key_data.get("primaryKey")
+                        primary_value = primary_key_data.get("valor")
 
-                    if not primary_key or primary_value is None:
-                        raise ValueError(f"A tabela '{table_name}' não contém uma chave primária válida para o UPDATE.")
+                        if not primary_key or primary_value is None:
+                            raise ValueError(f"A tabela '{table_name}' não contém uma chave primária válida para o UPDATE.")
 
-                    raw_values = data.updatedRow.get(table_name, {})
-                    updated_values = {
-                        col.split(".")[-1]: {
-                            "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
-                            "type_column": field.get("type_column", "text") if isinstance(field, dict) else getattr(field, "type_column", "text")
+                        raw_values = data.updatedRow.get(table_name, {})
+                        updated_values = {
+                            col.split(".")[-1]: {
+                                "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
+                                "type_column": field.get("type_column", "text") if isinstance(field, dict) else getattr(field, "type_column", "text")
+                            }
+                            for col, field in raw_values.items()
                         }
-                        for col, field in raw_values.items()
-                    }
 
-                    if not updated_values:
-                        log_message(f"Aviso: Tabela '{table_name}' ignorada pois não possui colunas alteradas.", "warning")
-                        continue
+                        if not updated_values:
+                            log_message(f"Aviso: Tabela '{table_name}' ignorada pois não possui colunas alteradas.", "warning")
+                            continue
 
-                    query = build_update_query(
-                        table_name=table_name,
-                        db_type=db_type,
-                        updated_values=updated_values,
-                        primary_key=primary_key,
-                        primary_value=primary_value
-                    )
-                    if query is None:
-                        continue
+                        query = build_update_query(
+                            table_name=table_name,
+                            db_type=db_type,
+                            updated_values=updated_values,
+                            primary_key=primary_key,
+                            primary_value=primary_value
+                        )
+                        if query is None:
+                            continue
 
-                    query_string += f"-- UPDATE em {table_name}\n{str(query)}\n"
-                    rs = conn.execute(query)
-                    linhas = rs.rowcount if rs.rowcount is not None and rs.rowcount >= 0 else 1
-                    resposta_query += f"{table_name}: {linhas} linha(s) atualizada(s).\n"
+                        query_string += f"-- UPDATE em {table_name}\n{str(query)}\n"
+                        rs = conn.execute(query)
+                        linhas = rs.rowcount if rs.rowcount is not None and rs.rowcount >= 0 else 1
+                        resposta_query += f"{table_name}: {linhas} linha(s) {'seriam atualizada(s)' if is_dry_run else 'atualizada(s)'}.\n"
 
-            sucesso = True
-        log_message(f"✅ Atualização concluída:\n{resposta_query}", "success")
+                    if is_dry_run:
+                        trans.rollback()
+                        log_message(f"🧪 [DRY-RUN] Rollback executado com sucesso (simulação). Nenhuma alteração persistida.", "info")
+                    else:
+                        trans.commit()
+                    sucesso = True
+                except Exception:
+                    try:
+                        trans.rollback()
+                    except Exception:
+                        pass
+                    raise
+
+        if is_dry_run:
+            log_message(f"🧪 [DRY-RUN] Simulação de atualização concluída com sucesso:\n{resposta_query}", "info")
+        else:
+            log_message(f"✅ Atualização concluída:\n{resposta_query}", "success")
 
     except SQLAlchemyError as sa_err:
         error_msg = _lidar_com_erro_sql(sa_err)
-        log_message(f"❌ Erro de Banco de Dados ao atualizar registro: {error_msg}", "error")
+        log_message(f"❌ Erro de Banco de Dados ao {'simular' if is_dry_run else 'atualizar'} registro: {error_msg}", "error")
     except Exception as e:
         error_msg = str(e)
-        log_message(f"❌ Erro inesperado ao atualizar registro: {error_msg}", "error")
+        log_message(f"❌ Erro inesperado ao {'simular' if is_dry_run else 'atualizar'} registro: {error_msg}", "error")
 
     # ==========================================
     # 🧾 SALVAMENTO DO HISTÓRICO (Roda sempre)
     # ==========================================
     duration_ms = int((time.time() - start_time) * 1000)
 
+    tags_hist = ("dry_run_update" if sucesso else "dry_run_error") if is_dry_run else ("update" if sucesso else "update_error")
     historico = QueryHistoryCreate(
         user_id=user_id,
         db_connection_id=connection_id, # type: ignore
-        query=query_string.strip() or "UPDATE não gerou query.",
+        query=query_string.strip() or ("UPDATE simulado (dry-run)" if is_dry_run else "UPDATE não gerou query."),
         query_type=QueryType.UPDATE,
         executed_at=datetime.now(timezone.utc),
         duration_ms=duration_ms,
         result_preview=resposta_query.strip() if sucesso else "Sem resultado devido a falha.",
         error_message=error_msg, # Fica None se sucesso for True
         is_favorite=False,
-        tags="update" if sucesso else "update_error",
+        tags=tags_hist,
         app_source=app_source,
         client_ip=client_ip,
         executed_by=executed_by,
         modified_by=modified_by or executed_by,
         meta_info={
             "db_type": db_type,
+            "dry_run": is_dry_run,
             "tables_attempted": list(data.updatedRow.keys()),
             "primary_keys": data.tables_primary_keys_values,
             "status": "success" if sucesso else "failed",
@@ -176,8 +203,22 @@ def update_row_service(
     # ==========================================
     # 🚀 RETORNO / EXCEÇÃO
     # ==========================================
+    if is_dry_run:
+        return {
+            "status": "dry_run",
+            "dry_run": True,
+            "valid": sucesso,
+            "success": sucesso,
+            "error": error_msg if not sucesso else None,
+            "updated": data.updatedRow,
+            "query": query_string.strip(),
+            "response": (
+                resposta_query.strip() or "[DRY-RUN] Simulação concluída com sucesso. Nenhuma alteração foi persistida."
+            ) if sucesso else f"Simulação falhou: {error_msg}"
+        }
+
     if not sucesso:
-        # Repassa o erro formatado para o FastAPI devolver um 400/500 amigável pro frontend
+        # Repassa o erro formatado para o FastAPI devolver um 400 amigável pro frontend
         raise ValueError(error_msg)
 
     return {
@@ -198,11 +239,14 @@ def update_all_by_query_service(
     app_source: str = "API",
     executed_by: str = "sistema",
     modified_by: Optional[str] = None,
+    dry_run: Optional[bool] = None,
 ) -> dict:
     """
     Atualiza todos os registros correspondentes a uma query (baseTable + where).
     Suporta bancos relacionais (via SQL) e NoSQL (MongoDB).
+    Suporta dry_run com rollback automático para validação prévia.
     """
+    is_dry_run = dry_run if dry_run is not None else bool(getattr(data, "dry_run", False))
     resposta_query = ""
     query_string = ""
     start_time = time.time()
@@ -232,9 +276,14 @@ def update_all_by_query_service(
                     for col, field in raw_values.items()
                 }
                 if set_dict:
-                    res = collection.update_many(mongo_filter, {"$set": set_dict})
-                    total_afetados += res.modified_count
-                    resposta_query += f"{collection_name}: {res.modified_count} documento(s) atualizado(s).\n"
+                    if is_dry_run:
+                        count = collection.count_documents(mongo_filter)
+                        total_afetados += count
+                        resposta_query += f"{collection_name}: {count} documento(s) validados para atualização (simulação).\n"
+                    else:
+                        res = collection.update_many(mongo_filter, {"$set": set_dict})
+                        total_afetados += res.modified_count
+                        resposta_query += f"{collection_name}: {res.modified_count} documento(s) atualizado(s).\n"
             sucesso = True
         else:
             # 2. Bancos Relacionais (PostgreSQL, MySQL, SQLite, Oracle, SQL Server, etc.)
@@ -245,39 +294,56 @@ def update_all_by_query_service(
             else:
                 where_clause = ""
 
-            with engine.begin() as conn:
-                for table_name, raw_values in data.updatedRow.items():
-                    set_clauses = []
-                    table_params = {}
-                    for idx, (col, field) in enumerate(raw_values.items()):
-                        val = field["value"] if isinstance(field, dict) else getattr(field, "value", None)
-                        col_type = (
-                            field.get("type_column", "text")
-                            if isinstance(field, dict)
-                            else getattr(field, "type_column", "text")
-                        )
-                        clean_col = col.split(".")[-1]
-                        quoted_col = quote_identifier(db_type, clean_col)
-                        param_name = f"bulk_val_{idx}"
-                        set_clauses.append(f"{quoted_col} = :{param_name}")
-                        table_params[param_name] = _convert_column_type_for_string_one_V1(val, col_type)
+            with engine.connect() as conn:
+                trans = conn.begin()
+                try:
+                    for table_name, raw_values in data.updatedRow.items():
+                        set_clauses = []
+                        table_params = {}
+                        for idx, (col, field) in enumerate(raw_values.items()):
+                            val = field["value"] if isinstance(field, dict) else getattr(field, "value", None)
+                            col_type = (
+                                field.get("type_column", "text")
+                                if isinstance(field, dict)
+                                else getattr(field, "type_column", "text")
+                            )
+                            clean_col = col.split(".")[-1]
+                            quoted_col = quote_identifier(db_type, clean_col)
+                            param_name = f"bulk_val_{idx}"
+                            set_clauses.append(f"{quoted_col} = :{param_name}")
+                            table_params[param_name] = _convert_column_type_for_string_one_V1(val, col_type)
 
-                    if not set_clauses:
-                        continue
+                        if not set_clauses:
+                            continue
 
-                    full_params = {**(where_params or {}), **table_params}
-                    target_table = table_name or data.query.baseTable
-                    quoted_table = quote_identifier(db_type, target_table)
-                    sql = f"UPDATE {quoted_table} SET {', '.join(set_clauses)} {where_clause}".strip()
-                    query_string += f"-- UPDATE em {target_table}\n{sql}\n"
+                        full_params = {**(where_params or {}), **table_params}
+                        target_table = table_name or data.query.baseTable
+                        quoted_table = quote_identifier(db_type, target_table)
+                        sql = f"UPDATE {quoted_table} SET {', '.join(set_clauses)} {where_clause}".strip()
+                        query_string += f"-- UPDATE em {target_table}\n{sql}\n"
 
-                    rs = conn.execute(text(sql), full_params)
-                    linhas = rs.rowcount if rs.rowcount is not None and rs.rowcount >= 0 else 0
-                    total_afetados += linhas
-                    resposta_query += f"{target_table}: {linhas} linha(s) atualizada(s).\n"
+                        rs = conn.execute(text(sql), full_params)
+                        linhas = rs.rowcount if rs.rowcount is not None and rs.rowcount >= 0 else 0
+                        total_afetados += linhas
+                        resposta_query += f"{target_table}: {linhas} linha(s) {'seriam atualizada(s)' if is_dry_run else 'atualizada(s)'}.\n"
 
-            sucesso = True
-            log_message(f"✅ Atualização em massa concluída: {total_afetados} linha(s) afetada(s)", "success")
+                    if is_dry_run:
+                        trans.rollback()
+                        log_message(f"🧪 [DRY-RUN] Rollback executado no update em massa. Linhas simuladas: {total_afetados}", "info")
+                    else:
+                        trans.commit()
+                    sucesso = True
+                except Exception:
+                    try:
+                        trans.rollback()
+                    except Exception:
+                        pass
+                    raise
+
+            if is_dry_run:
+                log_message(f"🧪 [DRY-RUN] Simulação de atualização em massa concluída: {total_afetados} linha(s) afetada(s)", "info")
+            else:
+                log_message(f"✅ Atualização em massa concluída: {total_afetados} linha(s) afetada(s)", "success")
 
     except SQLAlchemyError as sa_err:
         error_msg = _lidar_com_erro_sql(sa_err)
@@ -291,14 +357,14 @@ def update_all_by_query_service(
     historico = QueryHistoryCreate(
         user_id=user_id,
         db_connection_id=connection_id,
-        query=query_string.strip() or f"UPDATE ALL {data.query.baseTable}",
+        query=query_string.strip() or f"UPDATE ALL {data.query.baseTable} ({'dry-run' if is_dry_run else 'real'})",
         query_type=QueryType.UPDATE,
         executed_at=datetime.now(timezone.utc),
         duration_ms=duration_ms,
         result_preview=resposta_query.strip() if sucesso else "Sem resultado devido a falha.",
         error_message=error_msg,
         is_favorite=False,
-        tags="update_all" if sucesso else "update_all_error",
+        tags=("dry_run_update_all" if sucesso else "dry_run_error") if is_dry_run else ("update_all" if sucesso else "update_all_error"),
         app_source=app_source,
         client_ip=client_ip,
         executed_by=executed_by,
@@ -306,6 +372,7 @@ def update_all_by_query_service(
         meta_info={
             "db_type": db_type,
             "bulk_edit": True,
+            "dry_run": is_dry_run,
             "base_table": data.query.baseTable,
             "affected_rows": total_afetados,
             "status": "success" if sucesso else "failed",
@@ -314,6 +381,21 @@ def update_all_by_query_service(
     )
 
     create_query_history(db=db, user_id=user_id, data=historico)
+
+    if is_dry_run:
+        return {
+            "status": "dry_run",
+            "dry_run": True,
+            "valid": sucesso,
+            "success": sucesso,
+            "affected_rows": total_afetados,
+            "error": error_msg if not sucesso else None,
+            "updated": data.updatedRow,
+            "query": query_string.strip(),
+            "response": (
+                resposta_query.strip() or f"[DRY-RUN] Simulação concluída com sucesso. {total_afetados} linha(s) seriam atualizadas."
+            ) if sucesso else f"Simulação falhou: {error_msg}"
+        }
 
     if not sucesso:
         raise ValueError(error_msg)
@@ -337,12 +419,15 @@ def update_selected_service(
     app_source: str = "API",
     executed_by: str = "sistema",
     modified_by: Optional[str] = None,
+    dry_run: Optional[bool] = None,
 ) -> dict:
     """
     Atualiza múltiplos registros selecionados específicos (identificados pelas suas chaves primárias).
     Garante transação ACID: se qualquer registro falhar, tudo é revertido.
     Suporta bancos relacionais (PostgreSQL, MySQL, SQLite, Oracle, SQL Server, etc.) e NoSQL (MongoDB).
+    Suporta dry_run com rollback automático para validação prévia.
     """
+    is_dry_run = dry_run if dry_run is not None else bool(getattr(data, "dry_run", False))
     resposta_query = ""
     query_string = ""
     start_time = time.time()
@@ -395,75 +480,98 @@ def update_selected_service(
                     }
 
                     if set_dict:
-                        res = collection.update_one(filtro, {"$set": set_dict})
-                        total_afetados += res.modified_count
-                        resposta_query += f"{collection_name} ({primary_value}): {res.modified_count} doc.\n"
+                        if is_dry_run:
+                            count = collection.count_documents(filtro)
+                            total_afetados += count
+                            resposta_query += f"{collection_name} ({primary_value}): {count} doc validado(s).\n"
+                        else:
+                            res = collection.update_one(filtro, {"$set": set_dict})
+                            total_afetados += res.modified_count
+                            resposta_query += f"{collection_name} ({primary_value}): {res.modified_count} doc.\n"
 
             sucesso = True
         else:
-            with engine.begin() as conn:
-                for row_dict in data.rows_primary_keys:
-                    for table_name, pk_data in row_dict.items():
-                        primary_key = pk_data.get("primaryKey")
-                        primary_value = pk_data.get("valor")
+            with engine.connect() as conn:
+                trans = conn.begin()
+                try:
+                    for row_dict in data.rows_primary_keys:
+                        for table_name, pk_data in row_dict.items():
+                            primary_key = pk_data.get("primaryKey")
+                            primary_value = pk_data.get("valor")
 
-                        if not primary_key or primary_value is None:
-                            continue
+                            if not primary_key or primary_value is None:
+                                continue
 
-                        raw_values = data.updatedRow.get(table_name, {})
-                        if not raw_values:
-                            continue
+                            raw_values = data.updatedRow.get(table_name, {})
+                            if not raw_values:
+                                continue
 
-                        updated_values = {
-                            col.split(".")[-1]: {
-                                "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
-                                "type_column": field.get("type_column", "text") if isinstance(field, dict) else getattr(field, "type_column", "text")
+                            updated_values = {
+                                col.split(".")[-1]: {
+                                    "value": field["value"] if isinstance(field, dict) else getattr(field, "value", None),
+                                    "type_column": field.get("type_column", "text") if isinstance(field, dict) else getattr(field, "type_column", "text")
+                                }
+                                for col, field in raw_values.items()
                             }
-                            for col, field in raw_values.items()
-                        }
 
-                        if not updated_values:
-                            continue
+                            if not updated_values:
+                                continue
 
-                        query = build_update_query(
-                            table_name=table_name,
-                            db_type=db_type,
-                            updated_values=updated_values,
-                            primary_key=primary_key,
-                            primary_value=primary_value
-                        )
-                        if query is None:
-                            continue
+                            query = build_update_query(
+                                table_name=table_name,
+                                db_type=db_type,
+                                updated_values=updated_values,
+                                primary_key=primary_key,
+                                primary_value=primary_value
+                            )
+                            if query is None:
+                                continue
 
-                        query_string += f"-- UPDATE em {table_name} (PK={primary_value})\n{str(query)}\n"
-                        rs = conn.execute(query)
-                        linhas = rs.rowcount if rs.rowcount is not None and rs.rowcount >= 0 else 1
-                        total_afetados += linhas
-                        resposta_query += f"{table_name} (PK={primary_value}): {linhas} linha(s).\n"
+                            query_string += f"-- UPDATE em {table_name} (PK={primary_value})\n{str(query)}\n"
+                            rs = conn.execute(query)
+                            linhas = rs.rowcount if rs.rowcount is not None and rs.rowcount >= 0 else 1
+                            total_afetados += linhas
+                            resposta_query += f"{table_name} (PK={primary_value}): {linhas} linha(s) {'seriam atualizada(s)' if is_dry_run else 'atualizada(s)'}.\n"
 
-            sucesso = True
-        log_message(f"✅ Atualização de registros selecionados concluída: {total_afetados} linha(s) afetada(s)", "success")
+                    if is_dry_run:
+                        trans.rollback()
+                        log_message(f"🧪 [DRY-RUN] Rollback executado no update selecionado. Total testado: {total_afetados}", "info")
+                    else:
+                        trans.commit()
+                    sucesso = True
+                except Exception:
+                    try:
+                        trans.rollback()
+                    except Exception:
+                        pass
+                    raise
+
+            if is_dry_run:
+                log_message(f"🧪 [DRY-RUN] Simulação de atualização de registros selecionados concluída: {total_afetados} linha(s) afetada(s)", "info")
+            else:
+                log_message(f"✅ Atualização de registros selecionados concluída: {total_afetados} linha(s) afetada(s)", "success")
 
     except SQLAlchemyError as sa_err:
         error_msg = _lidar_com_erro_sql(sa_err)
-        log_message(f"❌ Erro SQL ao atualizar registros selecionados: {error_msg}", "error")
+        log_message(f"❌ Erro SQL ao {'simular' if is_dry_run else 'atualizar'} registros selecionados: {error_msg}", "error")
     except Exception as e:
         error_msg = str(e)
-        log_message(f"❌ Erro inesperado ao atualizar registros selecionados: {error_msg}", "error")
+        log_message(f"❌ Erro inesperado ao {'simular' if is_dry_run else 'atualizar'} registros selecionados: {error_msg}", "error")
 
     duration_ms = int((time.time() - start_time) * 1000)
 
+    tags_hist = ("dry_run_update_selected" if sucesso else "dry_run_error") if is_dry_run else ("update_selected" if sucesso else "update_selected_error")
     historico = QueryHistoryCreate(
         user_id=user_id,
         db_connection_id=connection_id,
-        query=query_string.strip() or f"UPDATE SELECTED ({len(data.rows_primary_keys)} rows)",
+        query=query_string.strip() or f"UPDATE SELECTED ({len(data.rows_primary_keys)} rows) ({'dry-run' if is_dry_run else 'real'})",
         query_type=QueryType.UPDATE,
         executed_at=datetime.now(timezone.utc),
         duration_ms=duration_ms,
         result_preview=resposta_query.strip() if sucesso else "Sem resultado devido a falha.",
         error_message=error_msg,
         is_favorite=False,
-        tags="update_selected" if sucesso else "update_selected_error",
+        tags=tags_hist,
         app_source=app_source,
         client_ip=client_ip,
         executed_by=executed_by,
@@ -471,6 +579,7 @@ def update_selected_service(
         meta_info={
             "db_type": db_type,
             "selected_edit": True,
+            "dry_run": is_dry_run,
             "total_selected": len(data.rows_primary_keys),
             "affected_rows": total_afetados,
             "status": "success" if sucesso else "failed",
@@ -480,6 +589,21 @@ def update_selected_service(
 
     create_query_history(db=db, user_id=user_id, data=historico)
 
+    if is_dry_run:
+        return {
+            "status": "dry_run",
+            "dry_run": True,
+            "valid": sucesso,
+            "success": sucesso,
+            "affected_rows": total_afetados,
+            "error": error_msg if not sucesso else None,
+            "updated": data.updatedRow,
+            "query": query_string.strip(),
+            "response": (
+                resposta_query.strip() or f"[DRY-RUN] Simulação concluída com sucesso. {total_afetados} linha(s) seriam afetadas."
+            ) if sucesso else f"Simulação falhou: {error_msg}"
+        }
+
     if not sucesso:
         raise ValueError(error_msg)
 
@@ -488,4 +612,4 @@ def update_selected_service(
         "affected_rows": total_afetados,
         "updated": data.updatedRow,
         "response": resposta_query.strip() or f"{total_afetados} linha(s) atualizada(s).",
-    }
+    }

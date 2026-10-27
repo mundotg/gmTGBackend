@@ -3,6 +3,7 @@ from __future__ import annotations
 import traceback
 from typing import Dict, List, Optional, Any, cast
 
+from fastapi import HTTPException
 from pymongo import MongoClient
 from sqlalchemy import Engine, inspect, text
 from sqlalchemy.orm import Session
@@ -876,6 +877,13 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
         result["db_connection_id"] = connection.id
         return result
 
+    except HTTPException as he:
+        # Situação de fluxo esperada (ex: utilizador sem conexão ativa ou sem permissão)
+        log_message(
+            f"ℹ️ Sincronização de estatísticas ignorada: {he.detail} | user_id={id_user}",
+            "info",
+        )
+        return None
     except Exception as e:
         connection_id = getattr(connection, "id", "?")
         log_message(
@@ -886,3 +894,4 @@ def sync_connection_statistics(id_user: int, db: Session) -> dict | None:
             "error",
         )
         return None
+

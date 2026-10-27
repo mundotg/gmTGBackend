@@ -6,10 +6,10 @@ from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-# from app.config.cache_manager import cache_result
 from app.config.cache_manager import cache_result
 from app.cruds.dbstructure_crud import (
     create_db_field,
+    create_db_fields_bulk,
     create_db_structure,
     delete_structure_by_name,
     get_db_structures_by_conn_id_and_table,
@@ -273,7 +273,7 @@ def sincronizar_metadados_da_tabela_simple(
 
 def montar_resposta_sincronizacao(
     db_connection_id: int,
-    schema_name: str,
+    schema_name: Optional[str],
     table_name: str,
     resposta_colunas: List[CampoDetalhado],
     total_adicionado: int,
@@ -416,7 +416,7 @@ def _criar_campos_mongo(
         )
         return []
 
-    campos: List[DBField] = []
+    campos_in: List[DBFieldCreate] = []
 
     for descritor in descritores:
         field_in = DBFieldCreate(
@@ -440,8 +440,16 @@ def _criar_campos_mongo(
             precision=None,
             scale=None,
         )
+        campos_in.append(field_in)
 
-        campos.append(create_db_field(db=db, field_in=field_in, structure_id=structure.id))
+    campos = []
+    for field_in in campos_in:
+        campo = create_db_field(
+            db=db,
+            field_in=field_in,
+            structure_id=structure.id,
+        )
+        campos.append(campo)
 
     log_message(
         f"✅ {len(campos)} campos inferidos da coleção '{structure.table_name}'.",
@@ -526,6 +534,8 @@ def buscar_ou_criar_campos_tabela(
             }
             relations_map[col_origem] = relation
 
+    fields_to_create: List[DBFieldCreate] = []
+
     # Processa cada coluna
     for column in columns:
         col_name = column["name"]
@@ -561,9 +571,8 @@ def buscar_ou_criar_campos_tabela(
             precision=precision,
             scale=scale,
         )
+        fields_to_create.append(field_in)
 
-        field_create = create_db_field(
-            db=db, field_in=field_in, structure_id=structure.id
-        )
-        campos_resultantes.append(field_create)
-    return campos_resultantes
+    return create_db_fields_bulk(
+        db=db, fields_in=fields_to_create, structure_id=structure.id
+    )

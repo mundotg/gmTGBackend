@@ -149,7 +149,7 @@ async def update_row_endpoint(
                 db, user_id, ConnectionAccessLevel.write
             )
 
-            log_message(f"Atualizando linha para usuário {user_id}", "info")
+            log_message(f"{'Simulando (dry-run)' if data.dry_run else 'Atualizando'} linha para usuário {user_id}", "info")
             result = update_row_service(
                 data,
                 engine,
@@ -159,11 +159,17 @@ async def update_row_endpoint(
                 db,  # pyright: ignore[reportArgumentType]
             )
 
-            log_message("Linha atualizada com sucesso", "success")
+            log_message(
+                "Simulação de linha concluída com sucesso" if data.dry_run else "Linha atualizada com sucesso",
+                "success",
+            )
             return result
 
         except HTTPException:
             raise
+        except ValueError as ve:
+            log_message(f"Aviso de validação ao atualizar linha: {str(ve)}", "warning")
+            raise HTTPException(status_code=400, detail=str(ve))
         except Exception as e:
             error_msg = f"Erro ao atualizar linha: {str(e)}"
             log_message(f"{error_msg}\n{traceback.format_exc()}", "error")
@@ -186,7 +192,7 @@ async def update_all_endpoint(
                 db, user_id, ConnectionAccessLevel.write
             )
 
-            log_message(f"Atualizando todos os registros da query para usuário {user_id}", "info")
+            log_message(f"{'Simulando (dry-run)' if data.dry_run else 'Atualizando'} todos os registros da query para usuário {user_id}", "info")
             result = update_all_by_query_service(
                 data,
                 engine,
@@ -196,11 +202,17 @@ async def update_all_endpoint(
                 db,
             )
 
-            log_message("Registros em massa atualizados com sucesso", "success")
+            log_message(
+                "Simulação em massa concluída com sucesso" if data.dry_run else "Registros em massa atualizados com sucesso",
+                "success",
+            )
             return result
 
         except HTTPException:
             raise
+        except ValueError as ve:
+            log_message(f"Aviso de validação ao atualizar registros em massa: {str(ve)}", "warning")
+            raise HTTPException(status_code=400, detail=str(ve))
         except Exception as e:
             error_msg = f"Erro ao atualizar registros em massa: {str(e)}"
             log_message(f"{error_msg}\n{traceback.format_exc()}", "error")
@@ -223,7 +235,7 @@ async def update_selected_endpoint(
                 db, user_id, ConnectionAccessLevel.write
             )
 
-            log_message(f"Atualizando {len(data.rows_primary_keys)} registros selecionados para usuário {user_id}", "info")
+            log_message(f"{'Simulando (dry-run)' if data.dry_run else 'Atualizando'} {len(data.rows_primary_keys)} registros selecionados para usuário {user_id}", "info")
             result = update_selected_service(
                 data,
                 engine,
@@ -233,11 +245,17 @@ async def update_selected_endpoint(
                 db,
             )
 
-            log_message("Registros selecionados atualizados com sucesso", "success")
+            log_message(
+                "Simulação de registros selecionados concluída com sucesso" if data.dry_run else "Registros selecionados atualizados com sucesso",
+                "success",
+            )
             return result
 
         except HTTPException:
             raise
+        except ValueError as ve:
+            log_message(f"Aviso de validação ao atualizar registros selecionados: {str(ve)}", "warning")
+            raise HTTPException(status_code=400, detail=str(ve))
         except Exception as e:
             error_msg = f"Erro ao atualizar registros selecionados: {str(e)}"
             log_message(f"{error_msg}\n{traceback.format_exc()}", "error")

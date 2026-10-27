@@ -667,10 +667,11 @@ def get_connection_logs_pagination(
 
     page, limit, offset = _safe_page_limit(page, limit, max_limit=200)
 
-    # Join existe por permissão (filtra logs por conexões do user)
+    # Outer join permite incluir logs do utilizador onde connection_id é NULL
+    # (ex: erros na criação de conexão, falhas no upload de dataset, etc.)
     query = (
         db.query(ConnectionLog)
-        .join(DBConnection, DBConnection.id == ConnectionLog.connection_id)
+        .outerjoin(DBConnection, DBConnection.id == ConnectionLog.connection_id)
         .options(
             load_only(
                 ConnectionLog.id,
@@ -686,7 +687,12 @@ def get_connection_logs_pagination(
                 else ()
             ),
         )
-        .filter(DBConnection.user_id == user_id)
+        .filter(
+            or_(
+                ConnectionLog.user_id == user_id,
+                DBConnection.user_id == user_id,
+            )
+        )
     )
 
     if connection_id is not None:
@@ -725,6 +731,13 @@ def create_connection_log(
         db.add(log_entry)
         db.commit()
         db.refresh(log_entry)
+
+        try:
+            from app.config.cache_manager import clear_cache, CACHE_PREFIX
+            clear_cache(f"{CACHE_PREFIX}get_connection_logs_pagination_cached:*")
+            clear_cache(f"{CACHE_PREFIX}get_connection_logs_cached:*")
+        except Exception:
+            pass
 
         log_message(
             f"📑 Log criado → conexão={connection_id or 'N/A'}, ação='{action}', status='{status}', usuário={user_id or 'anon'}",

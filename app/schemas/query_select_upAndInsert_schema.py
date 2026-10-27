@@ -72,6 +72,11 @@ class ChangedField(BaseModel):
 class UpdateRequest(BaseModel):
     updatedRow: Dict[str, Dict[str, ChangedField]]
     tables_primary_keys_values: Dict[str, Dict[str, str]]
+    dry_run: Optional[bool] = Field(
+        False,
+        title="Dry Run",
+        description="Se True, simula a execução sem persistir alterações no banco de dados."
+    )
 
 
 class InsertRequest(BaseModel):
@@ -179,8 +184,18 @@ class ParametrosRelatorioSchema(BaseModel):
 class UpdateAllRequest(BaseModel):
     updatedRow: Dict[str, Dict[str, ChangedField]]
     query: QueryPayload
+    dry_run: Optional[bool] = Field(
+        False,
+        title="Dry Run",
+        description="Se True, simula a execução sem persistir alterações no banco de dados."
+    )
 
 
 class UpdateSelectedRequest(BaseModel):
     updatedRow: Dict[str, Dict[str, ChangedField]]
     rows_primary_keys: List[Dict[str, Dict[str, Any]]]
+    dry_run: Optional[bool] = Field(
+        False,
+        title="Dry Run",
+        description="Se True, simula a execução sem persistir alterações no banco de dados."
+    )

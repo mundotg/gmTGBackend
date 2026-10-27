@@ -148,6 +148,14 @@
         "to": 6,
         "intent": "Aproximação com pressão sobre a Casa Central"
       }
+    ],
+    "011010222": [
+      {
+        "player": 2,
+        "from": 7,
+        "to": 4,
+        "intent": "Aproximação com pressão sobre a Casa Central"
+      }
     ]
   }
 }

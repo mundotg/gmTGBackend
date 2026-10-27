@@ -82,6 +82,72 @@ def _build_mongo_filter(custom_query: Optional[str] = None) -> dict:
     return {}
 
 
+async def _execute_sql_batch(
+    tgt_conn: Any,
+    insert_query: Any,
+    batch_params: List[dict],
+    destino: str,
+    current_total: int,
+    is_final: bool = False,
+) -> tuple[int, List[str]]:
+    """
+    Executa a inserção do lote via executemany.
+    Em caso de falha (ex: violação de constraint de chave única ou conflito em registros específicos),
+    faz fallback linha a linha para garantir que todos os outros registros válidos
+    sejam inseridos e salvos no banco em vez de perder o lote inteiro.
+    """
+    if not batch_params:
+        return current_total, []
+
+    tag = "final" if is_final else "intermediário"
+    messages: List[str] = []
+
+    try:
+        await tgt_conn.execute(insert_query, batch_params)
+        await tgt_conn.commit()
+        new_total = current_total + len(batch_params)
+        msg = f"📦 {new_total} registros inseridos em {destino}"
+        print(msg)
+        messages.append(msg)
+        return new_total, messages
+    except Exception as batch_err:
+        await tgt_conn.rollback()
+
+        # Se o lote tiver apenas 1 registro, não há como dividir em linhas individuais
+        if len(batch_params) <= 1:
+            err = f"⚠️ Falha lote {tag} ({destino}): {batch_err}"
+            print(err)
+            messages.append(err)
+            return current_total, messages
+
+        # Fallback resiliente linha a linha
+        inserted_fallback = 0
+        failed_count = 0
+        last_row_err = None
+
+        for row_param in batch_params:
+            try:
+                await tgt_conn.execute(insert_query, [row_param])
+                await tgt_conn.commit()
+                inserted_fallback += 1
+            except Exception as row_err:
+                await tgt_conn.rollback()
+                failed_count += 1
+                last_row_err = row_err
+
+        new_total = current_total + inserted_fallback
+        if inserted_fallback > 0:
+            msg = f"📦 {new_total} registros inseridos em {destino} ({failed_count} ignorados por conflito/erro)"
+            print(msg)
+            messages.append(msg)
+        if failed_count > 0:
+            err = f"⚠️ {failed_count} registros não inseridos no lote {tag} ({destino}): {last_row_err}"
+            print(err)
+            messages.append(err)
+
+        return new_total, messages
+
+
 async def transfer_data(
     id_user: int,
     db: AsyncSession,
@@ -287,34 +353,21 @@ async def transfer_data(
                         batch_params.append(serialize_sql_params(params, sql_types_dst))
 
                         if len(batch_params) >= batch_size:
-                            try:
-                                await tgt_conn.execute(insert_query, batch_params)
-                                await tgt_conn.commit()
-                                total += len(batch_params)
-                                msg = f"📦 {total} registros inseridos em {destino}"
-                                print(msg)
-                                yield msg
-                            except Exception as batch_err:
-                                await tgt_conn.rollback()
-                                err = f"⚠️ Falha no lote ({destino}): {batch_err}"
-                                print(err)
-                                yield err
-                            finally:
-                                batch_params.clear()
+                            total, msgs = await _execute_sql_batch(
+                                tgt_conn, insert_query, batch_params, destino, total, is_final=False
+                            )
+                            for m in msgs:
+                                yield m
+                            batch_params.clear()
                             await asyncio.sleep(0)
 
                     if batch_params:
-                        try:
-                            await tgt_conn.execute(insert_query, batch_params)
-                            await tgt_conn.commit()
-                            total += len(batch_params)
-                        except Exception as batch_err:
-                            await tgt_conn.rollback()
-                            err = f"⚠️ Falha lote final ({destino}): {batch_err}"
-                            print(err)
-                            yield err
-                        finally:
-                            batch_params.clear()
+                        total, msgs = await _execute_sql_batch(
+                            tgt_conn, insert_query, batch_params, destino, total, is_final=True
+                        )
+                        for m in msgs:
+                            yield m
+                        batch_params.clear()
 
                     msg = f"✅ Concluído {origem} → {destino}: {total} registros."
                     print(msg)
@@ -440,34 +493,21 @@ async def transfer_data(
                         batch_params.append(serialize_sql_params(params, sql_types_dst))
 
                         if len(batch_params) >= batch_size:
-                            try:
-                                await tgt_conn.execute(insert_query, batch_params)
-                                await tgt_conn.commit()
-                                total += len(batch_params)
-                                msg = f"📦 {total} registros inseridos em {destino}"
-                                print(msg)
-                                yield msg
-                            except Exception as batch_err:
-                                await tgt_conn.rollback()
-                                err = f"⚠️ Falha no lote ({destino}): {batch_err}"
-                                print(err)
-                                yield err
-                            finally:
-                                batch_params.clear()
+                            total, msgs = await _execute_sql_batch(
+                                tgt_conn, insert_query, batch_params, destino, total, is_final=False
+                            )
+                            for m in msgs:
+                                yield m
+                            batch_params.clear()
                             await asyncio.sleep(0)
 
                     if batch_params:
-                        try:
-                            await tgt_conn.execute(insert_query, batch_params)
-                            await tgt_conn.commit()
-                            total += len(batch_params)
-                        except Exception as batch_err:
-                            await tgt_conn.rollback()
-                            err = f"⚠️ Falha lote final ({destino}): {batch_err}"
-                            print(err)
-                            yield err
-                        finally:
-                            batch_params.clear()
+                        total, msgs = await _execute_sql_batch(
+                            tgt_conn, insert_query, batch_params, destino, total, is_final=True
+                        )
+                        for m in msgs:
+                            yield m
+                        batch_params.clear()
 
                     msg = f"✅ Concluído {origem} → {destino}: {total} registros."
                     print(msg)

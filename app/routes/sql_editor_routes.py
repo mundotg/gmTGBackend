@@ -1350,7 +1350,6 @@ async def list_history(user_id: int = Depends(get_current_user_id)):
     return _ok(read_cache(_k_hist(user_id)) or [])
 
 @router.get("/metrics")
-
 async def metrics(user_id: int = Depends(get_current_user_id)):
 
     m = read_cache(_k_metrics(user_id)) or {"queriesExecuted": 0, "activeQueries": 0, "savedQueries": 0}

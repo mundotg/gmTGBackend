@@ -79,6 +79,8 @@ from app.schemas.connetion_schema import (
 )
 from app.services.crypto_utils import secret_encrypt, to_wire
 from app.services.dataset_service import (
+    download_kaggle_dataset,
+    list_kaggle_dataset_files,
     read_dataframe,
     read_dataset_source,
     save_dataframe_to_sqlite,
@@ -836,6 +838,7 @@ async def listar_elementos_connections(
 async def open_dataset(
     file: Optional[UploadFile] = File(None, description="Arquivo para upload"),
     url: Optional[str] = Form(None, description="URL pública do dataset"),
+    max_rows: Optional[int] = Form(None, description="Limite de linhas para amostragem"),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -848,11 +851,13 @@ async def open_dataset(
     filename = "dataset"
 
     try:
-        # 1. Lê os bytes do ficheiro/url
-        contents, filename, source_type = await read_dataset_source(file=file, url=url)
+        # 1. Lê os dados do ficheiro/url de forma segura para memória
+        source_data, filename, source_type = await read_dataset_source(
+            file=file, url=url, max_rows=max_rows
+        )
 
-        # 2. Transforma num dicionário de DataFrames (suporta múltiplas abas/tabelas)
-        dict_dfs = read_dataframe(contents, filename)
+        # 2. Transforma num dicionário de DataFrames (suporta múltiplas abas/tabelas) com suporte a max_rows
+        dict_dfs = read_dataframe(source_data, filename, max_rows=max_rows)
 
         # 3. Guarda tudo no SQLite e obtém o caminho e as tabelas criadas
         db_path, tabelas_criadas = save_dataframe_to_sqlite(
@@ -936,18 +941,17 @@ async def open_dataset(
             level="warning",
         )
 
-        if conn:
-            create_connection_log(
-                db,
-                connection_id=conn.id,
-                action="Falha ao importar dataset",
-                status="error",
-                details={
-                    "error": e.detail,
-                    "filename": filename,
-                },
-                user_id=user_id,
-            )
+        create_connection_log(
+            db,
+            connection_id=conn.id if conn else None,
+            action="Falha ao importar dataset",
+            status="error",
+            details={
+                "error": e.detail,
+                "filename": filename,
+            },
+            user_id=user_id,
+        )
 
         if db_path and os.path.exists(db_path):
             try:
@@ -964,18 +968,17 @@ async def open_dataset(
             level="error",
         )
 
-        if conn:
-            create_connection_log(
-                db,
-                connection_id=cast(int, conn.id),
-                action="Erro crítico no processamento do dataset",
-                status="error",
-                details={
-                    "error": str(e),
-                    "filename": filename,
-                },
-                user_id=user_id,
-            )
+        create_connection_log(
+            db,
+            connection_id=conn.id if conn else None,
+            action="Erro crítico no processamento do dataset",
+            status="error",
+            details={
+                "error": str(e),
+                "filename": filename,
+            },
+            user_id=user_id,
+        )
 
         if db_path and os.path.exists(db_path):
             try:
@@ -985,8 +988,172 @@ async def open_dataset(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno ao processar o dataset.",
+            detail=f"Erro interno ao processar o dataset: {str(e)}",
         )
+
+
+@router.get("/dataset/kaggle/files")
+async def get_kaggle_dataset_files_endpoint(
+    dataset_handle: str = Query(..., description="Handle ou URL do Kaggle"),
+    kaggle_username: Optional[str] = Query(None),
+    kaggle_key: Optional[str] = Query(None),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Lista arquivos disponíveis em um dataset do Kaggle.
+    """
+    files = list_kaggle_dataset_files(
+        dataset_handle=dataset_handle,
+        username=kaggle_username,
+        key=kaggle_key,
+    )
+    return {"success": True, "files": files}
+
+
+@router.post("/dataset/kaggle")
+async def open_kaggle_dataset(
+    dataset_handle: str = Form(..., description="Handle (owner/dataset) ou URL do Kaggle"),
+    file_path: Optional[str] = Form(None, description="Arquivo específico dentro do dataset"),
+    max_rows: Optional[int] = Form(50000, description="Limite máximo de linhas para amostragem"),
+    kaggle_username: Optional[str] = Form(None),
+    kaggle_key: Optional[str] = Form(None),
+    save_credentials: bool = Form(False),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Descarrega um dataset do Kaggle (ou arquivo específico dentro dele),
+    converte para base de dados SQLite e regista como conexão do utilizador.
+    """
+    conn = None
+    db_path: Optional[str] = None
+    filename = "kaggle_dataset"
+
+    try:
+        dict_dfs, filename = download_kaggle_dataset(
+            dataset_handle=dataset_handle,
+            file_path=file_path,
+            max_rows=max_rows,
+            username=kaggle_username,
+            key=kaggle_key,
+            save_to_env=save_credentials,
+        )
+
+        db_path, tabelas_criadas = save_dataframe_to_sqlite(
+            dict_dfs=dict_dfs,
+            user_id=user_id,
+            original_filename=filename,
+        )
+
+        main_table_name = tabelas_criadas[0] if tabelas_criadas else "main_table"
+
+        conn_data = DBConnectionBase(
+            name=f"Kaggle: {filename}",
+            type="SQLite",
+            host=secret_encrypt(db_path),
+            port=0,
+            username="",
+            password="",
+            database_name=main_table_name,
+            status="available",
+        )
+
+        conn = create_db_connection(db, user_id, conn_data)
+
+        total_rows_all_tables = sum(len(df) for df in dict_dfs.values())
+
+        tabelas_info = []
+        for tab_name in tabelas_criadas:
+            df = dict_dfs[tab_name]
+            tabelas_info.append(
+                {
+                    "table_name": tab_name,
+                    "rows": int(len(df)),
+                    "columns": int(len(df.columns)),
+                    "column_names": list(df.columns),
+                    "preview": df.head(3)
+                    .where(pd.notna(df.head(3)), None)
+                    .to_dict(orient="records"),
+                }
+            )
+
+        log_message(
+            f"📄 Dataset Kaggle '{filename}' importado pelo utilizador {user_id}. "
+            f"Tabelas: {len(tabelas_criadas)}. Linhas: {total_rows_all_tables}.",
+            level="info",
+        )
+
+        create_connection_log(
+            db,
+            connection_id=conn.id,
+            action="Dataset Kaggle importado e convertido para SQLite",
+            status="success",
+            details={
+                "source": "kaggle",
+                "handle": dataset_handle,
+                "file": file_path,
+                "max_rows": max_rows,
+                "host": db_path,
+                "tables_created": tabelas_criadas,
+                "total_rows_processed": total_rows_all_tables,
+            },
+            user_id=user_id,
+        )
+
+        return {
+            "success": True,
+            "source": "kaggle",
+            "filename": filename,
+            "connection_id": conn.id,
+            "tables": tabelas_info,
+            "total_tables_extracted": len(tabelas_criadas),
+            "message": f"Dataset do Kaggle '{filename}' carregado com sucesso. {len(tabelas_criadas)} tabela(s) criada(s).",
+        }
+
+    except HTTPException as e:
+        log_message(
+            f"⚠️ Falha ao abrir dataset Kaggle '{filename}' para utilizador {user_id}: {e.detail}",
+            level="warning",
+        )
+        create_connection_log(
+            db,
+            connection_id=conn.id if conn else None,
+            action="Falha ao importar dataset Kaggle",
+            status="error",
+            details={"error": e.detail, "filename": filename},
+            user_id=user_id,
+        )
+        if db_path and os.path.exists(db_path):
+            try:
+                os.remove(db_path)
+            except Exception:
+                pass
+        raise
+
+    except Exception as e:
+        log_message(
+            f"❌ Erro interno ao abrir dataset Kaggle '{filename}' para utilizador {user_id}: "
+            f"{str(e)}\n{traceback.format_exc()}",
+            level="error",
+        )
+        create_connection_log(
+            db,
+            connection_id=conn.id if conn else None,
+            action="Erro crítico no processamento do dataset Kaggle",
+            status="error",
+            details={"error": str(e), "filename": filename},
+            user_id=user_id,
+        )
+        if db_path and os.path.exists(db_path):
+            try:
+                os.remove(db_path)
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno ao processar o dataset do Kaggle: {str(e)}",
+        )
+
 
 
 # =========================================================

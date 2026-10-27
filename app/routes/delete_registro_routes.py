@@ -2,6 +2,7 @@
 Rotas de exclusão de registros.
 """
 
+from typing import Optional
 import traceback
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -29,6 +30,7 @@ def _sum_total_afetados(itens_afetados) -> int:
 @router.delete("/records", response_model=DeleteResponse)
 async def delete_multiple_records(
     delete_request: BatchDeleteRequest,
+    dry_run: Optional[bool] = None,
     db: Session = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
@@ -40,8 +42,10 @@ async def delete_multiple_records(
                 detail="A lista de registros para exclusão não pode estar vazia.",
             )
 
+        is_dry_run = dry_run if dry_run is not None else bool(getattr(delete_request, "dry_run", False))
+
         log_message(
-            f"Iniciando exclusão em lote de {len(registros)} registro(s) pelo usuário {current_user_id}.",
+            f"{'Simulando (dry-run)' if is_dry_run else 'Iniciando'} exclusão em lote de {len(registros)} registro(s) pelo usuário {current_user_id}.",
             "info",
         )
 
@@ -52,12 +56,13 @@ async def delete_multiple_records(
             db=db,
             current_user_id=current_user_id,
             delete_all=False,
+            dry_run=is_dry_run,
         )
 
         total_afetados = _sum_total_afetados(result.itens_afetados)
 
         log_message(
-            f"Exclusão em lote concluída com sucesso. Total removido(s): {total_afetados}.",
+            f"{'Simulação' if is_dry_run else 'Exclusão em lote'} concluída com sucesso. Total {'simulado' if is_dry_run else 'removido(s)'}: {total_afetados}.",
             "success",
         )
 
@@ -87,6 +92,7 @@ async def delete_multiple_records(
 @router.delete("/delete_all", response_model=DeleteResponse)
 async def delete_all_records(
     query_payload: QueryPayload,
+    dry_run: bool = False,
     db: Session = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
@@ -96,6 +102,11 @@ async def delete_all_records(
             rowDeletes={},
         )
 
+        log_message(
+            f"{'Simulando (dry-run)' if dry_run else 'Iniciando'} exclusão total pelo usuário {current_user_id}.",
+            "info",
+        )
+
         service = DeleteOperationService()
         result = await service.execute_delete(
             registros=[fake_registro],
@@ -103,12 +114,13 @@ async def delete_all_records(
             db=db,
             current_user_id=current_user_id,
             delete_all=True,
+            dry_run=dry_run,
         )
 
         total_afetados = _sum_total_afetados(result.itens_afetados)
 
         log_message(
-            f"Exclusão total concluída com sucesso. Total removido(s): {total_afetados}.",
+            f"{'Simulação total' if dry_run else 'Exclusão total'} concluída com sucesso. Total {'simulado' if dry_run else 'removido(s)'}: {total_afetados}.",
             "success",
         )
 

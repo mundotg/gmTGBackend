@@ -223,9 +223,11 @@ def serialize_for_sql(val: Any, dst_type: Optional[str] = None) -> Any:
         if val == "NULL":
             return None
 
-    # Dicionários e listas para SQL: se a coluna não for JSON, converte para JSON string
+    # Dicionários e listas para SQL:
+    # Se a coluna de destino for array nativo do Postgres (ex: text[], int[]), mantém list.
+    # Para JSON, JSONB, TEXT ou qualquer outro tipo SQL, serializa para JSON string (necessário para drivers como asyncpg).
     if isinstance(val, (dict, list)):
-        if any(k in t for k in ("json", "jsonb")):
+        if isinstance(val, list) and (any(k in t for k in ("array", "[]")) or (t.startswith("_") and len(t) > 1)):
             return val
         try:
             return json.dumps(val, default=str, ensure_ascii=False)
@@ -238,6 +240,8 @@ def serialize_for_sql(val: Any, dst_type: Optional[str] = None) -> Any:
 
     # Tuplas e Sets
     if isinstance(val, (tuple, set)):
+        if any(k in t for k in ("array", "[]")) or (t.startswith("_") and len(t) > 1):
+            return list(val)
         return json.dumps(list(val), default=str, ensure_ascii=False)
 
     return val

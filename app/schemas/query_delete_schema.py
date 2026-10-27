@@ -20,10 +20,23 @@ class PayloadDeleteRow(BaseModel):
 class BatchDeleteRequest(BaseModel):
     registros: List[PayloadDeleteRow] = Field(..., description="Lista de registros a serem excluídos")
     payloadSelectedRow: Optional[QueryPayload] = Field(None, description="Payload completo da linha selecionada")
+    dry_run: Optional[bool] = Field(
+        False,
+        title="Dry Run",
+        description="Se True, simula a exclusão sem persistir alterações no banco de dados."
+    )
 
 
 class DeleteResponse(BaseModel):
     success: bool = True
     mensagem: str
     itens_afetados: List[Dict[str, Any]] = Field(default_factory=list)
+    dry_run: Optional[bool] = Field(
+        False,
+        description="Indica se a operação foi executada em modo de simulação (dry-run)."
+    )
+    query: Optional[str] = Field(
+        None,
+        description="SQL gerado/simulado durante a operação (se aplicável)."
+    )
     executado_em: datetime = Field(default_factory=datetime.utcnow)

@@ -46,6 +46,10 @@ class ChatSession(Base):
     __table_args__ = (Index("idx_chat_user", "user_id"),)
 
 
+# Alias de compatibilidade retroativa
+chat_sessions = ChatSession
+
+
 # ============================================================
 # 💬 MESSAGE
 # ============================================================

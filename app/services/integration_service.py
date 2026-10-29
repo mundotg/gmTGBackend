@@ -33,7 +33,7 @@ DEFAULT_CATALOGUE = [
         "name": "Google BigQuery",
         "provider": "Google Cloud Platform",
         "category": "Data Warehouse & Cloud",
-        "description": "Data warehouse corporativo de alta escalabilidade. Conecta esquemas, executa queries analíticas e alimenta o motor de Dry-Run do MustaInfo para estimativa prévia de custos e bytes.",
+        "description": "Data warehouse corporativo de alta escalabilidade. Conecta esquemas, executa queries analíticas e alimenta o motor de Dry-Run do MustaInfoo para estimativa prévia de custos e bytes.",
         "badge": "Destaque & Dry-Run",
         "default_metrics": [
             {"label": "Datasets", "value": "4 ativos"},
@@ -579,7 +579,7 @@ class IntegrationService:
                 target_secret = target_secret or cfg.secret
 
         if not target_url:
-            target_url = "https://api.empresa.com/v1/mustainf-events"
+            target_url = "https://api.empresa.com/v1/MustaInfo-events"
         if not target_secret:
             target_secret = "whsec_default_secret_key"
 
@@ -588,12 +588,12 @@ class IntegrationService:
 
         payload = {
             "event": "test.ping",
-            "source": "mustainf.integrations",
+            "source": "MustaInfo.integrations",
             "timestamp": now_iso,
             "empresa_id": empresa_id,
-            "actor": actor_email or "admin@mustainf.com",
+            "actor": actor_email or "admin@MustaInfo.com",
             "data": {
-                "message": "Teste de conectividade de webhook do MustaInfo disparado com sucesso.",
+                "message": "Teste de conectividade de webhook do MustaInfoo disparado com sucesso.",
                 "dry_run_service_active": True,
             },
         }
@@ -616,8 +616,8 @@ class IntegrationService:
                         content=payload_bytes,
                         headers={
                             "Content-Type": "application/json",
-                            "X-MustaInf-Signature": f"sha256={signature}",
-                            "User-Agent": "MustaInf-Webhook-Engine/1.0",
+                            "X-MustaInfo-Signature": f"sha256={signature}",
+                            "User-Agent": "MustaInfo-Webhook-Engine/1.0",
                         },
                     )
                     status_code = resp.status_code

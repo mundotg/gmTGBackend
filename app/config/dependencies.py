@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config.dotenv import get_env
 from app.database import get_db
 from app.models.connection_models import DBConnection
+from app.services.agent_tunnel_manager import agent_tunnel_registry, parse_agent_host
 from app.services.crypto_utils import secret_decrypt
 from app.ultils.conect_database import DatabaseManager
 from app.ultils.db_url import InvalidDatabaseUrl, parse_db_url, remap_url_host
@@ -71,6 +72,37 @@ def _maybe_remap_host(host: str) -> str:
     return alias
 
 
+def _resolve_agent_or_host(
+    host: str,
+    port: int | None,
+    user_id: int | None,
+) -> tuple[str, int | None]:
+    """
+    Resolve hosts que apontam para um túnel reverso MustaLink (`agent`,
+    `musta-agent`, `agent://<agent_id>`) para o listener local `127.0.0.1:<porta>`
+    do agente autenticado.
+    """
+    agent_id = parse_agent_host(host)
+    if agent_id is not None:
+        session = agent_tunnel_registry.get_session(user_id, agent_id)
+        if not session or not session.local_port:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"Agente MustaLink '{agent_id}' não está conectado no momento. "
+                    "Inicie o musta-link-agent na infraestrutura local e tente novamente."
+                ),
+            )
+        log_message(
+            f"🚇 [MustaLink] Conexão encaminhada via túnel do agente '{session.agent_id}' "
+            f"(127.0.0.1:{session.local_port} -> {session.target_db}).",
+            level="info",
+        )
+        return "127.0.0.1", session.local_port
+
+    return _maybe_remap_host(host), port
+
+
 def _build_config(connection: DBConnection) -> dict:
     """
     Monta a configuração utilizada pelo DatabaseManager.
@@ -80,6 +112,7 @@ def _build_config(connection: DBConnection) -> dict:
     """
 
     host = secret_decrypt(connection.host) if connection.host else ""
+    owner_user_id = getattr(connection, "user_id", None) or getattr(connection, "_user_id", None)
 
     # Modo "ligar por URL": a connection string manda, e os campos servem
     # apenas para as mensagens de erro (host:porta). Ao testar uma conexão nova
@@ -115,6 +148,12 @@ def _build_config(connection: DBConnection) -> dict:
             or "yes",
         }
 
+    resolved_host, resolved_port = _resolve_agent_or_host(
+        host,
+        connection.port,
+        owner_user_id,
+    )
+
     return {
         "user": secret_decrypt(connection.username)
         if connection.username else "",
@@ -122,9 +161,9 @@ def _build_config(connection: DBConnection) -> dict:
         "password": secret_decrypt(connection.password)
         if connection.password else "",
 
-        "host": _maybe_remap_host(host),
+        "host": resolved_host,
 
-        "port": connection.port,
+        "port": resolved_port,
         "database": connection.database_name,
         "service": getattr(connection, "service", "xe"),
         "sslmode": getattr(connection, "sslmode", "disable"),

@@ -342,7 +342,7 @@ def send_registration_confirmation_email(
     try:
         resultado = send_email(
             to=recipient_email,
-            subject="Confirmação de Registo - MustaInf",
+            subject="Confirmação de Registo - MustaInfo",
             template_name="confirmacao_registo",
             context={
                 "user_name": user_name,
@@ -350,7 +350,7 @@ def send_registration_confirmation_email(
                 "empresa": empresa,
                 "verification_url": verification_url,
                 "login_url": login_url,
-                "platform_name": "MustaInf",
+                "platform_name": "MustaInfo",
                 "validity_hours": auth.EMAIL_VERIFICATION_EXPIRE_HOURS,
             },
         )

@@ -1,6 +1,6 @@
 # 🚀 Plataforma Analítica e Pipeline de Dados para Monitoramento de Bases de Dados
 
-###### MustaInf
+###### MustaInfo
 
 > **Resumo:** Projeto end-to-end que integra **engenharia de dados, análise e fundamentos de ciência de dados** para monitorar, auditar e extrair insights acionáveis de bases de dados relacionais. A solução combina  **API em FastAPI** ,  **PostgreSQL** , **dashboards** e um **módulo de ML opcional** para apoiar a tomada de decisão.
 

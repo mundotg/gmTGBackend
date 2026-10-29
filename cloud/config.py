@@ -8,6 +8,7 @@ from botocore.exceptions import (
 from typing import Iterator, List, Optional, Tuple
 import os
 import tempfile
+import threading
 import shutil
 import logging
 
@@ -153,7 +154,37 @@ class StorageService:
     # -------------------------
     # 📤 Upload
     # -------------------------
-    def upload_file(self, file, key: str, content_type: Optional[str] = None) -> str:
+    def _sync_local_to_cloud(self, local_path: str, key: str, content_type: Optional[str] = None) -> None:
+        if not (self.bucket and self.s3 and os.path.exists(local_path)):
+            return
+        extra = {"ContentType": content_type} if content_type else {}
+        try:
+            with open(local_path, "rb") as f_cloud:
+                self.s3.upload_fileobj(
+                    f_cloud,
+                    self.bucket,
+                    key,
+                    ExtraArgs=extra or None,
+                )
+            log_message(f"Upload sincronizado com a cloud: {key}", "info")
+        except (EndpointConnectionError, ClientError) as e:
+            log_message(
+                f"Cloud indisponível ({str(e)}), ficheiro mantido no storage local: {key}",
+                "warning",
+            )
+        except Exception as e:
+            log_message(
+                f"Falha ao sincronizar com cloud ({str(e)}), ficheiro mantido no storage local: {key}",
+                "warning",
+            )
+
+    def upload_file(
+        self,
+        file,
+        key: str,
+        content_type: Optional[str] = None,
+        sync_async: bool = True,
+    ) -> str:
         try:
             self._validate_filename(key)
 
@@ -171,32 +202,20 @@ class StorageService:
             except Exception as e:
                 raise ValueError(f"Ficheiro inacessível ou inválido: {e}")
 
-            # 1. Salva localmente primeiro de forma atômica (garante persistência 100% segura)
+            # 1. Salva localmente primeiro de forma atômica (garante persistência 100% segura e resposta imediata)
             local_path = self._get_local_path(key)
             _atomic_copy(local_path, file)
 
-            # 2. Tenta sincronizar com a cloud se configurado
+            # 2. Sincroniza com o MinIO/S3 remoto em background para não bloquear o request HTTP (evita timeout de 10s)
             if self.bucket and self.s3:
-                extra = {"ContentType": content_type} if content_type else {}
-                try:
-                    with open(local_path, "rb") as f_cloud:
-                        self.s3.upload_fileobj(
-                            f_cloud,
-                            self.bucket,
-                            key,
-                            ExtraArgs=extra or None,
-                        )
-                    log_message(f"Upload feito para cloud: {key}", "info")
-                except (EndpointConnectionError, ClientError) as e:
-                    log_message(
-                        f"Cloud indisponível ({str(e)}), ficheiro mantido no storage local: {key}",
-                        "warning",
-                    )
-                except Exception as e:
-                    log_message(
-                        f"Falha ao sincronizar com cloud ({str(e)}), ficheiro mantido no storage local: {key}",
-                        "warning",
-                    )
+                if sync_async:
+                    threading.Thread(
+                        target=self._sync_local_to_cloud,
+                        args=(local_path, key, content_type),
+                        daemon=True,
+                    ).start()
+                else:
+                    self._sync_local_to_cloud(local_path, key, content_type)
 
             return key
 
@@ -389,7 +408,24 @@ class StorageService:
         try:
             self._validate_filename(key)
 
-            # 🔹 Tenta cloud (MinIO/S3)
+            # 🔹 1. Prioriza cache local (leitura imediata em disco, sem latência de rede
+            # e disponível no próprio milissegundo após o upload enquanto sincroniza em background)
+            local_path = self._get_local_path(key)
+            if os.path.exists(local_path):
+                size = os.path.getsize(local_path)
+
+                def stream_local():
+                    with open(local_path, "rb") as f:
+                        while True:
+                            chunk = f.read(chunk_size)
+                            if not chunk:
+                                break
+                            yield chunk
+
+                log_message(f"Streaming local: {key}", "info")
+                return stream_local(), size, None
+
+            # 🔹 2. Fallback / Origem Cloud (MinIO/S3)
             try:
                 response = self.s3.get_object(
                     Bucket=self.bucket,
@@ -414,30 +450,11 @@ class StorageService:
                 return stream(), size, content_type
 
             except Exception as e:
-                # NoSuchKey, ClientError, etc. caem para o local
                 log_message(
-                    f"Cloud falhou, fallback local: {key} | {str(e)}",
+                    f"Objeto não encontrado na cloud nem localmente: {key} | {str(e)}",
                     "warning",
                 )
-
-            # 🔹 Fallback local
-            local_path = self._get_local_path(key)
-
-            if not os.path.exists(local_path):
                 raise FileNotFoundError("Ficheiro não encontrado")
-
-            size = os.path.getsize(local_path)
-
-            def stream_local():
-                with open(local_path, "rb") as f:
-                    while True:
-                        chunk = f.read(chunk_size)
-                        if not chunk:
-                            break
-                        yield chunk
-
-            log_message(f"Streaming local: {key}", "info")
-            return stream_local(), size, None
 
         except (ValueError, FileNotFoundError):
             raise

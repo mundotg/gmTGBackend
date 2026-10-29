@@ -44,6 +44,10 @@ from app.schemas.storage_folder_schema import (
     FolderUpdate,
 )
 from app.services import storage_folder_service as folder_service
+from app.services import storage_acl_service as acl_service
+from app.services import storage_compression_service as compression_service
+from app.services import storage_rate_limiter as rate_limiter
+from pydantic import BaseModel, Field
 from app.config.dotenv import get_env_int
 from app.ultils.get_id_by_token import get_current_user_id
 from app.ultils.logger import log_message
@@ -140,24 +144,51 @@ def get_owned_file(
     user_id,
     filename: str,
     folder_id=None,
+    file_id: Optional[UUID] = None,
+    minimum_role: acl_service.AccessRole = "owner",
 ) -> FileModel:
-    """Ficheiro ativo do utilizador, ou 404.
+    """Ficheiro ativo do utilizador (ou partilhado via ACL se `minimum_role` < `owner`), ou 404.
 
-    É aqui que a posse é garantida — e também que a senha da pasta é exigida,
+    É aqui que a posse/ACL é garantida — e também que a senha da pasta é exigida,
     para que nenhuma rota de conteúdo possa esquecer-se de a verificar.
     """
-    query = db.query(FileModel).filter_by(
-        user_id=user_id, filename=filename, is_deleted=False
-    )
-    if folder_id is not None:
-        query = query.filter(FileModel.folder_id == folder_id)
+    file: Optional[FileModel] = None
 
-    file = query.order_by(FileModel.created_at.desc()).first()
+    if file_id is not None:
+        file = db.query(FileModel).filter_by(id=file_id, is_deleted=False).first()
+
+    if file is None:
+        query = db.query(FileModel).filter_by(
+            user_id=user_id, filename=filename, is_deleted=False
+        )
+        if folder_id is not None:
+            query = query.filter(FileModel.folder_id == folder_id)
+        file = query.order_by(FileModel.created_at.desc()).first()
+
+    # Se não pertencer diretamente ao utilizador mas a operação aceitar partilha (ex: download),
+    # procura ficheiro partilhado com o utilizador
+    if file is None and minimum_role != "owner":
+        candidates = (
+            db.query(FileModel)
+            .filter_by(filename=filename, is_deleted=False)
+            .order_by(FileModel.created_at.desc())
+            .all()
+        )
+        for cand in candidates:
+            role = acl_service.get_effective_file_role(db, int(user_id), cand)
+            if acl_service.ROLE_LEVELS.get(role, 0) >= acl_service.ROLE_LEVELS["viewer"]:
+                file = cand
+                break
 
     if not file:
         fail("Ficheiro não encontrado", 404)
 
-    folder_service.assert_file_access(db, user_id, file)
+    eff_role = acl_service.get_effective_file_role(db, int(user_id), file)
+    if eff_role == "none":
+        fail("Ficheiro não encontrado", 404)
+
+    acl_service.assert_permission(eff_role, minimum_role, f"aceder a '{file.filename}'")
+    folder_service.assert_file_access(db, file.user_id, file)
     return file
 
 
@@ -193,7 +224,7 @@ def get_plan(user):
     return user.plan
 
 
-async def validate_file_size(file: UploadFile) -> int:
+def validate_file_size(file: UploadFile) -> int:
     """Tamanho do upload sem o carregar para memória.
 
     A versão anterior fazia `await file.read()` só para medir: um ficheiro de
@@ -218,7 +249,8 @@ async def validate_file_size(file: UploadFile) -> int:
 
 
 # 🧠 helpers métricas
-def check_request_limit(db, user_id):
+def check_request_limit(db, user_id, bucket: str = "api"):
+    rate_limiter.check_and_consume_rate_limit(user_id, bucket=bucket)
     today = dt_date.today()
     user = get_user_by_id(
         db, user_id
@@ -267,13 +299,26 @@ def credit_storage(db, user_id, file_size):
     usage.used_bytes += file_size
 
 
-def resolve_target_folder(db: Session, user_id, folder_id) -> Optional[StorageFolder]:
+def resolve_target_folder(
+    db: Session,
+    user_id,
+    folder_id,
+    minimum_role: acl_service.AccessRole = "viewer",
+) -> Optional[StorageFolder]:
     """Pasta de destino validada e desbloqueada, ou None para a raiz."""
     if not folder_id:
         return None
 
-    folder = folder_service.get_folder_or_404(db, user_id, folder_id)
-    folder_service.assert_folder_access(db, user_id, folder)
+    folder = db.query(StorageFolder).filter_by(id=folder_id, is_deleted=False).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Pasta não encontrada")
+
+    eff_role = acl_service.get_effective_folder_role(db, int(user_id), folder)
+    if eff_role == "none":
+        raise HTTPException(status_code=404, detail="Pasta não encontrada")
+
+    acl_service.assert_permission(eff_role, minimum_role, f"aceder à pasta '{folder.name}'")
+    folder_service.assert_folder_access(db, folder.user_id, folder)
     return folder
 
 
@@ -319,54 +364,96 @@ def fail(message="Erro", code=400):
 
 # 📤 UPLOAD
 @router.post("/upload")
-async def upload(
+def upload(
     file: UploadFile = File(...),
     folder_id: Optional[UUID] = Query(
         None, description="Pasta de destino; omitir envia para a raiz."
+    ),
+    compress: bool = Query(
+        False, description="Comprimir ficheiro com Gzip antes de armazenar no bucket."
+    ),
+    client_compressed: bool = Query(
+        False, description="Indica se o browser já enviou o stream comprimido via Gzip."
     ),
     db: Session = Depends(get_db),
     user_id=Depends(get_current_user_id),
 ):
     filename = file.filename if file else "unknown"
+    slot_id = f"up:{uuid.uuid4().hex[:10]}"
 
     try:
         if not file:
             fail("Ficheiro não enviado")
 
         validate_filename(filename)
-        size = await validate_file_size(file)
+        raw_size = validate_file_size(file)
 
-        check_request_limit(db, user_id)
-        assert_storage_limit(db, user_id, size)
+        check_request_limit(db, user_id, bucket="upload")
 
-        # Valida a pasta e exige que esteja desbloqueada.
-        destino = resolve_target_folder(db, user_id, folder_id)
+        # Valida a pasta e exige que esteja desbloqueada e com permissão de editor/owner.
+        destino = resolve_target_folder(db, user_id, folder_id, minimum_role="editor")
+        owner_id = destino.user_id if destino else user_id
 
-        key = build_object_key(user_id, filename)
-        mime_type = file.content_type or mimetypes.guess_type(filename)[0]
+        with rate_limiter.transfer_concurrency_slot(user_id, slot_id):
+            stream_obj, stored_size, orig_size, is_compressed, cleanup_fn = (
+                compression_service.prepare_upload_stream(
+                    file.file,
+                    filename,
+                    compress_requested=compress,
+                    client_compressed=client_compressed,
+                )
+            )
+            try:
+                assert_storage_limit(db, owner_id, stored_size)
 
-        storage.upload_file(file.file, key, content_type=mime_type)
+                key = build_object_key(owner_id, filename)
+                mime_type = file.content_type or mimetypes.guess_type(filename)[0]
 
-        credit_storage(db, user_id, size)
+                storage.upload_file(stream_obj, key, content_type=mime_type)
+            finally:
+                cleanup_fn()
 
-        db.add(
-            FileModel(
-                user_id=user_id,
+            credit_storage(db, owner_id, stored_size)
+            rate_limiter.record_bandwidth(user_id, stored_size)
+
+            new_file = FileModel(
+                user_id=owner_id,
                 folder_id=destino.id if destino else None,
                 filename=filename,
                 path=key,
-                size_bytes=size,
+                size_bytes=stored_size,
                 mime_type=mime_type,
             )
-        )
-        db.commit()
+            db.add(new_file)
+            db.commit()
+            db.refresh(new_file)
 
-        add_network(db, user_id, ingress=size)
+            comp_meta = compression_service.record_compression_meta(
+                key,
+                compressed=is_compressed,
+                original_size=orig_size,
+                stored_size=stored_size,
+            )
 
-        log_db(db, user_id, LogAction.UPLOAD, filename, LogStatus.SUCCESS)
-        invalidate_storage_cache(user_id)  # listagem/stats mudaram
+            add_network(db, user_id, ingress=stored_size)
 
-        return ok({"file": filename, "size": size}, "Upload realizado")
+            log_db(db, user_id, LogAction.UPLOAD, filename, LogStatus.SUCCESS)
+            invalidate_storage_cache(owner_id)
+            if int(owner_id) != int(user_id):
+                invalidate_storage_cache(user_id)
+
+            return ok(
+                {
+                    "id": str(new_file.id),
+                    "file": filename,
+                    "size": stored_size,
+                    "original_size": orig_size,
+                    "compressed": is_compressed,
+                    "saved_bytes": comp_meta["saved_bytes"],
+                    "compression_ratio_percent": comp_meta["compression_ratio_percent"],
+                },
+                "Upload realizado",
+            )
 
     except HTTPException as e:
         db.rollback()
@@ -392,7 +479,7 @@ async def upload(
 
 
 @router.get("/filespage")
-async def list_files_page(
+def list_files_page(
     db: Session = Depends(get_db),
     user_id=Depends(get_current_user_id),
     page: int = Query(1, ge=1),
@@ -405,7 +492,8 @@ async def list_files_page(
         check_request_limit(db, user_id)
 
         # Listar dentro de uma pasta bloqueada devolve 423 (e não a lista).
-        resolve_target_folder(db, user_id, folder_id)
+        destino = resolve_target_folder(db, user_id, folder_id, minimum_role="viewer")
+        target_owner_id = destino.user_id if destino else user_id
 
         cache_key = _files_key(user_id, page, limit, folder_id)
         cached = read_cache(cache_key)
@@ -415,7 +503,7 @@ async def list_files_page(
         offset = (page - 1) * limit
 
         query = db.query(FileModel).filter_by(
-            user_id=user_id, is_deleted=False, folder_id=folder_id
+            user_id=target_owner_id, is_deleted=False, folder_id=folder_id
         )
 
         total = query.count()
@@ -427,16 +515,23 @@ async def list_files_page(
             .all()
         )
 
-        data = [
-            {
-                "id": str(f.id),
-                "filename": f.filename,
-                "size_bytes": f.size_bytes,
-                "mime_type": f.mime_type,
-                "created_at": f.created_at.isoformat() if f.created_at else None,
-            }
-            for f in files
-        ]
+        data = []
+        for f in files:
+            comp = compression_service.get_compression_meta(f.path, f.size_bytes)
+            eff_role = acl_service.get_effective_file_role(db, int(user_id), f)
+            data.append(
+                {
+                    "id": str(f.id),
+                    "filename": f.filename,
+                    "size_bytes": f.size_bytes,
+                    "original_size_bytes": comp.get("original_size_bytes", f.size_bytes),
+                    "compressed": comp.get("compressed", False),
+                    "compression_ratio_percent": comp.get("compression_ratio_percent", 0.0),
+                    "mime_type": f.mime_type,
+                    "created_at": f.created_at.isoformat() if f.created_at else None,
+                    "my_role": eff_role,
+                }
+            )
 
         payload = {
             "items": data,
@@ -578,26 +673,37 @@ def get_url(
     folder_id: Optional[UUID] = Query(
         None, description="Desambigua nomes repetidos em pastas diferentes."
     ),
+    file_id: Optional[UUID] = Query(
+        None, description="ID explícito do ficheiro (suporta ficheiros partilhados)."
+    ),
     db: Session = Depends(get_db),
     user_id=Depends(get_current_user_id),
     expires: int = 3600,
 ):
     try:
         validate_filename(filename)
-        check_request_limit(db, user_id)
+        check_request_limit(db, user_id, bucket="download")
 
-        file = get_owned_file(db, user_id, filename, folder_id)
+        file = get_owned_file(
+            db, user_id, filename, folder_id, file_id=file_id, minimum_role="downloader"
+        )
 
-        # Se o objeto só existir no cache local, devolve a rota autenticada de
-        # download em vez de uma URL pré-assinada que daria 404 no browser.
+        # Se o ficheiro foi comprimido transparentemente pelo MustaInf Cloud,
+        # usamos a rota /storage/download para descomprimir em streaming.
+        comp = compression_service.get_compression_meta(file.path, file.size_bytes)
         fallback_url = (
             f"{str(request.base_url).rstrip('/')}"
             f"/storage/download/{quote(file.filename, safe='')}"
+            + (f"?file_id={file.id}" if file_id else "")
         )
 
-        url = storage.generate_url(file.path, expires, fallback_url=fallback_url)
+        if comp.get("compressed") and not file.filename.lower().endswith(".gz"):
+            url = fallback_url
+        else:
+            url = storage.generate_url(file.path, expires, fallback_url=fallback_url)
 
         add_network(db, user_id, egress=file.size_bytes)
+        rate_limiter.record_bandwidth(user_id, file.size_bytes)
 
         log_db(db, user_id, LogAction.DOWNLOAD, filename, LogStatus.SUCCESS)
 
@@ -635,27 +741,51 @@ def download_file(
     folder_id: Optional[UUID] = Query(
         None, description="Desambigua nomes repetidos em pastas diferentes."
     ),
+    file_id: Optional[UUID] = Query(
+        None, description="ID explícito do ficheiro (suporta ficheiros partilhados)."
+    ),
+    keep_compressed: bool = Query(
+        False, description="Se true, devolve o stream comprimido sem descomprimir."
+    ),
     db: Session = Depends(get_db),
     user_id=Depends(get_current_user_id),
 ):
+    slot_id = f"dl:{uuid.uuid4().hex[:10]}"
     try:
         validate_filename(filename)
-        check_request_limit(db, user_id)
+        check_request_limit(db, user_id, bucket="download")
 
-        file = get_owned_file(db, user_id, filename, folder_id)
+        file = get_owned_file(
+            db, user_id, filename, folder_id, file_id=file_id, minimum_role="downloader"
+        )
 
         # tamanho e tipo vêm da fonte real (bucket ou cache), não da BD
         stream, size, content_type = storage.get_file_stream(file.path)
+        comp = compression_service.get_compression_meta(file.path, size or file.size_bytes)
+        is_transparent_gzip = bool(
+            comp.get("compressed") and not file.filename.lower().endswith(".gz")
+        )
 
         add_network(db, user_id, egress=size or file.size_bytes)
+        rate_limiter.record_bandwidth(user_id, size or file.size_bytes)
         log_db(db, user_id, LogAction.DOWNLOAD, filename, LogStatus.SUCCESS)
 
         headers = {"Content-Disposition": content_disposition(file.filename)}
-        if size:
-            headers["Content-Length"] = str(size)
+        if not is_transparent_gzip or keep_compressed:
+            if size:
+                headers["Content-Length"] = str(size)
+        elif comp.get("original_size_bytes"):
+            headers["X-Original-Size"] = str(comp["original_size_bytes"])
+
+        def _guarded_stream():
+            with rate_limiter.transfer_concurrency_slot(user_id, slot_id):
+                for chunk in compression_service.wrap_download_stream_with_decompression(
+                    stream, file.filename, keep_compressed=keep_compressed
+                ):
+                    yield chunk
 
         return StreamingResponse(
-            stream,
+            _guarded_stream(),
             media_type=resolve_content_type(file, content_type),
             headers=headers,
         )
@@ -697,6 +827,7 @@ def get_stats(
     try:
         cached = read_cache(_stats_key(user_id))
         if cached:
+            cached["rate_limit"] = rate_limiter.get_user_rate_snapshot(user_id)
             return ok(cached)
 
         user = get_user_by_id(db, user_id)
@@ -716,6 +847,7 @@ def get_stats(
                 "ingress": network.ingress_bytes if network else 0,
                 "egress": network.egress_bytes if network else 0,
             },
+            "rate_limit": rate_limiter.get_user_rate_snapshot(user_id),
         }
         write_cache(_stats_key(user_id), payload, ttl=STATS_TTL)
         return ok(payload)
@@ -1140,3 +1272,353 @@ def delete_folder(
             user=user_id,
         )
         raise HTTPException(500, "Erro ao apagar pasta")
+
+
+# ══════════════════════════════ ⚡ CONCORRÊNCIA, RATE & COMPRESSÃO ZIP ══════════════════════════════
+
+
+class BulkZipDownloadRequest(BaseModel):
+    file_ids: List[UUID] = Field(default_factory=list)
+    folder_id: Optional[UUID] = None
+    archive_name: Optional[str] = "mustainf-cloud-pack.zip"
+
+
+class PermissionGrantRequest(BaseModel):
+    email: Optional[str] = None
+    user_id: Optional[int] = None
+    role: str = "downloader"
+    visibility: Optional[str] = None
+    company_role: Optional[str] = None
+
+
+class ShareLinkCreateRequest(BaseModel):
+    role: str = "downloader"
+    expires_in_hours: Optional[int] = 72
+    max_downloads: Optional[int] = None
+    password: Optional[str] = None
+
+
+@router.get("/rate-status", response_model=None)
+def get_rate_status(
+    user_id=Depends(get_current_user_id),
+):
+    """Estado em tempo real do Rate Limiter e dos slots de concorrência MEGA."""
+    return ok(rate_limiter.get_user_rate_snapshot(user_id))
+
+
+def _collect_files_for_zip(
+    db: Session,
+    user_id,
+    file_ids: List[UUID],
+    folder_id: Optional[UUID],
+) -> List[FileModel]:
+    collected: List[FileModel] = []
+    seen = set()
+
+    if folder_id is not None:
+        folder = resolve_target_folder(db, user_id, folder_id, minimum_role="downloader")
+        if folder:
+            desc_ids = folder_service.descendant_ids(db, folder)
+            # Apenas subpastas não bloqueadas
+            acessiveis = folder_service.accessible_folder_ids(db, folder.user_id)
+            valid_folder_ids = [fid for fid in desc_ids if fid in acessiveis]
+            folder_files = (
+                db.query(FileModel)
+                .filter(
+                    FileModel.folder_id.in_(valid_folder_ids),
+                    FileModel.is_deleted.is_(False),
+                )
+                .all()
+            )
+            for f in folder_files:
+                if f.id not in seen:
+                    seen.add(f.id)
+                    collected.append(f)
+
+    for fid in file_ids or []:
+        f = db.query(FileModel).filter_by(id=fid, is_deleted=False).first()
+        if not f:
+            continue
+        role = acl_service.get_effective_file_role(db, int(user_id), f)
+        acl_service.assert_permission(role, "downloader", f"baixar '{f.filename}'")
+        folder_service.assert_file_access(db, f.user_id, f)
+        if f.id not in seen:
+            seen.add(f.id)
+            collected.append(f)
+
+    if not collected:
+        raise HTTPException(
+            status_code=404,
+            detail="Nenhum ficheiro disponível para comprimir em .ZIP.",
+        )
+
+    return collected
+
+
+@router.post("/download-zip", response_model=None)
+def download_bulk_zip(
+    payload: BulkZipDownloadRequest,
+    db: Session = Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    """Comprime múltiplos ficheiros selecionados (ou uma pasta) num pacote `.zip` em streaming."""
+    slot_id = f"zip:{uuid.uuid4().hex[:10]}"
+    try:
+        check_request_limit(db, user_id, bucket="download")
+        files = _collect_files_for_zip(db, user_id, payload.file_ids, payload.folder_id)
+
+        with rate_limiter.transfer_concurrency_slot(user_id, slot_id):
+            entries = []
+            for f in files:
+                raw_stream, _, _ = storage.get_file_stream(f.path)
+                decompressed_stream = compression_service.wrap_download_stream_with_decompression(
+                    raw_stream, f.filename, keep_compressed=False
+                )
+                entries.append((f.filename, decompressed_stream))
+
+            zip_stream, zip_size = compression_service.build_zip_archive_stream(entries)
+
+            add_network(db, user_id, egress=zip_size)
+            rate_limiter.record_bandwidth(user_id, zip_size)
+            archive_name = (payload.archive_name or "mustainf-cloud-pack.zip").strip()
+            if not archive_name.lower().endswith(".zip"):
+                archive_name += ".zip"
+
+            log_db(db, user_id, LogAction.DOWNLOAD, archive_name, LogStatus.SUCCESS)
+
+            headers = {
+                "Content-Disposition": content_disposition(archive_name),
+                "Content-Length": str(zip_size),
+            }
+            return StreamingResponse(
+                zip_stream,
+                media_type="application/zip",
+                headers=headers,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_message(
+            message=f"Erro ao gerar pacote ZIP: {str(e)}{traceback.format_exc()}",
+            level="error",
+            source="storage_routes.py",
+            user=user_id,
+        )
+        raise HTTPException(500, "Erro ao comprimir ficheiros em .ZIP")
+
+
+@router.get("/folders/{folder_id}/download-zip", response_model=None)
+def download_folder_zip(
+    folder_id: UUID,
+    db: Session = Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    """Baixa uma pasta inteira comprimida em `.zip`."""
+    folder = resolve_target_folder(db, user_id, folder_id, minimum_role="downloader")
+    archive_name = f"{folder.name if folder else 'pasta'}.zip"
+    return download_bulk_zip(
+        BulkZipDownloadRequest(file_ids=[], folder_id=folder_id, archive_name=archive_name),
+        db=db,
+        user_id=user_id,
+    )
+
+
+# ══════════════════════════════ 🛡️ CONTROLO DE ACESSO & PERMISSÕES (ACL) ══════════════════════════════
+
+
+@router.get("/permissions/{target_type}/{target_id}", response_model=None)
+def get_resource_permissions(
+    target_type: str,
+    target_id: UUID,
+    db: Session = Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    check_request_limit(db, user_id, bucket="api")
+    if target_type not in ("file", "folder"):
+        raise HTTPException(status_code=400, detail="target_type deve ser 'file' ou 'folder'")
+    details = acl_service.get_permissions_details(
+        db, int(user_id), target_type, target_id  # type: ignore[arg-type]
+    )
+    return ok(details)
+
+
+@router.post("/permissions/{target_type}/{target_id}/grant", response_model=None)
+def grant_resource_permission(
+    target_type: str,
+    target_id: UUID,
+    payload: PermissionGrantRequest,
+    db: Session = Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    check_request_limit(db, user_id, bucket="api")
+    if target_type not in ("file", "folder"):
+        raise HTTPException(status_code=400, detail="target_type deve ser 'file' ou 'folder'")
+    details = acl_service.grant_user_permission(
+        db,
+        int(user_id),
+        target_type,  # type: ignore[arg-type]
+        target_id,
+        grantee_email=payload.email,
+        grantee_user_id=payload.user_id,
+        role=payload.role,
+        visibility=payload.visibility,  # type: ignore[arg-type]
+        company_role=payload.company_role,
+    )
+    return ok(details, "Permissões atualizadas com sucesso")
+
+
+@router.delete(
+    "/permissions/{target_type}/{target_id}/revoke/{grantee_user_id}",
+    response_model=None,
+)
+def revoke_resource_permission(
+    target_type: str,
+    target_id: UUID,
+    grantee_user_id: int,
+    db: Session = Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    check_request_limit(db, user_id, bucket="api")
+    if target_type not in ("file", "folder"):
+        raise HTTPException(status_code=400, detail="target_type deve ser 'file' ou 'folder'")
+    details = acl_service.revoke_user_permission(
+        db, int(user_id), target_type, target_id, grantee_user_id  # type: ignore[arg-type]
+    )
+    return ok(details, "Acesso revogado")
+
+
+@router.post("/permissions/{target_type}/{target_id}/share-link", response_model=None)
+def create_resource_share_link(
+    target_type: str,
+    target_id: UUID,
+    payload: ShareLinkCreateRequest,
+    db: Session = Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    check_request_limit(db, user_id, bucket="api")
+    if target_type not in ("file", "folder"):
+        raise HTTPException(status_code=400, detail="target_type deve ser 'file' ou 'folder'")
+    link = acl_service.create_share_link(
+        db,
+        int(user_id),
+        target_type,  # type: ignore[arg-type]
+        target_id,
+        role=payload.role,
+        expires_in_hours=payload.expires_in_hours,
+        max_downloads=payload.max_downloads,
+        password=payload.password,
+    )
+    return ok(link, "Link de partilha criado")
+
+
+@router.delete(
+    "/permissions/{target_type}/{target_id}/share-link/{token}",
+    response_model=None,
+)
+def delete_resource_share_link(
+    target_type: str,
+    target_id: UUID,
+    token: str,
+    db: Session = Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    check_request_limit(db, user_id, bucket="api")
+    if target_type not in ("file", "folder"):
+        raise HTTPException(status_code=400, detail="target_type deve ser 'file' ou 'folder'")
+    details = acl_service.delete_share_link(
+        db, int(user_id), target_type, target_id, token  # type: ignore[arg-type]
+    )
+    return ok(details, "Link de partilha revogado")
+
+
+@router.get("/shared-with-me", response_model=None)
+def get_shared_with_me(
+    db: Session = Depends(get_db),
+    user_id=Depends(get_current_user_id),
+):
+    """Lista ficheiros e pastas partilhados com o utilizador autenticado."""
+    check_request_limit(db, user_id, bucket="api")
+    return ok(acl_service.list_shared_with_user(db, int(user_id)))
+
+
+@router.get("/shared-link/{token}", response_model=None)
+def inspect_shared_link(
+    token: str,
+    password: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Consulta metadados públicos de um link de partilha."""
+    lk = acl_service.validate_and_consume_share_link(
+        db, token, password=password, consume_download=False
+    )
+    return ok(
+        {
+            "token": lk["token"],
+            "target_type": lk["target_type"],
+            "target_id": lk["target_id"],
+            "target_name": lk.get("target_name"),
+            "role": lk["role"],
+            "expires_at": lk.get("expires_at"),
+            "max_downloads": lk.get("max_downloads"),
+            "downloads_count": lk.get("downloads_count", 0),
+        }
+    )
+
+
+@router.get("/shared-link/{token}/download", response_model=None)
+def download_via_shared_link(
+    token: str,
+    password: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Transfere o ficheiro ou pasta associada a um link de partilha válido."""
+    lk = acl_service.validate_and_consume_share_link(
+        db, token, password=password, consume_download=True
+    )
+    if lk["target_type"] == "file":
+        file = db.query(FileModel).filter_by(id=UUID(str(lk["target_id"])), is_deleted=False).first()
+        if not file:
+            raise HTTPException(status_code=404, detail="Ficheiro não encontrado.")
+        raw_stream, size, content_type = storage.get_file_stream(file.path)
+        decompressed = compression_service.wrap_download_stream_with_decompression(
+            raw_stream, file.filename, keep_compressed=False
+        )
+        headers = {"Content-Disposition": content_disposition(file.filename)}
+        return StreamingResponse(
+            decompressed,
+            media_type=resolve_content_type(file, content_type),
+            headers=headers,
+        )
+    else:
+        folder = (
+            db.query(StorageFolder)
+            .filter_by(id=UUID(str(lk["target_id"])), is_deleted=False)
+            .first()
+        )
+        if not folder:
+            raise HTTPException(status_code=404, detail="Pasta não encontrada.")
+        desc_ids = folder_service.descendant_ids(db, folder)
+        files = (
+            db.query(FileModel)
+            .filter(FileModel.folder_id.in_(desc_ids), FileModel.is_deleted.is_(False))
+            .all()
+        )
+        entries = []
+        for f in files:
+            raw_stream, _, _ = storage.get_file_stream(f.path)
+            entries.append(
+                (
+                    f.filename,
+                    compression_service.wrap_download_stream_with_decompression(
+                        raw_stream, f.filename
+                    ),
+                )
+            )
+        zip_stream, zip_size = compression_service.build_zip_archive_stream(entries)
+        headers = {
+            "Content-Disposition": content_disposition(f"{folder.name}.zip"),
+            "Content-Length": str(zip_size),
+        }
+        return StreamingResponse(zip_stream, media_type="application/zip", headers=headers)
+

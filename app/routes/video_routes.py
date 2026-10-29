@@ -1,5 +1,5 @@
 """
-Módulo de rotas de vídeos e recomendações (compatibilidade com a estrutura app.routes do MustaInf).
+Módulo de rotas de vídeos e recomendações (compatibilidade com a estrutura app.routes do MustaInfo).
 """
 from app.controllers.video_controller import router
 

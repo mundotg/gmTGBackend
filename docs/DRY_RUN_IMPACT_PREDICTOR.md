@@ -1,6 +1,6 @@
 # 🛡️ Dry-Run & Avaliação de Risco Pré-Execução (Impact Predictor)
 
-O **Impact Predictor (Dry-Run)** é um subsistema avançado de governança e proteção do **MustaInf**, inspirado no mecanismo de simulação e previsão de custo do **Google BigQuery** e adaptado para bancos relacionais heterogêneos (PostgreSQL, MySQL, MariaDB, SQLite, Oracle, SQL Server) e NoSQL (MongoDB).
+O **Impact Predictor (Dry-Run)** é um subsistema avançado de governança e proteção do **MustaInfo**, inspirado no mecanismo de simulação e previsão de custo do **Google BigQuery** e adaptado para bancos relacionais heterogêneos (PostgreSQL, MySQL, MariaDB, SQLite, Oracle, SQL Server) e NoSQL (MongoDB).
 
 O objetivo é avaliar o impacto, custo, linhas estimadas e tipo de varredura (Index Scan vs. Full Table/Sequential/Collection Scan) **antes** de o usuário executar a consulta ou iniciar uma transferência de dados volumosa, prevenindo quedas e degradação de performance nos bancos de dados dos clientes.
 
@@ -70,7 +70,7 @@ O objetivo é avaliar o impacto, custo, linhas estimadas e tipo de varredura (In
 | **SQLite** | `EXPLAIN QUERY PLAN <query>` | Detalhe textual: `SCAN TABLE` vs `SEARCH TABLE USING INDEX` |
 | **SQL Server / Oracle / Outros** | `EXPLAIN <query>` + Heurísticas Estáticas | Análise léxica de ausência de `WHERE`, `LIMIT` e comandos DML destrutivos |
 
-> ⚠️ **Segurança Estrita**: O MustaInf **nunca** executa `EXPLAIN ANALYZE` no dry-run de operações de escrita, pois em PostgreSQL o `ANALYZE` executa a query física. O Impact Predictor utiliza estritamente o `EXPLAIN` puro do otimizador de consultas.
+> ⚠️ **Segurança Estrita**: O MustaInfo **nunca** executa `EXPLAIN ANALYZE` no dry-run de operações de escrita, pois em PostgreSQL o `ANALYZE` executa a query física. O Impact Predictor utiliza estritamente o `EXPLAIN` puro do otimizador de consultas.
 
 ---
 
@@ -142,7 +142,7 @@ Avalia uma consulta que será usada para extrair dados em uma transferência de 
 ## 💻 Integração no Frontend
 
 ### 1. Componente `ImpactPredictorCard.tsx`
-Localização: [app/component/ImpactPredictorCard.tsx](file:///c:/Users/Francemysebasti%C3%A3o/Documents/mustainf/gmTGFrontEnd/app/component/ImpactPredictorCard.tsx)
+Localização: [app/component/ImpactPredictorCard.tsx](file:///c:/Users/Francemysebasti%C3%A3o/Documents/MustaInfo/gmTGFrontEnd/app/component/ImpactPredictorCard.tsx)
 - Suporta dois modos:
   - **Inline**: Renderizado no painel de resultados ao clicar no botão *"🔍 Explain"*.
   - **Modal**: Renderizado como guarda de segurança interceptando o botão *"▶ Executar"* quando o risco for `HIGH` ou `CRITICAL`.
@@ -150,13 +150,13 @@ Localização: [app/component/ImpactPredictorCard.tsx](file:///c:/Users/Francemy
 - Gaveta retrátil para inspecionar o JSON bruto do otimizador (`raw_plan`).
 
 ### 2. No SQL Editor
-Localização: [app/home/editorsql/page.tsx](file:///c:/Users/Francemysebasti%C3%A3o/Documents/mustainf/gmTGFrontEnd/app/home/editorsql/page.tsx)
+Localização: [app/home/editorsql/page.tsx](file:///c:/Users/Francemysebasti%C3%A3o/Documents/MustaInfo/gmTGFrontEnd/app/home/editorsql/page.tsx)
 - Botão *"🔍 Explain"* agora apresenta o card de diagnóstico de impacto.
 - Ao pressionar `Ctrl+Enter` ou clicar em *"▶ Executar"*, o pré-flight check roda em milissegundos:
   - Se for seguro, a query executa de imediato.
   - Se for crítico, surge o modal preventivo de confirmação.
 
 ### 3. Na Transferência por Query
-Localização: [app/home/transacoes/components/transacao_query_component/index.tsx](file:///c:/Users/Francemysebasti%C3%A3o/Documents/mustainf/gmTGFrontEnd/app/home/transacoes/components/transacao_query_component/index.tsx)
+Localização: [app/home/transacoes/components/transacao_query_component/index.tsx](file:///c:/Users/Francemysebasti%C3%A3o/Documents/MustaInfo/gmTGFrontEnd/app/home/transacoes/components/transacao_query_component/index.tsx)
 - Botão *"⚡ Avaliar Impacto (Dry-Run)"* adicionado na barra de ferramentas.
 - Execução em paralelo durante a amostragem de dados, alertando se a extração causará travamentos na base de origem.

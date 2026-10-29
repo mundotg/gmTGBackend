@@ -398,7 +398,7 @@ class LineageService:
                 id=tx_node_id,
                 type="transformation",
                 label=tx_label,
-                database_name="MustaInf Pipeline Engine",
+                database_name="MustaInfo Pipeline Engine",
                 db_type="pipeline",
                 table_name=None,
                 connection_id=None,

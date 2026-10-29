@@ -90,7 +90,7 @@ def test_testar_conexao_bigquery():
     import asyncio
 
     test_in = BigQueryTestIn(
-        project_id="mustainf-dw-prod",
+        project_id="MustaInfo-dw-prod",
         dataset_id="marketing_dw",
         region="us-central1",
         service_account_json=json.dumps({"type": "service_account"}),
@@ -121,14 +121,14 @@ def test_configuracao_e_disparo_webhook(db):
     import asyncio
 
     wb_in = WebhookConfigIn(
-        url="https://api.empresa.com/v1/mustainf-events",
+        url="https://api.empresa.com/v1/MustaInfo-events",
         secret="whsec_teste1234567890",
         events=["query.executed", "dry_run.alert"],
         is_active=True,
     )
 
     saved_wb = IntegrationService.save_webhook_config(db, empresa_id=1, data=wb_in)
-    assert saved_wb.url == "https://api.empresa.com/v1/mustainf-events"
+    assert saved_wb.url == "https://api.empresa.com/v1/MustaInfo-events"
     assert saved_wb.secret == "whsec_teste1234567890"
     assert "dry_run.alert" in saved_wb.events
 
@@ -139,11 +139,11 @@ def test_configuracao_e_disparo_webhook(db):
             empresa_id=1,
             url=saved_wb.url,
             secret=saved_wb.secret,
-            actor_email="tester@mustainf.com",
+            actor_email="tester@MustaInfo.com",
         )
     )
 
     assert res_test.status == 200
     assert res_test.success is True
     assert res_test.payload["event"] == "test.ping"
-    assert res_test.payload["actor"] == "tester@mustainf.com"
+    assert res_test.payload["actor"] == "tester@MustaInfo.com"

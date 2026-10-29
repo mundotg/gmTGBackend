@@ -119,7 +119,7 @@ class SMTPService:
     ) -> MIMEMultipart:
         """Monta o envelope MIME do e-mail com suporte a texto, HTML e anexos."""
         sender_email = from_email or self.config.from_email
-        # No Gmail, se o From for de outro domínio sem SPF (ex: @mustainf.com),
+        # No Gmail, se o From for de outro domínio sem SPF (ex: @MustaInfo.com),
         # provedores corporativos rejeitam ou enviam para o Spam por falha de SPF/DMARC.
         if self.config.username and "@gmail.com" in self.config.username.lower():
             if not sender_email or "@gmail.com" not in sender_email.lower():

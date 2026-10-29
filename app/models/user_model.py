@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Optional
+from typing import List, Optional
 from sqlalchemy import (
     Column,
     Integer,
@@ -14,10 +14,10 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from app.ultils.company_permissions import is_company_permission
-from app.models.clouds_models import FileModel, Plan, Plan, StorageUsage
+from app.models.clouds_models import FileModel, Plan, StorageUsage
 from app.models.task_models import TimestampMixin, project_team_association
 
 
@@ -262,7 +262,11 @@ class User(Base, TimestampMixin):
         Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True, index=True
     )
     settings = relationship(
-        "Settings", back_populates="user", uselist=False, cascade="all, delete-orphan"
+        "Settings",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     empresa = relationship("Empresa", back_populates="users")
@@ -276,63 +280,122 @@ class User(Base, TimestampMixin):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     plan: Mapped["Plan"] = relationship(back_populates="users")
-    files: Mapped[List["FileModel"]] = relationship(back_populates="user")
+    files: Mapped[List["FileModel"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     storage_usage: Mapped[Optional["StorageUsage"]] = relationship(
-        back_populates="user", uselist=False
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
-    request_usage = relationship("RequestUsage", back_populates="user", uselist=False)
+    request_usage = relationship(
+        "RequestUsage",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     network_metrics = relationship(
-        "NetworkMetric", back_populates="user", uselist=False
+        "NetworkMetric",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     # 🔗 Tokens e Contas OAuth
     refresh_tokens = relationship(
-        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+        "RefreshToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     email_verification_tokens = relationship(
-        "EmailVerificationToken", back_populates="user", cascade="all, delete-orphan"
+        "EmailVerificationToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     oauth_accounts = relationship(
-        "OAuthAccount", back_populates="user", cascade="all, delete-orphan"
+        "OAuthAccount",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     # 🔗 Projetos e tarefas
     created_projects = relationship(
-        "Project", back_populates="owner_user", cascade="all, delete-orphan"
+        "Project",
+        back_populates="owner_user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     assigned_tasks = relationship(
-        "Task", back_populates="assigned_user", foreign_keys="[Task.assigned_to_id]"
+        "Task",
+        back_populates="assigned_user",
+        foreign_keys="[Task.assigned_to_id]",
+        passive_deletes=True,
     )
 
     delegated_tasks = relationship(
-        "Task", back_populates="delegated_user", foreign_keys="[Task.delegated_to_id]"
+        "Task",
+        back_populates="delegated_user",
+        foreign_keys="[Task.delegated_to_id]",
+        passive_deletes=True,
     )
 
     created_tasks = relationship(
-        "Task", back_populates="creator_user", foreign_keys="[Task.created_by_id]"
+        "Task",
+        back_populates="creator_user",
+        foreign_keys="[Task.created_by_id]",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     created_sprints = relationship(
-        "Sprint", back_populates="created_by", foreign_keys="[Sprint.created_by_id]"
+        "Sprint",
+        back_populates="created_by",
+        foreign_keys="[Sprint.created_by_id]",
+        passive_deletes=True,
     )
 
     # 🔗 Projetos em que participa
     projects_participating = relationship(
-        "Project", secondary=project_team_association, back_populates="team_members"
+        "Project",
+        secondary=project_team_association,
+        back_populates="team_members",
+        passive_deletes=True,
     )
 
     db_connections = relationship(
-        "DBConnection", back_populates="owner", cascade="all, delete-orphan"
+        "DBConnection",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     query_history = relationship(
-        "QueryHistory", back_populates="user", cascade="all, delete-orphan"
+        "QueryHistory",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     datascience_analyses = relationship(
-        "DataScienceAnalysis", back_populates="user", cascade="all, delete-orphan"
+        "DataScienceAnalysis",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
-    chat_sessions = relationship("ChatSession", back_populates="user")
+    chat_sessions = relationship(
+        "ChatSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     @property
     def permissions(self) -> set[str]:

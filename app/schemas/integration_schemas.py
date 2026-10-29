@@ -25,6 +25,9 @@ class BigQueryConfigOut(BaseModel):
     cost_alert_threshold_usd: float
     auto_sync_lineage: bool
     export_query_audit: bool
+    status: str = "disconnected"
+    last_error: Optional[str] = None
+    last_latency_ms: Optional[int] = None
 
 
 class BigQueryTestIn(BaseModel):
@@ -38,6 +41,7 @@ class BigQueryTestOut(BaseModel):
     success: bool
     latency_ms: int
     message: str
+    error_code: Optional[str] = None
     datasets: List[str] = []
     permissions_validated: List[str] = []
 
@@ -49,8 +53,16 @@ class IntegrationItemOut(BaseModel):
     description: str
     category: str
     badge: Optional[str] = None
+    brand_color: str = "#4285F4"
+    docs_url: Optional[str] = None
+    featured: bool = False
     connected: bool
+    status: str = "disconnected"
+    endpoint_url: Optional[str] = None
     last_sync: Optional[str] = None
+    last_error: Optional[str] = None
+    error_count: int = 0
+    last_latency_ms: Optional[int] = None
     metrics: Optional[List[Dict[str, str]]] = None
     config: Optional[Dict[str, Any]] = None
 
@@ -61,6 +73,23 @@ class GenericIntegrationIn(BaseModel):
     category: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
     credentials: Optional[Dict[str, Any]] = None
+    verify_connection: bool = True
+
+
+class GenericIntegrationTestIn(BaseModel):
+    provider: str
+    host: str
+    token: Optional[str] = None
+    extra_config: Optional[Dict[str, Any]] = None
+
+
+class GenericIntegrationTestOut(BaseModel):
+    success: bool
+    status_code: Optional[int] = None
+    latency_ms: int
+    error_code: Optional[str] = None
+    message: str
+    resolved_endpoint: Optional[str] = None
 
 
 class WebhookConfigIn(BaseModel):
@@ -77,6 +106,7 @@ class WebhookConfigOut(BaseModel):
     is_active: bool
     last_triggered_at: Optional[str] = None
     last_status_code: Optional[int] = None
+    last_error: Optional[str] = None
 
 
 class WebhookTestIn(BaseModel):
@@ -87,6 +117,36 @@ class WebhookTestIn(BaseModel):
 class WebhookTestOut(BaseModel):
     status: int
     success: bool
+    error_code: Optional[str] = None
     message: str
     latency_ms: int
     payload: Dict[str, Any]
+
+
+class IntegrationLogOut(BaseModel):
+    id: int
+    provider: str
+    action: str
+    level: str
+    status_code: Optional[int] = None
+    error_code: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    latency_ms: Optional[int] = None
+    message: str
+    details: Optional[Dict[str, Any]] = None
+    created_at: str
+
+
+class IntegrationStaticConfigOut(BaseModel):
+    enforce_https: bool
+    allow_private_networks: bool
+    http_timeout_seconds: int
+    max_retries: int
+    bq_default_region: str
+    bq_default_max_bytes_gb: int
+    bq_default_cost_alert_usd: float
+    bq_cost_per_tb_usd: float
+    gcp_regions: List[Dict[str, str]]
+    webhook_signature_header: str
+    webhook_timestamp_header: str
+    webhook_events_catalog: List[Dict[str, str]]

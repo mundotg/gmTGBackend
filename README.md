@@ -1,6 +1,6 @@
 # 🚀 Data Pipeline & Analytics Platform for Database Monitoring (Backend)
 
-###### MustaInf
+###### MustaInfo
 
 This repository contains the **backend API** of a **Data Pipeline and Analytics Platform** designed to **manage, monitor, query, and transfer data across databases** in a secure, scalable, and auditable way.
 

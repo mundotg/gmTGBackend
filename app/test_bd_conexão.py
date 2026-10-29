@@ -37,7 +37,7 @@ def test_socket(host: str, port: int) -> bool:
         # getaddrinfo falhou: o NOME não resolve. Não é firewall nem porta
         # fechada — não se chegou a tentar ligar a nada. Acontece sempre que
         # se corre isto fora do cluster com um host interno do Docker/Swarm
-        # (ex.: mustainfocloud-pgmustainfodb-ifp14h), que só existe na rede
+        # (ex.: MustaInfoocloud-pgMustaInfoodb-ifp14h), que só existe na rede
         # overlay da plataforma.
         print(f"❌ Nome '{host}' não resolve (DNS): {e}")
         print("   Não é firewall. Ou o nome está errado, ou é um host interno")

@@ -46,10 +46,10 @@ class TemplateService:
         # Variáveis globais úteis disponíveis em todos os templates
         self._env.globals.update(
             {
-                "platform_name": "MustaInf",
+                "platform_name": "MustaInfo",
                 "current_year": datetime.now().year,
                 "now": datetime.now,
-                "support_email": "suporte@mustainf.com",
+                "support_email": "suporte@MustaInfo.com",
             }
         )
 

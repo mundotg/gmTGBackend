@@ -34,7 +34,7 @@ def client():
     app = FastAPI()
     mock_admin = MagicMock()
     mock_admin.id = 1
-    mock_admin.email = "admin@mustainf.com"
+    mock_admin.email = "admin@MustaInfo.com"
     mock_admin.permissions = {"settings:system", "admin:*"}
     mock_admin.is_active = True
 
@@ -193,8 +193,8 @@ from app.routes.cache_admin_routes import _extrair_user_id_de_chave_ou_dado
 def client_com_db(client):
     """Cliente com uma sessão de BD falsa que conhece os utilizadores 10 e 20."""
     utilizadores = [
-        SimpleNamespace(id=10, nome="Maria", email="maria@mustainf.com"),
-        SimpleNamespace(id=20, nome="João", email="joao@mustainf.com"),
+        SimpleNamespace(id=10, nome="Maria", email="maria@MustaInfo.com"),
+        SimpleNamespace(id=20, nome="João", email="joao@MustaInfo.com"),
     ]
     db = MagicMock()
     db.query.return_value.filter.return_value.all.return_value = utilizadores

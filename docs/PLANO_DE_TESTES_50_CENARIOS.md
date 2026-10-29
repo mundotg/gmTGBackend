@@ -1,4 +1,4 @@
-# 📋 Plano Mestre de Testes de Qualidade (QA) - MustaInfo
+# 📋 Plano Mestre de Testes de Qualidade (QA) - MustaInfoo
 **Versão:** 1.0.0  
 **Ambiente:** Staging / Local Dev  
 **Data:** 18 de Outubro de 2026  
@@ -8,7 +8,7 @@
 
 ## 📌 1. Visão Geral e Matriz de Cobertura
 
-Este documento estabelece o protocolo oficial de homologação e validação da plataforma **MustaInfo**. Todos os 50 cenários possuem passos reproduzíveis, pré-condições claras e critérios estritos de aprovação/rejeição.
+Este documento estabelece o protocolo oficial de homologação e validação da plataforma **MustaInfoo**. Todos os 50 cenários possuem passos reproduzíveis, pré-condições claras e critérios estritos de aprovação/rejeição.
 
 | ID Intervalo | Módulo Funcional | Total de Testes | Prioridade Dominante |
 |---|---|---|---|

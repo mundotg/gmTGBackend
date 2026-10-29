@@ -1,6 +1,6 @@
 # 📡 Serviço de Mensageria: SMPP (SMS) & SMTP (E-mail)
 
-Este módulo fornece a infraestrutura de configuração e envio de mensagens para a aplicação **MustaInf**, centralizando o envio de e-mails via **SMTP** e mensagens de texto SMS via protocolo **SMPP 3.4**.
+Este módulo fornece a infraestrutura de configuração e envio de mensagens para a aplicação **MustaInfo**, centralizando o envio de e-mails via **SMTP** e mensagens de texto SMS via protocolo **SMPP 3.4**.
 
 ---
 
@@ -44,9 +44,9 @@ SMTP_USER=seu_email@empresa.com
 SMTP_PASSWORD=sua_senha_de_app
 SMTP_USE_TLS=true
 SMTP_USE_SSL=false
-SMTP_FROM_EMAIL=notificacoes@mustainf.com
-SMTP_FROM_NAME="MustaInf Notificações"
-SMTP_REPLY_TO=suporte@mustainf.com
+SMTP_FROM_EMAIL=notificacoes@MustaInfo.com
+SMTP_FROM_NAME="MustaInfo Notificações"
+SMTP_REPLY_TO=suporte@MustaInfo.com
 SMTP_TIMEOUT=30
 SMTP_MAX_RETRIES=3
 ```
@@ -63,7 +63,7 @@ SMPP_SYSTEM_ID=seu_system_id
 SMPP_PASSWORD=sua_senha_smsc
 SMPP_SYSTEM_TYPE=""
 SMPP_BIND_TYPE=transceiver
-SMPP_SOURCE_ADDR=MustaInf
+SMPP_SOURCE_ADDR=MustaInfo
 SMPP_SOURCE_TON=5
 SMPP_SOURCE_NPI=0
 SMPP_DEST_TON=1
@@ -87,7 +87,7 @@ resultado = send_email(
     to="cliente@empresa.com",
     subject="Recuperação de Palavra-passe",
     body_text="O seu código de verificação é: 123456",
-    body_html="<h3>MustaInf</h3><p>O seu código de verificação é: <b>123456</b></p>",
+    body_html="<h3>MustaInfo</h3><p>O seu código de verificação é: <b>123456</b></p>",
 )
 
 if resultado.get("success"):
@@ -115,12 +115,12 @@ from app.ultils.servico_SMPP_smtp import send_email
 
 resultado = send_email(
     to="usuario@empresa.com",
-    subject="Confirmação de Registo - MustaInf",
+    subject="Confirmação de Registo - MustaInfo",
     template_name="confirmacao_registo",  # procura emails/confirmacao_registo.html e .txt
     context={
         "user_name": "Maria Silva",
         "empresa": "Tech Lda",
-        "login_url": "https://app.mustainf.com/auth/login",
+        "login_url": "https://app.MustaInfo.com/auth/login",
     },
 )
 ```
@@ -135,7 +135,7 @@ from app.ultils.servico_SMPP_smtp import send_sms, async_send_sms
 # Envio de SMS (reconhece caracteres especiais/acentos automaticamente via UCS2):
 resultado = send_sms(
     to="+244923456789",
-    text="Olá! O seu código de confirmação no MustaInf é 987654.",
+    text="Olá! O seu código de confirmação no MustaInfo é 987654.",
 )
 
 if resultado.get("success"):

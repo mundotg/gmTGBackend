@@ -8,7 +8,7 @@ services:
   # ---------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
-    # Nome diferente do `mustainfo-redis` do compose do frontend, para as duas
+    # Nome diferente do `MustaInfoo-redis` do compose do frontend, para as duas
     # stacks não disputarem o mesmo contentor.
     container_name: minha-api-redis
 
@@ -30,9 +30,9 @@ services:
       - default
       - "off"
       - --user
-      - ${REDIS_USERNAME:-mustainf}
+      - ${REDIS_USERNAME:-MustaInfo}
       - "on"
-      - ">${REDIS_PASSWORD:-mustainf_redis_dev}"
+      - ">${REDIS_PASSWORD:-MustaInfo_redis_dev}"
       - "~*"
       - "&*"
       - "+@all"
@@ -54,7 +54,7 @@ services:
     healthcheck:
       # Com o `default` desligado, o ping sem `--user`/`--pass` responde NOAUTH
       # e o contentor ficava eternamente "unhealthy".
-      test: ["CMD", "redis-cli", "--no-auth-warning", "--user", "${REDIS_USERNAME:-mustainf}", "--pass", "${REDIS_PASSWORD:-mustainf_redis_dev}", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "--user", "${REDIS_USERNAME:-MustaInfo}", "--pass", "${REDIS_PASSWORD:-MustaInfo_redis_dev}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -113,9 +113,9 @@ services:
       # `app_cache_REDIS_URL` tem de ir também: ganha a tudo em `_build_url()`.
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_USERNAME=${REDIS_USERNAME:-mustainf}
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-mustainf_redis_dev}
-      - app_cache_REDIS_URL=redis://${REDIS_USERNAME:-mustainf}:${REDIS_PASSWORD:-mustainf_redis_dev}@redis:6379/0
+      - REDIS_USERNAME=${REDIS_USERNAME:-MustaInfo}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-MustaInfo_redis_dev}
+      - app_cache_REDIS_URL=redis://${REDIS_USERNAME:-MustaInfo}:${REDIS_PASSWORD:-MustaInfo_redis_dev}@redis:6379/0
 
     extra_hosts:
       - "host.docker.internal:host-gateway"

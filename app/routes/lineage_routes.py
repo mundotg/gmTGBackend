@@ -112,7 +112,7 @@ def get_lineage_history(
     response_model=LineageEventResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registrar Evento de Linhagem Manual ou Externo",
-    description="Permite que pipelines ETL/ELT externos ou scripts customizados registrem transferências de dados no MustaInf.",
+    description="Permite que pipelines ETL/ELT externos ou scripts customizados registrem transferências de dados no MustaInfo.",
 )
 def create_lineage_event(
     payload: LineageEventCreate,

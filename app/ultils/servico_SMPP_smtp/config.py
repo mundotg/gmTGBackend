@@ -24,8 +24,8 @@ class SMTPConfig(BaseModel):
     password: Optional[str] = Field(default_factory=lambda: get_env("SMTP_PASSWORD") or get_env("SMTP_PASS"), description="Senha do servidor SMTP")
     use_tls: bool = Field(default_factory=lambda: get_env_bool("SMTP_USE_TLS", True), description="Usar STARTTLS (normalmente porta 587)")
     use_ssl: bool = Field(default_factory=lambda: get_env_bool("SMTP_USE_SSL", False), description="Usar SSL direto (normalmente porta 465)")
-    from_email: str = Field(default_factory=lambda: get_env("SMTP_FROM_EMAIL") or get_env("SMTP_USER") or "noreply@mustainf.com", description="E-mail de envio padrão")
-    from_name: str = Field(default_factory=lambda: get_env("SMTP_FROM_NAME", "MustaInf Notificações"), description="Nome do remetente exibido")
+    from_email: str = Field(default_factory=lambda: get_env("SMTP_FROM_EMAIL") or get_env("SMTP_USER") or "noreply@MustaInfo.com", description="E-mail de envio padrão")
+    from_name: str = Field(default_factory=lambda: get_env("SMTP_FROM_NAME", "MustaInfo Notificações"), description="Nome do remetente exibido")
     reply_to: Optional[str] = Field(default_factory=lambda: get_env("SMTP_REPLY_TO"), description="E-mail de resposta (Reply-To)")
     timeout: int = Field(default_factory=lambda: get_env_int("SMTP_TIMEOUT", 30) or 30, description="Tempo limite em segundos")
     max_retries: int = Field(default_factory=lambda: get_env_int("SMTP_MAX_RETRIES", 3) or 3, description="Tentativas máximas em caso de falha transitória")
@@ -64,7 +64,7 @@ class SMPPConfig(BaseModel):
     bind_type: str = Field(default_factory=lambda: get_env("SMPP_BIND_TYPE", "transceiver"), description="Tipo de bind: transceiver, transmitter ou receiver")
     
     # Endereço de Origem (Remetente)
-    source_addr: str = Field(default_factory=lambda: get_env("SMPP_SOURCE_ADDR") or get_env("SMPP_SENDER_ID", "MustaInf"), description="Remetente do SMS (Alfanumérico ou Numérico)")
+    source_addr: str = Field(default_factory=lambda: get_env("SMPP_SOURCE_ADDR") or get_env("SMPP_SENDER_ID", "MustaInfo"), description="Remetente do SMS (Alfanumérico ou Numérico)")
     source_addr_ton: int = Field(default_factory=lambda: get_env_int("SMPP_SOURCE_TON", 5) or 5, description="Type of Number do remetente (1=Internacional, 5=Alfanumérico)")
     source_addr_npi: int = Field(default_factory=lambda: get_env_int("SMPP_SOURCE_NPI", 0) or 0, description="Numbering Plan Indicator do remetente (0=Unknown, 1=ISDN/E.164)")
 
@@ -116,7 +116,7 @@ class MessagingConfig(BaseModel):
     """
     smtp: SMTPConfig = Field(default_factory=SMTPConfig)
     smpp: SMPPConfig = Field(default_factory=SMPPConfig)
-    app_name: str = Field(default_factory=lambda: get_env("APP_NAME", "MustaInf"))
+    app_name: str = Field(default_factory=lambda: get_env("APP_NAME", "MustaInfo"))
     environment: str = Field(default_factory=lambda: get_env("ENV", "development"))
 
     def masked_dict(self) -> Dict[str, Any]:

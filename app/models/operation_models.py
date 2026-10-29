@@ -1,5 +1,5 @@
 """
-🧭 Operation — a unidade de governança do MustaInf.
+🧭 Operation — a unidade de governança do MustaInfo.
 
 Uma `Operation` é o pedido de alteração: liga **o que se vai fazer** (o payload)
 a **onde** (`connection_id`), a **em que contexto** (`project_id`, o pipeline) e

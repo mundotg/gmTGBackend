@@ -149,8 +149,3 @@ class UsageLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (Index("idx_usage_user", "user_id"),)
-
-
-chat_sessions = relationship(
-    "ChatSession", back_populates="user", cascade="all, delete-orphan"
-)

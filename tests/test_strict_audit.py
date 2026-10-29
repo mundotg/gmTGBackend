@@ -186,7 +186,7 @@ def test_middleware_com_auditoria_ativada_registra_e_redige():
             # 1. Teste POST
             resp = client.post(
                 "/login",
-                json={"email": "teste@mustainf.com", "password": "segredo_real", "token": "abc"},
+                json={"email": "teste@MustaInfo.com", "password": "segredo_real", "token": "abc"},
                 headers={"X-Request-ID": "req-1234"},
             )
             assert resp.status_code == 200
@@ -203,7 +203,7 @@ def test_middleware_com_auditoria_ativada_registra_e_redige():
             assert "segredo_real" not in msg
             assert "abc" not in msg
             assert REDIGIDO in msg
-            assert "teste@mustainf.com" in msg
+            assert "teste@MustaInfo.com" in msg
 
             # 2. Teste GET (não deve auditar)
             mock_log.reset_mock()

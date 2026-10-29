@@ -1,6 +1,6 @@
 # 🗺️ Linhagem Visual de Dados (Data Lineage & Flow)
 
-A **Linhagem Visual de Dados (Data Lineage & Flow)** é o módulo de governança, auditoria e rastreabilidade do **MustaInf**, projetado para responder à pergunta fundamental de Diretores de Dados (CDOs), Auditores e Engenheiros de Dados:  
+A **Linhagem Visual de Dados (Data Lineage & Flow)** é o módulo de governança, auditoria e rastreabilidade do **MustaInfo**, projetado para responder à pergunta fundamental de Diretores de Dados (CDOs), Auditores e Engenheiros de Dados:  
 > *"De onde veio cada dado, quais transformações foram aplicadas e quais tabelas ou relatórios dependem dele?"*
 
 ---
@@ -129,7 +129,7 @@ Realiza a análise de impacto da tabela informada:
 Lista cronológica paginada de todos os eventos de fluxo e transferências registrados.
 
 ### 4. `POST /lineage/events`
-Permite que scripts ou ferramentas ETL/ELT externas registrem fluxos no grafo de governança do MustaInf.
+Permite que scripts ou ferramentas ETL/ELT externas registrem fluxos no grafo de governança do MustaInfo.
 
 ---
 

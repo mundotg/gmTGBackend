@@ -1,6 +1,6 @@
 """
 Script para geração automática da apresentação executiva em PowerPoint (.pptx)
-do Plano Mestre de Testes de Qualidade (50 Cenários) - MustaInfo.
+do Plano Mestre de Testes de Qualidade (50 Cenários) - MustaInfoo.
 Design moderno no formato 16:9 widescreen com tema dark/slate corporativo.
 """
 
@@ -30,7 +30,7 @@ def create_deck(output_path: str):
     COLOR_RED = RGBColor(239, 68, 68)     # Red 500
     COLOR_ORANGE = RGBColor(249, 115, 22) # Orange 500
 
-    def add_header(slide, title_text, category_text="PLANO DE TESTES DE QUALIDADE — MUSTAINFO"):
+    def add_header(slide, title_text, category_text="PLANO DE TESTES DE QUALIDADE — MustaInfoO"):
         # Background
         bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(13.333), Inches(7.5))
         bg.fill.solid()
@@ -141,7 +141,7 @@ def create_deck(output_path: str):
     p_title.font.color.rgb = COLOR_WHITE
 
     p_sub = tf1.add_paragraph()
-    p_sub.text = "Guia Didático e Prático de Homologação dos 50 Cenários Críticos do MustaInfo"
+    p_sub.text = "Guia Didático e Prático de Homologação dos 50 Cenários Críticos do MustaInfoo"
     p_sub.font.size = Pt(18)
     p_sub.font.color.rgb = COLOR_CYAN
     p_sub.space_before = Pt(8)
@@ -482,7 +482,7 @@ def create_deck(output_path: str):
     ], badge_text="SLA de Qualidade", badge_color=COLOR_RED)
 
     add_card(s10, Inches(6.8), Inches(1.8), Inches(5.7), Inches(5.0), "Termo de Homologação da Release", [
-        "Status da Release MustaInfo:",
+        "Status da Release MustaInfoo:",
         "[ X ] Suíte de 50 Cenários Homologada",
         "[ X ] Dry-Run & Impact Predictor Validado",
         "[ X ] Linhagem de Dados e Telemetria Operacionais",

@@ -1,6 +1,6 @@
 """cria a tabela operations
 
-A `change request` do MustaInf: liga o que se vai executar ao projeto (o
+A `change request` do MustaInfo: liga o que se vai executar ao projeto (o
 pipeline) e a conexao alvo, e guarda o estado do pedido ao longo do ciclo
 de vida. Sem ela, a promessa de que nada corre fora de um pipeline ativo
 nao tem onde se apoiar.

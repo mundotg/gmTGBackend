@@ -325,6 +325,7 @@ async def test_and_connect(
 
         # 2. TESTE DE CONEXÃO (Ponto crítico de bloqueio)
         # Executamos em threadpool para que o teste do driver (ex: pyodbc) não trave o backend
+        object.__setattr__(conn_data, "_user_id", user_id)
         engine = await run_in_threadpool(get_session_by_connection, conn_data)
 
         if not engine:
@@ -450,6 +451,7 @@ async def connect_or_disconnect(
         # MELHORIA: Rodar em threadpool para não travar o loop se a rede demorar
         from fastapi.concurrency import run_in_threadpool
 
+        object.__setattr__(conn_data, "_user_id", user_id)
         engine = await run_in_threadpool(get_session_by_connection, conn_data)
 
         if not engine:
@@ -756,6 +758,7 @@ async def test_connection(
 
     try:
         temp_conn = create_db_connection(db, user_id, conn_data)
+        object.__setattr__(conn_data, "_user_id", user_id)
         engine = get_session_by_connection(conn_data)
 
         if not engine:
@@ -866,7 +869,7 @@ async def open_dataset(
             original_filename=filename,
         )
 
-        # 4. Registar a conexão na base de dados principal (o MustaInf)
+        # 4. Registar a conexão na base de dados principal (o MustaInfo)
         # Usamos o nome da primeira tabela como database_name principal para referência,
         # mas o SQLite tem todas lá dentro.
         main_table_name = tabelas_criadas[0] if tabelas_criadas else "main_table"
@@ -1427,3 +1430,244 @@ async def delete_connection_empresa(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+
+# =========================================================
+# 🚇 MustaLink Data Connector Agent (Túnel Reverso TCP/WS)
+# =========================================================
+from fastapi import WebSocket, WebSocketDisconnect  # noqa: E402
+from fastapi.responses import FileResponse, RedirectResponse  # noqa: E402
+from app.services.agent_tunnel_manager import (  # noqa: E402
+    AgentTunnelSession,
+    agent_tunnel_registry,
+    authenticate_agent_websocket,
+    create_agent_tunnel_token,
+    get_available_releases,
+    get_minio_releases_base_url,
+    get_release_minio_url,
+    get_release_zip_path,
+    normalize_agent_id,
+)
+
+ws_router = APIRouter(prefix="/conn", tags=["connections"])
+
+
+@router.post("/agent-tunnel/token")
+async def generate_agent_tunnel_token(
+    agent_id: str = Body("default", embed=True),
+    expires_days: int = Body(30, ge=1, le=365, embed=True),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Gera um token JWT dedicado para autenticar o `musta-link-agent` na infraestrutura local.
+    """
+    norm_id = normalize_agent_id(agent_id)
+    token = create_agent_tunnel_token(
+        user_id=user_id,
+        agent_id=norm_id,
+        expires_days=expires_days,
+    )
+    return {
+        "agent_id": norm_id,
+        "virtual_host": f"agent://{norm_id}",
+        "expires_days": expires_days,
+        "token": token,
+    }
+
+
+@router.post("/agent-tunnel/pairing-code")
+async def generate_agent_pairing_code(
+    agent_id: str = Body("luanda-pg-01", embed=True),
+    target_db: str = Body("127.0.0.1:5432", embed=True),
+    expires_days: int = Body(30, ge=1, le=365, embed=True),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Emite um código temporário de emparelhamento (`XXXX-XXXX`, válido por 10 minutos)
+    para associar um `musta-link-agent` recém-descarregado sem expor o JWT ao utilizador.
+    """
+    entry = agent_tunnel_registry.create_pairing_code(
+        user_id=user_id,
+        agent_id=agent_id,
+        target_db=target_db,
+        expires_days=expires_days,
+    )
+    return {
+        "code": entry.code,
+        "agent_id": entry.agent_id,
+        "target_db": entry.target_db,
+        "virtual_host": f"agent://{entry.agent_id}",
+        "expires_at": entry.expires_at.isoformat(),
+    }
+
+
+@router.post("/agent-tunnel/pair")
+async def pair_agent_with_code(
+    code: str = Body(..., embed=True),
+    agent_id: Optional[str] = Body(None, embed=True),
+    target_db: Optional[str] = Body(None, embed=True),
+):
+    """
+    Troca um código temporário de emparelhamento (`XXXX-XXXX`) por uma credencial JWT
+    dedicada do agente. O código é de uso único.
+    """
+    result = agent_tunnel_registry.consume_pairing_code(
+        raw_code=code,
+        override_agent_id=agent_id,
+        override_target_db=target_db,
+    )
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Código de emparelhamento inválido, expirado ou já utilizado.",
+        )
+
+    log_message(
+        f"🔗 [MustaLink] Agente '{result['agent_id']}' emparelhado com sucesso (user={result['user_id']}).",
+        level="info",
+    )
+    return result
+
+
+@router.get("/agent-tunnel/releases")
+async def list_agent_releases(
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Lista os pacotes nativos compilados do MustaLink Agent disponíveis para download
+    (Windows, Linux, macOS · amd64 / arm64) com os respetivos checksums SHA-256 e URLs do MinIO.
+    """
+    releases = get_available_releases()
+    return {
+        "version": "1.0.0",
+        "minio_base_url": get_minio_releases_base_url(),
+        "releases": releases,
+    }
+
+
+@router.get("/agent-tunnel/download")
+async def download_agent_package(
+    os: str = Query(..., description="Sistema operativo: windows, linux ou darwin"),
+    arch: str = Query("amd64", description="Arquitetura: amd64 ou arm64"),
+    redirect_minio: bool = Query(False, description="Se true, redireciona diretamente para a URL do MinIO configurada no .env"),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Entrega o pacote `.zip` compilado do MustaLink Agent a partir do MinIO ou do disco local.
+    """
+    if redirect_minio:
+        minio_url = get_release_minio_url(os, arch)
+        if not minio_url:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Pacote para {os}/{arch} não suportado.",
+            )
+        return RedirectResponse(url=minio_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+    zip_path = get_release_zip_path(os, arch)
+    if not zip_path:
+        minio_url = get_release_minio_url(os, arch)
+        if minio_url:
+            return RedirectResponse(url=minio_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pacote para {os}/{arch} não encontrado ou não suportado.",
+        )
+
+    return FileResponse(
+        path=str(zip_path),
+        filename=zip_path.name,
+        media_type="application/zip",
+    )
+
+
+@router.get("/agent-tunnel/status")
+async def get_agent_tunnels_status(
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Lista os agentes MustaLink atualmente conectados para o utilizador autenticado.
+    """
+    agents = agent_tunnel_registry.list_for_user(user_id)
+    return {
+        "connected": len(agents) > 0,
+        "count": len(agents),
+        "agents": agents,
+    }
+
+
+@router.delete("/agent-tunnel/{agent_id}")
+async def revoke_agent_tunnel(
+    agent_id: str,
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Revoga as credenciais de um agente MustaLink e encerra imediatamente qualquer
+    túnel ativo associado a `(user_id, agent_id)`.
+    """
+    norm_id = normalize_agent_id(agent_id)
+    was_active = await agent_tunnel_registry.revoke_agent(user_id, norm_id)
+    log_message(
+        f"🛑 [MustaLink] Agente '{norm_id}' revogado pelo utilizador {user_id} (ativo={was_active}).",
+        level="info",
+    )
+    return {
+        "agent_id": norm_id,
+        "revoked": True,
+        "disconnected_active_session": was_active,
+    }
+
+
+@ws_router.websocket("/agent-tunnel")
+async def agent_reverse_tunnel_ws(websocket: WebSocket):
+    """
+    Endpoint WebSocket do túnel reverso multiplexado (`musta-link-agent`).
+    Exige cabeçalho `Authorization: Bearer <token>` e aloca um listener TCP
+    em loopback (`127.0.0.1`) isolado por sessão.
+    """
+    auth_info = authenticate_agent_websocket(websocket)
+    if not auth_info:
+        log_message(
+            "⛔ [MustaLink] Tentativa de conexão de agente recusada (token ausente, inválido ou revogado).",
+            level="warning",
+        )
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    user_id, agent_id, jti = auth_info
+    target_db = (websocket.headers.get("x-musta-target-db") or "127.0.0.1:5432").strip()[:128]
+    platform = (websocket.headers.get("x-musta-agent-platform") or "").strip()[:32]
+    version = (websocket.headers.get("x-musta-agent-version") or "1.0.0").strip()[:16]
+
+    await websocket.accept()
+
+    session = AgentTunnelSession(
+        user_id=user_id,
+        agent_id=agent_id,
+        target_db=target_db,
+        websocket=websocket,
+        token_jti=jti,
+        platform=platform,
+        version=version,
+    )
+
+    try:
+        local_port = await session.start_local_listener()
+        await agent_tunnel_registry.register(session)
+        log_message(
+            f"✅ [MustaLink] Agente '{agent_id}' (user={user_id}, {platform}) conectado. "
+            f"Relay local em 127.0.0.1:{local_port} -> {target_db} (use host 'agent://{agent_id}').",
+            level="info",
+        )
+        await session.receive_loop()
+    except WebSocketDisconnect:
+        log_message(
+            f"🔌 [MustaLink] Agente '{agent_id}' (user={user_id}) desconectado.",
+            level="info",
+        )
+    except Exception as exc:
+        log_message(
+            f"⚠️ [MustaLink] Erro no túnel do agente '{agent_id}' (user={user_id}): {exc}",
+            level="warning",
+        )
+    finally:
+        await agent_tunnel_registry.unregister(session)

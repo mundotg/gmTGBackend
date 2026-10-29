@@ -21,7 +21,7 @@ NotificationChannel = Literal["email", "sms", "both"]
 
 class MessagingManager:
     """
-    Controlador central de mensageria da aplicação MustaInf.
+    Controlador central de mensageria da aplicação MustaInfo.
     """
 
     def __init__(

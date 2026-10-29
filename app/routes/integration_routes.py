@@ -148,7 +148,7 @@ async def test_webhook_delivery(
         empresa_id=empresa_id,
         url=data.url,
         secret=data.secret,
-        actor_email=getattr(current_user, "email", "admin@mustainf.com"),
+        actor_email=getattr(current_user, "email", "admin@MustaInfo.com"),
     )
 
 

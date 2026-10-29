@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "name": "Tapatan 3x3 Knowledge Base",
-  "description": "Arquivo de padrões táticos e jogadas históricas aprendidas para o motor de IA do MustaInf Tapatan.",
+  "description": "Arquivo de padrões táticos e jogadas históricas aprendidas para o motor de IA do MustaInfo Tapatan.",
   "openings": [
     {
       "board_hash": "111000222",

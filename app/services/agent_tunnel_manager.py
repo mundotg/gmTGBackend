@@ -80,61 +80,64 @@ def create_agent_tunnel_token(
     return create_token(payload, timedelta(days=max(1, min(expires_days, 365))))
 
 
-def authenticate_agent_websocket(websocket: WebSocket) -> Optional[Tuple[int, str, str]]:
+def authenticate_agent_websocket_with_reason(
+    websocket: WebSocket,
+) -> Tuple[Optional[Tuple[int, str, str]], str]:
     """
-    Valida estritamente a autenticação do agente via cabeçalho `Authorization: Bearer <token>`.
-    Exige:
-      1. Cabeçalho Authorization Bearer (não aceita token na URL nem cookies de browser).
-      2. Token JWT assinado válido com `typ == "agent_tunnel"`.
-      3. Correspondência exata entre o `agent_id` do token e o header `X-Musta-Agent-ID`.
-      4. Token/agente não revogado no Control Plane.
-      5. Utilizador existente e com conta ativa (`is_active == True`) na base de dados.
-    Devolve `(user_id, agent_id, jti)` ou `None`.
+    Valida estritamente a autenticação do agente via cabeçalho `Authorization: Bearer <token>`,
+    retornando a tupla `(user_id, agent_id, jti)` e o motivo detalhado de erro em caso de recusa.
     """
     auth_header = (websocket.headers.get("authorization") or "").strip()
     if not auth_header.lower().startswith("bearer "):
-        return None
+        return None, "Cabeçalho Authorization Bearer ausente ou inválido"
 
     token = auth_header.split(" ", 1)[1].strip()
     if not token:
-        return None
+        return None, "Token Bearer vazio"
 
     payload = decode_token(token)
     if not isinstance(payload, dict):
-        return None
+        return None, "Token JWT malformado ou assinatura expirada/inválida"
 
     # Exige token específico de agente (recusa tokens normais de sessão web)
     if payload.get("typ") != "agent_tunnel":
-        return None
+        return None, f"Tipo de token incompatível ('{payload.get('typ')}'), esperado 'agent_tunnel'"
 
     encrypted_sub = payload.get("sub")
     if not encrypted_sub:
-        return None
+        return None, "Identificador de utilizador ausente no token"
 
     try:
         user_id = int(aes_decrypt(str(encrypted_sub)))
     except Exception:
-        return None
+        return None, "Falha na decifra do identificador do utilizador"
 
     token_agent_id = normalize_agent_id(str(payload.get("agent_id") or "default"))
     header_agent_id = websocket.headers.get("x-musta-agent-id")
     if header_agent_id and normalize_agent_id(header_agent_id) != token_agent_id:
-        return None
+        return None, f"ID do agente divergente (header '{header_agent_id}' != token '{token_agent_id}')"
 
     jti = str(payload.get("jti") or "")
     if agent_tunnel_registry.is_revoked(user_id, token_agent_id, jti):
-        return None
+        return None, f"Agente '{token_agent_id}' foi revogado no painel MustaInfo (credencial invalidada)"
 
     # Confirma na base de dados que o utilizador existe e está ativo
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.id == user_id).first()
-        if not user or not user.is_active:
-            return None
+        if not user:
+            return None, f"Utilizador #{user_id} não encontrado na base de dados"
+        if not user.is_active:
+            return None, f"Conta do utilizador #{user_id} está desativada"
     finally:
         db.close()
 
-    return user_id, token_agent_id, jti
+    return (user_id, token_agent_id, jti), "Autenticado com sucesso"
+
+
+def authenticate_agent_websocket(websocket: WebSocket) -> Optional[Tuple[int, str, str]]:
+    auth_info, _ = authenticate_agent_websocket_with_reason(websocket)
+    return auth_info
 
 
 class AgentTunnelSession:
@@ -591,11 +594,20 @@ def get_releases_dist_dir() -> Path:
     env_dir = (get_env("MUSTA_AGENT_DIST_DIR", "") or "").strip()
     if env_dir:
         return Path(env_dir).resolve()
+
+    # 1. Verifica no diretório local gmTGBackend/musta-link-agent/dist
+    backend_root = Path(__file__).resolve().parents[2]
+    cand1 = backend_root / "musta-link-agent" / "dist"
+    if cand1.is_dir():
+        return cand1
+
+    # 2. Verifica no diretório pai workspace/musta-link-agent/dist
     workspace_root = Path(__file__).resolve().parents[3]
-    default_dist = workspace_root / "musta-link-agent" / "dist"
-    if default_dist.is_dir():
-        return default_dist
-    return Path(__file__).resolve().parents[2] / "musta-link-dist"
+    cand2 = workspace_root / "musta-link-agent" / "dist"
+    if cand2.is_dir():
+        return cand2
+
+    return backend_root / "musta-link-dist"
 
 
 def get_available_releases() -> list[dict[str, Any]]:
@@ -621,17 +633,29 @@ def get_available_releases() -> list[dict[str, Any]]:
     # para todas as plataformas suportadas (Windows, Linux, macOS × amd64, arm64)
     # apontando para o bucket MinIO configurado no .env.
     if not items:
+        import hashlib
+
         for os_name in ("windows", "linux", "darwin"):
             for arch in ("amd64", "arm64"):
                 fname = f"musta-link-{os_name}-{arch}.zip"
                 local_zip = dist_dir / fname
-                size_b = local_zip.stat().st_size if local_zip.is_file() else 3650000
+                if local_zip.is_file():
+                    size_b = local_zip.stat().st_size
+                    try:
+                        sha = hashlib.sha256(local_zip.read_bytes()).hexdigest()
+                    except Exception:
+                        sha = ""
+                else:
+                    size_b = 3650000
+                    sha = ""
+
                 items.append(
                     {
                         "os": os_name,
                         "arch": arch,
                         "filename": fname,
                         "size_bytes": size_b,
+                        "sha256": sha,
                         "version": "1.0.0",
                     }
                 )

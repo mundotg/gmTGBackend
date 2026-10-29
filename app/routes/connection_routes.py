@@ -1436,10 +1436,12 @@ async def delete_connection_empresa(
 # =========================================================
 from fastapi import WebSocket, WebSocketDisconnect  # noqa: E402
 from fastapi.responses import FileResponse, RedirectResponse  # noqa: E402
+from app.config.dotenv import get_env  # noqa: E402
 from app.services.agent_tunnel_manager import (  # noqa: E402
     AgentTunnelSession,
     agent_tunnel_registry,
     authenticate_agent_websocket,
+    authenticate_agent_websocket_with_reason,
     create_agent_tunnel_token,
     get_available_releases,
     get_minio_releases_base_url,
@@ -1588,10 +1590,13 @@ async def get_agent_tunnels_status(
     Lista os agentes MustaLink atualmente conectados para o utilizador autenticado.
     """
     agents = agent_tunnel_registry.list_for_user(user_id)
+    is_dev = (get_env("ENV", "development") or "development").lower() in ("dev", "development")
     return {
         "connected": len(agents) > 0,
         "count": len(agents),
         "agents": agents,
+        "environment": "development" if is_dev else "production",
+        "relay_url": "ws://127.0.0.1:8000/conn/agent-tunnel" if is_dev else "wss://api.mustainfo.cloud/conn/agent-tunnel",
     }
 
 
@@ -1606,14 +1611,19 @@ async def revoke_agent_tunnel(
     """
     norm_id = normalize_agent_id(agent_id)
     was_active = await agent_tunnel_registry.revoke_agent(user_id, norm_id)
+    is_dev = (get_env("ENV", "development") or "development").lower() in ("dev", "development")
     log_message(
-        f"🛑 [MustaLink] Agente '{norm_id}' revogado pelo utilizador {user_id} (ativo={was_active}).",
+        f"🛑 [MustaLink] Agente '{norm_id}' revogado pelo utilizador #{user_id} (sessão_ativa_encerrada={was_active}). "
+        f"[Ambiente: {'DESENVOLVIMENTO' if is_dev else 'PRODUÇÃO'}] "
+        f"{'💡 Dica: Para re-emparelhar, gere um novo código temporário.' if is_dev else ''}",
         level="info",
     )
     return {
         "agent_id": norm_id,
         "revoked": True,
         "disconnected_active_session": was_active,
+        "environment": "development" if is_dev else "production",
+        "message": f"Agente '{norm_id}' revogado com sucesso. Para reconectar, gere um novo código de emparelhamento.",
     }
 
 
@@ -1624,13 +1634,23 @@ async def agent_reverse_tunnel_ws(websocket: WebSocket):
     Exige cabeçalho `Authorization: Bearer <token>` e aloca um listener TCP
     em loopback (`127.0.0.1`) isolado por sessão.
     """
-    auth_info = authenticate_agent_websocket(websocket)
+    auth_info, fail_reason = authenticate_agent_websocket_with_reason(websocket)
+    is_dev = (get_env("ENV", "development") or "development").lower() in ("dev", "development")
+
     if not auth_info:
         log_message(
-            "⛔ [MustaLink] Tentativa de conexão de agente recusada (token ausente, inválido ou revogado).",
+            f"⛔ [MustaLink] Tentativa de conexão de agente recusada: {fail_reason}. "
+            f"[Ambiente: {'DESENVOLVIMENTO' if is_dev else 'PRODUÇÃO'}]",
             level="warning",
         )
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        try:
+            # Envia o motivo exato de recusa no frame de fecho do WebSocket (RFC 6455)
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason=fail_reason[:120],
+            )
+        except Exception:
+            pass
         return
 
     user_id, agent_id, jti = auth_info

@@ -311,7 +311,7 @@ class AgentTunnelSession:
             self._open_errors.pop(conn_id, None)
             try:
                 writer.close()
-                await writer.wait_closed()
+                await asyncio.wait_for(writer.wait_closed(), timeout=1.5)
             except Exception:
                 pass
 
@@ -374,12 +374,34 @@ class AgentTunnelRegistry:
         if old is not None and old is not session:
             await old.close()
         self._sessions[key] = session
+        # Limpa qualquer engine em cache para este utilizador, pois a porta local do túnel mudou
+        try:
+            from app.config.engine_manager_cache import EngineManager
+            from app.ultils.conect_database import close_engine
+
+            old_engine = EngineManager.get(session.user_id)
+            if old_engine:
+                close_engine(old_engine)
+            EngineManager.remove(session.user_id)
+        except Exception:
+            pass
 
     async def unregister(self, session: AgentTunnelSession) -> None:
         key = (session.user_id, session.agent_id)
         if self._sessions.get(key) is session:
             self._sessions.pop(key, None)
         await session.close()
+        # Limpa qualquer engine em cache para este utilizador, pois o túnel foi encerrado
+        try:
+            from app.config.engine_manager_cache import EngineManager
+            from app.ultils.conect_database import close_engine
+
+            old_engine = EngineManager.get(session.user_id)
+            if old_engine:
+                close_engine(old_engine)
+            EngineManager.remove(session.user_id)
+        except Exception:
+            pass
 
     def get_session(self, user_id: Optional[int], agent_id: str = "default") -> Optional[AgentTunnelSession]:
         """

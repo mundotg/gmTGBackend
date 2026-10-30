@@ -10,9 +10,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.orm import Session
 
+from app.services.agent_tunnel_manager import agent_tunnel_registry, parse_agent_host
 from app.config.dependencies import (
     DATABASE_TYPES,
     _maybe_remap_host,
+    _resolve_agent_or_host,
     get_session_by_connection,
 )
 from app.config.engine_manager_cache import EngineManager
@@ -90,6 +92,29 @@ class ConnectionManager:
                 )
                 EngineManager.remove(user_id)
                 engine = None
+
+            # Valida túnel do agente MustaLink
+            if engine and connection and connection.host:
+                host_str = secret_decrypt(connection.host)
+                agent_id = parse_agent_host(host_str)
+                if agent_id:
+                    session = agent_tunnel_registry.get_session(user_id, agent_id)
+                    if not session or not session.local_port:
+                        log_message(
+                            f"Túnel do agente '{agent_id}' inativo | user_id={user_id}",
+                            "warning",
+                        )
+                        EngineManager.remove(user_id)
+                        engine = None
+                    else:
+                        engine_port = engine.url.port if hasattr(engine, "url") else None
+                        if engine_port != session.local_port:
+                            log_message(
+                                f"Porta do agente mudou ({engine_port} -> {session.local_port}) | user_id={user_id}",
+                                "info",
+                            )
+                            EngineManager.remove(user_id)
+                            engine = None
 
             # Se não existir engine ativa tenta reativar
             if not engine:
@@ -320,12 +345,17 @@ class ConnectionManager:
                 uri = f"sqlite+aiosqlite:///{db_path}"
                 engine = create_async_engine(uri, echo=False, pool_pre_ping=True)
             else:
+                owner_user_id = getattr(connection, "user_id", None) or getattr(connection, "_user_id", None)
+                resolved_host, resolved_port = _resolve_agent_or_host(
+                    secret_decrypt(connection.host) if connection.host else "",
+                    connection.port,
+                    owner_user_id,
+                )
                 config = {
                     "user": secret_decrypt(connection.username) if connection.username else "",
                     "password": secret_decrypt(connection.password) if connection.password else "",
-                    # Remap localhost→host.docker.internal em contentor.
-                    "host": _maybe_remap_host(secret_decrypt(connection.host)),
-                    "port": connection.port,
+                    "host": resolved_host,
+                    "port": resolved_port,
                     "database": connection.database_name,
                     "service": connection.service or "",
                     "sslmode": connection.sslmode or "disable",

@@ -20,7 +20,10 @@ from app.cruds.dbstatistics_crud import (
 from app.cruds.dbstructure_crud import create_db_structure, get_db_structures
 from app.models.dbstructure_models import DBField
 from app.schemas.dbstatistics_schema import DBStatisticsDict
+from app.models.connection_models import DBConnection
 from app.schemas.dbstructure_schema import DBStructureOut
+from app.services.agent_tunnel_manager import agent_tunnel_registry, parse_agent_host
+from app.services.crypto_utils import secret_decrypt
 from app.services.field_info import (
     get_fields_of_table,
     get_fields_of_tables_bulk,
@@ -90,16 +93,64 @@ def safe_inspect(engine: Any) -> Any:
     return inspect(engine)
 
 
-def _get_engine(connection_id: int, user_id: int, db: Session) -> Engine:
+def _get_engine(
+    connection_id: int,
+    user_id: int,
+    db: Session,
+    force_refresh: bool = False,
+) -> Engine:
     """
     Obtém o engine ativo ou recria a sessão a partir da conexão.
+    Valida se a conexão em cache corresponde ao connection_id e se túneis de agente estão válidos.
     """
-    engine: Optional[Engine] = EngineManager.get(user_id)
+    if not force_refresh:
+        engine: Optional[Engine] = EngineManager.get(user_id)
+        cached_conn_id = EngineManager.get_connection_id(user_id)
 
-    if engine is not None:
-        return engine
+        # Se o cache pertence a outra conexão, descarta o cache
+        if engine is not None and cached_conn_id is not None and cached_conn_id != connection_id:
+            log_message(
+                f"🔄 Cache de engine pertence à conexão {cached_conn_id}, "
+                f"mas foi solicitada a {connection_id}. Invalidando para utilizador {user_id}.",
+                "info",
+            )
+            EngineManager.remove(user_id)
+            engine = None
 
-    return get_session_by_connection_id(connection_id, db)
+        # Se a conexão for via agente MustaLink, valida se o listener local continua na mesma porta
+        if engine is not None:
+            conn = db.query(DBConnection).filter(DBConnection.id == connection_id).first()
+            if conn and conn.host:
+                host_str = secret_decrypt(conn.host)
+                agent_id = parse_agent_host(host_str)
+                if agent_id:
+                    session = agent_tunnel_registry.get_session(user_id, agent_id)
+                    if not session or not session.local_port:
+                        log_message(
+                            f"⚠️ Túnel do agente '{agent_id}' não está ativo para conexão {connection_id}. "
+                            f"Invalidando engine em cache para utilizador {user_id}.",
+                            "warning",
+                        )
+                        EngineManager.remove(user_id)
+                        engine = None
+                    else:
+                        engine_port = engine.url.port if hasattr(engine, "url") else None
+                        if engine_port != session.local_port:
+                            log_message(
+                                f"🔄 Porta do túnel do agente mudou ({engine_port} -> {session.local_port}). "
+                                f"Invalidando engine em cache para utilizador {user_id}.",
+                                "info",
+                            )
+                            EngineManager.remove(user_id)
+                            engine = None
+
+        if engine is not None:
+            return engine
+
+    fresh_engine = get_session_by_connection_id(connection_id, db)
+    if fresh_engine:
+        EngineManager.set(fresh_engine, user_id, connection_id=connection_id)
+    return fresh_engine
 
 
 def _get_default_schema(engine: Engine, inspector: Any) -> Optional[str]:
@@ -282,11 +333,27 @@ def get_table_names(
         if id_user <= 0:
             raise ValueError("id_user inválido")
 
-        engine = _get_engine(connection_id, id_user, db)
-
-        inspector: Any = safe_inspect(engine)
-
-        items = _list_tables_and_views(engine, inspector)
+        try:
+            engine = _get_engine(connection_id, id_user, db)
+            inspector: Any = safe_inspect(engine)
+            items = _list_tables_and_views(engine, inspector)
+        except Exception as initial_err:
+            log_message(
+                f"⚠️ Falha inicial ao listar tabelas da conexão {connection_id} ({initial_err}). "
+                f"Tentando com engine renovado...",
+                "warning",
+            )
+            try:
+                EngineManager.remove(id_user)
+                engine = _get_engine(connection_id, id_user, db, force_refresh=True)
+                inspector: Any = safe_inspect(engine)
+                items = _list_tables_and_views(engine, inspector)
+            except Exception as retry_err:
+                log_message(
+                    f"❌ Erro ao listar nomes de tabelas da conexão {connection_id}: {retry_err}\n{traceback.format_exc()}",
+                    "error",
+                )
+                return []
 
         seen: set[str] = set()
         names: list[str] = []
@@ -401,10 +468,21 @@ def get_strutures_names(
         return [DBStructureOut.model_validate(s) for s in structures]
 
     try:
-        engine = _get_engine(connection_id, id_user, db)
-        inspector = safe_inspect(engine)
+        try:
+            engine = _get_engine(connection_id, id_user, db)
+            inspector = safe_inspect(engine)
+            items = _list_tables_and_views(engine, inspector)
+        except Exception as initial_err:
+            log_message(
+                f"⚠️ Falha inicial ao obter estruturas da conexão {connection_id} ({initial_err}). "
+                f"Tentando com engine renovado...",
+                "warning",
+            )
+            EngineManager.remove(id_user)
+            engine = _get_engine(connection_id, id_user, db, force_refresh=True)
+            inspector = safe_inspect(engine)
+            items = _list_tables_and_views(engine, inspector)
 
-        items = _list_tables_and_views(engine, inspector)
         all_structures: list[DBStructureOut] = []
 
         for name, schema, _obj_type in items:
@@ -453,10 +531,21 @@ def get_strutures_names_only(
         return [DBStructureOut.model_validate(s) for s in structures]
 
     try:
-        engine = _get_engine(connection_id, id_user, db)
-        inspector = safe_inspect(engine)
+        try:
+            engine = _get_engine(connection_id, id_user, db)
+            inspector = safe_inspect(engine)
+            items = _list_tables_and_views(engine, inspector)
+        except Exception as initial_err:
+            log_message(
+                f"⚠️ Falha inicial ao obter estruturas da conexão {connection_id} ({initial_err}). "
+                f"Tentando com engine renovado...",
+                "warning",
+            )
+            EngineManager.remove(id_user)
+            engine = _get_engine(connection_id, id_user, db, force_refresh=True)
+            inspector = safe_inspect(engine)
+            items = _list_tables_and_views(engine, inspector)
 
-        items = _list_tables_and_views(engine, inspector)
         all_structures: list[DBStructureOut] = []
 
         for name, schema, _obj_type in items:

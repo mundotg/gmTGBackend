@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional, Set, Tuple
 from fastapi import WebSocket
 
 from app.auth import create_token, decode_token
-from app.config.dotenv import get_env
+from app.config.dotenv import get_env, get_env_bool, get_env_float, get_env_int
 from app.database import SessionLocal
 from app.models.user_model import User
 from app.services.crypto_utils import aes_decrypt, aes_encrypt
@@ -28,17 +28,64 @@ FRAME_CLOSE = 4
 FRAME_ERROR = 5
 
 HEADER_STRUCT = struct.Struct("!BII")
-MAX_PAYLOAD_SIZE = 64 * 1024
-MAX_CONCURRENT_STREAMS = 64
-MAX_STREAM_QUEUE_SIZE = 256
-OPEN_ACK_TIMEOUT = 7.0
-PAIRING_CODE_TTL_SECONDS = 600  # 10 minutos
+
+# -----------------------------------------------------------------------------
+# Configurações do Túnel e Protocolo MustaLink (carregadas dinamicamente via .env)
+# -----------------------------------------------------------------------------
+# Tamanho máximo do payload por frame binário (padrão: 64KB = 65536 bytes)
+MAX_PAYLOAD_SIZE = get_env_int("MUSTA_TUNNEL_MAX_PAYLOAD_SIZE", 64 * 1024) or (64 * 1024)
+
+# Máximo de conexões simultâneas multiplexadas num único túnel de agente (padrão: 64)
+MAX_CONCURRENT_STREAMS = get_env_int("MUSTA_TUNNEL_MAX_CONCURRENT_STREAMS", 64) or 64
+
+# Capacidade da fila assíncrona por stream para backpressure e controle de fluxo (padrão: 256)
+MAX_STREAM_QUEUE_SIZE = get_env_int("MUSTA_TUNNEL_MAX_STREAM_QUEUE_SIZE", 256) or 256
+
+# Timeout em segundos para o agente responder à abertura de socket local (padrão: 7.0s)
+OPEN_ACK_TIMEOUT = get_env_float("MUSTA_TUNNEL_OPEN_ACK_TIMEOUT", 7.0) or 7.0
+
+# Tempo de vida dos códigos temporários de emparelhamento em segundos (padrão: 600s = 10 min)
+PAIRING_CODE_TTL_SECONDS = get_env_int("MUSTA_PAIRING_CODE_TTL_SECONDS", 600) or 600
+
+# Timeout em segundos para encerramento gracioso de sockets no Windows (padrão: 1.5s)
+SOCKET_CLOSE_TIMEOUT = get_env_float("MUSTA_TUNNEL_SOCKET_CLOSE_TIMEOUT", 1.5) or 1.5
+
+# Endereço de ligação (bind) do listener de relay TCP local (padrão: 127.0.0.1)
+TUNNEL_BIND_HOST = (get_env("MUSTA_TUNNEL_BIND_HOST", "127.0.0.1") or "127.0.0.1").strip()
+
+# Parâmetros padrão ao gerar código de emparelhamento
+DEFAULT_AGENT_ID = (get_env("MUSTA_AGENT_DEFAULT_ID", "luanda-pg-01") or "luanda-pg-01").strip()
+DEFAULT_TARGET_DB = (get_env("MUSTA_AGENT_DEFAULT_TARGET_DB", "127.0.0.1:5432") or "127.0.0.1:5432").strip()
+
+# Validade padrão e limite máximo para tokens JWT dedicados do agente (em dias)
+DEFAULT_TOKEN_EXPIRES_DAYS = get_env_int("MUSTA_AGENT_TOKEN_EXPIRES_DAYS", 30) or 30
+MAX_TOKEN_EXPIRES_DAYS = get_env_int("MUSTA_AGENT_TOKEN_MAX_DAYS", 365) or 365
+
+# Versão padrão reportada pelo catálogo e sessões do agente
+DEFAULT_AGENT_VERSION = (get_env("MUSTA_AGENT_DEFAULT_VERSION", "1.0.0") or "1.0.0").strip()
+
+# TTL das URLs pré-assinadas de download dos binários no MinIO (segundos)
+RELEASE_PRESIGNED_TTL = get_env_int("MUSTA_RELEASE_PRESIGNED_TTL", 86400) or 86400
+RELEASE_SHORT_PRESIGNED_TTL = get_env_int("MUSTA_RELEASE_SHORT_PRESIGNED_TTL", 3600) or 3600
+RELEASE_FALLBACK_FILE_SIZE = get_env_int("MUSTA_RELEASE_FALLBACK_FILE_SIZE", 3650000) or 3650000
 
 _AGENT_ID_RE = re.compile(r"[^a-zA-Z0-9._-]")
 _PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-ALLOWED_OS = {"windows", "linux", "darwin"}
-ALLOWED_ARCH = {"amd64", "arm64"}
+# Whitelists de sistemas operacionais e arquiteturas permitidas para download
+_env_os = get_env("MUSTA_ALLOWED_OS")
+ALLOWED_OS = (
+    {x.strip().lower() for x in _env_os.split(",") if x.strip()}
+    if _env_os
+    else {"windows", "linux", "darwin"}
+)
+
+_env_arch = get_env("MUSTA_ALLOWED_ARCH")
+ALLOWED_ARCH = (
+    {x.strip().lower() for x in _env_arch.split(",") if x.strip()}
+    if _env_arch
+    else {"amd64", "arm64"}
+)
 
 
 @dataclass
@@ -61,7 +108,7 @@ def normalize_agent_id(raw: Optional[str]) -> str:
 def create_agent_tunnel_token(
     user_id: int,
     agent_id: str = "default",
-    expires_days: int = 30,
+    expires_days: int = DEFAULT_TOKEN_EXPIRES_DAYS,
 ) -> str:
     """
     Emite um token JWT dedicado (`typ="agent_tunnel"`) com identificador único (`jti`)
@@ -77,7 +124,7 @@ def create_agent_tunnel_token(
         "agent_id": norm_agent_id,
         "jti": jti,
     }
-    return create_token(payload, timedelta(days=max(1, min(expires_days, 365))))
+    return create_token(payload, timedelta(days=max(1, min(expires_days, MAX_TOKEN_EXPIRES_DAYS))))
 
 
 def authenticate_agent_websocket_with_reason(
@@ -155,7 +202,7 @@ class AgentTunnelSession:
         websocket: WebSocket,
         token_jti: str = "",
         platform: str = "",
-        version: str = "1.0.0",
+        version: str = DEFAULT_AGENT_VERSION,
     ) -> None:
         self.user_id = user_id
         self.agent_id = agent_id
@@ -184,7 +231,7 @@ class AgentTunnelSession:
         """Inicia um socket TCP local (127.0.0.1:0) exclusivo para este túnel."""
         self._server = await asyncio.start_server(
             self._handle_local_tcp_client,
-            host="127.0.0.1",
+            host=TUNNEL_BIND_HOST,
             port=0,
         )
         sockets = self._server.sockets or []
@@ -311,7 +358,7 @@ class AgentTunnelSession:
             self._open_errors.pop(conn_id, None)
             try:
                 writer.close()
-                await asyncio.wait_for(writer.wait_closed(), timeout=1.5)
+                await asyncio.wait_for(writer.wait_closed(), timeout=SOCKET_CLOSE_TIMEOUT)
             except Exception:
                 pass
 
@@ -455,9 +502,9 @@ class AgentTunnelRegistry:
     def create_pairing_code(
         self,
         user_id: int,
-        agent_id: str = "luanda-pg-01",
-        target_db: str = "127.0.0.1:5432",
-        expires_days: int = 30,
+        agent_id: str = DEFAULT_AGENT_ID,
+        target_db: str = DEFAULT_TARGET_DB,
+        expires_days: int = DEFAULT_TOKEN_EXPIRES_DAYS,
     ) -> PairingCodeEntry:
         """Gera um código temporário único (XXXX-XXXX) válido por 10 minutos."""
         now = datetime.now(timezone.utc)
@@ -599,7 +646,7 @@ def get_release_minio_url(os_name: str, arch: str) -> Optional[str]:
 
         storage = StorageService()
         if storage.bucket and storage.s3:
-            presigned = storage.generate_url(key, expires=3600, fallback_url=direct_url)
+            presigned = storage.generate_url(key, expires=RELEASE_SHORT_PRESIGNED_TTL, fallback_url=direct_url)
             if presigned:
                 return presigned
     except Exception:
@@ -668,7 +715,7 @@ def get_available_releases() -> list[dict[str, Any]]:
                     except Exception:
                         sha = ""
                 else:
-                    size_b = 3650000
+                    size_b = RELEASE_FALLBACK_FILE_SIZE
                     sha = ""
 
                 items.append(
@@ -678,7 +725,7 @@ def get_available_releases() -> list[dict[str, Any]]:
                         "filename": fname,
                         "size_bytes": size_b,
                         "sha256": sha,
-                        "version": "1.0.0",
+                        "version": DEFAULT_AGENT_VERSION,
                     }
                 )
 
@@ -706,7 +753,7 @@ def get_available_releases() -> list[dict[str, Any]]:
                 entry["download_url"] = s3_pub.generate_presigned_url(
                     "get_object",
                     Params={"Bucket": bucket_name, "Key": minio_key},
-                    ExpiresIn=86400,
+                    ExpiresIn=RELEASE_PRESIGNED_TTL,
                 )
             except Exception:
                 entry["download_url"] = f"{base_url}/{filename}"
@@ -731,3 +778,26 @@ def get_release_zip_path(os_name: str, arch: str) -> Optional[Path]:
     if zip_path.is_file():
         return zip_path
     return None
+
+
+def get_musta_tunnel_config() -> dict[str, Any]:
+    """Retorna um resumo de todas as variáveis de configuração ativas do MustaLink para diagnóstico e logs."""
+    return {
+        "max_payload_size": MAX_PAYLOAD_SIZE,
+        "max_concurrent_streams": MAX_CONCURRENT_STREAMS,
+        "max_stream_queue_size": MAX_STREAM_QUEUE_SIZE,
+        "open_ack_timeout": OPEN_ACK_TIMEOUT,
+        "pairing_code_ttl_seconds": PAIRING_CODE_TTL_SECONDS,
+        "socket_close_timeout": SOCKET_CLOSE_TIMEOUT,
+        "tunnel_bind_host": TUNNEL_BIND_HOST,
+        "default_agent_id": DEFAULT_AGENT_ID,
+        "default_target_db": DEFAULT_TARGET_DB,
+        "default_token_expires_days": DEFAULT_TOKEN_EXPIRES_DAYS,
+        "max_token_expires_days": MAX_TOKEN_EXPIRES_DAYS,
+        "default_agent_version": DEFAULT_AGENT_VERSION,
+        "minio_prefix": get_minio_releases_prefix(),
+        "minio_base_url": get_minio_releases_base_url(),
+        "dist_dir": str(get_releases_dist_dir()),
+        "allowed_os": sorted(list(ALLOWED_OS)),
+        "allowed_arch": sorted(list(ALLOWED_ARCH)),
+    }

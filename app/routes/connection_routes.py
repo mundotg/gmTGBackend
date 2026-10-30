@@ -1438,6 +1438,10 @@ from fastapi import WebSocket, WebSocketDisconnect  # noqa: E402
 from fastapi.responses import FileResponse, RedirectResponse  # noqa: E402
 from app.config.dotenv import get_env  # noqa: E402
 from app.services.agent_tunnel_manager import (  # noqa: E402
+    DEFAULT_AGENT_ID,
+    DEFAULT_AGENT_VERSION,
+    DEFAULT_TARGET_DB,
+    DEFAULT_TOKEN_EXPIRES_DAYS,
     AgentTunnelSession,
     agent_tunnel_registry,
     authenticate_agent_websocket,
@@ -1456,7 +1460,7 @@ ws_router = APIRouter(prefix="/conn", tags=["connections"])
 @router.post("/agent-tunnel/token")
 async def generate_agent_tunnel_token(
     agent_id: str = Body("default", embed=True),
-    expires_days: int = Body(30, ge=1, le=365, embed=True),
+    expires_days: int = Body(DEFAULT_TOKEN_EXPIRES_DAYS, ge=1, le=365, embed=True),
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -1478,9 +1482,9 @@ async def generate_agent_tunnel_token(
 
 @router.post("/agent-tunnel/pairing-code")
 async def generate_agent_pairing_code(
-    agent_id: str = Body("luanda-pg-01", embed=True),
-    target_db: str = Body("127.0.0.1:5432", embed=True),
-    expires_days: int = Body(30, ge=1, le=365, embed=True),
+    agent_id: str = Body(DEFAULT_AGENT_ID, embed=True),
+    target_db: str = Body(DEFAULT_TARGET_DB, embed=True),
+    expires_days: int = Body(DEFAULT_TOKEN_EXPIRES_DAYS, ge=1, le=365, embed=True),
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -1540,7 +1544,7 @@ async def list_agent_releases(
     """
     releases = get_available_releases()
     return {
-        "version": "1.0.0",
+        "version": DEFAULT_AGENT_VERSION,
         "minio_base_url": get_minio_releases_base_url(),
         "releases": releases,
     }
@@ -1591,12 +1595,14 @@ async def get_agent_tunnels_status(
     """
     agents = agent_tunnel_registry.list_for_user(user_id)
     is_dev = (get_env("ENV", "development") or "development").lower() in ("dev", "development")
+    default_relay = "ws://127.0.0.1:8000/conn/agent-tunnel" if is_dev else "wss://api.mustainfo.cloud/conn/agent-tunnel"
+    relay_url = get_env("MUSTA_RELAY_WS_URL", default_relay) or default_relay
     return {
         "connected": len(agents) > 0,
         "count": len(agents),
         "agents": agents,
         "environment": "development" if is_dev else "production",
-        "relay_url": "ws://127.0.0.1:8000/conn/agent-tunnel" if is_dev else "wss://api.mustainfo.cloud/conn/agent-tunnel",
+        "relay_url": relay_url,
     }
 
 

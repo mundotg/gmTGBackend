@@ -12,6 +12,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# Garante o carregamento do .env do backend antes de inicializar o StorageService
+from app.config.dotenv import get_env
 from app.services.agent_tunnel_manager import (
     get_minio_releases_base_url,
     get_minio_releases_prefix,
@@ -39,10 +41,13 @@ def upload_releases() -> int:
     )
 
     if not files_to_upload:
-        print(f"⚠️ Nenhum pacote .zip encontrado em {dist_dir}")
+        print(f"⚠️ Nenhum pacote .zip ou manifesto encontrado em {dist_dir}")
         return 1
 
-    print(f"🚀 A enviar {len(files_to_upload)} ficheiros para MinIO (bucket={storage.bucket}, prefix={prefix})...\n")
+    print(f"🚀 A enviar {len(files_to_upload)} ficheiros para MinIO:")
+    print(f"   Bucket : {storage.bucket}")
+    print(f"   Prefix : {prefix}")
+    print(f"   BaseURL: {base_url}\n")
 
     for file_path in files_to_upload:
         key = f"{prefix}/{file_path.name}"
@@ -53,11 +58,13 @@ def upload_releases() -> int:
             if file_path.suffix == ".json"
             else "text/plain"
         )
+        size_kb = file_path.stat().st_size / 1024.0
+        print(f"  ⏳ A carregar {file_path.name} ({size_kb:.1f} KB)...", end="", flush=True)
         with open(file_path, "rb") as fh:
-            storage.upload_file(fh, key=key, content_type=content_type)
-        print(f"  ✅ {file_path.name} -> {base_url}/{file_path.name}")
+            storage.upload_file(fh, key=key, content_type=content_type, sync_async=False)
+        print(f"\r  ✅ {file_path.name} ({size_kb:.1f} KB) -> {base_url}/{file_path.name}")
 
-    print("\n🎉 Todos os pacotes MustaLink foram sincronizados com sucesso!")
+    print("\n🎉 Todos os pacotes MustaLink foram sincronizados com sucesso no MinIO!")
     return 0
 
 

@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional, Set, Tuple
 from fastapi import WebSocket
 
 from app.auth import create_token, decode_token
-from app.config.dotenv import get_env
+from app.config.dotenv import get_env, get_env_bool, get_env_float, get_env_int
 from app.database import SessionLocal
 from app.models.user_model import User
 from app.services.crypto_utils import aes_decrypt, aes_encrypt
@@ -28,17 +28,64 @@ FRAME_CLOSE = 4
 FRAME_ERROR = 5
 
 HEADER_STRUCT = struct.Struct("!BII")
-MAX_PAYLOAD_SIZE = 64 * 1024
-MAX_CONCURRENT_STREAMS = 64
-MAX_STREAM_QUEUE_SIZE = 256
-OPEN_ACK_TIMEOUT = 7.0
-PAIRING_CODE_TTL_SECONDS = 600  # 10 minutos
+
+# -----------------------------------------------------------------------------
+# Configurações do Túnel e Protocolo MustaLink (carregadas dinamicamente via .env)
+# -----------------------------------------------------------------------------
+# Tamanho máximo do payload por frame binário (padrão: 64KB = 65536 bytes)
+MAX_PAYLOAD_SIZE = get_env_int("MUSTA_TUNNEL_MAX_PAYLOAD_SIZE", 64 * 1024) or (64 * 1024)
+
+# Máximo de conexões simultâneas multiplexadas num único túnel de agente (padrão: 64)
+MAX_CONCURRENT_STREAMS = get_env_int("MUSTA_TUNNEL_MAX_CONCURRENT_STREAMS", 64) or 64
+
+# Capacidade da fila assíncrona por stream para backpressure e controle de fluxo (padrão: 256)
+MAX_STREAM_QUEUE_SIZE = get_env_int("MUSTA_TUNNEL_MAX_STREAM_QUEUE_SIZE", 256) or 256
+
+# Timeout em segundos para o agente responder à abertura de socket local (padrão: 7.0s)
+OPEN_ACK_TIMEOUT = get_env_float("MUSTA_TUNNEL_OPEN_ACK_TIMEOUT", 7.0) or 7.0
+
+# Tempo de vida dos códigos temporários de emparelhamento em segundos (padrão: 600s = 10 min)
+PAIRING_CODE_TTL_SECONDS = get_env_int("MUSTA_PAIRING_CODE_TTL_SECONDS", 600) or 600
+
+# Timeout em segundos para encerramento gracioso de sockets no Windows (padrão: 1.5s)
+SOCKET_CLOSE_TIMEOUT = get_env_float("MUSTA_TUNNEL_SOCKET_CLOSE_TIMEOUT", 1.5) or 1.5
+
+# Endereço de ligação (bind) do listener de relay TCP local (padrão: 127.0.0.1)
+TUNNEL_BIND_HOST = (get_env("MUSTA_TUNNEL_BIND_HOST", "127.0.0.1") or "127.0.0.1").strip()
+
+# Parâmetros padrão ao gerar código de emparelhamento
+DEFAULT_AGENT_ID = (get_env("MUSTA_AGENT_DEFAULT_ID", "luanda-pg-01") or "luanda-pg-01").strip()
+DEFAULT_TARGET_DB = (get_env("MUSTA_AGENT_DEFAULT_TARGET_DB", "127.0.0.1:5432") or "127.0.0.1:5432").strip()
+
+# Validade padrão e limite máximo para tokens JWT dedicados do agente (em dias)
+DEFAULT_TOKEN_EXPIRES_DAYS = get_env_int("MUSTA_AGENT_TOKEN_EXPIRES_DAYS", 30) or 30
+MAX_TOKEN_EXPIRES_DAYS = get_env_int("MUSTA_AGENT_TOKEN_MAX_DAYS", 365) or 365
+
+# Versão padrão reportada pelo catálogo e sessões do agente
+DEFAULT_AGENT_VERSION = (get_env("MUSTA_AGENT_DEFAULT_VERSION", "1.0.0") or "1.0.0").strip()
+
+# TTL das URLs pré-assinadas de download dos binários no MinIO (segundos)
+RELEASE_PRESIGNED_TTL = get_env_int("MUSTA_RELEASE_PRESIGNED_TTL", 86400) or 86400
+RELEASE_SHORT_PRESIGNED_TTL = get_env_int("MUSTA_RELEASE_SHORT_PRESIGNED_TTL", 3600) or 3600
+RELEASE_FALLBACK_FILE_SIZE = get_env_int("MUSTA_RELEASE_FALLBACK_FILE_SIZE", 3650000) or 3650000
 
 _AGENT_ID_RE = re.compile(r"[^a-zA-Z0-9._-]")
 _PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-ALLOWED_OS = {"windows", "linux", "darwin"}
-ALLOWED_ARCH = {"amd64", "arm64"}
+# Whitelists de sistemas operacionais e arquiteturas permitidas para download
+_env_os = get_env("MUSTA_ALLOWED_OS")
+ALLOWED_OS = (
+    {x.strip().lower() for x in _env_os.split(",") if x.strip()}
+    if _env_os
+    else {"windows", "linux", "darwin"}
+)
+
+_env_arch = get_env("MUSTA_ALLOWED_ARCH")
+ALLOWED_ARCH = (
+    {x.strip().lower() for x in _env_arch.split(",") if x.strip()}
+    if _env_arch
+    else {"amd64", "arm64"}
+)
 
 
 @dataclass
@@ -61,7 +108,7 @@ def normalize_agent_id(raw: Optional[str]) -> str:
 def create_agent_tunnel_token(
     user_id: int,
     agent_id: str = "default",
-    expires_days: int = 30,
+    expires_days: int = DEFAULT_TOKEN_EXPIRES_DAYS,
 ) -> str:
     """
     Emite um token JWT dedicado (`typ="agent_tunnel"`) com identificador único (`jti`)
@@ -77,64 +124,67 @@ def create_agent_tunnel_token(
         "agent_id": norm_agent_id,
         "jti": jti,
     }
-    return create_token(payload, timedelta(days=max(1, min(expires_days, 365))))
+    return create_token(payload, timedelta(days=max(1, min(expires_days, MAX_TOKEN_EXPIRES_DAYS))))
 
 
-def authenticate_agent_websocket(websocket: WebSocket) -> Optional[Tuple[int, str, str]]:
+def authenticate_agent_websocket_with_reason(
+    websocket: WebSocket,
+) -> Tuple[Optional[Tuple[int, str, str]], str]:
     """
-    Valida estritamente a autenticação do agente via cabeçalho `Authorization: Bearer <token>`.
-    Exige:
-      1. Cabeçalho Authorization Bearer (não aceita token na URL nem cookies de browser).
-      2. Token JWT assinado válido com `typ == "agent_tunnel"`.
-      3. Correspondência exata entre o `agent_id` do token e o header `X-Musta-Agent-ID`.
-      4. Token/agente não revogado no Control Plane.
-      5. Utilizador existente e com conta ativa (`is_active == True`) na base de dados.
-    Devolve `(user_id, agent_id, jti)` ou `None`.
+    Valida estritamente a autenticação do agente via cabeçalho `Authorization: Bearer <token>`,
+    retornando a tupla `(user_id, agent_id, jti)` e o motivo detalhado de erro em caso de recusa.
     """
     auth_header = (websocket.headers.get("authorization") or "").strip()
     if not auth_header.lower().startswith("bearer "):
-        return None
+        return None, "Cabeçalho Authorization Bearer ausente ou inválido"
 
     token = auth_header.split(" ", 1)[1].strip()
     if not token:
-        return None
+        return None, "Token Bearer vazio"
 
     payload = decode_token(token)
     if not isinstance(payload, dict):
-        return None
+        return None, "Token JWT malformado ou assinatura expirada/inválida"
 
     # Exige token específico de agente (recusa tokens normais de sessão web)
     if payload.get("typ") != "agent_tunnel":
-        return None
+        return None, f"Tipo de token incompatível ('{payload.get('typ')}'), esperado 'agent_tunnel'"
 
     encrypted_sub = payload.get("sub")
     if not encrypted_sub:
-        return None
+        return None, "Identificador de utilizador ausente no token"
 
     try:
         user_id = int(aes_decrypt(str(encrypted_sub)))
     except Exception:
-        return None
+        return None, "Falha na decifra do identificador do utilizador"
 
     token_agent_id = normalize_agent_id(str(payload.get("agent_id") or "default"))
     header_agent_id = websocket.headers.get("x-musta-agent-id")
     if header_agent_id and normalize_agent_id(header_agent_id) != token_agent_id:
-        return None
+        return None, f"ID do agente divergente (header '{header_agent_id}' != token '{token_agent_id}')"
 
     jti = str(payload.get("jti") or "")
     if agent_tunnel_registry.is_revoked(user_id, token_agent_id, jti):
-        return None
+        return None, f"Agente '{token_agent_id}' foi revogado no painel MustaInfo (credencial invalidada)"
 
     # Confirma na base de dados que o utilizador existe e está ativo
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.id == user_id).first()
-        if not user or not user.is_active:
-            return None
+        if not user:
+            return None, f"Utilizador #{user_id} não encontrado na base de dados"
+        if not user.is_active:
+            return None, f"Conta do utilizador #{user_id} está desativada"
     finally:
         db.close()
 
-    return user_id, token_agent_id, jti
+    return (user_id, token_agent_id, jti), "Autenticado com sucesso"
+
+
+def authenticate_agent_websocket(websocket: WebSocket) -> Optional[Tuple[int, str, str]]:
+    auth_info, _ = authenticate_agent_websocket_with_reason(websocket)
+    return auth_info
 
 
 class AgentTunnelSession:
@@ -152,7 +202,7 @@ class AgentTunnelSession:
         websocket: WebSocket,
         token_jti: str = "",
         platform: str = "",
-        version: str = "1.0.0",
+        version: str = DEFAULT_AGENT_VERSION,
     ) -> None:
         self.user_id = user_id
         self.agent_id = agent_id
@@ -181,7 +231,7 @@ class AgentTunnelSession:
         """Inicia um socket TCP local (127.0.0.1:0) exclusivo para este túnel."""
         self._server = await asyncio.start_server(
             self._handle_local_tcp_client,
-            host="127.0.0.1",
+            host=TUNNEL_BIND_HOST,
             port=0,
         )
         sockets = self._server.sockets or []
@@ -308,7 +358,7 @@ class AgentTunnelSession:
             self._open_errors.pop(conn_id, None)
             try:
                 writer.close()
-                await writer.wait_closed()
+                await asyncio.wait_for(writer.wait_closed(), timeout=SOCKET_CLOSE_TIMEOUT)
             except Exception:
                 pass
 
@@ -371,12 +421,34 @@ class AgentTunnelRegistry:
         if old is not None and old is not session:
             await old.close()
         self._sessions[key] = session
+        # Limpa qualquer engine em cache para este utilizador, pois a porta local do túnel mudou
+        try:
+            from app.config.engine_manager_cache import EngineManager
+            from app.ultils.conect_database import close_engine
+
+            old_engine = EngineManager.get(session.user_id)
+            if old_engine:
+                close_engine(old_engine)
+            EngineManager.remove(session.user_id)
+        except Exception:
+            pass
 
     async def unregister(self, session: AgentTunnelSession) -> None:
         key = (session.user_id, session.agent_id)
         if self._sessions.get(key) is session:
             self._sessions.pop(key, None)
         await session.close()
+        # Limpa qualquer engine em cache para este utilizador, pois o túnel foi encerrado
+        try:
+            from app.config.engine_manager_cache import EngineManager
+            from app.ultils.conect_database import close_engine
+
+            old_engine = EngineManager.get(session.user_id)
+            if old_engine:
+                close_engine(old_engine)
+            EngineManager.remove(session.user_id)
+        except Exception:
+            pass
 
     def get_session(self, user_id: Optional[int], agent_id: str = "default") -> Optional[AgentTunnelSession]:
         """
@@ -430,9 +502,9 @@ class AgentTunnelRegistry:
     def create_pairing_code(
         self,
         user_id: int,
-        agent_id: str = "luanda-pg-01",
-        target_db: str = "127.0.0.1:5432",
-        expires_days: int = 30,
+        agent_id: str = DEFAULT_AGENT_ID,
+        target_db: str = DEFAULT_TARGET_DB,
+        expires_days: int = DEFAULT_TOKEN_EXPIRES_DAYS,
     ) -> PairingCodeEntry:
         """Gera um código temporário único (XXXX-XXXX) válido por 10 minutos."""
         now = datetime.now(timezone.utc)
@@ -574,7 +646,7 @@ def get_release_minio_url(os_name: str, arch: str) -> Optional[str]:
 
         storage = StorageService()
         if storage.bucket and storage.s3:
-            presigned = storage.generate_url(key, expires=3600, fallback_url=direct_url)
+            presigned = storage.generate_url(key, expires=RELEASE_SHORT_PRESIGNED_TTL, fallback_url=direct_url)
             if presigned:
                 return presigned
     except Exception:
@@ -591,11 +663,20 @@ def get_releases_dist_dir() -> Path:
     env_dir = (get_env("MUSTA_AGENT_DIST_DIR", "") or "").strip()
     if env_dir:
         return Path(env_dir).resolve()
+
+    # 1. Verifica no diretório local gmTGBackend/musta-link-agent/dist
+    backend_root = Path(__file__).resolve().parents[2]
+    cand1 = backend_root / "musta-link-agent" / "dist"
+    if cand1.is_dir():
+        return cand1
+
+    # 2. Verifica no diretório pai workspace/musta-link-agent/dist
     workspace_root = Path(__file__).resolve().parents[3]
-    default_dist = workspace_root / "musta-link-agent" / "dist"
-    if default_dist.is_dir():
-        return default_dist
-    return Path(__file__).resolve().parents[2] / "musta-link-dist"
+    cand2 = workspace_root / "musta-link-agent" / "dist"
+    if cand2.is_dir():
+        return cand2
+
+    return backend_root / "musta-link-dist"
 
 
 def get_available_releases() -> list[dict[str, Any]]:
@@ -621,18 +702,30 @@ def get_available_releases() -> list[dict[str, Any]]:
     # para todas as plataformas suportadas (Windows, Linux, macOS × amd64, arm64)
     # apontando para o bucket MinIO configurado no .env.
     if not items:
+        import hashlib
+
         for os_name in ("windows", "linux", "darwin"):
             for arch in ("amd64", "arm64"):
                 fname = f"musta-link-{os_name}-{arch}.zip"
                 local_zip = dist_dir / fname
-                size_b = local_zip.stat().st_size if local_zip.is_file() else 3650000
+                if local_zip.is_file():
+                    size_b = local_zip.stat().st_size
+                    try:
+                        sha = hashlib.sha256(local_zip.read_bytes()).hexdigest()
+                    except Exception:
+                        sha = ""
+                else:
+                    size_b = RELEASE_FALLBACK_FILE_SIZE
+                    sha = ""
+
                 items.append(
                     {
                         "os": os_name,
                         "arch": arch,
                         "filename": fname,
                         "size_bytes": size_b,
-                        "version": "1.0.0",
+                        "sha256": sha,
+                        "version": DEFAULT_AGENT_VERSION,
                     }
                 )
 
@@ -660,7 +753,7 @@ def get_available_releases() -> list[dict[str, Any]]:
                 entry["download_url"] = s3_pub.generate_presigned_url(
                     "get_object",
                     Params={"Bucket": bucket_name, "Key": minio_key},
-                    ExpiresIn=86400,
+                    ExpiresIn=RELEASE_PRESIGNED_TTL,
                 )
             except Exception:
                 entry["download_url"] = f"{base_url}/{filename}"
@@ -685,3 +778,238 @@ def get_release_zip_path(os_name: str, arch: str) -> Optional[Path]:
     if zip_path.is_file():
         return zip_path
     return None
+
+
+def get_musta_tunnel_config() -> dict[str, Any]:
+    """Retorna um resumo de todas as variáveis de configuração ativas do MustaLink para diagnóstico e logs."""
+    return {
+        "max_payload_size": MAX_PAYLOAD_SIZE,
+        "max_concurrent_streams": MAX_CONCURRENT_STREAMS,
+        "max_stream_queue_size": MAX_STREAM_QUEUE_SIZE,
+        "open_ack_timeout": OPEN_ACK_TIMEOUT,
+        "pairing_code_ttl_seconds": PAIRING_CODE_TTL_SECONDS,
+        "socket_close_timeout": SOCKET_CLOSE_TIMEOUT,
+        "tunnel_bind_host": TUNNEL_BIND_HOST,
+        "default_agent_id": DEFAULT_AGENT_ID,
+        "default_target_db": DEFAULT_TARGET_DB,
+        "default_token_expires_days": DEFAULT_TOKEN_EXPIRES_DAYS,
+        "max_token_expires_days": MAX_TOKEN_EXPIRES_DAYS,
+        "default_agent_version": DEFAULT_AGENT_VERSION,
+        "minio_prefix": get_minio_releases_prefix(),
+        "minio_base_url": get_minio_releases_base_url(),
+        "dist_dir": str(get_releases_dist_dir()),
+        "allowed_os": sorted(list(ALLOWED_OS)),
+        "allowed_arch": sorted(list(ALLOWED_ARCH)),
+    }
+
+
+
+# -----------------------------------------------------------------------------
+# Sincronização e Verificação de Versão das Releases no MinIO / S3
+# -----------------------------------------------------------------------------
+
+def parse_semver(ver: str) -> tuple[int, ...]:
+    """Extrai tupla numérica (major, minor, patch) de uma string de versão."""
+    clean = re.sub(r"^[vV]", "", (ver or "").strip())
+    parts = []
+    for p in clean.split("."):
+        m = re.match(r"^(\d+)", p)
+        if m:
+            parts.append(int(m.group(1)))
+        else:
+            break
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
+def compare_versions(v1: str, v2: str) -> int:
+    """
+    Compara v1 e v2 segundo SemVer.
+    Retorna -1 se v1 < v2, 0 se v1 == v2, 1 se v1 > v2.
+    """
+    p1 = parse_semver(v1)
+    p2 = parse_semver(v2)
+    if p1 < p2:
+        return -1
+    elif p1 > p2:
+        return 1
+    return 0
+
+
+def extract_manifest_version(data: Any) -> Optional[str]:
+    """Extrai a versão de um manifesto releases.json (seja lista de objetos ou dict)."""
+    if isinstance(data, dict):
+        if data.get("version"):
+            return str(data["version"]).strip()
+        releases = data.get("releases")
+        if isinstance(releases, list) and releases and isinstance(releases[0], dict):
+            return str(releases[0].get("version") or "").strip()
+    elif isinstance(data, list) and data and isinstance(data[0], dict):
+        return str(data[0].get("version") or "").strip()
+    return None
+
+
+def sync_agent_releases_with_storage(force_upload: bool = False) -> dict[str, Any]:
+    """
+    Verifica e sincroniza os pacotes compilados do MustaLink Agent com o MinIO / S3:
+      1. Se os pacotes estiverem ausentes no MinIO, realiza upload de todos os binários.
+      2. Se existirem, analisa a versão do MinIO vs versão local:
+         - Versão MinIO < Local (passada/inferior): atualiza todos os pacotes no MinIO.
+         - Versão MinIO == Local (igual): verifica se falta algum ficheiro e envia apenas os ausentes.
+         - Versão MinIO > Local (superior): mantém o MinIO intacto.
+    """
+    auto_sync = get_env_bool("MUSTA_AUTO_SYNC_MINIO_ON_STARTUP", True)
+    if not auto_sync and not force_upload:
+        log_message("ℹ️ [MustaLink] Sincronização automática com MinIO desativada por .env (MUSTA_AUTO_SYNC_MINIO_ON_STARTUP=false).", "info")
+        return {"status": "skipped", "reason": "disabled_by_env"}
+
+    dist_dir = get_releases_dist_dir()
+    if not dist_dir.is_dir():
+        log_message(f"⚠️ [MustaLink] Diretório de releases '{dist_dir}' não encontrado. Sincronização MinIO ignorada.", "warning")
+        return {"status": "skipped", "reason": "no_dist_dir"}
+
+    local_files = sorted(
+        [
+            p
+            for p in dist_dir.iterdir()
+            if p.is_file() and (p.suffix == ".zip" or p.name in ("releases.json", "SHA256SUMS.txt"))
+        ]
+    )
+
+    if not local_files:
+        log_message(f"⚠️ [MustaLink] Nenhum ficheiro .zip ou manifesto encontrado em '{dist_dir}'.", "warning")
+        return {"status": "skipped", "reason": "no_local_files"}
+
+    # Determina a versão local
+    local_version = DEFAULT_AGENT_VERSION
+    manifest_local_path = dist_dir / "releases.json"
+    if manifest_local_path.is_file():
+        try:
+            m_data = json.loads(manifest_local_path.read_text(encoding="utf-8-sig"))
+            extracted = extract_manifest_version(m_data)
+            if extracted:
+                local_version = extracted
+        except Exception:
+            pass
+
+    # Inicializa StorageService
+    try:
+        from cloud.config import StorageService
+
+        storage = StorageService()
+    except Exception as err:
+        log_message(f"⚠️ [MustaLink] Falha ao inicializar StorageService: {err}", "warning")
+        return {"status": "error", "error": str(err)}
+
+    if not storage.bucket or not storage.s3:
+        log_message("⚠️ [MustaLink] MinIO/S3 não configurado (STORAGE_BUCKET ou cliente ausente). Sincronização ignorada.", "warning")
+        return {"status": "skipped", "reason": "storage_not_configured"}
+
+    prefix = get_minio_releases_prefix()
+    base_url = get_minio_releases_base_url()
+
+    # Inspeciona estado atual no MinIO
+    remote_version: Optional[str] = None
+    existing_remote_filenames: set[str] = set()
+
+    try:
+        paginator = storage.s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=storage.bucket, Prefix=f"{prefix}/"):
+            for obj in page.get("Contents", []):
+                key = obj.get("Key", "")
+                fname = key[len(prefix) :].lstrip("/")
+                if fname:
+                    existing_remote_filenames.add(fname)
+
+        if "releases.json" in existing_remote_filenames:
+            try:
+                resp = storage.s3.get_object(Bucket=storage.bucket, Key=f"{prefix}/releases.json")
+                body = resp["Body"].read().decode("utf-8-sig")
+                remote_data = json.loads(body)
+                remote_version = extract_manifest_version(remote_data)
+            except Exception as read_err:
+                log_message(f"⚠️ [MustaLink] Falha ao ler releases.json do MinIO ({read_err}). Será regravado.", "warning")
+                remote_version = None
+    except Exception as list_err:
+        log_message(f"⚠️ [MustaLink] Falha ao listar objetos no MinIO ({list_err}). Tentando sincronização direta.", "warning")
+
+    # Decisão de sincronização
+    files_to_upload: list[Path] = []
+    reason = ""
+
+    if force_upload:
+        files_to_upload = local_files
+        reason = "forçada manualmente"
+    elif remote_version is None or "releases.json" not in existing_remote_filenames:
+        files_to_upload = local_files
+        reason = f"pacotes ausentes no MinIO (enviando versão {local_version})"
+    else:
+        cmp = compare_versions(remote_version, local_version)
+        if cmp < 0:
+            # Versão no MinIO é passada / inferior (< local)
+            files_to_upload = local_files
+            reason = f"versão no MinIO desatualizada (remota {remote_version} < local {local_version})"
+        elif cmp == 0:
+            # Versão no MinIO é igual (== local): verifica se faltam arquivos
+            missing = [p for p in local_files if p.name not in existing_remote_filenames]
+            if missing:
+                files_to_upload = missing
+                reason = f"versão {local_version} igual, mas {len(missing)} ficheiro(s) estavam em falta no MinIO"
+            else:
+                log_message(
+                    f"✅ [MustaLink] Pacotes do agente já estão no MinIO e atualizados (versão: {remote_version}, {len(existing_remote_filenames)} ficheiros).",
+                    level="info",
+                )
+                return {
+                    "status": "up_to_date",
+                    "version": remote_version,
+                    "files_count": len(existing_remote_filenames),
+                    "base_url": base_url,
+                }
+        else:
+            # Versão no MinIO é superior (> local)
+            log_message(
+                f"ℹ️ [MustaLink] MinIO possui versão mais recente que a local (remota {remote_version} > local {local_version}). Mantendo MinIO.",
+                level="info",
+            )
+            return {
+                "status": "up_to_date",
+                "version": remote_version,
+                "base_url": base_url,
+            }
+
+    # Executa o upload dos ficheiros selecionados
+    log_message(
+        f"🚀 [MustaLink] Sincronizando binários no MinIO ({reason}). Enviando {len(files_to_upload)} ficheiro(s)...",
+        level="info",
+    )
+
+    uploaded: list[str] = []
+    for file_path in files_to_upload:
+        key = f"{prefix}/{file_path.name}"
+        content_type = (
+            "application/zip"
+            if file_path.suffix == ".zip"
+            else "application/json"
+            if file_path.suffix == ".json"
+            else "text/plain"
+        )
+        try:
+            with open(file_path, "rb") as fh:
+                storage.upload_file(fh, key=key, content_type=content_type, sync_async=False)
+            uploaded.append(file_path.name)
+        except Exception as up_err:
+            log_message(f"❌ [MustaLink] Erro ao enviar {file_path.name} para o MinIO: {up_err}", "error")
+
+    log_message(
+        f"🎉 [MustaLink] Sincronização concluída no MinIO: {len(uploaded)}/{len(files_to_upload)} ficheiros enviados com sucesso (versão: {local_version}).",
+        level="info",
+    )
+
+    return {
+        "status": "synced",
+        "version": local_version,
+        "uploaded": uploaded,
+        "base_url": base_url,
+    }

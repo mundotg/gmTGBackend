@@ -18,6 +18,7 @@ from app.services.crypto_utils import secret_decrypt
 from app.ultils.logger import log_message
 from datetime import datetime
 
+from app.services.agent_tunnel_manager import agent_tunnel_registry, parse_agent_host
 from app.ultils.socket_connection import is_port_open
 
 
@@ -72,9 +73,24 @@ def reativar_connection(id_user: int, db: Session) -> dict:
         if not EngineManager.get(id_user):
             # 🔍 Checa antes de criar engine se o host:porta está acessível
             if type_db.lower() != "sqlite":
-                if not is_port_open(host, conexao.port):
+                check_host = host
+                check_port = conexao.port
+                agent_id = parse_agent_host(host)
+                if agent_id:
+                    session = agent_tunnel_registry.get_session(id_user, agent_id)
+                    if not session or not session.local_port:
+                        log_message(
+                            f"❌ Agente MustaLink '{agent_id}' não está conectado para o usuário {id_user}",
+                            "warning",
+                        )
+                        desativar_connection(id_user, conexao.id, db)
+                        return {"success": False, "config": db_on}
+                    check_host = "127.0.0.1"
+                    check_port = session.local_port
+
+                if not is_port_open(check_host, check_port):
                     log_message(
-                        f"❌ Banco {host}:{conexao.port} inacessível para o usuário {id_user}",
+                        f"❌ Banco {check_host}:{check_port} inacessível para o usuário {id_user}",
                         "error",
                     )
                     desativar_connection(id_user, conexao.id, db)

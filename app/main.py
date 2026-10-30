@@ -152,6 +152,13 @@ async def lifespan(app: FastAPI):
 
     schedule_cache_cleanup()
 
+    # 🚇 Verificação e sincronização automática dos pacotes do MustaLink no MinIO / Storage
+    try:
+        from app.services.agent_tunnel_manager import sync_agent_releases_with_storage
+        await asyncio.to_thread(sync_agent_releases_with_storage)
+    except Exception as err:
+        log_message(f"⚠️ [MustaLink] Falha ao verificar/sincronizar releases no MinIO: {err}", "warning")
+
     # O FastAPI roda a aplicação aqui
     yield
 

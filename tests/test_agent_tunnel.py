@@ -22,6 +22,10 @@ from app.services.agent_tunnel_manager import (
     get_release_minio_url,
     get_release_zip_path,
     parse_agent_host,
+    compare_versions,
+    parse_semver,
+    extract_manifest_version,
+    sync_agent_releases_with_storage,
 )
 from app.services.crypto_utils import aes_encrypt
 
@@ -240,6 +244,56 @@ class TestAgentTunnelSecurityAndIsolation(unittest.IsolatedAsyncioTestCase):
             agent_task.cancel()
             recv_task.cancel()
 
+
+
+    def test_version_analysis_and_semver(self):
+        # 1. Comparações de versão SemVer
+        self.assertEqual(compare_versions("1.0.0", "1.0.0"), 0)
+        self.assertEqual(compare_versions("0.9.5", "1.0.0"), -1)
+        self.assertEqual(compare_versions("1.0.1", "1.0.0"), 1)
+        self.assertEqual(compare_versions("v1.0.0", "1.0.0"), 0)
+        self.assertEqual(compare_versions("1.0", "1.0.0"), 0)
+
+        # 2. Extração de versão do manifesto releases.json
+        self.assertEqual(extract_manifest_version({"version": "1.2.0"}), "1.2.0")
+        self.assertEqual(extract_manifest_version([{"version": "1.0.0"}]), "1.0.0")
+        self.assertIsNone(extract_manifest_version([]))
+
+    def test_storage_releases_sync_detection(self):
+        # Testa a lógica de detecção de versão no MinIO com mock de StorageService
+        mock_storage = MagicMock()
+        mock_storage.bucket = "meu-bucket"
+        mock_storage.s3 = MagicMock()
+
+        # Simula resposta do MinIO com releases.json versão 1.0.0 já existente
+        import io
+        mock_manifest_body = io.BytesIO(b'[{"version": "1.0.0"}]')
+        mock_storage.s3.get_object.return_value = {"Body": mock_manifest_body}
+
+        # Simula list_objects_v2 retornando todos os 8 ficheiros
+        paginator = MagicMock()
+        paginator.paginate.return_value = [
+            {
+                "Contents": [
+                    {"Key": "releases/musta-link/releases.json"},
+                    {"Key": "releases/musta-link/SHA256SUMS.txt"},
+                    {"Key": "releases/musta-link/musta-link-windows-amd64.zip"},
+                    {"Key": "releases/musta-link/musta-link-windows-arm64.zip"},
+                    {"Key": "releases/musta-link/musta-link-linux-amd64.zip"},
+                    {"Key": "releases/musta-link/musta-link-linux-arm64.zip"},
+                    {"Key": "releases/musta-link/musta-link-darwin-amd64.zip"},
+                    {"Key": "releases/musta-link/musta-link-darwin-arm64.zip"},
+                ]
+            }
+        ]
+        mock_storage.s3.get_paginator.return_value = paginator
+
+        with patch("cloud.config.StorageService", return_value=mock_storage):
+            result = sync_agent_releases_with_storage(force_upload=False)
+            self.assertEqual(result.get("status"), "up_to_date")
+            self.assertEqual(result.get("version"), "1.0.0")
+            # Nenhum upload foi necessário pois a versão é igual e todos os ficheiros existem
+            mock_storage.upload_file.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()

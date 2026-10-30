@@ -801,3 +801,215 @@ def get_musta_tunnel_config() -> dict[str, Any]:
         "allowed_os": sorted(list(ALLOWED_OS)),
         "allowed_arch": sorted(list(ALLOWED_ARCH)),
     }
+
+
+
+# -----------------------------------------------------------------------------
+# Sincronização e Verificação de Versão das Releases no MinIO / S3
+# -----------------------------------------------------------------------------
+
+def parse_semver(ver: str) -> tuple[int, ...]:
+    """Extrai tupla numérica (major, minor, patch) de uma string de versão."""
+    clean = re.sub(r"^[vV]", "", (ver or "").strip())
+    parts = []
+    for p in clean.split("."):
+        m = re.match(r"^(\d+)", p)
+        if m:
+            parts.append(int(m.group(1)))
+        else:
+            break
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
+def compare_versions(v1: str, v2: str) -> int:
+    """
+    Compara v1 e v2 segundo SemVer.
+    Retorna -1 se v1 < v2, 0 se v1 == v2, 1 se v1 > v2.
+    """
+    p1 = parse_semver(v1)
+    p2 = parse_semver(v2)
+    if p1 < p2:
+        return -1
+    elif p1 > p2:
+        return 1
+    return 0
+
+
+def extract_manifest_version(data: Any) -> Optional[str]:
+    """Extrai a versão de um manifesto releases.json (seja lista de objetos ou dict)."""
+    if isinstance(data, dict):
+        if data.get("version"):
+            return str(data["version"]).strip()
+        releases = data.get("releases")
+        if isinstance(releases, list) and releases and isinstance(releases[0], dict):
+            return str(releases[0].get("version") or "").strip()
+    elif isinstance(data, list) and data and isinstance(data[0], dict):
+        return str(data[0].get("version") or "").strip()
+    return None
+
+
+def sync_agent_releases_with_storage(force_upload: bool = False) -> dict[str, Any]:
+    """
+    Verifica e sincroniza os pacotes compilados do MustaLink Agent com o MinIO / S3:
+      1. Se os pacotes estiverem ausentes no MinIO, realiza upload de todos os binários.
+      2. Se existirem, analisa a versão do MinIO vs versão local:
+         - Versão MinIO < Local (passada/inferior): atualiza todos os pacotes no MinIO.
+         - Versão MinIO == Local (igual): verifica se falta algum ficheiro e envia apenas os ausentes.
+         - Versão MinIO > Local (superior): mantém o MinIO intacto.
+    """
+    auto_sync = get_env_bool("MUSTA_AUTO_SYNC_MINIO_ON_STARTUP", True)
+    if not auto_sync and not force_upload:
+        log_message("ℹ️ [MustaLink] Sincronização automática com MinIO desativada por .env (MUSTA_AUTO_SYNC_MINIO_ON_STARTUP=false).", "info")
+        return {"status": "skipped", "reason": "disabled_by_env"}
+
+    dist_dir = get_releases_dist_dir()
+    if not dist_dir.is_dir():
+        log_message(f"⚠️ [MustaLink] Diretório de releases '{dist_dir}' não encontrado. Sincronização MinIO ignorada.", "warning")
+        return {"status": "skipped", "reason": "no_dist_dir"}
+
+    local_files = sorted(
+        [
+            p
+            for p in dist_dir.iterdir()
+            if p.is_file() and (p.suffix == ".zip" or p.name in ("releases.json", "SHA256SUMS.txt"))
+        ]
+    )
+
+    if not local_files:
+        log_message(f"⚠️ [MustaLink] Nenhum ficheiro .zip ou manifesto encontrado em '{dist_dir}'.", "warning")
+        return {"status": "skipped", "reason": "no_local_files"}
+
+    # Determina a versão local
+    local_version = DEFAULT_AGENT_VERSION
+    manifest_local_path = dist_dir / "releases.json"
+    if manifest_local_path.is_file():
+        try:
+            m_data = json.loads(manifest_local_path.read_text(encoding="utf-8-sig"))
+            extracted = extract_manifest_version(m_data)
+            if extracted:
+                local_version = extracted
+        except Exception:
+            pass
+
+    # Inicializa StorageService
+    try:
+        from cloud.config import StorageService
+
+        storage = StorageService()
+    except Exception as err:
+        log_message(f"⚠️ [MustaLink] Falha ao inicializar StorageService: {err}", "warning")
+        return {"status": "error", "error": str(err)}
+
+    if not storage.bucket or not storage.s3:
+        log_message("⚠️ [MustaLink] MinIO/S3 não configurado (STORAGE_BUCKET ou cliente ausente). Sincronização ignorada.", "warning")
+        return {"status": "skipped", "reason": "storage_not_configured"}
+
+    prefix = get_minio_releases_prefix()
+    base_url = get_minio_releases_base_url()
+
+    # Inspeciona estado atual no MinIO
+    remote_version: Optional[str] = None
+    existing_remote_filenames: set[str] = set()
+
+    try:
+        paginator = storage.s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=storage.bucket, Prefix=f"{prefix}/"):
+            for obj in page.get("Contents", []):
+                key = obj.get("Key", "")
+                fname = key[len(prefix) :].lstrip("/")
+                if fname:
+                    existing_remote_filenames.add(fname)
+
+        if "releases.json" in existing_remote_filenames:
+            try:
+                resp = storage.s3.get_object(Bucket=storage.bucket, Key=f"{prefix}/releases.json")
+                body = resp["Body"].read().decode("utf-8-sig")
+                remote_data = json.loads(body)
+                remote_version = extract_manifest_version(remote_data)
+            except Exception as read_err:
+                log_message(f"⚠️ [MustaLink] Falha ao ler releases.json do MinIO ({read_err}). Será regravado.", "warning")
+                remote_version = None
+    except Exception as list_err:
+        log_message(f"⚠️ [MustaLink] Falha ao listar objetos no MinIO ({list_err}). Tentando sincronização direta.", "warning")
+
+    # Decisão de sincronização
+    files_to_upload: list[Path] = []
+    reason = ""
+
+    if force_upload:
+        files_to_upload = local_files
+        reason = "forçada manualmente"
+    elif remote_version is None or "releases.json" not in existing_remote_filenames:
+        files_to_upload = local_files
+        reason = f"pacotes ausentes no MinIO (enviando versão {local_version})"
+    else:
+        cmp = compare_versions(remote_version, local_version)
+        if cmp < 0:
+            # Versão no MinIO é passada / inferior (< local)
+            files_to_upload = local_files
+            reason = f"versão no MinIO desatualizada (remota {remote_version} < local {local_version})"
+        elif cmp == 0:
+            # Versão no MinIO é igual (== local): verifica se faltam arquivos
+            missing = [p for p in local_files if p.name not in existing_remote_filenames]
+            if missing:
+                files_to_upload = missing
+                reason = f"versão {local_version} igual, mas {len(missing)} ficheiro(s) estavam em falta no MinIO"
+            else:
+                log_message(
+                    f"✅ [MustaLink] Pacotes do agente já estão no MinIO e atualizados (versão: {remote_version}, {len(existing_remote_filenames)} ficheiros).",
+                    level="info",
+                )
+                return {
+                    "status": "up_to_date",
+                    "version": remote_version,
+                    "files_count": len(existing_remote_filenames),
+                    "base_url": base_url,
+                }
+        else:
+            # Versão no MinIO é superior (> local)
+            log_message(
+                f"ℹ️ [MustaLink] MinIO possui versão mais recente que a local (remota {remote_version} > local {local_version}). Mantendo MinIO.",
+                level="info",
+            )
+            return {
+                "status": "up_to_date",
+                "version": remote_version,
+                "base_url": base_url,
+            }
+
+    # Executa o upload dos ficheiros selecionados
+    log_message(
+        f"🚀 [MustaLink] Sincronizando binários no MinIO ({reason}). Enviando {len(files_to_upload)} ficheiro(s)...",
+        level="info",
+    )
+
+    uploaded: list[str] = []
+    for file_path in files_to_upload:
+        key = f"{prefix}/{file_path.name}"
+        content_type = (
+            "application/zip"
+            if file_path.suffix == ".zip"
+            else "application/json"
+            if file_path.suffix == ".json"
+            else "text/plain"
+        )
+        try:
+            with open(file_path, "rb") as fh:
+                storage.upload_file(fh, key=key, content_type=content_type, sync_async=False)
+            uploaded.append(file_path.name)
+        except Exception as up_err:
+            log_message(f"❌ [MustaLink] Erro ao enviar {file_path.name} para o MinIO: {up_err}", "error")
+
+    log_message(
+        f"🎉 [MustaLink] Sincronização concluída no MinIO: {len(uploaded)}/{len(files_to_upload)} ficheiros enviados com sucesso (versão: {local_version}).",
+        level="info",
+    )
+
+    return {
+        "status": "synced",
+        "version": local_version,
+        "uploaded": uploaded,
+        "base_url": base_url,
+    }

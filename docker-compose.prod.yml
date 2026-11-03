@@ -1,0 +1,64 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: mustainfo-redis-prod
+    command:
+      - redis-server
+      - --user
+      - default
+      - "off"
+      - --user
+      - ${REDIS_USERNAME:-MustaInfo}
+      - "on"
+      - ">${REDIS_PASSWORD:-MustaInfo_redis_prod_secret}"
+      - "~*"
+      - "&*"
+      - "+@all"
+      - --save
+      - "60"
+      - "1"
+      - --loglevel
+      - warning
+    volumes:
+      - redisdata_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "--user", "${REDIS_USERNAME:-MustaInfo}", "--pass", "${REDIS_PASSWORD:-MustaInfo_redis_prod_secret}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PG_CLIENT_VERSION: ${PG_CLIENT_VERSION:-18}
+        INSTALL_DUMP_TOOLS: "false"
+    container_name: mustainfo-backend-prod
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - PYTHONPATH=/app
+      - ENV=production
+      - WORKERS=${WORKERS:-4}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_USERNAME=${REDIS_USERNAME:-MustaInfo}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-MustaInfo_redis_prod_secret}
+      - app_cache_REDIS_URL=redis://${REDIS_USERNAME:-MustaInfo}:${REDIS_PASSWORD:-MustaInfo_redis_prod_secret}@redis:6379/0
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+volumes:
+  redisdata_prod:
+

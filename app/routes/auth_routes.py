@@ -165,6 +165,9 @@ OAUTH_PROVIDERS = _OAuthProvidersProxy()
 
 
 def _cookie_domain():
+    # Em ambiente de desenvolvimento local (ENV == "dev"), não restringe o domínio para permitir localhost
+    if ENV == "dev":
+        return None
     return COOKIE_DOMAIN or None
 
 
@@ -188,12 +191,13 @@ def set_cookie(response: Response, key: str, value: str, path: str = "/"):
         else:
             max_age = _to_seconds(ACCESS_TOKEN_EXPIRE_MINUTES, "minutes")
 
+        is_dev = (ENV == "dev")
         cookie_options = {
             "key": key,
             "value": value,
             "httponly": COOKIE_HTTPONLY,
-            "secure": COOKIE_SECURE,
-            "samesite": COOKIE_SAMESITE,
+            "secure": False if is_dev else COOKIE_SECURE,
+            "samesite": "lax" if is_dev else COOKIE_SAMESITE,
             "max_age": max_age,
             "path": path,
         }

@@ -8,7 +8,7 @@ services:
   # ---------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
-    # Nome diferente do `MustaInfoo-redis` do compose do frontend, para as duas
+    # Nome diferente do `MustaInfo-redis` do compose do frontend, para as duas
     # stacks não disputarem o mesmo contentor.
     container_name: minha-api-redis
 

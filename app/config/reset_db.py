@@ -30,8 +30,12 @@ def recreate_db():
 
     try:
         # 1️⃣ Apaga todas as tabelas
-        for base in all_bases:
-            base.metadata.drop_all(bind=database.sync_engine)
+        if database.sync_engine.dialect.name == "postgresql":
+            with database.sync_engine.begin() as conn:
+                conn.execute(database.text("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"))
+        else:
+            for base in all_bases:
+                base.metadata.drop_all(bind=database.sync_engine)
         print("  Todas as tabelas foram removidas com sucesso.")
 
         # 2️⃣ Recria todas as tabelas
@@ -39,12 +43,10 @@ def recreate_db():
             base.metadata.create_all(bind=database.sync_engine)
         print("  Banco de dados recriado com sucesso!\n")
 
-        # print("📦 Engine usada:", database.DATABASE_URL)
         print(" Pronto para inserção de dados iniciais.")
         return True
     except Exception as e:
         print(f"  Erro ao recriar o banco de dados: {e}{traceback.format_exc()}")
-        sys.exit(1)
         return False
 
 

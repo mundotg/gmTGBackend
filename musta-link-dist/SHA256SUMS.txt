@@ -1,0 +1,6 @@
+﻿b56834ef7cb167b19b9060c093d406bbbc4e0370064865d746737b87b6fb663b  musta-link-windows-amd64.zip
+ca2f0042d525aa8e04a27a91725c187edf27ead72a60d6746d41cd6fcc29c192  musta-link-windows-arm64.zip
+efecfb37dfb0a47fb01beb3c61bf2f0a2041f63f6f851c91ea1e218152e32c8b  musta-link-linux-amd64.zip
+12faa4e7ad133e4a40a1d3a87033220fa63485618e1440d6cb15eb806f14b840  musta-link-linux-arm64.zip
+77269ecb60af5fcb069f7f1527140c7905f515df94b40e7bc370671daa1f2196  musta-link-darwin-amd64.zip
+7a221c7d790f78772199be77258dcd5547bdea60aab19e541b15a6a93ae885a7  musta-link-darwin-arm64.zip

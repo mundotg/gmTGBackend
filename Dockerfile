@@ -5,7 +5,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    WORKERS=4
 
 WORKDIR /app
 
@@ -24,19 +25,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender1 \
     libgomp1 \
+    tini \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # -------- Ferramentas de backup/restore (sempre) --------
 # pg_dump/pg_restore/psql e mysqldump/mysql são o que os backups de PostgreSQL
-# e MySQL executam. Eram opcionais (INSTALL_DUMP_TOOLS=false por omissão) e o
-# deploy não passa esse build-arg: em produção não havia pg_dump e todo o
-# backup PostgreSQL falhava.
+# e MySQL executam.
 #
 # O cliente PostgreSQL vem do repositório oficial (PGDG) e não do Debian: o
 # `postgresql-client` do bookworm é o 15, e o pg_dump recusa servidores mais
-# novos do que ele ("server version mismatch"). Um pg_dump N faz dump de
-# servidores até N — PG_CLIENT_VERSION deve ser >= à versão mais alta servida.
-# PostgreSQL 18.x suportado por omissão (pg_dump 18 suporta servidores <= 18).
+# novos do que ele ("server version mismatch").
 ARG PG_CLIENT_VERSION=18
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates gzip \
     && . /etc/os-release \
@@ -49,9 +48,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 
 # -------- mongodump/mongorestore (opcional, download pesado) --------
-# O backup MongoDB usa PyMongo/BSON (db_backup_restore_pymongo) e não precisa
-# destas ferramentas. Ativa com `--build-arg INSTALL_DUMP_TOOLS=true` se for
-# preciso o formato do mongodump.
 ARG INSTALL_DUMP_TOOLS=false
 RUN if [ "$INSTALL_DUMP_TOOLS" = "true" ]; then \
       curl -fsSL https://pgp.mongodb.com/server-7.0.asc \
@@ -69,28 +65,31 @@ RUN curl https://packages.microsoft.com/keys/microsoft.asc \
     && echo "deb [signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/11/prod bullseye main" \
     > /etc/apt/sources.list.d/mssql-release.list
 
-# (se precisares do driver)
-# RUN apt-get update && ACCEPT_EULA=Y apt-get install -y msodbcsql18
-
-# -------- Dependências Python --------
+# -------- Dependências Python & Ferramentas de Diagnóstico de Produção --------
 COPY requirements.txt .
 
 RUN pip install --upgrade pip setuptools wheel \
+    && pip install py-spy \
     && pip install -r requirements.txt
 
-# -------- Código --------
+# -------- Código da Aplicação --------
 COPY . .
 
-# -------- Segurança (APENAS NO FINAL) --------
+# -------- Segurança e Permissões --------
 RUN chmod +x /app/docker-entrypoint.sh \
     && useradd -m appuser && chown -R appuser /app
 USER appuser
 
 EXPOSE 8000
 
-# -------- Run --------
-# ENTRYPOINT + CMD (e não só CMD): o entrypoint corre `alembic upgrade head`
-# antes do servidor e sobrevive a plataformas de deploy que substituem o
-# comando. Para saltar as migrações numa emergência: RUN_MIGRATIONS=false.
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# -------- Healthcheck de Produção --------
+# Verifica se a API está viva e a responder pedidos HTTP
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -f http://127.0.0.1:8000/health/live || exit 1
+
+# -------- Execução de Alta Disponibilidade (Multi-workers & Proxy Headers) --------
+# Tini atua como PID 1 para gestão segura de processos e sinais (SIGTERM/SIGINT)
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker-entrypoint.sh"]
+
+# Em produção: Multi-workers com resiliência a bloqueio de loop e suporte total a proxy reverso
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WORKERS:-4} --proxy-headers --forwarded-allow-ips '*' --timeout-keep-alive 65"]

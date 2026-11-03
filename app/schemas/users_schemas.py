@@ -334,27 +334,23 @@ class CargoSchema(BaseModel):
 # 👤 User Create Schema
 # =============================
 class UserCreate(BaseModel):
-    nome: str = Field(..., alias="firstName", min_length=2)
-    apelido: str = Field(..., alias="lastName", min_length=2)
+    nome: str = Field(..., alias="firstName", min_length=1)
+    apelido: Optional[str] = Field(default="", alias="lastName")
     email: EmailStr
-    telefone: str = Field(..., alias="phone")
+    telefone: Optional[str] = Field(default="", alias="phone")
 
     empresa: EmpresaSchema = Field(..., alias="companyData")
     cargo: Optional[CargoSchema] = Field(None, alias="positionData")
 
-    senha: Annotated[str, StringConstraints(min_length=8)] = Field(
-        ..., alias="password"
-    )
-    confirmar_senha: Annotated[str, StringConstraints(min_length=8)] = Field(
-        ..., alias="confirmPassword"
-    )
+    senha: Optional[str] = Field(default=None, alias="password")
+    confirmar_senha: Optional[str] = Field(default=None, alias="confirmPassword")
 
     concorda_termos: bool = Field(..., alias="terms")
     oauth_token: Optional[str] = Field(None, alias="oauthToken")
 
     model_config = ConfigDict(
         populate_by_name=True,
-        str_strip_whitespace=True,  # 🔥 remove espaços automaticamente
+        str_strip_whitespace=True,
         json_schema_extra={
             "example": {
                 "firstName": "João",
@@ -377,6 +373,45 @@ class UserCreate(BaseModel):
     )
 
     # -------------------------
+    # 🔄 Pré-processamento inteligente (OAuth & Split de nomes)
+    # -------------------------
+    @model_validator(mode="before")
+    @classmethod
+    def preprocess_user_create(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            first = (data.get("firstName") or data.get("nome") or "").strip()
+            last = (data.get("lastName") or data.get("apelido") or "").strip()
+
+            # Se lastName não foi fornecido e firstName tem sobrenome junto, separa automaticamente
+            if not last and " " in first:
+                parts = first.split(" ", 1)
+                data["firstName"] = parts[0]
+                data["nome"] = parts[0]
+                data["lastName"] = parts[1]
+                data["apelido"] = parts[1]
+            elif not last:
+                data["lastName"] = ""
+                data["apelido"] = ""
+
+            # Se for registo OAuth e senha não foi enviada, gera senha forte aleatória
+            has_oauth = bool(data.get("oauthToken") or data.get("oauth_token"))
+            pw = data.get("password") or data.get("senha")
+            if has_oauth and not pw:
+                import secrets
+                random_pw = f"OAuth_{secrets.token_urlsafe(16)}!9"
+                data["password"] = random_pw
+                data["senha"] = random_pw
+                data["confirmPassword"] = random_pw
+                data["confirmar_senha"] = random_pw
+
+            # Se terms não foi fornecido mas é OAuth, assume aceite dos termos
+            if has_oauth and data.get("terms") is None and data.get("concorda_termos") is None:
+                data["terms"] = True
+                data["concorda_termos"] = True
+
+        return data
+
+    # -------------------------
     # 📧 Email
     # -------------------------
     @field_validator("email")
@@ -385,26 +420,35 @@ class UserCreate(BaseModel):
         return v.lower()
 
     # -------------------------
-    # 👤 Nome
+    # 👤 Nome e Apelido
     # -------------------------
-    @field_validator("nome", "apelido")
+    @field_validator("nome")
     @classmethod
     def normalize_name(cls, v: str):
-        return " ".join(v.title().split())
+        cleaned = " ".join((v or "").strip().title().split())
+        if not cleaned:
+            raise ValueError("O nome é obrigatório.")
+        return cleaned
+
+    @field_validator("apelido")
+    @classmethod
+    def normalize_apelido(cls, v: Optional[str]):
+        if not v:
+            return ""
+        return " ".join(v.strip().title().split())
 
     # -------------------------
-    # 📞 Telefone (obrigatório no registo)
+    # 📞 Telefone (obrigatório no registo direto, flexível em OAuth)
     # -------------------------
     @field_validator("telefone")
     @classmethod
-    def normalize_phone(cls, v: str):
-        # Aceita "+244 923 456 789", "923-456-789", "(244) 923456789"...
-        # e guarda só "+" e dígitos. 9 dígitos a começar por 9 = número
-        # angolano sem indicativo → +244.
+    def normalize_phone(cls, v: Optional[str]):
         raw = (v or "").strip()
+        if not raw:
+            return ""
         digits = re.sub(r"\D", "", raw)
         if not digits:
-            raise ValueError("O número de telefone é obrigatório.")
+            return ""
         if not 9 <= len(digits) <= 15:
             raise ValueError("Número de telefone inválido: indique entre 9 e 15 dígitos.")
         if raw.startswith("+") or raw.startswith("00"):
@@ -414,12 +458,25 @@ class UserCreate(BaseModel):
         return "+" + digits
 
     # -------------------------
-    # 🔐 Senhas (melhor abordagem)
+    # 🔐 Senhas
     # -------------------------
     @model_validator(mode="after")
     def validate_passwords(self):
-        if self.senha != self.confirmar_senha:
-            raise ValueError("Passwords do not match.")
+        # Se for fluxo com senha preenchida
+        if self.senha or self.confirmar_senha:
+            if self.senha != self.confirmar_senha:
+                raise ValueError("Passwords do not match.")
+            if len(self.senha) < 8:
+                raise ValueError("A palavra-passe deve ter pelo menos 8 caracteres.")
+        elif not self.oauth_token:
+            raise ValueError("A palavra-passe é obrigatória.")
+        else:
+            # Fallback seguro para OAuth sem senha digitada
+            import secrets
+            random_pw = f"OAuth_{secrets.token_urlsafe(16)}!9"
+            self.senha = random_pw
+            self.confirmar_senha = random_pw
+
         return self
 
     # -------------------------

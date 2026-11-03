@@ -1,0 +1,62 @@
+﻿[
+    {
+        "os":  "windows",
+        "arch":  "amd64",
+        "filename":  "musta-link-windows-amd64.zip",
+        "size_bytes":  4815042,
+        "sha256":  "b56834ef7cb167b19b9060c093d406bbbc4e0370064865d746737b87b6fb663b",
+        "binary_sha":  "ab3529d50a23bf38ab6d84638178ca2d6be3b2265699193b2ed1f8efd7fc1486",
+        "installer":  "install.ps1",
+        "version":  "1.0.0"
+    },
+    {
+        "os":  "windows",
+        "arch":  "arm64",
+        "filename":  "musta-link-windows-arm64.zip",
+        "size_bytes":  4429745,
+        "sha256":  "ca2f0042d525aa8e04a27a91725c187edf27ead72a60d6746d41cd6fcc29c192",
+        "binary_sha":  "78a3e4f7a6e135c52dd20ca8646e6d1e9028df547bb19c17824f11105faf70fc",
+        "installer":  "install.ps1",
+        "version":  "1.0.0"
+    },
+    {
+        "os":  "linux",
+        "arch":  "amd64",
+        "filename":  "musta-link-linux-amd64.zip",
+        "size_bytes":  4842002,
+        "sha256":  "efecfb37dfb0a47fb01beb3c61bf2f0a2041f63f6f851c91ea1e218152e32c8b",
+        "binary_sha":  "fda5aac0b787bf6fda25d8df6f33bce9396fb3edf6af3e892e092a7f53253a07",
+        "installer":  "install.sh",
+        "version":  "1.0.0"
+    },
+    {
+        "os":  "linux",
+        "arch":  "arm64",
+        "filename":  "musta-link-linux-arm64.zip",
+        "size_bytes":  4506321,
+        "sha256":  "12faa4e7ad133e4a40a1d3a87033220fa63485618e1440d6cb15eb806f14b840",
+        "binary_sha":  "ed744c7ecc7cb52a64bf93334d9caf543de539efe95d38d322646b057e4cdd20",
+        "installer":  "install.sh",
+        "version":  "1.0.0"
+    },
+    {
+        "os":  "darwin",
+        "arch":  "amd64",
+        "filename":  "musta-link-darwin-amd64.zip",
+        "size_bytes":  4791190,
+        "sha256":  "77269ecb60af5fcb069f7f1527140c7905f515df94b40e7bc370671daa1f2196",
+        "binary_sha":  "c1edb688860823e67b7eb86d21847e7e95f8177f8009a014acdc5ab21d7ca063",
+        "installer":  "install.sh",
+        "version":  "1.0.0"
+    },
+    {
+        "os":  "darwin",
+        "arch":  "arm64",
+        "filename":  "musta-link-darwin-arm64.zip",
+        "size_bytes":  4552003,
+        "sha256":  "7a221c7d790f78772199be77258dcd5547bdea60aab19e541b15a6a93ae885a7",
+        "binary_sha":  "debfdac4bc0949a4b89aa23e1a3b38ca7b5e4b73d03333d0b774e5371a4f5c62",
+        "installer":  "install.sh",
+        "version":  "1.0.0"
+    }
+]

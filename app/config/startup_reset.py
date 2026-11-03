@@ -41,7 +41,26 @@ MODELS_PACKAGE = "app.models"
 def already_initialized() -> bool:
     """Verifica se o banco já foi inicializado anteriormente."""
     print(f" Verificando flag de inicialização em: {DEFAULT_FLAG_PATH}")
-    return os.path.exists(DEFAULT_FLAG_PATH)
+    if os.path.exists(DEFAULT_FLAG_PATH):
+        return True
+
+    # Prevenção: se a flag não existir no disco, inspeciona se o banco já tem tabelas
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        existing = inspector.get_table_names()
+        if "users" in existing or len(existing) > 5:
+            log_message(
+                f"ℹ️ Base de dados já contém {len(existing)} tabelas existentes. "
+                f"Auto-gerando flag em {DEFAULT_FLAG_PATH} para proteger os dados contra reset acidental.",
+                "info",
+            )
+            mark_initialized()
+            return True
+    except Exception as e:
+        log_message(f"⚠️ Erro ao verificar tabelas existentes no banco: {e}", "warning")
+
+    return False
 
 
 def mark_initialized():

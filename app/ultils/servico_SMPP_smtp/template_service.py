@@ -7,6 +7,7 @@ formatação dinâmica de mensagens.
 
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -50,6 +51,7 @@ class TemplateService:
                 "current_year": datetime.now().year,
                 "now": datetime.now,
                 "support_email": "suporte@MustaInfo.com",
+                "logo_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:3000').rstrip('/')}/img/logo_mustainfo.png",
             }
         )
 

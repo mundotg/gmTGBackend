@@ -27,17 +27,14 @@ def _setup_paddle_environment():
     os.environ.setdefault("FLAGS_use_mkldnn", "0")
     os.environ.setdefault("FLAGS_use_onednn", "0")
 
-_setup_paddle_environment()
-
-from paddleocr import PaddleOCR
-
-# Singleton do motor PaddleOCR para evitar recarga pesada de modelos a cada requisição
+# Singleton do motor PaddleOCR (Lazy loaded para startup instantâneo da aplicação)
 _ocr_engine = None
 
 def get_ocr_engine():
     global _ocr_engine
     if _ocr_engine is None:
         _setup_paddle_environment()
+        from paddleocr import PaddleOCR
         try:
             # Versões recentes do PaddleOCR usam use_textline_orientation
             _ocr_engine = PaddleOCR(lang="pt", use_textline_orientation=True)

@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONPATH=/app \
-    WORKERS=4
+    WORKERS=2
 
 WORKDIR /app
 
@@ -84,7 +84,7 @@ EXPOSE 8000
 
 # -------- Healthcheck de Produção --------
 # Verifica se a API está viva e a responder pedidos HTTP
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
     CMD curl -f http://127.0.0.1:8000/health/live || exit 1
 
 # -------- Execução de Alta Disponibilidade (Multi-workers & Proxy Headers) --------
@@ -92,4 +92,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker-entrypoint.sh"]
 
 # Em produção: Multi-workers com resiliência a bloqueio de loop e suporte total a proxy reverso
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WORKERS:-4} --proxy-headers --forwarded-allow-ips '*' --timeout-keep-alive 65"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WORKERS:-2} --proxy-headers --forwarded-allow-ips '*' --timeout-keep-alive 65"]

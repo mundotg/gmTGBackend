@@ -188,6 +188,7 @@ async def get_metadata_db(
 async def get_metadata_fields(
     table_name: str,
     schema: Optional[str] = Query(None, description="Schema da tabela"),
+    connection_id: Optional[int] = Query(None, description="ID da conexão"),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -202,7 +203,9 @@ async def get_metadata_fields(
     try:
         # Monta o nome completo (ex: dbo.users) para segurança
         full_table_name = f"{schema}.{table_name}" if schema else table_name
-        return sincronizar_metadados_da_tabela(db, full_table_name.strip(), user_id)
+        return sincronizar_metadados_da_tabela(
+            db, full_table_name.strip(), user_id, connection_id=connection_id
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -210,7 +213,7 @@ async def get_metadata_fields(
             f"❌ Erro em get_metadata_fields [{table_name}]: {e}", level="error"
         )
         raise HTTPException(
-            status_code=500, detail="Não foi possível ler as colunas desta tabela."
+            status_code=500, detail=str(e) or "Não foi possível ler as colunas desta tabela."
         )
 
 

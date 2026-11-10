@@ -35,7 +35,7 @@ from app.models.connection_models import (
 from app.models.user_model import Role, User
 from app.schemas.connetion_schema import ConnectionAccessLevel, EffectiveConnectionRules
 from app.ultils.logger import log_message
-from app.ultils.permissions import is_superadmin
+from app.ultils.permissions import is_admin, is_superadmin
 
 # Força relativa dos níveis. Serve para responder a "write chega para ler?".
 ACCESS_ORDER: Dict[ConnectionAccessLevel, int] = {
@@ -52,10 +52,10 @@ def forca_do_nivel(nivel: Optional[ConnectionAccessLevel]) -> int:
 
 def _nivel_por_papel(conn: DBConnection, user: User) -> Optional[ConnectionAccessLevel]:
     """
-    Acesso que não vem de uma partilha: o dono e o super admin valem sempre
+    Acesso que não vem de uma partilha: o dono, super admin e admin valem sempre
     `manage`. Devolve None quando o acesso, a existir, tem de vir de um share.
     """
-    if conn.user_id == user.id or is_superadmin(user):
+    if conn.user_id == user.id or is_admin(user):
         return ConnectionAccessLevel.manage
     return None
 
@@ -159,7 +159,7 @@ def get_effective_connection_rules(
     Resolve as regras granulares de segurança (tabelas, campos, tipos de consulta, max_rows)
     aplicáveis a `user` na conexão `conn`.
     """
-    if conn.user_id == user.id or is_superadmin(user):
+    if conn.user_id == user.id or is_admin(user):
         return EffectiveConnectionRules()
 
     # 1. Share direto
@@ -369,7 +369,7 @@ async def get_effective_connection_rules_async(
     db: AsyncSession, conn: DBConnection, user: User
 ) -> EffectiveConnectionRules:
     """Versão assíncrona para resolução de regras de conexão."""
-    if conn.user_id == user.id or is_superadmin(user):
+    if conn.user_id == user.id or is_admin(user):
         return EffectiveConnectionRules()
 
     resultado = await db.execute(

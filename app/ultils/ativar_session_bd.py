@@ -1,7 +1,7 @@
 import traceback
 from typing import Optional, Tuple
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from app.config.dependencies import get_session_by_connection
 from app.config.engine_manager_cache import EngineManager
 from app.cruds.connection_cruds import (
@@ -11,11 +11,18 @@ from app.cruds.connection_cruds import (
 )
 from app.cruds.dbstatistics_crud import get_statistics_by_connection_geral
 from app.cruds.queryhistory_crud import get_ultima_consulta
-from app.models.connection_models import ActiveConnection, DBConnection
+from app.models.connection_models import (
+    ActiveConnection,
+    DBConnection,
+    DBConnectionShare,
+    EmpresaConnection,
+)
+from app.models.user_model import Role, User
 from app.schemas.connetion_schema import DBConnectionBase
 from app.schemas.users_schemas import DbInfoSchema
 from app.services.crypto_utils import secret_decrypt
 from app.ultils.logger import log_message
+from app.ultils.permissions import is_admin
 from datetime import datetime
 
 from app.services.agent_tunnel_manager import agent_tunnel_registry, parse_agent_host
@@ -195,14 +202,52 @@ def get_connection_by_id(
     db: Session, id_user: int, id_conn: int
 ) -> Optional[DBConnection]:
     """
-    Retorna a conexão ativa do usuário, se existir, e a data de ativação.
-    Agora com apenas 1 consulta ao banco.
+    Retorna a conexão por ID se o utilizador for o dono, tiver acesso partilhado,
+    empresa associada ou privilégios de administrador.
     """
-    return (
-        db.query(DBConnection)
-        .filter(DBConnection.user_id == id_user, DBConnection.id == id_conn)
+    conn = db.query(DBConnection).filter(DBConnection.id == id_conn).first()
+    if not conn:
+        return None
+
+    if conn.user_id == id_user:
+        return conn
+
+    # Admins e Superadmins têm acesso
+    user = (
+        db.query(User)
+        .options(joinedload(User.role).joinedload(Role.permissions))
+        .filter(User.id == id_user)
         .first()
     )
+    if user and is_admin(user):
+        return conn
+
+    # Partilha direta
+    has_share = (
+        db.query(DBConnectionShare)
+        .filter(
+            DBConnectionShare.connection_id == id_conn,
+            DBConnectionShare.user_id == id_user,
+        )
+        .first()
+    )
+    if has_share:
+        return conn
+
+    # Empresa vinculada
+    if user and getattr(user, "empresa_id", None):
+        has_emp = (
+            db.query(EmpresaConnection)
+            .filter(
+                EmpresaConnection.connection_id == id_conn,
+                EmpresaConnection.empresa_id == user.empresa_id,
+            )
+            .first()
+        )
+        if has_emp:
+            return conn
+
+    return None
 
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -243,7 +288,7 @@ async def get_connection_id_async(
     db: AsyncSession, id_user: int, id_connection: int
 ) -> Optional[DBConnection]:
     """
-    Retorna uma conexão específica do usuário, se existir.
+    Retorna uma conexão específica do usuário se for dono, admin ou tiver partilha.
     Valida se o AsyncSession está funcional antes de executar a consulta.
     """
     try:
@@ -264,20 +309,54 @@ async def get_connection_id_async(
             )
             return None
 
-        # 2️⃣ Busca a conexão no banco
-        stmt = select(DBConnection).where(
-            DBConnection.id == id_connection, DBConnection.user_id == id_user
-        )
+        # 2️⃣ Busca a conexão no banco por ID
+        stmt = select(DBConnection).where(DBConnection.id == id_connection)
         result = await db.execute(stmt)
-        connection = result.scalar_one_or_none()
+        conn = result.scalar_one_or_none()
 
-        if connection is None:
+        if conn is None:
             log_message(
-                f"[WARN] Conexão {id_connection} não encontrada para o usuário {id_user}"
+                f"[WARN] Conexão {id_connection} não encontrada"
             )
             return None
-        # print("existe")
-        return connection
+
+        if conn.user_id == id_user:
+            return conn
+
+        # Verificar admin / superadmin
+        stmt_user = (
+            select(User)
+            .options(selectinload(User.role).selectinload(Role.permissions))
+            .where(User.id == id_user)
+        )
+        res_user = await db.execute(stmt_user)
+        user = res_user.scalar_one_or_none()
+        if user and is_admin(user):
+            return conn
+
+        # Verificar partilha direta
+        stmt_share = select(DBConnectionShare).where(
+            DBConnectionShare.connection_id == id_connection,
+            DBConnectionShare.user_id == id_user,
+        )
+        res_share = await db.execute(stmt_share)
+        if res_share.scalar_one_or_none():
+            return conn
+
+        # Verificar empresa
+        if user and getattr(user, "empresa_id", None):
+            stmt_emp = select(EmpresaConnection).where(
+                EmpresaConnection.connection_id == id_connection,
+                EmpresaConnection.empresa_id == user.empresa_id,
+            )
+            res_emp = await db.execute(stmt_emp)
+            if res_emp.scalar_one_or_none():
+                return conn
+
+        log_message(
+            f"[WARN] Usuário {id_user} não tem permissão para a conexão {id_connection}"
+        )
+        return None
 
     except SQLAlchemyError as db_err:
         log_message(

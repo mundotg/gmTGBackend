@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import traceback
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
-from sqlalchemy import inspect
+from sqlalchemy import inspect, or_, and_
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,10 @@ from app.cruds.dbstructure_crud import (
     get_fields_by_structure,
 )
 from app.models.dbstructure_models import DBField, DBStructure
+from app.models.connection_models import DBConnection, DBConnectionShare, EmpresaConnection
+from app.models.user_model import User
+from app.ultils.permissions import is_admin
+from app.ultils.connection_access import load_actor
 from app.schemas.dbstructure_schema import (
     CampoDetalhado,
     DBFieldCreate,
@@ -33,39 +37,116 @@ from sqlalchemy.exc import SQLAlchemyError, NoSuchTableError
 from sqlalchemy.exc import OperationalError
 
 
-def safe_get_columns(engine: Engine, table_name: str, schema: str):
+def safe_get_columns(engine: Engine, table_name: str, schema: Optional[str] = None):
     inspector = inspect(engine)
+    pure_table = table_name.split(".")[-1] if "." in table_name else table_name
     try:
-        return inspector.get_columns(table_name, schema=schema), inspector
+        return inspector.get_columns(pure_table, schema=schema), inspector
+    except NoSuchTableError:
+        # Se schema era None, tenta explicitamente com 'public'
+        if schema is None:
+            try:
+                return inspector.get_columns(pure_table, schema="public"), inspector
+            except NoSuchTableError:
+                pass
+        elif schema == "public":
+            try:
+                return inspector.get_columns(pure_table, schema=None), inspector
+            except NoSuchTableError:
+                pass
+        raise
     except OperationalError as e:
         if "SSL connection has been closed" in str(e):
             # 🔄 recria o inspector e tenta de novo
             inspector = inspect(engine)
-            return inspector.get_columns(table_name, schema=schema), inspector
+            return inspector.get_columns(pure_table, schema=schema), inspector
         raise
 
 
-def sincronizar_metadados_da_tabela(db: Session, table_name: str, user_id: int) -> dict:
+def sincronizar_metadados_da_tabela(
+    db: Session, table_name: str, user_id: int, connection_id: Optional[int] = None
+) -> dict:
     try:
-        # 1. Obtém conexão ativa do usuário
-        engine, connection = ConnectionManager.ensure_connection(db, user_id)
+        # 1. Obtém conexão
+        if connection_id:
+            engine, connection = ConnectionManager.ensure_idConn_connection(
+                db, user_id, connection_id
+            )
+        else:
+            engine, connection = ConnectionManager.ensure_connection(db, user_id)
 
         # 2. Obtém o tipo do banco de dados
         db_type = connection.type if connection else "postgresql"  # fallback seguro
 
         # 3. Busca ou cria a estrutura da tabela
-        structure = buscar_estrutura_tabela(
-            db=db,
-            table_name=table_name,
-            db_connection_id=connection.id,
-            engine=engine,
-            db_type=db_type,
-        )
+        # Tenta inicialmente na conexão obtida
+        try:
+            structure = buscar_estrutura_tabela(
+                db=db,
+                table_name=table_name,
+                db_connection_id=connection.id,
+                engine=engine,
+                db_type=db_type,
+            )
 
-        # 4. Busca ou cria os campos
-        fields_table: List[DBField] = buscar_ou_criar_campos_tabela(
-            db, structure, engine, str(db_type)
-        )
+            # 4. Busca ou cria os campos
+            fields_table: List[DBField] = buscar_ou_criar_campos_tabela(
+                db, structure, engine, str(db_type)
+            )
+        except (ValueError, NoSuchTableError, RuntimeError) as initial_err:
+            # Se connection_id não foi forçado, tenta buscar em outras conexões acessíveis ao utilizador
+            if not connection_id:
+                pure_name = table_name.split(".")[-1]
+                actor = load_actor(db, user_id)
+                alt_struct_query = (
+                    db.query(DBStructure)
+                    .join(DBConnection, DBStructure.db_connection_id == DBConnection.id)
+                    .filter(
+                        DBStructure.table_name == pure_name,
+                        DBStructure.is_deleted == False,
+                    )
+                )
+                if not is_admin(actor):
+                    emp_filter = (
+                        and_(EmpresaConnection.empresa_id == actor.empresa_id, actor.empresa_id != None)
+                        if getattr(actor, "empresa_id", None)
+                        else False
+                    )
+                    alt_struct_query = alt_struct_query.outerjoin(
+                        DBConnectionShare, DBConnectionShare.connection_id == DBConnection.id
+                    ).outerjoin(
+                        EmpresaConnection, EmpresaConnection.connection_id == DBConnection.id
+                    ).filter(
+                        or_(
+                            DBConnection.user_id == user_id,
+                            DBConnectionShare.user_id == user_id,
+                            emp_filter,
+                        )
+                    )
+                alt_struct = alt_struct_query.first()
+                if alt_struct:
+                    log_message(
+                        f"Tabela '{table_name}' resolvida via conexão alternativa {alt_struct.db_connection_id}",
+                        "info",
+                    )
+                    engine, connection = ConnectionManager.ensure_idConn_connection(
+                        db, user_id, alt_struct.db_connection_id
+                    )
+                    db_type = connection.type if connection else "postgresql"
+                    structure = buscar_estrutura_tabela(
+                        db=db,
+                        table_name=table_name,
+                        db_connection_id=connection.id,
+                        engine=engine,
+                        db_type=db_type,
+                    )
+                    fields_table = buscar_ou_criar_campos_tabela(
+                        db, structure, engine, str(db_type)
+                    )
+                else:
+                    raise initial_err
+            else:
+                raise initial_err
 
         # 5. Busca valores ENUM por coluna
         enum_map: Dict[str, List[str]] = _fetch_enum_values(
@@ -342,6 +423,9 @@ def buscar_estrutura_tabela(
     Busca ou cria a estrutura da tabela na base local.
     """
     structure = get_db_structures_by_conn_id_and_table(db, db_connection_id, table_name)
+    if not structure and "." in table_name:
+        pure_name = table_name.split(".")[-1]
+        structure = get_db_structures_by_conn_id_and_table(db, db_connection_id, pure_name)
 
     if not structure:
         if is_mongo(engine):

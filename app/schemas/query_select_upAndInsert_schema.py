@@ -144,6 +144,7 @@ class CondicaoFiltro(BaseModel):
 
 class QueryPayload(BaseModel):
     baseTable: str
+    connection_id: Optional[int] = None
     joins: Optional[dict[str, AdvancedJoinOption]] = None
     table_list: Optional[List[str]] = None
     select: Optional[List[str]] = Field(default_factory=list)

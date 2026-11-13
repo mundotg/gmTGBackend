@@ -93,3 +93,4 @@ ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker-entrypoint.sh"]
 
 # Em produção: Multi-workers com resiliência a bloqueio de loop e suporte total a proxy reverso
 CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WORKERS:-2} --proxy-headers --forwarded-allow-ips '*' --timeout-keep-alive 65"]
+ 

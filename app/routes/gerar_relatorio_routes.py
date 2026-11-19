@@ -176,6 +176,10 @@ async def gerar_relatorio_query_com_cache(query_result: dict, user_id: int, db: 
     preview = rs_dict.get("preview", [])
     query_result["preview"] = preview
     query_result["duration_ms"] = rs_dict.get("duration_ms", query_result.get("duration_ms", 0))
+    if preview and isinstance(preview[0], dict):
+        query_result["columns"] = list(preview[0].keys())
+    elif rs_dict.get("columns"):
+        query_result["columns"] = rs_dict["columns"]
 
     # 🚀 A CORREÇÃO ESTÁ AQUI: Remover AMBAS as chaves e NÃO voltar a injetar o payload_obj
     query_result.pop("QueryPayload", None)

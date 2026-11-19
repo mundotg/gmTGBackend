@@ -174,6 +174,14 @@ def _sse(event: str, data: Any) -> str:
 
 # ══════════════════════════ SQL parsing ══════════════════════════
 
+def _is_effective_statement(stmt: str) -> bool:
+    """Verifica se o statement contém código SQL executável além de comentários e espaços."""
+    if not stmt or not stmt.strip():
+        return False
+    cleaned = re.sub(r"/\*.*?\*/", "", stmt, flags=re.DOTALL)
+    cleaned = re.sub(r"--[^\n]*", "", cleaned)
+    return bool(cleaned.strip())
+
 def split_statements(sql: str) -> List[str]:
 
     """Divide em statements por `;`, respeitando strings, aspas e comentários."""
@@ -246,7 +254,7 @@ def split_statements(sql: str) -> List[str]:
 
             stmt = "".join(buf).strip()
 
-            if stmt:
+            if stmt and _is_effective_statement(stmt):
 
                 stmts.append(stmt)
 
@@ -262,7 +270,7 @@ def split_statements(sql: str) -> List[str]:
 
     tail = "".join(buf).strip()
 
-    if tail:
+    if tail and _is_effective_statement(tail):
 
         stmts.append(tail)
 
@@ -939,7 +947,12 @@ async def _run_sql(engine, query: str, limit: int, offset: int = 0) -> AsyncGene
                 # AsyncResult não expõe `returns_rows` em todas as versões do
                 # SQLAlchemy. `keys()` é a API pública e permite distinguir
                 # resultados tabulares (SELECT/RETURNING) de comandos sem linhas.
-                columns = list(result.keys())
+                columns = []
+                if getattr(result, "returns_rows", True):
+                    try:
+                        columns = list(result.keys())
+                    except Exception:
+                        columns = []
                 if columns:
                     yield _sse("columns", {"columns": columns})
                     fetched = 0

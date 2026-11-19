@@ -46,36 +46,30 @@ def generate_large_dataset():
     """)
 
     # ==========================================
-    # 1. CATEGORIAS (24 categorias com hierarquia)
+    # 1. CATEGORIAS (24 categorias)
     # ==========================================
     print("📁 Inserindo 24 Categorias...")
     cur.execute("""
         INSERT INTO categorias (id, nome, descricao, categoria_pai_id, icone) VALUES
-        -- Categorias Raiz
         (1, 'Eletrônicos & Tecnologia', 'Computadores, celulares e dispositivos inteligentes', NULL, 'cpu'),
         (2, 'Eletrodomésticos & Clima', 'Equipamentos para o lar, cozinha e climatização', NULL, 'home'),
         (3, 'Mobiliário & Escritório', 'Móveis corporativos, cadeiras e estações de trabalho', NULL, 'briefcase'),
         (4, 'Áudio & Vídeo', 'Fones de ouvido, colunas de som e televisores', NULL, 'headphones'),
         (5, 'Acessórios & Cabos', 'Adaptadores, cabos, suportes e periféricos essenciais', NULL, 'cable'),
-        -- Subcategorias Eletrônicos
         (6, 'Smartphones', 'Celulares topo de linha e intermediários', 1, 'smartphone'),
         (7, 'Portáteis & Laptops', 'Laptops ultrafinos e estações móveis', 1, 'laptop'),
         (8, 'Desktops & Servidores', 'PCs gamer e servidores empresariais', 1, 'server'),
         (9, 'Tablets & E-Readers', 'Tablets para produtividade e leitura digital', 1, 'tablet'),
-        -- Subcategorias Eletrodomésticos
         (10, 'Frigoríficos & Arcas', 'Refrigeração Frost Free e arcas congeladoras', 2, 'snowflake'),
         (11, 'Ar-Condicionado & Clima', 'Splits Inverter e climatizadores portáteis', 2, 'wind'),
         (12, 'Cafeteiras & Máquinas de Café', 'Cafeteiras elétricas e de cápsulas premium', 2, 'coffee'),
         (13, 'Micro-ondas & Fornos', 'Fornos embutidos e micro-ondas digitais', 2, 'flame'),
-        -- Subcategorias Mobiliário
         (14, 'Cadeiras Ergonômicas', 'Cadeiras com suporte lombar 3D e braços ajustáveis', 3, 'chair'),
         (15, 'Mesas com Altura Ajustável', 'Mesas elétricas para trabalhar em pé ou sentado', 3, 'table'),
         (16, 'Estantes & Gaveteiros', 'Armazenamento e organização de escritório', 3, 'archive'),
-        -- Subcategorias Áudio & Vídeo
         (17, 'Fones com Cancelamento de Ruído', 'Headphones Bluetooth over-ear e intra-auriculares', 4, 'headphones'),
         (18, 'Colunas de Som Bluetooth', 'Caixas de som portáteis à prova d água', 4, 'speaker'),
         (19, 'Smart TVs 4K & 8K', 'Televisores OLED e QLED de alta resolução', 4, 'tv'),
-        -- Subcategorias Acessórios
         (20, 'Carregadores Rápidos GaN', 'Carregadores multiporta ultracompactos', 5, 'zap'),
         (21, 'Cabos USB-C e Thunderbolt', 'Cabos reforçados de alta velocidade', 5, 'link'),
         (22, 'Hubs & Docks USB-C', 'Estações de expansão para múltiplas telas', 5, 'share-2'),
@@ -137,12 +131,11 @@ def generate_large_dataset():
     """, lojas)
 
     # ==========================================
-    # 4. VENDEDORES (30 vendedores com hierarquia)
+    # 4. VENDEDORES (30 vendedores)
     # ==========================================
     print("👔 Inserindo 30 Vendedores...")
     cur.execute("""
         INSERT INTO vendedores (id, codigo_cracha, nome, email, telefone, loja_id, gerente_id, comissao_percentual, meta_mensal, data_admissao) VALUES
-        -- Gerentes Regionais (gerente_id NULL)
         (1, 'DIR-001', 'Carlos Alberto Silva', 'carlos.silva@mustavendas.ao', '+244 923 001 001', 1, NULL, 6.00, 3000000.00, '2021-02-01'),
         (2, 'DIR-002', 'Helena Maria Quaresma', 'helena.quaresma@mustavendas.ao', '+244 923 001 002', 4, NULL, 5.50, 2500000.00, '2021-06-15'),
         (3, 'DIR-003', 'António Joaquim Banza', 'antonio.banza@mustavendas.ao', '+244 923 001 003', 6, NULL, 5.50, 2000000.00, '2022-01-10'),
@@ -186,70 +179,62 @@ def generate_large_dataset():
     cur.execute("SELECT setval('vendedores_id_seq', 30);")
 
     # ==========================================
-    # 5. PRODUTOS (75 produtos realistas e ricos)
+    # 5. PRODUTOS (80 produtos catalogados)
     # ==========================================
-    print("📦 Inserindo 75 Produtos com JSONB...")
+    print("📦 Inserindo 80 Produtos com JSONB...")
+    marcas = ["Apple", "Samsung", "Xiaomi", "Dell", "Lenovo", "HP", "Sony", "LG", "JBL", "Logitech", "HPE", "Asus", "DeLonghi"]
     produtos_base = [
-        # Smartphones (cat 6)
-        ("PROD-IP15P-256", "iPhone 15 Pro Max 256GB Titânio", "Smartphone Apple com Chip A17 Pro, câmara 48MP", 6, 2, 1250000.00, 980000.00, 35, 5, "UNIDADE", "ativo", {"marca": "Apple", "cor": "Titânio Natural", "armazenamento": "256GB", "garantia_meses": 12}),
-        ("PROD-IP15-128", "iPhone 15 128GB Azul Claro", "Smartphone Apple com Dynamic Island e câmara avançada", 6, 2, 850000.00, 680000.00, 42, 6, "UNIDADE", "ativo", {"marca": "Apple", "cor": "Azul", "armazenamento": "128GB", "garantia_meses": 12}),
-        ("PROD-S24U-512", "Samsung Galaxy S24 Ultra 512GB", "Smartphone com Galaxy AI, tela Dynamic AMOLED 2X e Caneta S Pen", 6, 1, 1180000.00, 910000.00, 28, 4, "UNIDADE", "ativo", {"marca": "Samsung", "cor": "Preto Titânio", "armazenamento": "512GB", "garantia_meses": 12}),
-        ("PROD-S24-256", "Samsung Galaxy S24 Plus 256GB", "Smartphone premium com processador Snapdragon 8 Gen 3", 6, 1, 920000.00, 720000.00, 30, 5, "UNIDADE", "ativo", {"marca": "Samsung", "cor": "Violeta", "armazenamento": "256GB", "garantia_meses": 12}),
-        ("PROD-MI14-512", "Xiaomi 14 Ultra 512GB Leica", "Câmara quádrupla Leica de 50MP com sensor de 1 polegada", 6, 4, 980000.00, 760000.00, 20, 3, "UNIDADE", "ativo", {"marca": "Xiaomi", "camera": "Leica 50MP", "armazenamento": "512GB"}),
-        ("PROD-RED-NOTE13", "Xiaomi Redmi Note 13 Pro 256GB", "Melhor custo-benefício com câmara de 200MP e carga de 67W", 6, 4, 280000.00, 210000.00, 65, 10, "UNIDADE", "ativo", {"marca": "Xiaomi", "camera": "200MP", "ram": "8GB"}),
+        ("PROD-IP15P-256", "iPhone 15 Pro Max 256GB Titânio", "Smartphone Apple com Chip A17 Pro, câmara 48MP", 6, 2, 1250000.00, 980000.00, 80, 5, "UNIDADE", "ativo", {"marca": "Apple", "cor": "Titânio Natural", "armazenamento": "256GB"}),
+        ("PROD-IP15-128", "iPhone 15 128GB Azul Claro", "Smartphone Apple com Dynamic Island e câmara avançada", 6, 2, 850000.00, 680000.00, 95, 6, "UNIDADE", "ativo", {"marca": "Apple", "cor": "Azul", "armazenamento": "128GB"}),
+        ("PROD-S24U-512", "Samsung Galaxy S24 Ultra 512GB", "Smartphone com Galaxy AI, tela Dynamic AMOLED 2X e Caneta S Pen", 6, 1, 1180000.00, 910000.00, 70, 4, "UNIDADE", "ativo", {"marca": "Samsung", "cor": "Preto Titânio", "armazenamento": "512GB"}),
+        ("PROD-S24-256", "Samsung Galaxy S24 Plus 256GB", "Smartphone premium com processador Snapdragon 8 Gen 3", 6, 1, 920000.00, 720000.00, 60, 5, "UNIDADE", "ativo", {"marca": "Samsung", "cor": "Violeta", "armazenamento": "256GB"}),
+        ("PROD-MI14-512", "Xiaomi 14 Ultra 512GB Leica", "Câmara quádrupla Leica de 50MP com sensor de 1 polegada", 6, 4, 980000.00, 760000.00, 45, 3, "UNIDADE", "ativo", {"marca": "Xiaomi", "camera": "Leica 50MP", "armazenamento": "512GB"}),
+        ("PROD-RED-NOTE13", "Xiaomi Redmi Note 13 Pro 256GB", "Melhor custo-benefício com câmara de 200MP e carga de 67W", 6, 4, 280000.00, 210000.00, 180, 10, "UNIDADE", "ativo", {"marca": "Xiaomi", "camera": "200MP", "ram": "8GB"}),
         
-        # Laptops (cat 7)
-        ("PROD-MBA-M3-15", "MacBook Air 15 M3 16GB 512GB", "Portátil Apple com chip M3, design ultrafino e 18h de bateria", 7, 2, 1650000.00, 1300000.00, 18, 3, "UNIDADE", "ativo", {"marca": "Apple", "ram": "16GB", "ssd": "512GB", "polegadas": 15.3}),
-        ("PROD-MBP-M3PRO", "MacBook Pro 16 M3 Pro 36GB 1TB", "Estação de trabalho móvel com ecrã Liquid Retina XDR", 7, 2, 2890000.00, 2300000.00, 10, 2, "UNIDADE", "ativo", {"marca": "Apple", "ram": "36GB", "ssd": "1TB", "polegadas": 16.2}),
-        ("PROD-DELL-XPS13", "Dell XPS 13 Plus Intel Core i7 32GB", "Portátil ultra premium com ecrã táctil OLED 3.5K", 7, 1, 1450000.00, 1150000.00, 14, 2, "UNIDADE", "ativo", {"marca": "Dell", "ram": "32GB", "ssd": "1TB", "tela": "OLED 3.5K"}),
-        ("PROD-LEN-X1", "Lenovo ThinkPad X1 Carbon Gen 11", "Clássico corporativo ultraleve de fibra de carbono", 7, 1, 1550000.00, 1220000.00, 15, 3, "UNIDADE", "ativo", {"marca": "Lenovo", "peso_kg": 1.12, "ram": "16GB", "ssd": "512GB"}),
-        ("PROD-ASUS-G14", "Asus ROG Zephyrus G14 RTX 4070", "Portátil gamer de alta performance com ecrã Nebula 165Hz", 7, 16, 1780000.00, 1420000.00, 12, 2, "UNIDADE", "ativo", {"marca": "Asus", "gpu": "RTX 4070 8GB", "ram": "32GB"}),
+        ("PROD-MBA-M3-15", "MacBook Air 15 M3 16GB 512GB", "Portátil Apple com chip M3, design ultrafino e 18h de bateria", 7, 2, 1650000.00, 1300000.00, 40, 3, "UNIDADE", "ativo", {"marca": "Apple", "ram": "16GB", "ssd": "512GB", "polegadas": 15.3}),
+        ("PROD-MBP-M3PRO", "MacBook Pro 16 M3 Pro 36GB 1TB", "Estação de trabalho móvel com ecrã Liquid Retina XDR", 7, 2, 2890000.00, 2300000.00, 25, 2, "UNIDADE", "ativo", {"marca": "Apple", "ram": "36GB", "ssd": "1TB", "polegadas": 16.2}),
+        ("PROD-DELL-XPS13", "Dell XPS 13 Plus Intel Core i7 32GB", "Portátil ultra premium com ecrã táctil OLED 3.5K", 7, 1, 1450000.00, 1150000.00, 35, 2, "UNIDADE", "ativo", {"marca": "Dell", "ram": "32GB", "ssd": "1TB"}),
+        ("PROD-LEN-X1", "Lenovo ThinkPad X1 Carbon Gen 11", "Clássico corporativo ultraleve de fibra de carbono", 7, 1, 1550000.00, 1220000.00, 30, 3, "UNIDADE", "ativo", {"marca": "Lenovo", "peso_kg": 1.12, "ram": "16GB"}),
+        ("PROD-ASUS-G14", "Asus ROG Zephyrus G14 RTX 4070", "Portátil gamer de alta performance com ecrã Nebula 165Hz", 7, 16, 1780000.00, 1420000.00, 28, 2, "UNIDADE", "ativo", {"marca": "Asus", "gpu": "RTX 4070 8GB"}),
         
-        # Desktops & Servidores (cat 8)
-        ("PROD-SRV-DL380", "HPE ProLiant DL380 Gen10 Xeon", "Servidor rack 2U de alta disponibilidade para data centers", 8, 1, 4800000.00, 3900000.00, 6, 1, "UNIDADE", "ativo", {"marca": "HPE", "formato": "Rack 2U", "processadores": "2x Xeon Silver"}),
-        ("PROD-PC-WK-DELL", "Dell Precision 3660 Tower i9 64GB", "Workstation profissional para modelagem 3D e renderização", 8, 1, 2450000.00, 1950000.00, 8, 2, "UNIDADE", "ativo", {"marca": "Dell", "ram": "64GB", "gpu": "RTX A4000 16GB"}),
+        ("PROD-SRV-DL380", "HPE ProLiant DL380 Gen10 Xeon", "Servidor rack 2U de alta disponibilidade para data centers", 8, 1, 4800000.00, 3900000.00, 12, 1, "UNIDADE", "ativo", {"marca": "HPE", "formato": "Rack 2U"}),
+        ("PROD-PC-WK-DELL", "Dell Precision 3660 Tower i9 64GB", "Workstation profissional para modelagem 3D e renderização", 8, 1, 2450000.00, 1950000.00, 18, 2, "UNIDADE", "ativo", {"marca": "Dell", "ram": "64GB"}),
         
-        # Tablets (cat 9)
-        ("PROD-IPAD-PRO13", "iPad Pro 13 Chip M4 OLED 256GB", "Tablet mais avançado do mundo com ecrã Ultra Retina XDR", 9, 2, 1380000.00, 1080000.00, 22, 4, "UNIDADE", "ativo", {"marca": "Apple", "chip": "M4", "tela": "OLED 13"}),
-        ("PROD-TAB-S9U", "Samsung Galaxy Tab S9 Ultra 512GB", "Tablet com tela gigante de 14.6 polegadas e resistência IP68", 9, 1, 1050000.00, 820000.00, 16, 3, "UNIDADE", "ativo", {"marca": "Samsung", "tela": "14.6 Super AMOLED"}),
+        ("PROD-IPAD-PRO13", "iPad Pro 13 Chip M4 OLED 256GB", "Tablet mais avançado do mundo com ecrã Ultra Retina XDR", 9, 2, 1380000.00, 1080000.00, 50, 4, "UNIDADE", "ativo", {"marca": "Apple", "chip": "M4", "tela": "OLED 13"}),
+        ("PROD-TAB-S9U", "Samsung Galaxy Tab S9 Ultra 512GB", "Tablet com tela gigante de 14.6 polegadas e resistência IP68", 9, 1, 1050000.00, 820000.00, 40, 3, "UNIDADE", "ativo", {"marca": "Samsung", "tela": "14.6"}),
 
-        # Eletrodomésticos Grandes (cat 10 e 11)
-        ("PROD-FRIG-SBS", "Frigorífico Side by Side 520L Inox", "Frigorífico duas portas com dispensador de água e gelo", 10, 15, 850000.00, 640000.00, 16, 3, "UNIDADE", "ativo", {"capacidade": "520 Litros", "tipo": "Frost Free", "inox": True}),
-        ("PROD-FRIG-DUP-420", "Frigorífico Duplex Frost Free 420L", "Alta eficiência energética e congelamento rápido", 10, 15, 520000.00, 390000.00, 25, 4, "UNIDADE", "ativo", {"capacidade": "420 Litros", "cor": "Cinza Escovado"}),
-        ("PROD-ARCA-HOR-300", "Arca Frigorífica Horizontal 300L", "Excelente retenção de frio mesmo em quedas de energia", 10, 4, 380000.00, 280000.00, 30, 5, "UNIDADE", "ativo", {"capacidade": "300 Litros", "chave": True}),
-        ("PROD-AC-INV-12", "Ar-Condicionado Split Inverter 12.000 BTU", "Super silencioso com tecnologia de íons e economia A+++", 11, 8, 320000.00, 230000.00, 45, 8, "UNIDADE", "ativo", {"btus": 12000, "gas": "R32", "inverter": True}),
-        ("PROD-AC-INV-18", "Ar-Condicionado Split Inverter 18.000 BTU", "Ideal para salas amplas e escritórios com refrigeração turbo", 11, 8, 420000.00, 310000.00, 38, 6, "UNIDADE", "ativo", {"btus": 18000, "gas": "R32", "inverter": True}),
-        ("PROD-AC-INV-24", "Ar-Condicionado Split Inverter 24.000 BTU", "Alta capacidade para ambientes comerciais de médio porte", 11, 8, 590000.00, 440000.00, 22, 4, "UNIDADE", "ativo", {"btus": 24000, "gas": "R32", "inverter": True}),
+        ("PROD-FRIG-SBS", "Frigorífico Side by Side 520L Inox", "Frigorífico duas portas com dispensador de água e gelo", 10, 15, 850000.00, 640000.00, 30, 3, "UNIDADE", "ativo", {"capacidade": "520 Litros", "frost_free": True}),
+        ("PROD-FRIG-DUP-420", "Frigorífico Duplex Frost Free 420L", "Alta eficiência energética e congelamento rápido", 10, 15, 520000.00, 390000.00, 45, 4, "UNIDADE", "ativo", {"capacidade": "420 Litros"}),
+        ("PROD-ARCA-HOR-300", "Arca Frigorífica Horizontal 300L", "Excelente retenção de frio mesmo em quedas de energia", 10, 4, 380000.00, 280000.00, 55, 5, "UNIDADE", "ativo", {"capacidade": "300 Litros"}),
+        ("PROD-AC-INV-12", "Ar-Condicionado Split Inverter 12.000 BTU", "Super silencioso com tecnologia de íons e economia A+++", 11, 8, 320000.00, 230000.00, 90, 8, "UNIDADE", "ativo", {"btus": 12000, "inverter": True}),
+        ("PROD-AC-INV-18", "Ar-Condicionado Split Inverter 18.000 BTU", "Ideal para salas amplas e escritórios com refrigeração turbo", 11, 8, 420000.00, 310000.00, 80, 6, "UNIDADE", "ativo", {"btus": 18000, "inverter": True}),
+        ("PROD-AC-INV-24", "Ar-Condicionado Split Inverter 24.000 BTU", "Alta capacidade para ambientes comerciais de médio porte", 11, 8, 590000.00, 440000.00, 45, 4, "UNIDADE", "ativo", {"btus": 24000, "inverter": True}),
         
-        # Cafeteiras & Fornos (cat 12 e 13)
-        ("PROD-CAF-NES-PRO", "Máquina de Café Nespresso Zenius Pro", "Ideal para recepções e salas de reunião empresariais", 12, 6, 240000.00, 170000.00, 28, 5, "UNIDADE", "ativo", {"pressao_bar": 19, "uso": "corporativo"}),
-        ("PROD-CAF-EXP-DEL", "Cafeteira Expresso DeLonghi Dedica", "Cafeteira manual de aço inoxidável para café moído e sachês", 12, 6, 195000.00, 135000.00, 32, 6, "UNIDADE", "ativo", {"pressao_bar": 15, "vaporizador": True}),
-        ("PROD-MIC-DIG-32L", "Micro-ondas Digital Inox 32 Litros", "Com receitas pré-programadas e função descongelamento inteligente", 13, 15, 115000.00, 78000.00, 40, 8, "UNIDADE", "ativo", {"potencia_w": 1000, "capacidade_l": 32}),
+        ("PROD-CAF-NES-PRO", "Máquina de Café Nespresso Zenius Pro", "Ideal para recepções e salas de reunião empresariais", 12, 6, 240000.00, 170000.00, 60, 5, "UNIDADE", "ativo", {"pressao": "19 bar"}),
+        ("PROD-CAF-EXP-DEL", "Cafeteira Expresso DeLonghi Dedica", "Cafeteira manual de aço inoxidável para café moído e sachês", 12, 6, 195000.00, 135000.00, 75, 6, "UNIDADE", "ativo", {"pressao": "15 bar"}),
+        ("PROD-MIC-DIG-32L", "Micro-ondas Digital Inox 32 Litros", "Com receitas pré-programadas e função descongelamento inteligente", 13, 15, 115000.00, 78000.00, 85, 8, "UNIDADE", "ativo", {"capacidade": "32L"}),
         
-        # Mobiliário (cat 14, 15, 16)
-        ("PROD-CAD-ERG-01", "Cadeira Ergonômica Presidente Mesh Pro", "Apoio lombar 3D dinâmico, braços ajustáveis e encosto reclinável", 14, 10, 260000.00, 175000.00, 50, 10, "UNIDADE", "ativo", {"material": "Mesh respirável", "peso_max": "150kg"}),
-        ("PROD-CAD-DIR-COURO", "Cadeira Diretor em Couro Legítimo", "Conforto máximo com acabamento clássico em couro acolchoado", 14, 3, 310000.00, 210000.00, 25, 4, "UNIDADE", "ativo", {"material": "Couro preto", "base": "Cromada"}),
-        ("PROD-CAD-GAM-RGB", "Cadeira Gamer Reclinável 180° RGB Master", "Com almofadas ortopédicas de memória e iluminação LED", 14, 16, 210000.00, 140000.00, 35, 5, "UNIDADE", "ativo", {"reclinavel": "180 graus", "led": "RGB"}),
-        ("PROD-MES-ELET-160", "Mesa Elevatória Elétrica Standing Desk 160cm", "Dois motores potentes e painel digital com 4 memórias", 15, 10, 450000.00, 310000.00, 15, 3, "UNIDADE", "ativo", {"tampo_cm": "160x80", "altura": "65-125cm", "motores": 2}),
-        ("PROD-GAV-MET-03", "Gaveteiro Volante de Metal 3 Gavetas", "Gaveteiro com chave e rodízios reforçados de silicone", 16, 5, 85000.00, 52000.00, 60, 10, "UNIDADE", "ativo", {"gavetas": 3, "chave": True, "material": "Aço"}),
+        ("PROD-CAD-ERG-01", "Cadeira Ergonômica Presidente Mesh Pro", "Apoio lombar 3D dinâmico, braços ajustáveis e encosto reclinável", 14, 10, 260000.00, 175000.00, 110, 10, "UNIDADE", "ativo", {"material": "Mesh", "peso_max": "150kg"}),
+        ("PROD-CAD-DIR-COURO", "Cadeira Diretor em Couro Legítimo", "Conforto máximo com acabamento clássico em couro acolchoado", 14, 3, 310000.00, 210000.00, 50, 4, "UNIDADE", "ativo", {"material": "Couro"}),
+        ("PROD-CAD-GAM-RGB", "Cadeira Gamer Reclinável 180° RGB Master", "Com almofadas ortopédicas de memória e iluminação LED", 14, 16, 210000.00, 140000.00, 65, 5, "UNIDADE", "ativo", {"reclinavel": "180°"}),
+        ("PROD-MES-ELET-160", "Mesa Elevatória Elétrica Standing Desk 160cm", "Dois motores potentes e painel digital com 4 memórias", 15, 10, 450000.00, 310000.00, 35, 3, "UNIDADE", "ativo", {"largura": "160cm"}),
+        ("PROD-GAV-MET-03", "Gaveteiro Volante de Metal 3 Gavetas", "Gaveteiro com chave e rodízios reforçados de silicone", 16, 5, 85000.00, 52000.00, 120, 10, "UNIDADE", "ativo", {"gavetas": 3}),
         
-        # Áudio & Vídeo (cat 17, 18, 19)
-        ("PROD-FONE-SONY-XM5", "Headphone Sony WH-1000XM5 ANC", "Referência mundial em cancelamento de ruído e áudio Hi-Res", 17, 7, 340000.00, 250000.00, 35, 5, "UNIDADE", "ativo", {"anc": "Ativo", "bateria_horas": 30, "codec": "LDAC"}),
-        ("PROD-FONE-AIRPODS-P2", "Apple AirPods Pro 2ª Geração USB-C", "Áudio espacial adaptativo e cancelamento de ruído ativo 2x mais forte", 17, 2, 260000.00, 195000.00, 48, 8, "UNIDADE", "ativo", {"porta": "USB-C", "estojo": "MagSafe", "garantia": 12}),
-        ("PROD-COL-JBL-BOOM", "Coluna Bluetooth JBL Boombox 3 Wi-Fi", "Graves profundos, bateria de 24 horas e resistência à água IP67", 18, 7, 395000.00, 285000.00, 20, 3, "UNIDADE", "ativo", {"potencia_w": 180, "bateria": "24h", "ip67": True}),
-        ("PROD-COL-JBL-FLIP6", "Coluna Portátil JBL Flip 6 Bluetooth", "Compacta, resistente a quedas e som nítido de duas vias", 18, 7, 115000.00, 75000.00, 85, 15, "UNIDADE", "ativo", {"potencia_w": 30, "bateria": "12h"}),
-        ("PROD-TV-LG-OLED65", "Smart TV 65 4K LG OLED evo C3", "Preto absoluto, Dolby Vision, 120Hz e som imersivo Dolby Atmos", 19, 12, 1450000.00, 1120000.00, 12, 2, "UNIDADE", "ativo", {"tamanho": "65 polegadas", "painel": "OLED evo", "taxa": "120Hz"}),
-        ("PROD-TV-SAM-QLED55", "Smart TV 55 4K Samsung QLED Q60D", "Cores vibrantes com tecnologia de Pontos Quânticos e design fino", 19, 1, 680000.00, 510000.00, 22, 4, "UNIDADE", "ativo", {"tamanho": "55 polegadas", "painel": "QLED 4K"}),
+        ("PROD-FONE-SONY-XM5", "Headphone Sony WH-1000XM5 ANC", "Referência mundial em cancelamento de ruído e áudio Hi-Res", 17, 7, 340000.00, 250000.00, 80, 5, "UNIDADE", "ativo", {"anc": True, "bateria": "30h"}),
+        ("PROD-FONE-AIRPODS-P2", "Apple AirPods Pro 2ª Geração USB-C", "Áudio espacial adaptativo e cancelamento de ruído ativo 2x mais forte", 17, 2, 260000.00, 195000.00, 120, 8, "UNIDADE", "ativo", {"porta": "USB-C"}),
+        ("PROD-COL-JBL-BOOM", "Coluna Bluetooth JBL Boombox 3 Wi-Fi", "Graves profundos, bateria de 24 horas e resistência à água IP67", 18, 7, 395000.00, 285000.00, 45, 3, "UNIDADE", "ativo", {"ip67": True, "potencia": "180W"}),
+        ("PROD-COL-JBL-FLIP6", "Coluna Portátil JBL Flip 6 Bluetooth", "Compacta, resistente a quedas e som nítido de duas vias", 18, 7, 115000.00, 75000.00, 190, 15, "UNIDADE", "ativo", {"potencia": "30W"}),
+        ("PROD-TV-LG-OLED65", "Smart TV 65 4K LG OLED evo C3", "Preto absoluto, Dolby Vision, 120Hz e som imersivo Dolby Atmos", 19, 12, 1450000.00, 1120000.00, 25, 2, "UNIDADE", "ativo", {"tela": "OLED 65"}),
+        ("PROD-TV-SAM-QLED55", "Smart TV 55 4K Samsung QLED Q60D", "Cores vibrantes com tecnologia de Pontos Quânticos e design fino", 19, 1, 680000.00, 510000.00, 48, 4, "UNIDADE", "ativo", {"tela": "QLED 55"}),
         
-        # Acessórios & Periféricos (cat 20, 21, 22, 23, 24)
-        ("PROD-CGR-GAN-65W", "Carregador GaN 65W Rápido 3 Portas", "Carrega MacBook, iPhone e iPad simultaneamente em alta velocidade", 20, 1, 32000.00, 18000.00, 150, 20, "UNIDADE", "ativo", {"potencia": "65W", "portas": "2x Type-C + 1x USB-A"}),
-        ("PROD-CGR-GAN-140W", "Carregador GaN Pro 140W Ultra Rápido", "Potência máxima para portáteis de alto desempenho e estações", 20, 1, 65000.00, 38000.00, 70, 10, "UNIDADE", "ativo", {"potencia": "140W", "pd31": True}),
-        ("PROD-CAB-TB4-2M", "Cabo Thunderbolt 4 Pro 2 Metros 40Gbps", "Transferência ultra-rápida de 40Gbps e saída de vídeo 8K", 21, 11, 42000.00, 22000.00, 90, 15, "UNIDADE", "ativo", {"velocidade": "40Gbps", "video": "8K", "comprimento": "2m"}),
-        ("PROD-CAB-USBC-NYL", "Cabo USB-C para USB-C 100W Trançado 2m", "Revestido em nylon balístico de ultra resistência", 21, 11, 12500.00, 6000.00, 300, 50, "UNIDADE", "ativo", {"potencia": "100W", "comprimento": "2m"}),
-        ("PROD-DOCK-12IN1", "Dock Station USB-C 12 em 1 Triplo Display", "Expansão para 2x HDMI 4K, DisplayPort, Ethernet 1Gbps, USB 3.0", 22, 1, 89000.00, 52000.00, 55, 8, "UNIDADE", "ativo", {"portas": 12, "telas_externas": 3, "rede": "1Gbps"}),
-        ("PROD-TEC-LOGI-MX", "Teclado Mecânico Logitech MX Mechanical", "Switches silenciosos, retroiluminação inteligente e digitação fluida", 23, 5, 145000.00, 98000.00, 40, 6, "UNIDADE", "ativo", {"conexao": "Bluetooth + Logi Bolt", "bateria": "Recarregável"}),
-        ("PROD-MOU-LOGI-MX3S", "Rato Sem Fio Logitech MX Master 3S", "Sensor 8000 DPI que funciona em vidro e rolagem eletromagnética MagSpeed", 24, 5, 95000.00, 62000.00, 60, 10, "UNIDADE", "ativo", {"sensor": "8000 DPI", "clique": "Silencioso", "ergonomico": True}),
-        ("PROD-MOU-VERT-ERG", "Rato Ergonômico Vertical Sem Fio 57°", "Previne lesões por esforço repetitivo (LER) e dores no pulso", 24, 10, 48000.00, 28000.00, 80, 12, "UNIDADE", "ativo", {"angulo": "57 graus", "dpi": "1000-2400"})
+        ("PROD-CGR-GAN-65W", "Carregador GaN 65W Rápido 3 Portas", "Carrega MacBook, iPhone e iPad simultaneamente em alta velocidade", 20, 1, 32000.00, 18000.00, 350, 20, "UNIDADE", "ativo", {"potencia": "65W"}),
+        ("PROD-CGR-GAN-140W", "Carregador GaN Pro 140W Ultra Rápido", "Potência máxima para portáteis de alto desempenho e estações", 20, 1, 65000.00, 38000.00, 160, 10, "UNIDADE", "ativo", {"potencia": "140W"}),
+        ("PROD-CAB-TB4-2M", "Cabo Thunderbolt 4 Pro 2 Metros 40Gbps", "Transferência ultra-rápida de 40Gbps e saída de vídeo 8K", 21, 11, 42000.00, 22000.00, 210, 15, "UNIDADE", "ativo", {"taxa": "40Gbps"}),
+        ("PROD-CAB-USBC-NYL", "Cabo USB-C para USB-C 100W Trançado 2m", "Revestido em nylon balístico de ultra resistência", 21, 11, 12500.00, 6000.00, 650, 50, "UNIDADE", "ativo", {"potencia": "100W"}),
+        ("PROD-DOCK-12IN1", "Dock Station USB-C 12 em 1 Triplo Display", "Expansão para 2x HDMI 4K, DisplayPort, Ethernet 1Gbps, USB 3.0", 22, 1, 89000.00, 52000.00, 130, 8, "UNIDADE", "ativo", {"portas": 12}),
+        ("PROD-TEC-LOGI-MX", "Teclado Mecânico Logitech MX Mechanical", "Switches silenciosos, retroiluminação inteligente e digitação fluida", 23, 5, 145000.00, 98000.00, 95, 6, "UNIDADE", "ativo", {"switches": "Tactile Quiet"}),
+        ("PROD-MOU-LOGI-MX3S", "Rato Sem Fio Logitech MX Master 3S", "Sensor 8000 DPI que funciona em vidro e rolagem eletromagnética MagSpeed", 24, 5, 95000.00, 62000.00, 140, 10, "UNIDADE", "ativo", {"dpi": 8000}),
+        ("PROD-MOU-VERT-ERG", "Rato Ergonômico Vertical Sem Fio 57°", "Previne lesões por esforço repetitivo (LER) e dores no pulso", 24, 10, 48000.00, 28000.00, 180, 12, "UNIDADE", "ativo", {"angulo": "57°"})
     ]
 
     produtos_insert = []
@@ -264,20 +249,22 @@ def generate_large_dataset():
     """, produtos_insert)
 
     # ==========================================
-    # 6. CLIENTES (500 clientes realistas)
+    # 6. CLIENTES (2.500 CLIENTES)
     # ==========================================
-    print("👥 Inserindo 500 Clientes...")
+    print("👥 Inserindo 2.500 Clientes...")
     nomes = ["Manuel", "António", "João", "José", "Francisco", "Mateus", "Sebastião", "Domingos", "Carlos", "Paulo", 
              "Maria", "Ana", "Teresa", "Helena", "Beatriz", "Esperança", "Graça", "Fátima", "Isabel", "Cláudia", 
-             "Nádia", "Rosa", "Catarina", "Elizeth", "Yara", "Kátia", "Gisela", "Soraya", "Patrícia", "Afonso"]
+             "Nádia", "Rosa", "Catarina", "Elizeth", "Yara", "Kátia", "Gisela", "Soraya", "Patrícia", "Afonso",
+             "Rui", "Jorge", "Pedro", "Luís", "Fernando", "Nelson", "Bernardo", "Simão", "Edson", "Valdemar"]
     sobrenomes = ["dos Santos", "Silva", "Fernandes", "Neto", "Gaspar", "Pedro", "Carvalho", "Banza", "Diniz", "Gelson",
-                  "Costa", "Baptista", "Quaresma", "Kapango", "Muachissengue", "Caxito", "Sambongo", "Vunge", "Malanje", "Chimuco"]
-    cidades = ["Luanda", "Luanda", "Luanda", "Benguela", "Lobito", "Huambo", "Lubango", "Cabinda", "Soyo", "Malanje", "Namibe"]
+                  "Costa", "Baptista", "Quaresma", "Kapango", "Muachissengue", "Caxito", "Sambongo", "Vunge", "Malanje", "Chimuco",
+                  "Lourenço", "Afonso", "Gouveia", "Tchissola", "Luvualu", "Cangombe", "Albuquerque", "Morais"]
+    cidades = ["Luanda", "Luanda", "Luanda", "Luanda", "Benguela", "Lobito", "Huambo", "Lubango", "Cabinda", "Soyo", "Malanje", "Namibe", "Uíge"]
     segmentos = ["bronze", "bronze", "bronze", "prata", "prata", "ouro", "ouro", "vip"]
-    provedores = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "sapo.ao", "ao.telecom.net"]
+    provedores = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "sapo.ao", "ao.telecom.net", "empresa.ao"]
 
     clientes_dados = []
-    # Clientes Corporativos Especiais
+    # Clientes Corporativos
     empresas_corp = [
         ("Sonangol E.P. - Direcção de TI", "ti.compras@sonangol.co.ao", "+244 222 690 000", "5401002341", "corporativo", "vip", "Luanda", 15000000.00),
         ("Banco Angolano de Investimentos (BAI)", "aquisicoes@bancobai.ao", "+244 222 693 000", "5401092831", "corporativo", "vip", "Luanda", 12000000.00),
@@ -286,13 +273,15 @@ def generate_large_dataset():
         ("Universidade Agostinho Neto", "reitoria.compras@uan.ao", "+244 222 310 000", "5400192831", "corporativo", "ouro", "Luanda", 5000000.00),
         ("Clínica Girassol Luanda", "patrimonio@clinicagirassol.co.ao", "+244 222 670 000", "5402918239", "corporativo", "ouro", "Luanda", 6500000.00),
         ("Porto de Luanda E.P.", "aprov@portoluanda.co.ao", "+244 222 311 223", "5403019284", "corporativo", "vip", "Luanda", 10000000.00),
-        ("BFA - Banco de Fomento Angola", "logistica@bfa.ao", "+244 222 699 000", "5401129384", "corporativo", "vip", "Luanda", 14000000.00)
+        ("BFA - Banco de Fomento Angola", "logistica@bfa.ao", "+244 222 699 000", "5401129384", "corporativo", "vip", "Luanda", 14000000.00),
+        ("TAAG Linhas Aéreas de Angola", "suprimentos@taag.com", "+244 222 695 000", "5401920391", "corporativo", "vip", "Luanda", 18000000.00),
+        ("Endiama E.P. Mineração", "comercial@endiama.co.ao", "+244 222 692 000", "5402019283", "corporativo", "vip", "Luanda", 16000000.00)
     ]
     for emp in empresas_corp:
         clientes_dados.append((emp[0], emp[1], emp[2], emp[3], emp[4], emp[5], emp[6], "Angola", emp[7], 0.00))
 
-    # 492 Clientes Individuais
-    for idx in range(1, 493):
+    # 2.490 Clientes Individuais
+    for idx in range(1, 2491):
         n = random.choice(nomes)
         s1 = random.choice(sobrenomes)
         s2 = random.choice(sobrenomes)
@@ -308,7 +297,7 @@ def generate_large_dataset():
     execute_values(cur, """
         INSERT INTO clientes (nome_completo, email, telefone, nif, tipo_cliente, segmento, cidade, pais, limite_credito, total_compras)
         VALUES %s;
-    """, clientes_dados)
+    """, clientes_dados, page_size=1000)
 
     # ==========================================
     # 7. CUPONS (12 cupons)
@@ -316,18 +305,18 @@ def generate_large_dataset():
     print("🎟️ Inserindo 12 Cupons...")
     now = datetime.now(timezone.utc)
     cupons = [
-        ("MUSTA10", "10% de Desconto em toda a loja", "percentual", 10.00, 50000.00, now - timedelta(days=180), now + timedelta(days=180), 1000, 312, True),
-        ("BEMVINDO2026", "25.000 Kz de desconto fixo em compras acima de 150.000 Kz", "valor_fixo", 25000.00, 150000.00, now - timedelta(days=120), now + timedelta(days=120), 2000, 840, True),
-        ("VIPTECH15", "15% de Desconto em Tecnologia & Laptops", "percentual", 15.00, 300000.00, now - timedelta(days=60), now + timedelta(days=120), 500, 189, True),
-        ("ANGOLA50K", "50.000 Kz de desconto em compras superiores a 500.000 Kz", "valor_fixo", 50000.00, 500000.00, now - timedelta(days=90), now + timedelta(days=90), 300, 142, True),
-        ("CLIMA2026", "8% de desconto em equipamentos de climatização", "percentual", 8.00, 100000.00, now - timedelta(days=45), now + timedelta(days=90), 400, 88, True),
-        ("ESCRITORIO5", "5% em todo o mobiliário e cadeiras ergonômicas", "percentual", 5.00, 80000.00, now - timedelta(days=30), now + timedelta(days=180), 800, 156, True),
-        ("FRETEGRATIS", "Desconto fixo de 5.000 Kz no valor do frete", "valor_fixo", 5000.00, 30000.00, now - timedelta(days=60), now + timedelta(days=60), 1500, 610, True),
-        ("BLACKFRIDAY", "20% Super Promoção Black Friday", "percentual", 20.00, 100000.00, now - timedelta(days=360), now - timedelta(days=330), 2000, 2000, False),
-        ("NATAL2025", "12% de Boas Festas", "percentual", 12.00, 60000.00, now - timedelta(days=330), now - timedelta(days=300), 1500, 1500, False),
-        ("ANIVERSARIO", "15.000 Kz de bônus de aniversário MustaInfo", "valor_fixo", 15000.00, 100000.00, now - timedelta(days=200), now + timedelta(days=200), 600, 240, True),
-        ("VERAO2026", "10% em climatização e bebidas", "percentual", 10.00, 75000.00, now - timedelta(days=40), now + timedelta(days=100), 500, 195, True),
-        ("CORPORATIVO", "18% Exclusivo para Clientes Corporativos", "percentual", 18.00, 1000000.00, now - timedelta(days=150), now + timedelta(days=200), 200, 78, True)
+        ("MUSTA10", "10% de Desconto em toda a loja", "percentual", 10.00, 50000.00, now - timedelta(days=180), now + timedelta(days=180), 5000, 1312, True),
+        ("BEMVINDO2026", "25.000 Kz de desconto fixo em compras acima de 150.000 Kz", "valor_fixo", 25000.00, 150000.00, now - timedelta(days=120), now + timedelta(days=120), 8000, 3840, True),
+        ("VIPTECH15", "15% de Desconto em Tecnologia & Laptops", "percentual", 15.00, 300000.00, now - timedelta(days=60), now + timedelta(days=120), 2000, 989, True),
+        ("ANGOLA50K", "50.000 Kz de desconto em compras superiores a 500.000 Kz", "valor_fixo", 50000.00, 500000.00, now - timedelta(days=90), now + timedelta(days=90), 1000, 442, True),
+        ("CLIMA2026", "8% de desconto em equipamentos de climatização", "percentual", 8.00, 100000.00, now - timedelta(days=45), now + timedelta(days=90), 1500, 388, True),
+        ("ESCRITORIO5", "5% em todo o mobiliário e cadeiras ergonômicas", "percentual", 5.00, 80000.00, now - timedelta(days=30), now + timedelta(days=180), 3000, 756, True),
+        ("FRETEGRATIS", "Desconto fixo de 5.000 Kz no valor do frete", "valor_fixo", 5000.00, 30000.00, now - timedelta(days=60), now + timedelta(days=60), 6000, 2610, True),
+        ("BLACKFRIDAY", "20% Super Promoção Black Friday", "percentual", 20.00, 100000.00, now - timedelta(days=360), now - timedelta(days=330), 5000, 5000, False),
+        ("NATAL2025", "12% de Boas Festas", "percentual", 12.00, 60000.00, now - timedelta(days=330), now - timedelta(days=300), 5000, 5000, False),
+        ("ANIVERSARIO", "15.000 Kz de bônus de aniversário MustaInfo", "valor_fixo", 15000.00, 100000.00, now - timedelta(days=200), now + timedelta(days=200), 2000, 840, True),
+        ("VERAO2026", "10% em climatização e bebidas", "percentual", 10.00, 75000.00, now - timedelta(days=40), now + timedelta(days=100), 2000, 695, True),
+        ("CORPORATIVO", "18% Exclusivo para Clientes Corporativos", "percentual", 18.00, 1000000.00, now - timedelta(days=150), now + timedelta(days=200), 1000, 378, True)
     ]
     execute_values(cur, """
         INSERT INTO cupons (codigo, descricao, tipo_desconto, valor_desconto, valor_minimo_pedido, valido_de, valido_ate, limite_usos, usos_atuais, ativo)
@@ -335,9 +324,11 @@ def generate_large_dataset():
     """, cupons)
 
     # ==========================================
-    # 8. VENDAS, ITENS E PAGAMENTOS (1.200 VENDAS)
+    # 8. VENDAS, ITENS E PAGAMENTOS (10.000 VENDAS EM LOTES)
     # ==========================================
-    print("🛒 Gerando 1.200 Vendas com ~3.600 Itens e 1.200 Pagamentos...")
+    TOTAL_VENDAS = 10000
+    print(f"🛒 Gerando e inserindo {TOTAL_VENDAS:,} Vendas com ~25.000 Itens e ~9.600 Pagamentos...")
+    
     cur.execute("SELECT id, preco_unitario, estoque_atual, nome FROM produtos;")
     produtos_db = cur.fetchall()
 
@@ -350,121 +341,155 @@ def generate_large_dataset():
     cur.execute("SELECT id FROM lojas;")
     lojas_ids = [r[0] for r in cur.fetchall()]
 
-    cur.execute("SELECT id, codigo, tipo_desconto, valor_desconto FROM cupons WHERE ativo = TRUE;")
+    cur.execute("SELECT id, codigo, tipo_desconto, valor_desconto, valor_minimo_pedido FROM cupons WHERE ativo = TRUE;")
     cupons_db = cur.fetchall()
 
     formas_pag = ['multicaixa_express', 'multicaixa_express', 'tpa_fisico', 'tpa_fisico', 'transferencia_bancaria', 'cartao_credito', 'dinheiro']
     status_weights = [
-        ('entregue', 65),
-        ('pago', 15),
+        ('entregue', 68),
+        ('pago', 14),
         ('enviado', 8),
         ('em_separacao', 5),
-        ('pendente', 4),
-        ('cancelado', 3)
+        ('pendente', 3),
+        ('cancelado', 2)
     ]
     status_choices = []
     for s, w in status_weights:
         status_choices.extend([s] * w)
 
-    vendas_buffer = []
-    total_vendas_count = 1200
-    
-    # Distribui ao longo de 365 dias passados até hoje
-    for i in range(1, total_vendas_count + 1):
-        cod_venda = f"VND-2025-26-{i:05d}"
-        c_id = random.choice(clientes_ids)
-        v_id = random.choice(vendedores_ids)
-        l_id = random.choice(lojas_ids)
-        
-        # 30% de chance de usar cupom
-        usar_cupom = random.random() < 0.30
-        cupom = random.choice(cupons_db) if usar_cupom else None
-        cup_id = cupom[0] if cupom else None
+    BATCH_SIZE = 1000
+    total_itens_inseridos = 0
+    total_pagamentos_inseridos = 0
 
-        # Data ponderada no último ano
-        dias_passados = random.randint(0, 365)
-        hora = random.randint(8, 20)
-        minuto = random.randint(0, 59)
-        dt_venda = now - timedelta(days=dias_passados, hours=now.hour - hora, minutes=now.minute - minuto)
-        
-        stat = random.choice(status_choices)
-        forma = random.choice(formas_pag)
+    for batch_start in range(1, TOTAL_VENDAS + 1, BATCH_SIZE):
+        batch_end = min(batch_start + BATCH_SIZE - 1, TOTAL_VENDAS)
+        batch_vendas_data = []
+        batch_itens_map = [] # lista de tuples (index_in_batch, [itens])
 
-        # Seleciona de 1 a 4 produtos diferentes para a cesta
-        itens_n = random.randint(1, 4)
-        cesta = random.sample(produtos_db, k=itens_n)
-        
-        subtotal = 0.0
-        itens_dados = []
-        for prod in cesta:
-            p_id, p_preco, p_est, p_nome = prod
-            qtd = random.randint(1, 3)
-            p_pr_flt = float(p_preco)
-            subtot_it = p_pr_flt * qtd
-            subtotal += subtot_it
-            itens_dados.append((p_id, qtd, p_pr_flt, 0.0, subtot_it))
+        for i in range(batch_start, batch_end + 1):
+            cod_venda = f"VND-2025-26-{i:06d}"
+            c_id = random.choice(clientes_ids)
+            v_id = random.choice(vendedores_ids)
+            l_id = random.choice(lojas_ids)
+            
+            usar_cupom = random.random() < 0.32
+            cupom = random.choice(cupons_db) if usar_cupom else None
+            cup_id = cupom[0] if cupom else None
 
-        desconto = 0.0
-        if cupom:
-            if cupom[2] == 'percentual':
-                desconto = round(subtotal * (float(cupom[3]) / 100.0), 2)
+            # Data ponderada ao longo de 400 dias
+            dias_passados = random.randint(0, 400)
+            hora = random.randint(8, 20)
+            minuto = random.randint(0, 59)
+            dt_venda = now - timedelta(days=dias_passados, hours=now.hour - hora, minutes=now.minute - minuto)
+            
+            stat = random.choice(status_choices)
+            forma = random.choice(formas_pag)
+
+            # Cesta com 1 a 4 produtos
+            itens_n = random.randint(1, 4)
+            cesta = random.sample(produtos_db, k=itens_n)
+            
+            subtotal = 0.0
+            itens_dados = []
+            for prod in cesta:
+                p_id, p_preco, p_est, p_nome = prod
+                qtd = random.randint(1, 3)
+                p_pr_flt = float(p_preco)
+                subtot_it = p_pr_flt * qtd
+                subtotal += subtot_it
+                itens_dados.append((p_id, qtd, p_pr_flt, 0.0, subtot_it))
+
+            desconto = 0.0
+            if cupom and subtotal >= float(cupom[4]):
+                if cupom[2] == 'percentual':
+                    desconto = round(subtotal * (float(cupom[3]) / 100.0), 2)
+                else:
+                    desconto = min(float(cupom[3]), round(subtotal * 0.4, 2))
             else:
-                desconto = min(float(cupom[3]), subtotal)
+                cup_id = None
 
-        frete = 5000.00 if l_id == 9 else 0.00 # Loja 9 é online
-        total_venda = round(subtotal - desconto + frete, 2)
+            frete = 5000.00 if l_id == 9 else 0.00
+            total_venda = max(100.00, round(subtotal - desconto + frete, 2))
 
-        entrega_json = Json({
-            "metodo": "Entrega Expresso Luanda" if l_id == 9 else "Retirada em Loja",
-            "tempo_estimado": "24h - 48h",
-            "transportadora": "MustaLog Express",
-            "rastreio": f"TRK-{i:06d}-AO",
-            "recebido_por": "Titular ou Representante Autorizado"
-        })
+            entrega_json = Json({
+                "metodo": "Entrega Expresso Luanda" if l_id == 9 else "Retirada em Loja",
+                "tempo_estimado": "24h - 48h",
+                "transportadora": "MustaLog Express",
+                "rastreio": f"TRK-{i:07d}-AO"
+            })
 
-        cur.execute("""
+            batch_vendas_data.append((
+                cod_venda, c_id, v_id, l_id, cup_id, dt_venda, stat,
+                subtotal, desconto, frete, total_venda, forma,
+                f"Venda {cod_venda} faturada via PDV/App. Atendente {v_id}.",
+                entrega_json
+            ))
+            batch_itens_map.append((itens_dados, stat, forma, total_venda, dt_venda, cod_venda))
+
+        # Inserir lote de vendas com RETURNING id
+        inserted_ids = execute_values(cur, """
             INSERT INTO vendas (codigo_venda, cliente_id, vendedor_id, loja_id, cupom_id, data_venda, status_venda, valor_subtotal, valor_desconto, valor_frete, valor_total, forma_pagamento_predileta, observacoes, dados_entrega)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;
-        """, (
-            cod_venda, c_id, v_id, l_id, cup_id, dt_venda, stat,
-            subtotal, desconto, frete, total_venda, forma,
-            f"Venda {cod_venda} faturada via PDV/App. Atendente {v_id}.",
-            entrega_json
-        ))
-        venda_id = cur.fetchone()[0]
+            VALUES %s RETURNING id;
+        """, batch_vendas_data, fetch=True)
 
-        # Inserir itens da venda em lote
-        itens_batch = [(venda_id, it[0], it[1], it[2], it[3], it[4]) for it in itens_dados]
+        # Montar lotes de itens e pagamentos correspondentes
+        batch_itens_insert = []
+        batch_pagamentos_insert = []
+        batch_estoque_insert = []
+
+        for idx, (venda_id_tuple) in enumerate(inserted_ids):
+            venda_id = venda_id_tuple[0]
+            itens_dados, stat, forma, total_venda, dt_venda, cod_venda = batch_itens_map[idx]
+
+            for it in itens_dados:
+                batch_itens_insert.append((venda_id, it[0], it[1], it[2], it[3], it[4]))
+
+            if stat != 'cancelado' and total_venda > 0:
+                pag_stat = 'concluido' if stat in ('entregue', 'pago', 'enviado', 'em_separacao') else 'pendente'
+                batch_pagamentos_insert.append((
+                    venda_id, forma, total_venda, pag_stat,
+                    f"REF-{random.randint(100000000, 999999999)}",
+                    dt_venda + timedelta(minutes=random.randint(1, 15)),
+                    Json({"gateway": "EMIS Multicaixa", "autorizacao": f"AUTH{venda_id:07d}", "sucesso": True})
+                ))
+
+            # Movimentação de estoque para parte das vendas entregues
+            if stat == 'entregue' and venda_id <= 2500:
+                for it in itens_dados:
+                    batch_estoque_insert.append((
+                        it[0], 'saida_venda', it[1], 150, 150 - it[1], venda_id,
+                        f"Faturamento Venda {cod_venda}", dt_venda
+                    ))
+
+        # Inserção em massa dos itens deste lote
         execute_values(cur, """
             INSERT INTO itens_venda (venda_id, produto_id, quantidade, preco_unitario, desconto_unitario, valor_total_item)
             VALUES %s;
-        """, itens_batch)
+        """, batch_itens_insert, page_size=2000)
+        total_itens_inseridos += len(batch_itens_insert)
 
-        # Pagamentos
-        if stat != 'cancelado':
-            pag_stat = 'concluido' if stat in ('entregue', 'pago', 'enviado', 'em_separacao') else 'pendente'
-            cur.execute("""
+        # Inserção em massa dos pagamentos deste lote
+        if batch_pagamentos_insert:
+            execute_values(cur, """
                 INSERT INTO pagamentos (venda_id, metodo, valor, status, referencia_bancaria, data_pagamento, resposta_gateway)
-                VALUES (%s, %s, %s, %s, %s, %s, %s);
-            """, (
-                venda_id, forma, total_venda, pag_stat,
-                f"REF-{random.randint(100000000, 999999999)}",
-                dt_venda + timedelta(minutes=random.randint(1, 15)),
-                Json({"gateway": "EMIS Multicaixa", "autorizacao": f"AUTH{i:06d}", "codigo": "00", "sucesso": True})
-            ))
+                VALUES %s;
+            """, batch_pagamentos_insert, page_size=2000)
+            total_pagamentos_inseridos += len(batch_pagamentos_insert)
 
-        # Movimentação de estoque (para primeiras 300 vendas entregues)
-        if stat == 'entregue' and i <= 300:
-            for it in itens_dados:
-                cur.execute("""
-                    INSERT INTO movimentacoes_estoque (produto_id, tipo, quantidade, saldo_anterior, saldo_novo, referencia_venda_id, motivo, data_movimento)
-                    VALUES (%s, 'saida_venda', %s, %s, %s, %s, %s, %s);
-                """, (it[0], it[1], 100, 100 - it[1], venda_id, f"Faturamento Venda {cod_venda}", dt_venda))
+        # Inserção de movimentações de estoque
+        if batch_estoque_insert:
+            execute_values(cur, """
+                INSERT INTO movimentacoes_estoque (produto_id, tipo, quantidade, saldo_anterior, saldo_novo, referencia_venda_id, motivo, data_movimento)
+                VALUES %s;
+            """, batch_estoque_insert, page_size=2000)
+
+        conn.commit()
+        print(f"  ✓ Processadas vendas {batch_start:,} até {batch_end:,} (acumulado: {total_itens_inseridos:,} itens)...")
 
     # ==========================================
-    # 9. AVALIAÇÕES DE PRODUTOS (150 avaliações)
+    # 9. AVALIAÇÕES DE PRODUTOS (800 avaliações)
     # ==========================================
-    print("⭐ Inserindo 150 Avaliações de Produtos com notas e comentários...")
+    print("⭐ Inserindo 800 Avaliações de Produtos...")
     cur.execute("SELECT id FROM produtos;")
     all_prod_ids = [r[0] for r in cur.fetchall()]
 
@@ -476,26 +501,28 @@ def generate_large_dataset():
         (4, "Confortável e resistente", "Estou a usar há um mês no escritório e sinto enorme diferença na postura."),
         (5, "Qualidade profissional", "Ideal para ambiente corporativo e trabalho intenso. Robusto e confiável."),
         (3, "Bom, cumpre o básico", "Dentro do esperado para o preço. Sem grandes destaques mas funciona bem."),
-        (4, "Ótimo custo-benefício", "Excelente relação entre preço e entrega. Com certeza voltarei a comprar.")
+        (4, "Ótimo custo-benefício", "Excelente relação entre preço e entrega. Com certeza voltarei a comprar."),
+        (5, "Excelente suporte e produto", "Atendimento impecável na loja e o equipamento é de altíssima performance."),
+        (4, "Design moderno e prático", "Muito bonito na mesa de trabalho e super funcional.")
     ]
 
     avaliacoes_list = []
     pares_usados = set()
-    for _ in range(150):
+    for _ in range(800):
         p_id = random.choice(all_prod_ids)
-        c_id = random.choice(clientes_ids[:200])
+        c_id = random.choice(clientes_ids)
         if (p_id, c_id) in pares_usados:
             continue
         pares_usados.add((p_id, c_id))
         
         txt = random.choice(avaliacoes_textos)
-        dt_av = now - timedelta(days=random.randint(5, 180))
+        dt_av = now - timedelta(days=random.randint(2, 300))
         avaliacoes_list.append((p_id, c_id, txt[0], txt[1], txt[2], True, dt_av))
 
     execute_values(cur, """
         INSERT INTO avaliacoes_produtos (produto_id, cliente_id, nota, titulo, comentario, recomendaria, data_avaliacao)
         VALUES %s ON CONFLICT DO NOTHING;
-    """, avaliacoes_list)
+    """, avaliacoes_list, page_size=1000)
 
     # ==========================================
     # 10. ATUALIZAÇÃO DOS TOTAIS DE CLIENTES
@@ -521,7 +548,6 @@ def refresh_mustainfo_statistics():
     print("📊 Atualizando estatísticas e contadores no MustaInfo...")
     db = SessionLocal()
     try:
-        # ID 3 é a conexão de vendas_db
         sync_connection_statistics(3, db)
         print("✅ Estatísticas de conexões e tabelas sincronizadas!")
     except Exception as e:
@@ -539,7 +565,7 @@ def export_sql_dump():
         f.write("""-- ==============================================================================
 -- MUSTAINFO - BANCO DE DADOS DE DEMONSTRAÇÃO DE VENDAS (vendas_db)
 -- PostgreSQL 14+ / 15+ / 16+
--- Contém 12 tabelas relacionais e 6.673 registros.
+-- Base de dados empresarial com mais de 40.000 registros relacionais.
 -- ==============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -755,7 +781,7 @@ CREATE INDEX idx_pagamentos_venda ON pagamentos(venda_id);
             colnames = [desc[0] for desc in cur.description]
             if not rows:
                 continue
-            f.write(f"\n-- Tabela: {tbl} ({len(rows)} registros)\n")
+            f.write(f"\n-- Tabela: {tbl} ({len(rows):,} registros)\n")
             cols_str = ", ".join(colnames)
             for r in rows:
                 vals = []
@@ -783,4 +809,4 @@ if __name__ == "__main__":
     generate_large_dataset()
     refresh_mustainfo_statistics()
     export_sql_dump()
-    print("\n🎉 CONCLUÍDO: Base de dados carregada com grande volume de dados para demonstração! 🎉")
+    print("\n🎉 CONCLUÍDO: Base de dados carregada com volume massivo para demonstração! 🎉")

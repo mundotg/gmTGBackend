@@ -594,6 +594,52 @@ def format_order_by(
     return "ORDER BY " + ", ".join(order_parts)
 
 
+def _build_order_by_clause(
+    db_type: str,
+    order_by: Optional[List[Union[dict, "OrderByOption"]]] = None,
+    allowed_tables: Optional[set] = None,
+    distinct_on_cols: Optional[List[str]] = None,
+) -> str:
+    """
+    Constrói a cláusula ORDER BY compatível com PostgreSQL DISTINCT ON.
+    Quando há DISTINCT ON (c1, c2, ...), o PostgreSQL exige que o ORDER BY
+    comece exatamente com as mesmas expressões do DISTINCT ON.
+    """
+    raw_order = format_order_by(db_type, order_by, allowed_tables) if order_by else ""
+    if raw_order == "ORDER BY (SELECT NULL)":
+        raw_order = ""
+
+    if not distinct_on_cols:
+        return raw_order
+
+    existing_parts: List[str] = []
+    if raw_order.startswith("ORDER BY "):
+        existing_parts = [
+            p.strip() for p in raw_order[len("ORDER BY "):].split(",") if p.strip()
+        ]
+
+    distinct_clean = [c.strip() for c in distinct_on_cols if c.strip()]
+    distinct_set = set(distinct_clean)
+    existing_by_col: dict[str, str] = {}
+    remaining_parts: List[str] = []
+
+    for part in existing_parts:
+        tokens = part.rsplit(" ", 1)
+        col_expr = (
+            tokens[0].strip()
+            if len(tokens) == 2 and tokens[1].upper() in ("ASC", "DESC")
+            else part.strip()
+        )
+        if col_expr in distinct_set and col_expr not in existing_by_col:
+            existing_by_col[col_expr] = part
+        else:
+            remaining_parts.append(part)
+
+    prefix_parts = [existing_by_col.get(col, col) for col in distinct_clean]
+    final_parts = prefix_parts + remaining_parts
+    return f"ORDER BY {', '.join(final_parts)}" if final_parts else ""
+
+
 def get_query_string(
     base_table: str,
     joins: Optional[List[JoinOption]] = None,
@@ -633,11 +679,14 @@ def get_query_string(
     # SELECT
     select_view = build_select_view(db_type, select, aliases)
 
+    pg_distinct_on_cols: Optional[List[str]] = None
     if distinct and distinct.useDistinct:
-        distinct_cols = ", ".join(
+        distinct_cols_list = [
             quote_identifier(db_type, col) for col in distinct.distinct_columns
-        )
+        ]
+        distinct_cols = ", ".join(distinct_cols_list)
         if db_type in {"postgres", "postgresql"} and distinct_cols:
+            pg_distinct_on_cols = distinct_cols_list
             query = f"SELECT DISTINCT ON ({distinct_cols}) {select_view} FROM {quoted_base_table}{join_sql}"
         else:
             query = f"SELECT DISTINCT {select_view} FROM {quoted_base_table}{join_sql}"
@@ -651,7 +700,11 @@ def get_query_string(
     # ORDER BY
     if order_by and len(order_by) > 0:
         allowed = _allowed_table_names(base_table, table_list, joins)
-        query += f" {format_order_by(db_type, order_by, allowed)}"  # type: ignore
+        order_clause = _build_order_by_clause(
+            db_type, order_by, allowed, distinct_on_cols=pg_distinct_on_cols
+        )
+        if order_clause:
+            query += f" {order_clause}"
 
     # Paginação
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
@@ -714,6 +767,7 @@ def get_query_string_advance(
     # ==========================================
     # BLOCO MODIFICADO: Apenas a lógica do Distinct
     # ==========================================
+    pg_distinct_on_cols: Optional[List[str]] = None
     if distinct and distinct.useDistinct:
         distinct_cols_list = [
             quote_identifier(db_type, col) for col in distinct.distinct_columns
@@ -721,6 +775,7 @@ def get_query_string_advance(
         distinct_cols = ", ".join(distinct_cols_list)
 
         if db_type in {"postgres", "postgresql"} and distinct_cols:
+            pg_distinct_on_cols = distinct_cols_list
             query = (
                 f"SELECT DISTINCT ON ({distinct_cols}) "
                 f"{select_view} "
@@ -766,7 +821,11 @@ def get_query_string_advance(
 
     if order_by and len(order_by) > 0:
         allowed = _allowed_table_names(base_table, safe_table_list, joins)
-        query += f" {format_order_by(db_type, order_by, allowed)}"  # type: ignore
+        order_clause = _build_order_by_clause(
+            db_type, order_by, allowed, distinct_on_cols=pg_distinct_on_cols
+        )
+        if order_clause:
+            query += f" {order_clause}"
 
     if db_type in {"mysql", "sqlite", "postgres", "postgresql"}:
         if max_rows is not None and max_rows > 0:

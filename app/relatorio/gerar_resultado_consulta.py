@@ -143,6 +143,10 @@ class QueryReportBuilder:
 
         MAX_COLS = 10
         columns = self.query_result.columns
+        if self.query_result.preview and isinstance(self.query_result.preview[0], dict):
+            sample_record = self.query_result.preview[0]
+            if not columns or not all(col in sample_record for col in columns):
+                columns = list(sample_record.keys())
         truncated = len(columns) > MAX_COLS
         
         # 🚀 ALTERAÇÃO AQUI: Pega sempre o último elemento após dividir por '.'

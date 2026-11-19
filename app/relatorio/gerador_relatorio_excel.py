@@ -167,6 +167,10 @@ class ExcelReportGenerator:
 
         MAX_COLS = 15 # Aumentei um pouco para Excel, já que cabe mais que num PDF
         columns = query_result.columns
+        if query_result.preview and isinstance(query_result.preview[0], dict):
+            sample_record = query_result.preview[0]
+            if not columns or not all(col in sample_record for col in columns):
+                columns = list(sample_record.keys())
         truncated = len(columns) > MAX_COLS
         
         # Limpa nomes ("main.bank_full.age" -> "age")
